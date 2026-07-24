@@ -64,8 +64,8 @@ RealmID                      = 1
 DataDir                      = "@CONF_INSTALL_DIR@"
 LogsDir                      = ""
 LoginDatabaseInfo            = "127.0.0.1;3306;root;mangos;realmd"
-WorldDatabaseInfo            = "127.0.0.1;3306;root;mangos;mangos3"
-CharacterDatabaseInfo        = "127.0.0.1;3306;root;mangos;character3"
+WorldDatabaseInfo            = "127.0.0.1;3306;root;mangos;mangos4"
+CharacterDatabaseInfo        = "127.0.0.1;3306;root;mangos;character4"
 LoginDatabaseConnections     = 1
 WorldDatabaseConnections     = 1
 CharacterDatabaseConnections = 1
@@ -886,7 +886,7 @@ ShowProgressBars                          = 1
 WaitAtStartupError                        = 10
 Raid.MinLevel                             = 10
 PlayerCommands                            = 0
-Motd                                      = "Welcome to Mangos Three"
+Motd                                      = "Welcome to Mangos Four"
 AutoBroadcast                             = 0
 
 ################################################################################
