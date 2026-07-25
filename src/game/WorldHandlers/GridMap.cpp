@@ -1671,9 +1671,7 @@ float TerrainInfo::GetWaterLevel(float x, float y, float z, float* pGround /*= N
 
 //////////////////////////////////////////////////////////////////////////
 
-#define CLASS_LOCK MaNGOS::ClassLevelLockable<TerrainManager, ACE_Thread_Mutex>
-INSTANTIATE_SINGLETON_2(TerrainManager, CLASS_LOCK);
-INSTANTIATE_CLASS_MUTEX(TerrainManager, ACE_Thread_Mutex);
+INSTANTIATE_SINGLETON_1(TerrainManager);
 
 TerrainManager::TerrainManager()
 {
@@ -1695,7 +1693,7 @@ TerrainManager::~TerrainManager()
  */
 TerrainInfo* TerrainManager::LoadTerrain(const uint32 mapId)
 {
-    Guard _guard(*this);
+    std::lock_guard<LOCK_TYPE> _guard(m_lock);
 
     TerrainInfo* ptr = NULL;
     TerrainDataMap::const_iterator iter = i_TerrainMap.find(mapId);
@@ -1724,7 +1722,7 @@ void TerrainManager::UnloadTerrain(const uint32 mapId)
         return;
     }
 
-    Guard _guard(*this);
+    std::lock_guard<LOCK_TYPE> _guard(m_lock);
 
     TerrainDataMap::iterator iter = i_TerrainMap.find(mapId);
     if (iter != i_TerrainMap.end())

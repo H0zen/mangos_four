@@ -39,6 +39,7 @@
 #include <set>
 #include <list>
 #include <mutex>
+#include <atomic>
 
 #ifdef ENABLE_ELUNA
 class Eluna;
@@ -528,7 +529,7 @@ typedef std::unordered_map<uint32, WorldSession*> SessionMap;
 class World
 {
     public:
-        static ACE_Atomic_Op<ACE_Thread_Mutex, uint32> m_worldLoopCounter;
+        static std::atomic<uint32> m_worldLoopCounter;
 
         World();
         ~World();

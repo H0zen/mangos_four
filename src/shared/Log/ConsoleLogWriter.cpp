@@ -43,7 +43,7 @@ ConsoleLogWriter::ConsoleLogWriter()
 
 void ConsoleLogWriter::Enqueue(ConsoleLogRecord& rec)
 {
-    if (m_depth.value() >= MAX_CONSOLE_QUEUE)
+    if (m_depth.load() >= MAX_CONSOLE_QUEUE)
     {
         ++m_dropped;
         return;
@@ -70,7 +70,7 @@ bool ConsoleLogWriter::DrainOnce()
 {
     bool didWork = false;
 
-    long dropped = m_dropped.value();
+    long dropped = m_dropped.load();
     if (dropped > 0)
     {
         m_dropped -= dropped;

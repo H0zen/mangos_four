@@ -29,7 +29,7 @@
  *
  * This file contains the ObjectAccessor singleton class which provides centralized
  * access to all players and corpses in the game world. It maintains hash maps for
- * fast GUID-based lookups with thread-safe access using ACE synchronization primitives.
+ * fast GUID-based lookups with thread-safe access using std::shared_mutex.
  *
  * Key responsibilities:
  * - Global player lookups by GUID or name
@@ -51,9 +51,6 @@
 #include "Common.h"
 #include "Platform/Define.h"
 #include "Policies/Singleton.h"
-#include <ace/Thread_Mutex.h>
-#include <ace/RW_Thread_Mutex.h>
-#include "Policies/ThreadingModel.h"
 
 #include "UpdateData.h"
 
@@ -63,6 +60,7 @@
 #include "Corpse.h"
 
 #include <mutex>
+#include <shared_mutex>
 
 #include <set>
 #include <list>
@@ -80,19 +78,19 @@ class HashMapHolder
 
         void Insert(T* o)
         {
-            ACE_WRITE_GUARD(LockType, guard, i_lock)
+            std::unique_lock<LockType> guard(i_lock);
             m_objectMap[o->GetObjectGuid()] = o;
         }
 
         void Remove(T* o)
         {
-            ACE_WRITE_GUARD(LockType, guard, i_lock)
+            std::unique_lock<LockType> guard(i_lock);
             m_objectMap.erase(o->GetObjectGuid());
         }
 
         T* Find(ObjectGuid guid)
         {
-            ACE_READ_GUARD_RETURN (LockType, guard, i_lock, nullptr)
+            std::shared_lock<LockType> guard(i_lock);
             auto const itr = m_objectMap.find(guid);
             return (itr != m_objectMap.end()) ? itr->second : nullptr;
         }
@@ -101,7 +99,7 @@ class HashMapHolder
         template <typename F>
         T* FindWith(F&& pred)
         {
-            ACE_READ_GUARD_RETURN (LockType, guard, i_lock, nullptr)
+            std::shared_lock<LockType> guard(i_lock);
             for(auto const& itr : m_objectMap)
             {
                 if (std::forward<F>(pred)(itr.first, itr.second))
@@ -116,7 +114,7 @@ class HashMapHolder
         template <typename F>
         void Do(F&& work)
         {
-            ACE_READ_GUARD(LockType, guard, i_lock)
+            std::shared_lock<LockType> guard(i_lock);
             for(auto const& itr : m_objectMap)
             {
                 std::forward<F>(work)(itr.second);
@@ -124,7 +122,7 @@ class HashMapHolder
         }
 
     protected:
-        using LockType = ACE_RW_Thread_Mutex;
+        using LockType = std::shared_mutex;
         LockType i_lock;
         std::unordered_map<ObjectGuid, T*> m_objectMap;
 };
