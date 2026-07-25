@@ -49,7 +49,7 @@
 #include "Log.h"
 #include "Opcodes.h"
 #include "ByteBuffer.h"
-#include <openssl/md5.h>
+#include <openssl/evp.h>
 #include "Database/DatabaseEnv.h"
 #include "World.h"
 #include "Player.h"
@@ -58,6 +58,30 @@
 #include "WardenModuleWin.h"
 #include "WardenCheckMgr.h"
 #include "GameTime.h"
+#include <openssl/provider.h>
+
+namespace
+{
+    /// Explicit fetch, self-loading a provider if none is currently active (see
+    /// Sha1.cpp::Initialize() for why EVP_md5() alone is not safe here). Caller must
+    /// EVP_MD_free() the non-NULL result.
+    EVP_MD* FetchMd5()
+    {
+        EVP_MD* md = EVP_MD_fetch(nullptr, "MD5", nullptr);
+        if (md)
+        {
+            return md;
+        }
+
+        OSSL_PROVIDER* ownProvider = OSSL_PROVIDER_load(nullptr, "default");
+        md = EVP_MD_fetch(nullptr, "MD5", nullptr);
+        if (ownProvider)
+        {
+            OSSL_PROVIDER_unload(ownProvider);
+        }
+        return md;
+    }
+}
 
 /**
  * @brief WardenWin constructor
@@ -122,10 +146,14 @@ ClientWardenModule* WardenWin::GetModuleForClient()
     memcpy(mod->Key, Module.ModuleKey, 16);
 
     // md5 hash
-    MD5_CTX ctx;
-    MD5_Init(&ctx);
-    MD5_Update(&ctx, mod->CompressedData, length);
-    MD5_Final((uint8*)&mod->Id, &ctx);
+    EVP_MD_CTX* ctx = EVP_MD_CTX_new();
+    EVP_MD* md5 = FetchMd5();
+    EVP_DigestInit_ex(ctx, md5, nullptr);
+    EVP_MD_free(md5);
+    EVP_DigestUpdate(ctx, mod->CompressedData, length);
+    unsigned int mdLen = 0;
+    EVP_DigestFinal_ex(ctx, (uint8*)&mod->Id, &mdLen);
+    EVP_MD_CTX_free(ctx);
 
     return mod;
 }

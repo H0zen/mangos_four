@@ -231,7 +231,6 @@ target_include_directories(shared
     PUBLIC
         ${CMAKE_CURRENT_BINARY_DIR}
         ${CMAKE_CURRENT_SOURCE_DIR}
-        ${OPENSSL_INCLUDE_DIR}
         ${TGT_INCL}
 )
 
@@ -249,7 +248,8 @@ target_link_libraries(shared
         ace
         utf8
         MySQL::MySQL
-        ${OPENSSL_LIBRARIES}
-        OpenSSL::Crypto
+        mangos_openssl
         $<$<BOOL:${WIN32}>:dbghelp>
+    PRIVATE
+        mangos_openssl_strict
 )
