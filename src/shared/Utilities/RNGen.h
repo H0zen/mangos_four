@@ -28,8 +28,6 @@
 
 #include <random>
 
-#include "ace/Singleton.h"
-#include "ace/Synch_Traits.h"
 #include "Platform/Define.h"
 
 class RNGen
@@ -75,6 +73,22 @@ private:
     std::mt19937 gen_;
 };
 
-typedef ACE_TSS_Singleton<RNGen, ACE_SYNCH_MUTEX> RNG;
+/**
+ * @brief Per-thread access to an RNGen.
+ *
+ * std::mt19937 is not thread-safe, so every thread gets its own generator
+ * (each seeded independently from std::random_device). A genuine
+ * thread_local needs no mutex on the access path -- and these are called
+ * from the world and map-update threads on every roll.
+ */
+class RNG
+{
+public:
+    static RNGen* instance()
+    {
+        thread_local RNGen generator;
+        return &generator;
+    }
+};
 
 #endif
