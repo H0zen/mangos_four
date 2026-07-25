@@ -54,6 +54,8 @@
     #define CHAR_DB_CONTENT_NR          "1"
     #define CHAR_DB_UPDATE_DESCRIPT     "Initial Base M4 DB"
 
+    // The Rel23.01 base schema already owns the eight BroadcastTextID columns;
+    // content 2 records the proved 18414 npc_text mapping shipped with the DB.
     #define WORLD_DB_VERSION_NR         "23"
     #define WORLD_DB_STRUCTURE_NR       "1"
     #define WORLD_DB_CONTENT_NR         "2"

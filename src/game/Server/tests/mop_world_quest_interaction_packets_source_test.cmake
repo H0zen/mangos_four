@@ -93,10 +93,10 @@ if(DEFINED MUTATION)
             "MopNpcTextPackets::BuildResponse(data, response)"
             "data << \"Greetings $N\""
             gossip_def "${gossip_def}")
-    elseif(MUTATION STREQUAL "npc_db_structure")
+    elseif(MUTATION STREQUAL "npc_db_content")
         string(REPLACE
-            "WORLD_DB_STRUCTURE_NR       \"2\""
-            "WORLD_DB_STRUCTURE_NR       \"1\""
+            "WORLD_DB_CONTENT_NR         \"2\""
+            "WORLD_DB_CONTENT_NR         \"1\""
             revision_data "${revision_data}")
     elseif(MUTATION STREQUAL "npc_reference_status")
         string(REPLACE
@@ -216,9 +216,14 @@ foreach(reference IN ITEMS
     endif()
 endforeach()
 
-require_once("${revision_data}"
-    "WORLD_DB_STRUCTURE_NR[ \t]+\"2\""
-    "BroadcastText-aware world schema requirement")
+foreach(requirement IN ITEMS
+        "WORLD_DB_VERSION_NR[ \t]+\"23\""
+        "WORLD_DB_STRUCTURE_NR[ \t]+\"1\""
+        "WORLD_DB_CONTENT_NR[ \t]+\"2\"")
+    require_once("${revision_data}"
+        "${requirement}"
+        "BroadcastText-aware world database requirement")
+endforeach()
 
 string(FIND "${misc_handler}" "recv_data >> Trigger_ID;" stale_area_reader)
 if(NOT stale_area_reader EQUAL -1)
