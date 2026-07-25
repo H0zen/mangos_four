@@ -77,6 +77,7 @@
 #include "Pet.h"
 #include "SocialMgr.h"
 #include "DBCEnums.h"
+#include <algorithm>
 #ifdef ENABLE_ELUNA
 #include "LuaEngine.h"
 #endif /* ENABLE_ELUNA */
@@ -1330,7 +1331,9 @@ void WorldSession::HandlePlayedTime(WorldPacket& recv_data)
 void WorldSession::HandleInspectOpcode(WorldPacket& recv_data)
 {
     ObjectGuid guid;
-    recv_data >> guid;
+    if (!MopInspectPackets::ParseRequest(recv_data, guid))
+        return;
+
     DEBUG_LOG("Inspected guid is %s", guid.GetString().c_str());
 
     Player* plr = sObjectMgr.GetPlayer(guid);
@@ -1349,29 +1352,78 @@ void WorldSession::HandleInspectOpcode(WorldPacket& recv_data)
         return;
     }
 
-    WorldPacket data(SMSG_INSPECT_RESULTS, 50);
-    data << plr->GetObjectGuid();
+    MopInspectPackets::Response response;
+    response.targetGuid = plr->GetObjectGuid();
+
+    for (uint8 slot = 0; slot < EQUIPMENT_SLOT_END; ++slot)
+    {
+        Item* item = plr->GetItemByPos(INVENTORY_SLOT_BAG_0, slot);
+        if (!item)
+            continue;
+
+        MopInspectPackets::Item inspectItem;
+        inspectItem.creatorGuid = item->GetGuidValue(ITEM_FIELD_CREATOR);
+        inspectItem.randomPropertyId = int16(item->GetItemRandomPropertyId());
+        inspectItem.suffixFactor = item->GetItemSuffixFactor();
+        // This core has no 18414 dynamic-item-modifier backend. The client
+        // reader accepts the truthful zero-length blob emitted here.
+        for (uint8 enchantSlot = 0; enchantSlot < MAX_ENCHANTMENT_SLOT;
+            ++enchantSlot)
+        {
+            uint32 const enchantmentId =
+                item->GetEnchantmentId(EnchantmentSlot(enchantSlot));
+            if (enchantmentId)
+                inspectItem.enchantments.push_back(
+                    { enchantmentId, enchantSlot });
+        }
+        inspectItem.entry = item->GetEntry();
+        inspectItem.slot = slot;
+        response.items.push_back(inspectItem);
+    }
 
     if (sWorld.getConfig(CONFIG_BOOL_TALENTS_INSPECTING) || _player->isGameMaster())
     {
-        plr->BuildPlayerTalentsInfoData(&data);
-    }
-    else
-    {
-        data << uint32(0);                                  // unspentTalentPoints
-        data << uint8(0);                                   // talentGroupCount
-        data << uint8(0);                                   // talentGroupIndex
+        for (uint8 slot = 0; slot < MAX_GLYPH_SLOT_INDEX; ++slot)
+            response.glyphs.push_back(
+                uint16(plr->m_glyphMgr.GetGlyph(plr->GetActiveSpec(), slot)));
+
+        // Use the native 5.4.8 update field. The legacy TalentTab identifier
+        // is a different namespace and must not be substituted here.
+        response.specializationId =
+            plr->GetUInt32Value(PLAYER_FIELD_CURRENT_SPEC_ID);
+
+        PlayerTalentMap const& talents = plr->m_talents[plr->GetActiveSpec()];
+        for (PlayerTalentMap::const_iterator itr = talents.begin();
+            itr != talents.end(); ++itr)
+        {
+            if (itr->second.state != PLAYERSPELL_REMOVED &&
+                itr->second.talentEntry)
+            {
+                response.talents.push_back(
+                    uint16(itr->second.talentEntry->TalentID));
+            }
+        }
+        std::sort(response.talents.begin(), response.talents.end());
     }
 
-    plr->BuildEnchantmentsInfoData(&data);
     if (Guild* guild = sGuildMgr.GetGuildById(plr->GetGuildId()))
     {
-        data << guild->GetObjectGuid();
-        data << uint32(guild->GetLevel());
-        data << uint64(0/*guild->GetXP()*/);
-        data << uint32(guild->GetMemberSize());             // number of members
+        response.hasGuild = true;
+        response.guild.guid = guild->GetObjectGuid();
+        response.guild.memberCount = guild->GetMemberSize();
+        // Guild experience is not modelled by this core; zero is the truthful
+        // value for the otherwise fully represented 18414 guild block.
+        response.guild.experience = 0;
+        response.guild.level = guild->GetLevel();
     }
 
+    WorldPacket data;
+    if (!MopInspectPackets::BuildResponse(data, response))
+    {
+        sLog.outError("Inspect: could not serialize result for %s",
+            guid.GetString().c_str());
+        return;
+    }
     SendPacket(&data);
 }
 

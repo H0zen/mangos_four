@@ -2297,6 +2297,183 @@ namespace MopCharacterCustomizePackets
     }
 }
 
+namespace MopInspectPackets
+{
+    struct Enchantment
+    {
+        uint32 id = 0;
+        uint8 slot = 0;
+    };
+
+    struct Item
+    {
+        ObjectGuid creatorGuid;
+        int16 randomPropertyId = 0;
+        uint32 suffixFactor = 0;
+        std::vector<uint8> dynamicModifiers;
+        std::vector<Enchantment> enchantments;
+        uint32 entry = 0;
+        uint8 slot = 0;
+    };
+
+    struct Guild
+    {
+        ObjectGuid guid;
+        uint32 memberCount = 0;
+        uint64 experience = 0;
+        uint32 level = 0;
+    };
+
+    struct Response
+    {
+        ObjectGuid targetGuid;
+        bool hasGuild = false;
+        Guild guild;
+        std::vector<Item> items;
+        std::vector<uint16> glyphs;
+        uint32 specializationId = 0;
+        std::vector<uint16> talents;
+    };
+
+    inline bool RejectRequest(WorldPacket& in)
+    {
+        in.rfinish();
+        return false;
+    }
+
+    inline bool ParseRequest(WorldPacket& in, ObjectGuid& guid)
+    {
+        if (in.size() - in.rpos() < 1)
+            return RejectRequest(in);
+
+        uint8 const mask = in[in.rpos()];
+        size_t byteCount = 0;
+        for (uint8 bits = mask; bits; bits >>= 1)
+            byteCount += bits & 1;
+
+        if (in.size() - in.rpos() != 1 + byteCount)
+            return RejectRequest(in);
+
+        // ReadByteSeq XORs present bytes with one. A raw one would therefore
+        // encode a zero byte despite its presence mask and is non-canonical.
+        for (size_t i = in.rpos() + 1; i < in.size(); ++i)
+            if (in[i] == 1)
+                return RejectRequest(in);
+
+        ObjectGuid parsed;
+        in.ReadGuidMask<0, 3, 7, 2, 5, 1, 4, 6>(parsed);
+        in.ReadGuidBytes<3, 5, 2, 4, 1, 6, 0, 7>(parsed);
+        if (in.rpos() != in.size())
+            return RejectRequest(in);
+
+        guid = parsed;
+        return true;
+    }
+
+    inline bool BuildResponse(WorldPacket& out, Response const& response)
+    {
+        if (response.items.size() > EQUIPMENT_SLOT_END ||
+            response.glyphs.size() > MAX_GLYPH_SLOT_INDEX ||
+            response.talents.size() >= (size_t(1) << 23) ||
+            (response.hasGuild && response.guild.guid.IsEmpty()))
+        {
+            return false;
+        }
+
+        bool usedEquipmentSlots[EQUIPMENT_SLOT_END] = {};
+        for (Item const& item : response.items)
+        {
+            if (item.slot >= EQUIPMENT_SLOT_END || usedEquipmentSlots[item.slot] ||
+                item.enchantments.size() > MAX_ENCHANTMENT_SLOT)
+            {
+                return false;
+            }
+            usedEquipmentSlots[item.slot] = true;
+
+            bool usedEnchantmentSlots[MAX_ENCHANTMENT_SLOT] = {};
+            for (Enchantment const& enchantment : item.enchantments)
+            {
+                if (enchantment.slot >= MAX_ENCHANTMENT_SLOT ||
+                    usedEnchantmentSlots[enchantment.slot])
+                {
+                    return false;
+                }
+                usedEnchantmentSlots[enchantment.slot] = true;
+            }
+        }
+
+        out.Initialize(SMSG_INSPECT_RESULTS);
+        out.WriteBit(response.hasGuild);
+        out.WriteGuidMask<2>(response.targetGuid);
+        if (response.hasGuild)
+            out.WriteGuidMask<7, 0, 5, 3, 2, 4, 6, 1>(response.guild.guid);
+
+        out.WriteGuidMask<4, 3, 5, 7>(response.targetGuid);
+        out.WriteBits(uint32(response.items.size()), 20);
+        out.WriteGuidMask<0>(response.targetGuid);
+
+        for (Item const& item : response.items)
+        {
+            out.WriteGuidMask<1>(item.creatorGuid);
+            out.WriteBit(item.suffixFactor != 0);
+            // The terminal inverts this into the cached unavailable flag;
+            // downstream equipment consumers skip the record when it is false.
+            out.WriteBit(true);
+            out.WriteGuidMask<3>(item.creatorGuid);
+            out.WriteBits(uint32(item.enchantments.size()), 21);
+            out.WriteGuidMask<2, 6, 4>(item.creatorGuid);
+            out.WriteBit(item.randomPropertyId != 0);
+            out.WriteGuidMask<0, 5, 7>(item.creatorGuid);
+        }
+
+        out.WriteBits(uint32(response.glyphs.size()), 23);
+        out.WriteBits(uint32(response.talents.size()), 23);
+        out.WriteGuidMask<6, 1>(response.targetGuid);
+        out.FlushBits();
+
+        out.WriteGuidBytes<1, 4, 2>(response.targetGuid);
+        for (Item const& item : response.items)
+        {
+            if (item.randomPropertyId)
+                out << item.randomPropertyId;
+            out.WriteGuidBytes<3>(item.creatorGuid);
+            out << uint32(item.dynamicModifiers.size());
+            if (!item.dynamicModifiers.empty())
+                out.append(item.dynamicModifiers.data(), item.dynamicModifiers.size());
+            for (Enchantment const& enchantment : item.enchantments)
+                out << enchantment.id << enchantment.slot;
+            out << item.entry;
+            out.WriteGuidBytes<6, 4, 7, 2>(item.creatorGuid);
+            if (item.suffixFactor)
+                out << item.suffixFactor;
+            out.WriteGuidBytes<5>(item.creatorGuid);
+            out << item.slot;
+            out.WriteGuidBytes<0, 1>(item.creatorGuid);
+        }
+
+        if (response.hasGuild)
+        {
+            out.WriteGuidBytes<6, 2, 5, 0>(response.guild.guid);
+            out << response.guild.memberCount;
+            out.WriteGuidBytes<4, 7>(response.guild.guid);
+            out << response.guild.experience;
+            out.WriteGuidBytes<1>(response.guild.guid);
+            out << response.guild.level;
+            out.WriteGuidBytes<3>(response.guild.guid);
+        }
+
+        out.WriteGuidBytes<5>(response.targetGuid);
+        for (uint16 glyph : response.glyphs)
+            out << glyph;
+        out.WriteGuidBytes<0>(response.targetGuid);
+        out << response.specializationId;
+        for (uint16 talent : response.talents)
+            out << talent;
+        out.WriteGuidBytes<7, 3, 6>(response.targetGuid);
+        return true;
+    }
+}
+
 class Player : public Unit
 {
         friend class WorldSession;

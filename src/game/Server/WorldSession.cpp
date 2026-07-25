@@ -292,6 +292,7 @@ static bool IsEnterWorldConverted(uint16 opcode)
         case SMSG_INIT_WORLD_STATES:                // map, area, zone, 21-bit count, uint32 pairs; sub_732740
         case SMSG_ITEM_TIME_UPDATE:                  // packed item GUID then uint32 duration; sub_6F06A8
         case SMSG_ITEM_ENCHANT_TIME_UPDATE:          // interleaved item/player GUIDs, slot, duration; sub_6C8203
+        case SMSG_INSPECT_RESULTS:                    // MopInspectPackets::BuildResponse; Player_C.cpp leaf sub_7B9407
         case SMSG_UI_TIME:                           // one uint32 server time; sub_6D9F28 -> sub_40F340
         case SMSG_START_TIMER:                       // max time, remaining time, timer type; sub_6E7584
         case SMSG_CALENDAR_SEND_NUM_PENDING:         // one uint32 pending count; sub_6D9F28 -> sub_40F340

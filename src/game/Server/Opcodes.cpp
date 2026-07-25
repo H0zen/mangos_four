@@ -221,6 +221,10 @@ void InitializeOpcodes()
     DefS(SMSG_INIT_WORLD_STATES, "SMSG_INIT_WORLD_STATES");
     DefS(SMSG_ITEM_TIME_UPDATE, "SMSG_ITEM_TIME_UPDATE");
     DefS(SMSG_ITEM_ENCHANT_TIME_UPDATE, "SMSG_ITEM_ENCHANT_TIME_UPDATE");
+    // NotifyInspect writes one packed target GUID; the paired result returns
+    // equipment, glyph, talent, specialization, and optional guild records.
+    DefC(CMSG_INSPECT, "CMSG_INSPECT", STATUS_LOGGEDIN, PROCESS_THREADUNSAFE, &WorldSession::HandleInspectOpcode);
+    DefS(SMSG_INSPECT_RESULTS, "SMSG_INSPECT_RESULTS");
     DefS(SMSG_MOVE_TELEPORT, "SMSG_MOVE_TELEPORT");
     DefS(SMSG_CLIENT_CONTROL_UPDATE, "SMSG_CLIENT_CONTROL_UPDATE");
     DefS(SMSG_MOVE_SET_ACTIVE_MOVER, "SMSG_MOVE_SET_ACTIVE_MOVER");

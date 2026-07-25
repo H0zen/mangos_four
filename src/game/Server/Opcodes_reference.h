@@ -175,9 +175,9 @@
  *   TOTAL SMSG rows                   925
  *
  * SUBSYSTEM CONFIDENCE: high=359, low=223, medium=183, none=160
- * STATUS TOTALS: ACTIVE=317, DOC=436, DORMANT=767
- *   SMSG: ACTIVE=184, DOC=269, DORMANT=472
- *   CMSG: ACTIVE=133, DOC=167, DORMANT=295
+ * STATUS TOTALS: ACTIVE=319, DOC=436, DORMANT=765
+ *   SMSG: ACTIVE=185, DOC=269, DORMANT=471
+ *   CMSG: ACTIVE=134, DOC=167, DORMANT=294
  */
 
 // CAVEATS -- read before trusting any single row:
@@ -826,7 +826,7 @@ typedef uint16_t uint16;
  *   SMSG_QUESTUPDATE_ADD_KILL                      0x1645  DORMANT 
  *   SMSG_MINIMAP_PING                              0x168F  ACTIVE
  *   SMSG_FEATURE_SYSTEM_STATUS                     0x16BB  ACTIVE  
- *   SMSG_UNKNOWN_0x1842                            0x1842  DORMANT  cand SMSG_INSPECT_RESULTS bound to 0x4014
+ *   SMSG_INSPECT_RESULTS                           0x1842  ACTIVE
  *   SMSG_SPELLINTERRUPTLOG                         0x1851  ACTIVE
  *   SMSG_GODMODE                                   0x1862  DORMANT  [medium-conf]
  *   SMSG_EXPLORATION_EXPERIENCE                    0x189A  DORMANT 
@@ -1721,7 +1721,7 @@ typedef uint16_t uint16;
  *   CMSG_BINDER_ACTIVATE                           0x1248  ACTIVE
  *   CMSG_QUEST_CONFIRM_ACCEPT                      0x124B  ACTIVE
  *   CMSG_GET_ITEM_PURCHASE_DATA                    0x1258  DORMANT 
- *   CMSG_INSPECT                                   0x1259  DORMANT 
+ *   CMSG_INSPECT                                   0x1259  ACTIVE
  *   CMSG_SET_LOOT_SPECIALIZATION                   0x1260  DOC     
  *   CMSG_TOTEM_DESTROYED                           0x1263  DORMANT 
  *   CMSG_SHOWING_HELM                              0x126B  DORMANT 
