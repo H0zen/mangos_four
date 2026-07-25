@@ -630,7 +630,7 @@ typedef uint16_t uint16;
  *   SMSG_AE_LOOT_TARGETS                           0x0C32  DORMANT
  *   SMSG_LOOT_REMOVED                              0x0C3E  ACTIVE   [medium-conf]
  *   SMSG_PET_UPDATE_COMBO_POINTS                   0x1206  DORMANT  [low-conf]
- *   SMSG_QUEST_FORCE_REMOVED                       0x121F  DOC
+ *   SMSG_LOOT_CONTENTS                             0x121F  DOC       [name: reference-derived; semantic: binary+UI]
  *   SMSG_LOOT_RELEASE_RESPONSE                     0x123F  ACTIVE   [medium-conf]
  *   SMSG_LOOT_RESPONSE                             0x128A  ACTIVE
  *   SMSG_LOOT_MONEY_NOTIFY                         0x14C0  ACTIVE   [medium-conf]
@@ -2386,6 +2386,7 @@ enum class OpcodesReferenceDoc : uint16
     SMSG_CANCEL_SCENE                                = 0x120E,
     SMSG_ENCOUNTER_END                               = 0x120F,
     SMSG_FEATURE_SYSTEM_STATUS_GLUE_SCREEN           = 0x121E,
+    SMSG_LOOT_CONTENTS                               = 0x121F,
     SMSG_UNKNOWN_0x1223                              = 0x1223,
     SMSG_UNKNOWN_0x122A                              = 0x122A,
     SMSG_UNKNOWN_0x122F                              = 0x122F,
