@@ -175,8 +175,8 @@
  *   TOTAL SMSG rows                   925
  *
  * SUBSYSTEM CONFIDENCE: high=359, low=223, medium=183, none=160
- * STATUS TOTALS: ACTIVE=316, DOC=436, DORMANT=768
- *   SMSG: ACTIVE=183, DOC=269, DORMANT=473
+ * STATUS TOTALS: ACTIVE=317, DOC=436, DORMANT=767
+ *   SMSG: ACTIVE=184, DOC=269, DORMANT=472
  *   CMSG: ACTIVE=133, DOC=167, DORMANT=295
  */
 
@@ -827,7 +827,7 @@ typedef uint16_t uint16;
  *   SMSG_MINIMAP_PING                              0x168F  ACTIVE
  *   SMSG_FEATURE_SYSTEM_STATUS                     0x16BB  ACTIVE  
  *   SMSG_UNKNOWN_0x1842                            0x1842  DORMANT  cand SMSG_INSPECT_RESULTS bound to 0x4014
- *   SMSG_SPELLINTERRUPTLOG                         0x1851  DORMANT
+ *   SMSG_SPELLINTERRUPTLOG                         0x1851  ACTIVE
  *   SMSG_GODMODE                                   0x1862  DORMANT  [medium-conf]
  *   SMSG_EXPLORATION_EXPERIENCE                    0x189A  DORMANT 
  *   SMSG_TRAINER_LIST                              0x189F  DORMANT  [medium-conf]

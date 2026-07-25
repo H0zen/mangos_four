@@ -1400,7 +1400,7 @@ enum OpcodesList
     SMSG_SPLINE_MOVE_SET_WATER_WALK              = 0x1823,    // 5.4.8 18414 (Wow.exe leaf; name fork tables)
     SMSG_MOVE_COLLISION_ENABLE                   = 0x1826,    // 5.4.8 18414 (Wow.exe leaf; name fork tables)
     SMSG_STREAMING_MOVIE                         = 0x1843,    // 5.4.8 18414 (Wow.exe leaf; name fork tables)
-    SMSG_SPELLINTERRUPTLOG                       = 0x1851,    // 5.4.8 18414 (Wow.exe leaf; name fork tables)
+    SMSG_SPELLINTERRUPTLOG                       = 0x1851,    // 5.4.8 18414 (Wow.exe reader/handler -> SPELL_INTERRUPT)
     SMSG_CHARACTER_UPGRADE_STARTED               = 0x188A,    // 5.4.8 18414 (Wow.exe leaf; name fork tables, low confidence)
     SMSG_SPLINE_MOVE_SET_FEATHER_FALL            = 0x1893,    // 5.4.8 18414 (Wow.exe leaf; name fork tables)
     SMSG_ACCOUNT_CRITERIA_UPDATE                 = 0x189E,    // 5.4.8 18414 (Wow.exe leaf; name fork tables, low confidence)

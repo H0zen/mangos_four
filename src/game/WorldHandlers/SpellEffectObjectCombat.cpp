@@ -141,6 +141,23 @@ void Spell::EffectInterruptCast(SpellEffectEntry const* /*effect*/)
             if ((curSpellInfo->GetInterruptFlags() & SPELL_INTERRUPT_FLAG_INTERRUPT) && curSpellInfo->GetPreventionType() == SPELL_PREVENTION_TYPE_SILENCE )
             {
                 unitTarget->ProhibitSpellSchool(GetSpellSchoolMask(curSpellInfo), GetSpellDuration(m_spellInfo));
+
+                // The 18414 client turns this dedicated packet into the
+                // SPELL_INTERRUPT combat-log event. Build it while the
+                // interrupted spell record is still available.
+                if (Unit* interruptCaster = GetAffectiveCaster())
+                {
+                    MopCombatLogPackets::SpellInterruptLog log = {};
+                    log.casterGuid = interruptCaster->GetObjectGuid().GetRawValue();
+                    log.targetGuid = unitTarget->GetObjectGuid().GetRawValue();
+                    log.interruptSpellId = m_spellInfo->ID;
+                    log.interruptedSpellId = curSpellInfo->ID;
+
+                    WorldPacket data(SMSG_SPELLINTERRUPTLOG, 32);
+                    MopCombatLogPackets::BuildSpellInterruptLog(data, log);
+                    interruptCaster->SendMessageToSet(&data, true);
+                }
+
                 unitTarget->InterruptSpell(CurrentSpellTypes(i), false);
             }
         }

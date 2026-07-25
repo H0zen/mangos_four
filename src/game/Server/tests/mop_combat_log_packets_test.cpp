@@ -289,6 +289,48 @@ static std::vector<uint8> ExpectedDispel(MopCombatLogPackets::DispelLog const& l
     return writer.Bytes();
 }
 
+static std::vector<uint8> ExpectedInterrupt(MopCombatLogPackets::SpellInterruptLog const& log)
+{
+    RefWriter writer;
+
+    static uint8 const targetMaskA[] = { 7, 2, 4, 6 };
+    static uint8 const casterMaskA[] = { 0, 2, 5, 1, 4 };
+    static uint8 const targetMaskB[] = { 0, 3 };
+    static uint8 const casterMaskB[] = { 7, 6 };
+    static uint8 const targetMaskC[] = { 1 };
+    static uint8 const casterMaskC[] = { 3 };
+    static uint8 const targetMaskD[] = { 5 };
+
+    GuidBits(writer, log.targetGuid, targetMaskA, 4);
+    GuidBits(writer, log.casterGuid, casterMaskA, 5);
+    GuidBits(writer, log.targetGuid, targetMaskB, 2);
+    GuidBits(writer, log.casterGuid, casterMaskB, 2);
+    GuidBits(writer, log.targetGuid, targetMaskC, 1);
+    GuidBits(writer, log.casterGuid, casterMaskC, 1);
+    GuidBits(writer, log.targetGuid, targetMaskD, 1);
+
+    writer.Align();
+    writer.GuidByte(log.targetGuid, 0);
+    writer.GuidByte(log.casterGuid, 2);
+    writer.U32(log.interruptSpellId);
+    writer.GuidByte(log.casterGuid, 1);
+    writer.GuidByte(log.targetGuid, 2);
+    writer.GuidByte(log.casterGuid, 3);
+    writer.U32(log.interruptedSpellId);
+    writer.GuidByte(log.targetGuid, 4);
+    writer.GuidByte(log.casterGuid, 4);
+    writer.GuidByte(log.targetGuid, 3);
+    writer.GuidByte(log.targetGuid, 1);
+    writer.GuidByte(log.casterGuid, 5);
+    writer.GuidByte(log.casterGuid, 6);
+    writer.GuidByte(log.casterGuid, 7);
+    writer.GuidByte(log.targetGuid, 5);
+    writer.GuidByte(log.targetGuid, 6);
+    writer.GuidByte(log.casterGuid, 0);
+    writer.GuidByte(log.targetGuid, 7);
+    return writer.Bytes();
+}
+
 static bool Equal(WorldPacket const& packet, std::vector<uint8> const& expected)
 {
     if (packet.size() != expected.size())
@@ -412,11 +454,37 @@ static void test_dispel_and_steal_variants()
     CHECK(invalid.size() == 1 && invalid.contents()[0] == 0xAA);
 }
 
+static void CheckInterrupt(MopCombatLogPackets::SpellInterruptLog const& log)
+{
+    WorldPacket packet(SMSG_SPELLINTERRUPTLOG, 32);
+    MopCombatLogPackets::BuildSpellInterruptLog(packet, log);
+    CHECK(packet.GetOpcode() == SMSG_SPELLINTERRUPTLOG);
+    CHECK(Equal(packet, ExpectedInterrupt(log)));
+}
+
+static void test_spell_interrupt_log()
+{
+    MopCombatLogPackets::SpellInterruptLog dense = {};
+    dense.casterGuid = 0x0123456789ABCDEFull;
+    dense.targetGuid = 0xF1E2D3C4B5A69788ull;
+    dense.interruptSpellId = 0x11223344u;
+    dense.interruptedSpellId = 0xA1A2A3A4u;
+    CheckInterrupt(dense);
+
+    MopCombatLogPackets::SpellInterruptLog sparse = {};
+    sparse.casterGuid = 0x0002000400060008ull;
+    sparse.targetGuid = 0x0100030005000700ull;
+    sparse.interruptSpellId = 6552;
+    sparse.interruptedSpellId = 116;
+    CheckInterrupt(sparse);
+}
+
 static void test_successor_opcodes_are_framable()
 {
     CHECK(uint32(SMSG_SPELL_EXECUTE_LOG) == 0x00D8u);
     CHECK(uint32(SMSG_SPELL_PERIODIC_AURA_LOG) == 0x0CF2u);
     CHECK(uint32(SMSG_SPELLDISPELLOG) == 0x0DF9u);
+    CHECK(uint32(SMSG_SPELLINTERRUPTLOG) == 0x1851u);
 
     MopCombatLogPackets::SpellExecuteLog execute = {};
     execute.kind = MopCombatLogPackets::ExecuteKind::Target;
@@ -444,6 +512,12 @@ static void test_successor_opcodes_are_framable()
     CHECK(MopCombatLogPackets::BuildDispelLog(dispelPacket, dispel));
     CHECK(MopWire::BuildServerHeader(true, dispelPacket.size(), dispelPacket.GetOpcode(), header));
     CHECK(header[0] == 0xF9 && (header[1] & 0x1F) == 0x0D);
+
+    MopCombatLogPackets::SpellInterruptLog interrupt = {};
+    WorldPacket interruptPacket(SMSG_SPELLINTERRUPTLOG, 32);
+    MopCombatLogPackets::BuildSpellInterruptLog(interruptPacket, interrupt);
+    CHECK(MopWire::BuildServerHeader(true, interruptPacket.size(), interruptPacket.GetOpcode(), header));
+    CHECK(header[0] == 0x51 && (header[1] & 0x1F) == 0x18);
 }
 
 int main(int, char**)
@@ -451,6 +525,7 @@ int main(int, char**)
     test_execute_variants();
     test_periodic_variants();
     test_dispel_and_steal_variants();
+    test_spell_interrupt_log();
     test_successor_opcodes_are_framable();
     if (g_fail) return 1;
     std::printf("mop_combat_log_packets: all checks passed\n");

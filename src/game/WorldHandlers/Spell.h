@@ -1330,6 +1330,14 @@ namespace MopCombatLogPackets
         bool isBreak;
     };
 
+    struct SpellInterruptLog
+    {
+        uint64 casterGuid;
+        uint64 targetGuid;
+        uint32 interruptSpellId;
+        uint32 interruptedSpellId;
+    };
+
     inline bool BuildSpellExecuteLog(WorldPacket& out, SpellExecuteLog const& log)
     {
         bool const extraAttacks = log.kind == ExecuteKind::ExtraAttacks;
@@ -1534,6 +1542,46 @@ namespace MopCombatLogPackets
         WriteGuidBytes(out, log.casterGuid, casterBytesD);
         WriteGuidBytes(out, log.targetGuid, targetBytesE);
         return true;
+    }
+
+    /** Inverse of the complete 18414 reader at Wow.exe sub_C687A9. */
+    inline void BuildSpellInterruptLog(WorldPacket& out, SpellInterruptLog const& log)
+    {
+        uint8 const targetMaskA[] = { 7, 2, 4, 6 };
+        uint8 const casterMaskA[] = { 0, 2, 5, 1, 4 };
+        uint8 const targetMaskB[] = { 0, 3 };
+        uint8 const casterMaskB[] = { 7, 6 };
+        uint8 const targetMaskC[] = { 1 };
+        uint8 const casterMaskC[] = { 3 };
+        uint8 const targetMaskD[] = { 5 };
+
+        WriteGuidMask(out, log.targetGuid, targetMaskA);
+        WriteGuidMask(out, log.casterGuid, casterMaskA);
+        WriteGuidMask(out, log.targetGuid, targetMaskB);
+        WriteGuidMask(out, log.casterGuid, casterMaskB);
+        WriteGuidMask(out, log.targetGuid, targetMaskC);
+        WriteGuidMask(out, log.casterGuid, casterMaskC);
+        WriteGuidMask(out, log.targetGuid, targetMaskD);
+        out.FlushBits();
+
+        out.WriteByteSeq(GuidByte(log.targetGuid, 0));
+        out.WriteByteSeq(GuidByte(log.casterGuid, 2));
+        out << uint32(log.interruptSpellId);
+        out.WriteByteSeq(GuidByte(log.casterGuid, 1));
+        out.WriteByteSeq(GuidByte(log.targetGuid, 2));
+        out.WriteByteSeq(GuidByte(log.casterGuid, 3));
+        out << uint32(log.interruptedSpellId);
+        out.WriteByteSeq(GuidByte(log.targetGuid, 4));
+        out.WriteByteSeq(GuidByte(log.casterGuid, 4));
+        out.WriteByteSeq(GuidByte(log.targetGuid, 3));
+        out.WriteByteSeq(GuidByte(log.targetGuid, 1));
+        out.WriteByteSeq(GuidByte(log.casterGuid, 5));
+        out.WriteByteSeq(GuidByte(log.casterGuid, 6));
+        out.WriteByteSeq(GuidByte(log.casterGuid, 7));
+        out.WriteByteSeq(GuidByte(log.targetGuid, 5));
+        out.WriteByteSeq(GuidByte(log.targetGuid, 6));
+        out.WriteByteSeq(GuidByte(log.casterGuid, 0));
+        out.WriteByteSeq(GuidByte(log.targetGuid, 7));
     }
 }
 
