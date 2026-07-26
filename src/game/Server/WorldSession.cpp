@@ -83,6 +83,16 @@
 #include <mutex>
 #include <utility>
 
+// inet_addr() for SendRedirectClient(). Used to arrive transitively through
+// the ACE includes in the old Common.h; with that header gone it has to be
+// named here (matches the pattern in realmd/Realm/RealmList.cpp).
+#ifdef _WIN32
+#  include <winsock2.h>
+#  include <ws2tcpip.h>
+#else
+#  include <arpa/inet.h>
+#endif
+
 /**
  * @brief Helper for Map session filtering
  * @param session World session

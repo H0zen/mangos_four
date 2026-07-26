@@ -23,46 +23,53 @@
  * and lore are copyrighted by Blizzard Entertainment, Inc.
  */
 
-#ifndef ANTIFREEZE_THREAD
-#define ANTIFREEZE_THREAD
+#ifndef MANGOS_H_SOAPSERVICE
+#define MANGOS_H_SOAPSERVICE
 
-#include "Common.h"
-#include "Threading/Threading.h"
+#include "SoapThread.h"
+
+#include "../Service.h"
+
+#include "Platform/Define.h"
+
+#include <string>
+#include <thread>
 
 /**
- * @brief Watchdog thread that bang-crashes the process if the world loop hangs.
+ * @brief The gSOAP listener, as an IService.
+ *
+ * SoapThread() already polls World::IsStopped() in its own loop (it was never
+ * ACE, just a bare std::thread mangosd.cpp spun up and joined by hand), so
+ * there is nothing to signal here: the world stopping is the stop request,
+ * and Join() only has to wait for the thread to notice.
  */
-class AntiFreezeThread
+class SoapService : public IService
 {
     public:
-        explicit AntiFreezeThread(uint32 delay);
-        ~AntiFreezeThread();
 
-        /// Starts the watchdog thread.
-        void Activate();
+        SoapService(const std::string& host, uint16 port)
+            : m_host(host), m_port(port) {}
+
+        const char* Name() const override { return "SOAP"; }
+
+        void Start() override
+        {
+            m_thread = std::thread(SoapThread, m_host, m_port);
+        }
+
+        void Join() override
+        {
+            if (m_thread.joinable())
+            {
+                m_thread.join();
+            }
+        }
 
     private:
-        /// Runnable body driving the watchdog loop.
-        class Body : public MaNGOS::Runnable
-        {
-            public:
-                explicit Body(uint32 delay)
-                    : m_loops(0), m_lastchange(0), w_loops(0), w_lastchange(0), m_delayTime(delay)
-                {
-                }
 
-                void run() override;
-
-            private:
-                uint32 m_loops;
-                uint32 m_lastchange;
-                uint32 w_loops;
-                uint32 w_lastchange;
-                uint32 m_delayTime;
-        };
-
-        uint32          m_delayTime;
-        MaNGOS::Thread* m_thread;
+        std::string m_host;
+        uint16      m_port;
+        std::thread m_thread;
 };
 
 #endif

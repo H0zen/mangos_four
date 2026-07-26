@@ -110,22 +110,20 @@
 #include "LockedQueue/LockedQueue.h"
 #include "Threading/Threading.h"
 
-// Old ACE versions (pre-ACE-5.5.4) not have this type (add for allow use at Unix side external old ACE versions)
-#if PLATFORM != PLATFORM_WINDOWS
-#  ifndef ACE_OFF_T
-/**
- * @brief
- *
- */
-typedef off_t ACE_OFF_T;
-#  endif
-#endif
-
 #if PLATFORM == PLATFORM_WINDOWS
 #  if !defined (FD_SETSIZE)
 #    define FD_SETSIZE 4096
 #  endif
-#  include <ace/config-all.h>
+// ACE's config-all.h used to pull in <windows.h> with WIN32_LEAN_AND_MEAN
+// defined ahead of it, which as a side effect kept wincrypt.h out of the
+// transitive include graph. Without that, some other translation unit's
+// plain <windows.h> (via <ws2tcpip.h> et al.) drags wincrypt.h in, and its
+// `#define CRYPT_FAILED FALSE` textually clobbers AuthCrypt.h's CryptState
+// enumerator of the same name. Define it here ourselves -- this also
+// matches the convention already used in net/iocp/IocpServer.hpp.
+#  ifndef WIN32_LEAN_AND_MEAN
+#    define WIN32_LEAN_AND_MEAN
+#  endif
 #  include <ws2tcpip.h>
 #else
 #  include <sys/types.h>
@@ -177,6 +175,12 @@ typedef off_t ACE_OFF_T;
  */
 inline float finiteAlways(float f) { return finite(f) ? f : 0.0f; }
 
+// This used to need <ace/OS_NS_stdlib.h> included ahead of it: that header
+// declares its own atol(), and the #define below is a textual replacement,
+// so any translation unit that saw an ACE header declaring atol() after this
+// macro got a mangled declaration instead of a redefinition warning. With
+// ACE gone from src/ entirely, nothing declares atol() again downstream of
+// this file, so there is nothing left to collide with.
 #define atol(a) strtoul( a, NULL, 10)
 
 #define STRINGIZE(a) #a

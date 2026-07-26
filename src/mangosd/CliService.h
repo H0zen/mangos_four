@@ -23,39 +23,44 @@
  * and lore are copyrighted by Blizzard Entertainment, Inc.
  */
 
-/// \addtogroup mangosd
-/// @{
-/// \file
+#ifndef MANGOS_H_CLISERVICE
+#define MANGOS_H_CLISERVICE
 
-#ifndef MANGOS_H_RATHREAD
-#define MANGOS_H_RATHREAD
+#include "Service.h"
 
-#include <ace/SOCK_Acceptor.h>
-#include <ace/Acceptor.h>
-#include <ace/Task.h>
-#include <ace/INET_Addr.h>
+#include <atomic>
+#include <thread>
 
-#include "Common.h"
-
-class RASocket;
-class ACE_Reactor;
-
-typedef ACE_Acceptor < RASocket, ACE_SOCK_ACCEPTOR > RAAcceptor;
-
-class RAThread : public ACE_Task_Base
+/**
+ * @brief Reads console commands and queues them for the world thread.
+ *
+ * The commands themselves are never executed here: they go onto the world's
+ * command queue and run on the world thread, which is the only thread allowed
+ * to touch game state. This service is purely a reader -- the same job
+ * CliThread did, on std::thread instead of MaNGOS::Thread/Runnable so it fits
+ * the IService shape every background activity now shares.
+ */
+class CliService : public IService
 {
-    private:
-        ACE_Reactor    *m_Reactor;
-        RAAcceptor     *m_Acceptor;
-        ACE_INET_Addr  listen_addr;
-
     public:
-        explicit RAThread(uint16 port, const char* host);
-        virtual ~RAThread();
 
-        int open(void* unused) override;
-        int svc() override;
+        /// @param beep Emit a terminal bell once the console is ready.
+        explicit CliService(bool beep);
+        ~CliService() override;
+
+        const char* Name() const override { return "console"; }
+
+        void Start() override;
+        void RequestStop() override;
+        void Join() override;
+
+    private:
+
+        void Run();
+
+        const bool        m_beep;
+        std::thread       m_thread;
+        std::atomic<bool> m_stop;
 };
 
 #endif
-

@@ -649,7 +649,7 @@ static void test_complementary_and_empty_state()
 static void test_server_built_embedded_guid()
 {
     MovementInfo info;
-    info.SetMoverGuid(ObjectGuid(0x8070605040302010ull));
+    info.SetMoverGuid(ObjectGuid(uint64(0x8070605040302010ull)));
     RefState state;
     state.guid = 0x8070605040302010ull;
     state.flags = state.flags2 = state.timestamp = 0;
@@ -779,7 +779,7 @@ static void test_transport_stop_monster_move_fixture()
 {
     WorldPacket packet(SMSG_MONSTER_MOVE, 64);
     Movement::PacketBuilder::WriteStopMovement(G3D::Vector3(7.0f, 8.0f, 9.0f), 0xAABBCCDDu,
-        packet, ObjectGuid(0x8877665544332211ull), ObjectGuid(0xA8A7A6A5A4A3A2A1ull), int8(3));
+        packet, ObjectGuid(uint64(0x8877665544332211ull)), ObjectGuid(uint64(0xA8A7A6A5A4A3A2A1ull)), int8(3));
 
     std::vector<uint8> const expected {
         0x00, 0x00, 0x10, 0x41, 0x00, 0x00, 0xE0, 0x40, 0xDD, 0xCC, 0xBB, 0xAA,
@@ -796,7 +796,7 @@ static void test_linear_monster_move_fixture()
     Movement::MonsterMoveData move;
     move.position = G3D::Vector3(1.0f, 2.0f, 3.0f);
     move.splineId = 0x11223344u;
-    move.moverGuid = ObjectGuid(0x0807060504030201ull);
+    move.moverGuid = ObjectGuid(uint64(0x0807060504030201ull));
     move.duration = 1000;
     move.compressedPath.push_back(G3D::Vector3(1.0f, 1.0f, 1.0f));
     move.uncompressedPath.push_back(G3D::Vector3(9.0f, 10.0f, 11.0f));
