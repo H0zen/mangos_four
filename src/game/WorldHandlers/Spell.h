@@ -1478,6 +1478,17 @@ namespace MopCombatLogPackets
         uint32 powerType;
     };
 
+    struct SpellHealLog
+    {
+        uint64 casterGuid;
+        uint64 targetGuid;
+        uint32 spellId;
+        uint32 heal;
+        uint32 overheal;
+        uint32 absorb;
+        bool critical;
+    };
+
     inline void BuildSpellInstakillLog(WorldPacket& out, SpellInstakillLog const& log)
     {
         // The 18414 reader interleaves both packed-GUID masks before consuming
@@ -1546,6 +1557,43 @@ namespace MopCombatLogPackets
             out.WriteByteSeq(GuidByte(byte[1] ? log.casterGuid : log.targetGuid, byte[0]));
         out << uint32(log.spellId);
         out << uint32(log.powerType);
+    }
+
+    inline void BuildSpellHealLog(WorldPacket& out, SpellHealLog const& log)
+    {
+        // The reader consumes the four fixed scalars before its packed-GUID
+        // bit section. The three false bits omit unsupported cast-log/floats.
+        out << uint32(log.spellId);
+        out << uint32(log.absorb);
+        out << uint32(log.heal);
+        out << uint32(log.overheal);
+
+        uint8 const mask[][2] = {
+            { 0, 1 }, { 2, 0 }, { 6, 0 }, { 2, 1 }, { 3, 0 }, { 0, 0 }, { 5, 0 },
+            { 3, 1 }, { 7, 1 }, { 5, 1 }, { 7, 0 }, { 4, 1 }, { 4, 0 }, { 1, 0 },
+            { 1, 1 }, { 6, 1 }
+        };
+        for (size_t i = 0; i < 4; ++i)
+            out.WriteBit(GuidByte(mask[i][1] ? log.targetGuid : log.casterGuid, mask[i][0]) != 0);
+        out.WriteBit(log.critical);
+        for (size_t i = 4; i < 8; ++i)
+            out.WriteBit(GuidByte(mask[i][1] ? log.targetGuid : log.casterGuid, mask[i][0]) != 0);
+        out.WriteBit(false);
+        for (size_t i = 8; i < 12; ++i)
+            out.WriteBit(GuidByte(mask[i][1] ? log.targetGuid : log.casterGuid, mask[i][0]) != 0);
+        out.WriteBit(false);
+        out.WriteBit(false);
+        for (size_t i = 12; i < 16; ++i)
+            out.WriteBit(GuidByte(mask[i][1] ? log.targetGuid : log.casterGuid, mask[i][0]) != 0);
+        out.FlushBits();
+
+        uint8 const bytes[][2] = {
+            { 2, 0 }, { 6, 1 }, { 5, 0 }, { 3, 0 }, { 7, 1 }, { 7, 0 },
+            { 6, 0 }, { 1, 0 }, { 2, 1 }, { 4, 1 }, { 3, 1 }, { 0, 1 },
+            { 5, 1 }, { 0, 0 }, { 1, 1 }, { 4, 0 }
+        };
+        for (auto const& byte : bytes)
+            out.WriteByteSeq(GuidByte(byte[1] ? log.targetGuid : log.casterGuid, byte[0]));
     }
 
     inline bool BuildSpellExecuteLog(WorldPacket& out, SpellExecuteLog const& log)

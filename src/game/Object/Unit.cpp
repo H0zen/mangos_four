@@ -3521,16 +3521,16 @@ Unit* Unit::SelectMagnetTarget(Unit* victim, Spell* spell, SpellEffectIndex eff)
  */
 void Unit::SendHealSpellLog(Unit* pVictim, uint32 SpellID, uint32 Damage, uint32 OverHeal, bool critical, uint32 absorb)
 {
-    // we guess size
-    WorldPacket data(SMSG_SPELLHEALLOG, (8 + 8 + 4 + 4 + 1));
-    data << pVictim->GetPackGUID();
-    data << GetPackGUID();
-    data << uint32(SpellID);
-    data << uint32(Damage);
-    data << uint32(OverHeal);
-    data << uint32(absorb);
-    data << uint8(critical ? 1 : 0);
-    data << uint8(0);                                       // unused in client?
+    MopCombatLogPackets::SpellHealLog log = {};
+    log.casterGuid = GetObjectGuid().GetRawValue();
+    log.targetGuid = pVictim->GetObjectGuid().GetRawValue();
+    log.spellId = SpellID;
+    log.heal = Damage;
+    log.overheal = OverHeal;
+    log.absorb = absorb;
+    log.critical = critical;
+    WorldPacket data(SMSG_SPELLHEALLOG, 36);
+    MopCombatLogPackets::BuildSpellHealLog(data, log);
     SendMessageToSet(&data, true);
 }
 

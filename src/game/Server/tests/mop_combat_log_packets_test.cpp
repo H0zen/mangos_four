@@ -176,6 +176,42 @@ static std::vector<uint8> ExpectedEnergize(MopCombatLogPackets::SpellEnergizeLog
     return writer.Bytes();
 }
 
+static std::vector<uint8> ExpectedHeal(MopCombatLogPackets::SpellHealLog const& log)
+{
+    static uint8 const mask[][2] = {
+        { 0, 1 }, { 2, 0 }, { 6, 0 }, { 2, 1 }, { 3, 0 }, { 0, 0 }, { 5, 0 },
+        { 3, 1 }, { 7, 1 }, { 5, 1 }, { 7, 0 }, { 4, 1 }, { 4, 0 }, { 1, 0 },
+        { 1, 1 }, { 6, 1 }
+    };
+    static uint8 const bytes[][2] = {
+        { 2, 0 }, { 6, 1 }, { 5, 0 }, { 3, 0 }, { 7, 1 }, { 7, 0 },
+        { 6, 0 }, { 1, 0 }, { 2, 1 }, { 4, 1 }, { 3, 1 }, { 0, 1 },
+        { 5, 1 }, { 0, 0 }, { 1, 1 }, { 4, 0 }
+    };
+
+    RefWriter writer;
+    writer.U32(log.spellId);
+    writer.U32(log.absorb);
+    writer.U32(log.heal);
+    writer.U32(log.overheal);
+    for (size_t i = 0; i < 4; ++i)
+        writer.GuidBit(mask[i][1] ? log.targetGuid : log.casterGuid, mask[i][0]);
+    writer.Bit(log.critical);
+    for (size_t i = 4; i < 8; ++i)
+        writer.GuidBit(mask[i][1] ? log.targetGuid : log.casterGuid, mask[i][0]);
+    writer.Bit(false); // no optional spell-cast-log data
+    for (size_t i = 8; i < 12; ++i)
+        writer.GuidBit(mask[i][1] ? log.targetGuid : log.casterGuid, mask[i][0]);
+    writer.Bit(false); // no optional first float
+    writer.Bit(false); // no optional second float
+    for (size_t i = 12; i < 16; ++i)
+        writer.GuidBit(mask[i][1] ? log.targetGuid : log.casterGuid, mask[i][0]);
+    writer.Align();
+    for (auto const& byte : bytes)
+        writer.GuidByte(byte[1] ? log.targetGuid : log.casterGuid, byte[0]);
+    return writer.Bytes();
+}
+
 static std::vector<uint8> ExpectedExecute(MopCombatLogPackets::SpellExecuteLog const& log)
 {
     static uint8 const casterMaskPre[] = { 0, 6, 5, 7, 2 };
@@ -492,6 +528,33 @@ static void test_spell_energize_log()
     CHECK(Equal(sparsePacket, ExpectedEnergize(sparse)));
 }
 
+static void test_spell_heal_log()
+{
+    MopCombatLogPackets::SpellHealLog dense = {};
+    dense.casterGuid = 0x0123456789ABCDEFull;
+    dense.targetGuid = 0xF1E2D3C4B5A69788ull;
+    dense.spellId = 0x11223344u;
+    dense.heal = 0x55667788u;
+    dense.overheal = 0x01020304u;
+    dense.absorb = 0xA1A2A3A4u;
+    dense.critical = true;
+
+    WorldPacket densePacket(SMSG_SPELLHEALLOG, 40);
+    MopCombatLogPackets::BuildSpellHealLog(densePacket, dense);
+    CHECK(densePacket.GetOpcode() == SMSG_SPELLHEALLOG);
+    CHECK(Equal(densePacket, ExpectedHeal(dense)));
+
+    MopCombatLogPackets::SpellHealLog sparse = {};
+    sparse.casterGuid = 0x0002000400060008ull;
+    sparse.targetGuid = 0x0100030005000700ull;
+    sparse.spellId = 1;
+    sparse.heal = 2;
+
+    WorldPacket sparsePacket(SMSG_SPELLHEALLOG, 40);
+    MopCombatLogPackets::BuildSpellHealLog(sparsePacket, sparse);
+    CHECK(Equal(sparsePacket, ExpectedHeal(sparse)));
+}
+
 static void CheckPeriodic(MopCombatLogPackets::PeriodicAuraLog const& log)
 {
     WorldPacket packet(SMSG_SPELL_PERIODIC_AURA_LOG, 64);
@@ -599,6 +662,7 @@ static void test_successor_opcodes_are_framable()
 {
     CHECK(uint32(SMSG_SPELLINSTAKILLLOG) == 0x09F8u);
     CHECK(uint32(SMSG_SPELLENERGIZELOG) == 0x0D79u);
+    CHECK(uint32(SMSG_SPELLHEALLOG) == 0x09FBu);
     CHECK(uint32(SMSG_SPELL_EXECUTE_LOG) == 0x00D8u);
     CHECK(uint32(SMSG_SPELL_PERIODIC_AURA_LOG) == 0x0CF2u);
     CHECK(uint32(SMSG_SPELLDISPELLOG) == 0x0DF9u);
@@ -620,6 +684,11 @@ static void test_successor_opcodes_are_framable()
     WorldPacket energizePacket(SMSG_SPELLENERGIZELOG, 15);
     MopCombatLogPackets::BuildSpellEnergizeLog(energizePacket, energize);
     CHECK(MopWire::BuildServerHeader(true, energizePacket.size(), energizePacket.GetOpcode(), header));
+
+    MopCombatLogPackets::SpellHealLog heal = {};
+    WorldPacket healPacket(SMSG_SPELLHEALLOG, 19);
+    MopCombatLogPackets::BuildSpellHealLog(healPacket, heal);
+    CHECK(MopWire::BuildServerHeader(true, healPacket.size(), healPacket.GetOpcode(), header));
 
     CHECK(MopWire::BuildServerHeader(true, executePacket.size(), executePacket.GetOpcode(), header));
     CHECK(header[0] == 0xD8 && header[1] == 0xA0 && header[2] == 0x03 && header[3] == 0x00);
@@ -652,6 +721,7 @@ int main(int, char**)
 {
     test_spell_instakill_log();
     test_spell_energize_log();
+    test_spell_heal_log();
     test_execute_variants();
     test_periodic_variants();
     test_dispel_and_steal_variants();

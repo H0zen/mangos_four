@@ -227,7 +227,8 @@ add_test(NAME mop_combat_log_packets_source
         -DSOURCE_ROOT=${CMAKE_SOURCE_DIR}
         -P ${CMAKE_CURRENT_SOURCE_DIR}/mop_combat_log_packets_source_test.cmake)
 foreach(mutation IN ITEMS instakill_builder instakill_sender instakill_registration instakill_gate instakill_reference
-        energize_builder energize_sender energize_registration energize_gate energize_reference)
+        energize_builder energize_sender energize_registration energize_gate energize_reference
+        heal_builder heal_sender heal_registration heal_gate heal_reference)
     add_test(NAME mop_combat_log_packets_source_mutation_${mutation}
         COMMAND ${CMAKE_COMMAND} -DSOURCE_ROOT=${CMAKE_SOURCE_DIR} -DMUTATION=${mutation}
             -P ${CMAKE_CURRENT_SOURCE_DIR}/mop_combat_log_packets_source_test.cmake)
