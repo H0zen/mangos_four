@@ -367,6 +367,15 @@ void WorldGateway::Deliver(proto::SessionId session, WorldPacket&& packet)
 
     if (WorldSession* target = Find(session))
     {
+        // Packet dumps stay in game code so the transport remains opcode-agnostic.
+        // The gateway session id replaces the old ACE socket handle as the
+        // connection-scoped identifier for incoming traffic.
+        if (sLog.IsPacketLoggingEnabled())
+        {
+            sLog.outWorldPacketDump(session, packet.GetOpcode(),
+                                    LookupOpcodeName(DIR_CLIENT, packet.GetOpcode()), &packet, true);
+        }
+
         // QueuePacket takes ownership; the world thread drains and frees it.
         target->QueuePacket(new WorldPacket(std::move(packet)));
     }

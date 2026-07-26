@@ -567,6 +567,23 @@ void WorldSession::SendPacket(WorldPacket const* packet, bool bypassSuppress)
 
 #endif                                                  // !MANGOS_DEBUG
 
+    // Packet dumps stay in game code so the transport remains opcode-agnostic.
+    // Use the stable account id in place of the old ACE socket handle. Preserve
+    // the auth-response redaction that WorldSocket applied before its removal.
+    if (sLog.IsPacketLoggingEnabled())
+    {
+        if (packet->GetOpcode() == SMSG_AUTH_RESPONSE)
+        {
+            sLog.outWorldPacketDumpRedacted(GetAccountId(), packet->GetOpcode(),
+                                            LookupOpcodeName(DIR_SERVER, packet->GetOpcode()), packet->size(), false);
+        }
+        else
+        {
+            sLog.outWorldPacketDump(GetAccountId(), packet->GetOpcode(),
+                                    LookupOpcodeName(DIR_SERVER, packet->GetOpcode()), packet, false);
+        }
+    }
+
     // SendPacket() is void and safe to call on a dead link -- unlike the old
     // WorldSocket::SendPacket, there is no -1 failure to react to here.
     m_Socket->SendPacket(*packet);

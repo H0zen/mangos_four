@@ -633,6 +633,10 @@ add_test(NAME mop_core_banner_source
     COMMAND ${CMAKE_COMMAND} -DSOURCE_ROOT=${CMAKE_SOURCE_DIR}
         -P ${CMAKE_CURRENT_SOURCE_DIR}/mop_core_banner_source_test.cmake)
 
+add_test(NAME mop_world_packet_logging_source
+    COMMAND ${CMAKE_COMMAND} -DSOURCE_ROOT=${CMAKE_SOURCE_DIR}
+        -P ${CMAKE_CURRENT_SOURCE_DIR}/mop_world_packet_logging_source_test.cmake)
+
 add_test(NAME mop_default_language_skill_source
     COMMAND ${CMAKE_COMMAND} -DSOURCE_ROOT=${CMAKE_SOURCE_DIR}
         -P ${CMAKE_CURRENT_SOURCE_DIR}/mop_default_language_skill_source_test.cmake)
