@@ -304,6 +304,42 @@ static void test_guild_bank_money_withdrawn()
     CHECK(uint32(SMSG_GUILD_BANK_MONEY_WITHDRAWN) < uint32(OPCODE_TABLE_SIZE));
 }
 
+static void test_guild_bank_text_bounds()
+{
+    WorldPacket shortText;
+    CHECK(MopGuildPackets::BuildGuildBankText(
+        shortText, 0x11223344u, "ABC"));
+    CHECK(shortText.GetOpcode() == SMSG_GUILD_BANK_TEXT);
+    CHECK(Equal(shortText, {
+        0x00, 0x0C,
+        0x44, 0x33, 0x22, 0x11,
+        0x41, 0x42, 0x43
+    }));
+
+    WorldPacket maximum;
+    CHECK(MopGuildPackets::BuildGuildBankText(
+        maximum, 1u, std::string(500, 'x')));
+    CHECK(maximum.size() == 506);
+
+    WorldPacket truncated;
+    CHECK(MopGuildPackets::BuildGuildBankText(
+        truncated, 1u, std::string(501, 'x')));
+    CHECK(truncated.size() == 506);
+    CHECK(truncated.contents()[0] == 0x07);
+    CHECK(truncated.contents()[1] == 0xD0);
+    for (size_t index = 6; index < truncated.size(); ++index)
+        CHECK(truncated.contents()[index] == uint8('x'));
+
+    std::string const fourByteCharacter("\xF0\x9F\x98\x80", 4);
+    std::string multibyte;
+    for (size_t index = 0; index < 500; ++index)
+        multibyte += fourByteCharacter;
+    WorldPacket multibyteMaximum;
+    CHECK(MopGuildPackets::BuildGuildBankText(
+        multibyteMaximum, 1u, multibyte));
+    CHECK(multibyteMaximum.size() == 2006);
+}
+
 static void test_guild_command_result()
 {
     WorldPacket packet;
@@ -393,6 +429,7 @@ int main(int /*argc*/, char** /*argv*/)
     test_guild_event_name_bounds();
     test_guild_event_opcodes();
     test_guild_bank_money_withdrawn();
+    test_guild_bank_text_bounds();
     test_guild_command_result();
     test_guild_invite_request();
 

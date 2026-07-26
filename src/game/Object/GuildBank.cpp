@@ -1223,10 +1223,9 @@ void Guild::SendGuildBankTabText(WorldSession* session, uint8 TabId)
 {
     GuildBankTab const* tab = m_TabListMap[TabId];
 
-    WorldPacket data(SMSG_GUILD_BANK_TEXT, 1 + tab->Text.size() + 1);
-    data.WriteBits(tab->Text.length(), 14);
-    data << uint32(TabId);
-    data.WriteStringData(tab->Text);
+    WorldPacket data;
+    if (!MopGuildPackets::BuildGuildBankText(data, uint32(TabId), tab->Text))
+        return;
 
     if (session)
     {

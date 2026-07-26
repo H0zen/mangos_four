@@ -34,6 +34,7 @@
 #include "ObjectAccessor.h"
 #include "SharedDefines.h"
 #include "Opcodes.h"
+#include "Util.h"
 #include "WorldPacket.h"
 
 #include <string>
@@ -136,6 +137,24 @@ namespace MopGuildPackets
         out.WriteBits(motd.size(), 10);
         out.FlushBits();
         out.append(motd.data(), motd.size());
+        return true;
+    }
+
+    inline bool BuildGuildBankText(WorldPacket& out, uint32 tabId,
+        std::string text)
+    {
+        // The 18414 reader copies its 14-bit text length into fixed storage.
+        // Enforce the game's 500-character limit here as well as on edits so
+        // oversized or malformed database content can never reach that copy.
+        utf8truncate(text, 500);
+        if (text.size() >= (size_t(1) << 14))
+            return false;
+
+        out.Initialize(SMSG_GUILD_BANK_TEXT, 6 + text.size());
+        out.WriteBits(text.size(), 14);
+        out.FlushBits();
+        out << tabId;
+        out.WriteStringData(text);
         return true;
     }
 
