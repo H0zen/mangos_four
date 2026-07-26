@@ -390,6 +390,16 @@ namespace MopSpellPackets
         out.WriteGuidBytes<3, 1, 2, 4, 6, 0>(ownerGuid);
     }
 
+    inline void BuildItemCooldown(WorldPacket& out, ObjectGuid itemGuid,
+        uint32 spellId)
+    {
+        out.Initialize(SMSG_ITEM_COOLDOWN, 12);
+
+        // Dynamic 18414 handler sub_77D70B reads a raw uint64 item GUID and
+        // then a uint32 spell ID before installing the item's 30-second lock.
+        out << itemGuid << spellId;
+    }
+
     inline void BuildLearnedSpell(WorldPacket& out, uint32 spellId,
         bool suppressMessaging)
     {

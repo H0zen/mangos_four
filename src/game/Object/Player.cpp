@@ -4584,9 +4584,8 @@ void Player::ApplyEquipCooldown(Item* pItem)
 
         AddSpellCooldown(spellData.SpellId, pItem->GetEntry(), time(NULL) + 30);
 
-        WorldPacket data(SMSG_ITEM_COOLDOWN, 12);
-        data << pItem->GetObjectGuid();
-        data << uint32(spellData.SpellId);
+        WorldPacket data;
+        MopSpellPackets::BuildItemCooldown(data, pItem->GetObjectGuid(), spellData.SpellId);
         GetSession()->SendPacket(&data);
     }
 }

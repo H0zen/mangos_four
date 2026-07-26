@@ -1124,6 +1124,18 @@ static void test_cooldown_event_wire_layout()
     });
 }
 
+static void test_item_cooldown_wire_layout()
+{
+    WorldPacket packet;
+    MopSpellPackets::BuildItemCooldown(packet,
+        ObjectGuid(UINT64_C(0x0807060504030201)), 0x11223344u);
+    CHECK(packet.GetOpcode() == SMSG_ITEM_COOLDOWN);
+    CheckBytes(packet, {
+        0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08,
+        0x44, 0x33, 0x22, 0x11,
+    });
+}
+
 int main(int, char**)
 {
     test_dense_and_guid_permutations();
@@ -1142,6 +1154,7 @@ int main(int, char**)
     test_spell_cooldown_wire_layout();
     test_clear_cooldowns_wire_layout();
     test_cooldown_event_wire_layout();
+    test_item_cooldown_wire_layout();
     test_spellbook_mutation_wire_layouts();
     test_pet_spellbook_mutation_wire_layouts();
 

@@ -378,6 +378,31 @@ elseif(MUTATION STREQUAL "cooldown_event_reference")
         "SMSG_COOLDOWN_EVENT                            0x1163  ACTIVE"
         "SMSG_COOLDOWN_EVENT                            0x1163  DORMANT"
         opcode_reference "${opcode_reference}")
+elseif(MUTATION STREQUAL "item_cooldown_wire_order")
+    string(REPLACE
+        "out << itemGuid << spellId;"
+        "out << spellId << itemGuid;"
+        spell_header "${spell_header}")
+elseif(MUTATION STREQUAL "item_cooldown_sender")
+    string(REPLACE
+        "MopSpellPackets::BuildItemCooldown(data, pItem->GetObjectGuid(), spellData.SpellId);"
+        "/* removed item cooldown sender */"
+        player_source "${player_source}")
+elseif(MUTATION STREQUAL "item_cooldown_registration")
+    string(REPLACE
+        "DefS(SMSG_ITEM_COOLDOWN, \"SMSG_ITEM_COOLDOWN\");"
+        "/* removed SMSG_ITEM_COOLDOWN registration */"
+        opcode_registry "${opcode_registry}")
+elseif(MUTATION STREQUAL "item_cooldown_gate")
+    string(REPLACE
+        "case SMSG_ITEM_COOLDOWN:"
+        "case SMSG_UNKNOWN_0:"
+        world_session "${world_session}")
+elseif(MUTATION STREQUAL "item_cooldown_reference")
+    string(REPLACE
+        "SMSG_ITEM_COOLDOWN                             0x1904  ACTIVE"
+        "SMSG_ITEM_COOLDOWN                             0x1904  DORMANT"
+        opcode_reference "${opcode_reference}")
 endif()
 
 string(FIND "${spell_handler}" "void WorldSession::HandleCastSpellOpcode" cast_start)
@@ -716,6 +741,26 @@ require_once("${opcode_reference}"
     "active cooldown-event reference")
 forbid("${spell_cooldown_mgr_source}" "WorldPacket data(SMSG_COOLDOWN_EVENT"
     "legacy cooldown-event body")
+require_once("${spell_header}"
+    "inline void BuildItemCooldown(WorldPacket& out, ObjectGuid itemGuid,"
+    "18414 item-cooldown builder")
+require_once("${spell_header}"
+    "out << itemGuid << spellId;"
+    "item-cooldown wire field order")
+require_once("${player_source}"
+    "MopSpellPackets::BuildItemCooldown(data, pItem->GetObjectGuid(), spellData.SpellId);"
+    "item-cooldown sender")
+require_once("${opcode_registry}"
+    "DefS(SMSG_ITEM_COOLDOWN, \"SMSG_ITEM_COOLDOWN\");"
+    "item-cooldown registration")
+require_once("${world_session}"
+    "case SMSG_ITEM_COOLDOWN:"
+    "item-cooldown send admission")
+require_once("${opcode_reference}"
+    "SMSG_ITEM_COOLDOWN                             0x1904  ACTIVE"
+    "active direct-client item-cooldown reference")
+forbid("${player_source}" "WorldPacket data(SMSG_ITEM_COOLDOWN"
+    "legacy item-cooldown body")
 require_once("${spell_header}"
     "inline void BuildLearnedSpell(WorldPacket& out, uint32 spellId,"
     "18414 learned-spell builder")

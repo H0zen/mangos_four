@@ -175,8 +175,8 @@
  *   TOTAL SMSG rows                   925
  *
  * SUBSYSTEM CONFIDENCE: high=365, low=221, medium=182, none=157
- * STATUS TOTALS: ACTIVE=367, DOC=438, DORMANT=715
- *   SMSG: ACTIVE=227, DOC=271, DORMANT=427
+ * STATUS TOTALS: ACTIVE=368, DOC=438, DORMANT=714
+ *   SMSG: ACTIVE=228, DOC=271, DORMANT=426
  *   CMSG: ACTIVE=140, DOC=167, DORMANT=288
  */
 
@@ -1273,7 +1273,7 @@ typedef uint16_t uint16;
  *   SMSG_UNKNOWN_0x188B                            0x188B  DOC      [unattributed]  handler never installed in this build
  *   SMSG_UNKNOWN_0x18AA                            0x18AA  DOC      [unattributed]  handler never installed in this build
  *   SMSG_UNKNOWN_0x18BB                            0x18BB  DOC      [unattributed]  handler never installed in this build
- *   SMSG_ITEM_COOLDOWN                             0x1904  DORMANT  [unattributed]  dynamic slot 772 installed by 0x78F488
+ *   SMSG_ITEM_COOLDOWN                             0x1904  ACTIVE  [Wow.exe binary: dynamic slot 772 handler sub_77D70B reads uint64 item GUID then uint32 spell ID]
  *   SMSG_UNKNOWN_0x1949                            0x1949  DOC      [unattributed]  special-control (ingress)
  *   SMSG_UNKNOWN_0x1968                            0x1968  DOC      [unattributed]  special-control (ingress)
  *   SMSG_PONG                                      0x1969  ACTIVE   [unattributed]  special-control (ingress)
