@@ -469,18 +469,16 @@ void Unit::DealMeleeDamage(CalcDamageInfo* damageInfo, bool durabilityLoss)
                 uint32 targetHealth = GetHealth();
                 uint32 overkill = damage > targetHealth ? damage - targetHealth : 0;
 
-                WorldPacket data(SMSG_SPELLDAMAGESHIELD, (8 + 8 + 4 + 4 + 4 + 4));
-                data << pVictim->GetObjectGuid();
-                data << GetObjectGuid();
-                data << uint32(i_spellProto->ID);
-                data << uint32(damage);                  // Damage
-                data << uint32(overkill);                // Overkill
-#if !defined (MISTS)
-                data << uint32(i_spellProto->SchoolMask);
-#else
-                data << uint32(i_spellProto->GetSchoolMask());
-#endif
-                data << uint32(resist);                  // Resist
+                MopCombatLogPackets::SpellDamageShieldLog log = {};
+                log.casterGuid = pVictim->GetObjectGuid().GetRawValue();
+                log.targetGuid = GetObjectGuid().GetRawValue();
+                log.spellId = i_spellProto->ID;
+                log.damage = damage;
+                log.overkill = overkill;
+                log.schoolMask = i_spellProto->GetSchoolMask();
+                log.resist = resist;
+                WorldPacket data(SMSG_SPELLDAMAGESHIELD, 36);
+                MopCombatLogPackets::BuildSpellDamageShieldLog(data, log);
                 pVictim->SendMessageToSet(&data, true);
 
                 pVictim->DealDamage(this, damage, 0, SPELL_DIRECT_DAMAGE, GetSpellSchoolMask(i_spellProto), i_spellProto, true);

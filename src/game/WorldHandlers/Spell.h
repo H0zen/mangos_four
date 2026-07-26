@@ -1489,6 +1489,17 @@ namespace MopCombatLogPackets
         bool critical;
     };
 
+    struct SpellDamageShieldLog
+    {
+        uint64 casterGuid;
+        uint64 targetGuid;
+        uint32 spellId;
+        uint32 damage;
+        uint32 overkill;
+        uint32 schoolMask;
+        uint32 resist;
+    };
+
     inline void BuildSpellInstakillLog(WorldPacket& out, SpellInstakillLog const& log)
     {
         // The 18414 reader interleaves both packed-GUID masks before consuming
@@ -1594,6 +1605,45 @@ namespace MopCombatLogPackets
         };
         for (auto const& byte : bytes)
             out.WriteByteSeq(GuidByte(byte[1] ? log.targetGuid : log.casterGuid, byte[0]));
+    }
+
+    inline void BuildSpellDamageShieldLog(WorldPacket& out, SpellDamageShieldLog const& log)
+    {
+        // The false bit omits the optional client cast-log extension. All
+        // damage-shield scalars below are mandatory in the 18414 reader.
+        uint8 const mask[][2] = {
+            { 1, 1 }, { 2, 0 }, { 6, 0 }, { 3, 1 }, { 4, 0 }, { 2, 1 },
+            { 5, 1 }, { 6, 1 }, { 3, 0 }, { 0, 1 }, { 5, 0 }, { 1, 0 },
+            { 0, 0 }, { 7, 1 }, { 4, 1 }, { 7, 0 }
+        };
+        for (size_t i = 0; i < 2; ++i)
+            out.WriteBit(GuidByte(mask[i][1] ? log.targetGuid : log.casterGuid, mask[i][0]) != 0);
+        out.WriteBit(false);
+        for (size_t i = 2; i < 16; ++i)
+            out.WriteBit(GuidByte(mask[i][1] ? log.targetGuid : log.casterGuid, mask[i][0]) != 0);
+        out.FlushBits();
+
+        out.WriteByteSeq(GuidByte(log.targetGuid, 2));
+        out.WriteByteSeq(GuidByte(log.casterGuid, 6));
+        out.WriteByteSeq(GuidByte(log.targetGuid, 6));
+        out.WriteByteSeq(GuidByte(log.targetGuid, 4));
+        out.WriteByteSeq(GuidByte(log.casterGuid, 3));
+        out.WriteByteSeq(GuidByte(log.targetGuid, 7));
+        out << uint32(log.resist);
+        out.WriteByteSeq(GuidByte(log.casterGuid, 4));
+        out.WriteByteSeq(GuidByte(log.targetGuid, 1));
+        out << uint32(log.damage);
+        out.WriteByteSeq(GuidByte(log.casterGuid, 7));
+        out << uint32(log.spellId);
+        out << uint32(log.overkill);
+        out.WriteByteSeq(GuidByte(log.targetGuid, 5));
+        out.WriteByteSeq(GuidByte(log.casterGuid, 5));
+        out.WriteByteSeq(GuidByte(log.targetGuid, 0));
+        out.WriteByteSeq(GuidByte(log.casterGuid, 1));
+        out.WriteByteSeq(GuidByte(log.casterGuid, 0));
+        out.WriteByteSeq(GuidByte(log.casterGuid, 2));
+        out << uint32(log.schoolMask);
+        out.WriteByteSeq(GuidByte(log.targetGuid, 3));
     }
 
     inline bool BuildSpellExecuteLog(WorldPacket& out, SpellExecuteLog const& log)

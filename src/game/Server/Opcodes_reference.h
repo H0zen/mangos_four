@@ -175,8 +175,8 @@
  *   TOTAL SMSG rows                   925
  *
  * SUBSYSTEM CONFIDENCE: high=365, low=221, medium=182, none=157
- * STATUS TOTALS: ACTIVE=365, DOC=438, DORMANT=717
- *   SMSG: ACTIVE=225, DOC=271, DORMANT=429
+ * STATUS TOTALS: ACTIVE=366, DOC=438, DORMANT=716
+ *   SMSG: ACTIVE=226, DOC=271, DORMANT=428
  *   CMSG: ACTIVE=140, DOC=167, DORMANT=288
  */
 
@@ -747,7 +747,7 @@ typedef uint16_t uint16;
  *   SMSG_UNKNOWN_0x04AA                            0x04AA  DOC      [medium-conf]
  *   SMSG_ARENA_ERROR                               0x04BA  DORMANT  [medium-conf]
  *   SMSG_VOICE_PARENTAL_CONTROLS                   0x04BF  DORMANT  [medium-conf]
- *   SMSG_SPELLDAMAGESHIELD                         0x05F3  DORMANT 
+ *   SMSG_SPELLDAMAGESHIELD                         0x05F3  ACTIVE
  *   SMSG_CHAT_PLAYER_AMBIGUOUS                     0x061A  DORMANT  [medium-conf]
  *   SMSG_PLAY_TIME_WARNING                         0x062A  DORMANT  [medium-conf]
  *   SMSG_DISMOUNTRESULT                            0x062F  DORMANT  [medium-conf]

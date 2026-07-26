@@ -212,6 +212,45 @@ static std::vector<uint8> ExpectedHeal(MopCombatLogPackets::SpellHealLog const& 
     return writer.Bytes();
 }
 
+static std::vector<uint8> ExpectedDamageShield(MopCombatLogPackets::SpellDamageShieldLog const& log)
+{
+    static uint8 const mask[][2] = {
+        { 1, 1 }, { 2, 0 }, { 6, 0 }, { 3, 1 }, { 4, 0 }, { 2, 1 },
+        { 5, 1 }, { 6, 1 }, { 3, 0 }, { 0, 1 }, { 5, 0 }, { 1, 0 },
+        { 0, 0 }, { 7, 1 }, { 4, 1 }, { 7, 0 }
+    };
+
+    RefWriter writer;
+    for (size_t i = 0; i < 2; ++i)
+        writer.GuidBit(mask[i][1] ? log.targetGuid : log.casterGuid, mask[i][0]);
+    writer.Bit(false); // no optional spell-cast-log data
+    for (size_t i = 2; i < 16; ++i)
+        writer.GuidBit(mask[i][1] ? log.targetGuid : log.casterGuid, mask[i][0]);
+    writer.Align();
+    writer.GuidByte(log.targetGuid, 2);
+    writer.GuidByte(log.casterGuid, 6);
+    writer.GuidByte(log.targetGuid, 6);
+    writer.GuidByte(log.targetGuid, 4);
+    writer.GuidByte(log.casterGuid, 3);
+    writer.GuidByte(log.targetGuid, 7);
+    writer.U32(log.resist);
+    writer.GuidByte(log.casterGuid, 4);
+    writer.GuidByte(log.targetGuid, 1);
+    writer.U32(log.damage);
+    writer.GuidByte(log.casterGuid, 7);
+    writer.U32(log.spellId);
+    writer.U32(log.overkill);
+    writer.GuidByte(log.targetGuid, 5);
+    writer.GuidByte(log.casterGuid, 5);
+    writer.GuidByte(log.targetGuid, 0);
+    writer.GuidByte(log.casterGuid, 1);
+    writer.GuidByte(log.casterGuid, 0);
+    writer.GuidByte(log.casterGuid, 2);
+    writer.U32(log.schoolMask);
+    writer.GuidByte(log.targetGuid, 3);
+    return writer.Bytes();
+}
+
 static std::vector<uint8> ExpectedExecute(MopCombatLogPackets::SpellExecuteLog const& log)
 {
     static uint8 const casterMaskPre[] = { 0, 6, 5, 7, 2 };
@@ -555,6 +594,34 @@ static void test_spell_heal_log()
     CHECK(Equal(sparsePacket, ExpectedHeal(sparse)));
 }
 
+static void test_spell_damage_shield_log()
+{
+    MopCombatLogPackets::SpellDamageShieldLog dense = {};
+    dense.casterGuid = 0x0123456789ABCDEFull;
+    dense.targetGuid = 0xF1E2D3C4B5A69788ull;
+    dense.spellId = 0x11223344u;
+    dense.damage = 0x55667788u;
+    dense.overkill = 0x01020304u;
+    dense.schoolMask = 0xA1A2A3A4u;
+    dense.resist = 0x05060708u;
+
+    WorldPacket densePacket(SMSG_SPELLDAMAGESHIELD, 40);
+    MopCombatLogPackets::BuildSpellDamageShieldLog(densePacket, dense);
+    CHECK(densePacket.GetOpcode() == SMSG_SPELLDAMAGESHIELD);
+    CHECK(Equal(densePacket, ExpectedDamageShield(dense)));
+
+    MopCombatLogPackets::SpellDamageShieldLog sparse = {};
+    sparse.casterGuid = 0x0002000400060008ull;
+    sparse.targetGuid = 0x0100030005000700ull;
+    sparse.spellId = 1;
+    sparse.damage = 2;
+    sparse.schoolMask = 4;
+
+    WorldPacket sparsePacket(SMSG_SPELLDAMAGESHIELD, 40);
+    MopCombatLogPackets::BuildSpellDamageShieldLog(sparsePacket, sparse);
+    CHECK(Equal(sparsePacket, ExpectedDamageShield(sparse)));
+}
+
 static void CheckPeriodic(MopCombatLogPackets::PeriodicAuraLog const& log)
 {
     WorldPacket packet(SMSG_SPELL_PERIODIC_AURA_LOG, 64);
@@ -663,6 +730,7 @@ static void test_successor_opcodes_are_framable()
     CHECK(uint32(SMSG_SPELLINSTAKILLLOG) == 0x09F8u);
     CHECK(uint32(SMSG_SPELLENERGIZELOG) == 0x0D79u);
     CHECK(uint32(SMSG_SPELLHEALLOG) == 0x09FBu);
+    CHECK(uint32(SMSG_SPELLDAMAGESHIELD) == 0x05F3u);
     CHECK(uint32(SMSG_SPELL_EXECUTE_LOG) == 0x00D8u);
     CHECK(uint32(SMSG_SPELL_PERIODIC_AURA_LOG) == 0x0CF2u);
     CHECK(uint32(SMSG_SPELLDISPELLOG) == 0x0DF9u);
@@ -689,6 +757,11 @@ static void test_successor_opcodes_are_framable()
     WorldPacket healPacket(SMSG_SPELLHEALLOG, 19);
     MopCombatLogPackets::BuildSpellHealLog(healPacket, heal);
     CHECK(MopWire::BuildServerHeader(true, healPacket.size(), healPacket.GetOpcode(), header));
+
+    MopCombatLogPackets::SpellDamageShieldLog damageShield = {};
+    WorldPacket damageShieldPacket(SMSG_SPELLDAMAGESHIELD, 23);
+    MopCombatLogPackets::BuildSpellDamageShieldLog(damageShieldPacket, damageShield);
+    CHECK(MopWire::BuildServerHeader(true, damageShieldPacket.size(), damageShieldPacket.GetOpcode(), header));
 
     CHECK(MopWire::BuildServerHeader(true, executePacket.size(), executePacket.GetOpcode(), header));
     CHECK(header[0] == 0xD8 && header[1] == 0xA0 && header[2] == 0x03 && header[3] == 0x00);
@@ -722,6 +795,7 @@ int main(int, char**)
     test_spell_instakill_log();
     test_spell_energize_log();
     test_spell_heal_log();
+    test_spell_damage_shield_log();
     test_execute_variants();
     test_periodic_variants();
     test_dispel_and_steal_variants();
