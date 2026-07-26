@@ -311,6 +311,20 @@ void MopUpdateObject::AppendSelfPlayerValuesBlock(ByteBuffer& out, uint64 guid,
             });
             continue;
         }
+        // MerchantFrame.lua's GetNumBuybackItems() path ignores a logical
+        // slot when its native buyback-price field is zero. IDA 9.4 places
+        // the 18414 price/timestamp arrays at 1865..1888, eight fields after
+        // Four's legacy storage. Preserve zero values so cleared slots also
+        // reach the client.
+        if (sourceIndex >= SelfBuybackSourceStart &&
+            sourceIndex < SelfBuybackSourceStart + SelfBuybackFieldCount)
+        {
+            fields.push_back({
+                uint16(SelfBuybackTargetStart + sourceIndex - SelfBuybackSourceStart),
+                value
+            });
+            continue;
+        }
 
         if (sourceIndex >= 29 && sourceIndex <= 33)
         {

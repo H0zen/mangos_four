@@ -408,6 +408,48 @@ int main(int /*argc*/, char** /*argv*/)
         CHECK(values.rpos() == values.size());
     }
 
+    // MerchantFrame.lua asks native GetNumBuybackItems(), which admits a
+    // logical slot only when both its item object and buybackPrice are set.
+    // The 18414 CGPlayerData metadata moves Four's price/timestamp ranges by
+    // eight fields; changed-to-zero endpoints remain significant.
+    {
+        const MopUpdateObject::StaticField sourceFields[] =
+        {
+            { 1857, 0x01020304u },       // first buyback price -> 1865
+            { 1868, 0 },                 // final buyback price -> 1876
+            { 1869, 0x11223344u },       // first buyback timestamp -> 1877
+            { 1880, 0 },                 // final buyback timestamp -> 1888
+        };
+        ByteBuffer values;
+        MopUpdateObject::AppendSelfPlayerValuesBlock(values, 0x10, sourceFields,
+            sizeof(sourceFields) / sizeof(sourceFields[0]));
+        values.rpos(3); // VALUES + packed GUID
+        uint8 blockCount;
+        values >> blockCount;
+        CHECK(blockCount == 60);
+        uint32 masks[60];
+        for (uint32& mask : masks) values >> mask;
+        auto hasBit = [&masks](uint16 index)
+        {
+            return (masks[index / 32] & (uint32(1) << (index % 32))) != 0;
+        };
+        for (uint16 index : { uint16(1865), uint16(1876), uint16(1877), uint16(1888) })
+            CHECK(hasBit(index));
+        CHECK(!hasBit(1857));
+        CHECK(!hasBit(1869));
+
+        for (uint32 expectedValue : { 0x01020304u, 0u, 0x11223344u, 0u })
+        {
+            uint32 actualValue;
+            values >> actualValue;
+            CHECK(actualValue == expectedValue);
+        }
+        uint8 dynamicCount;
+        values >> dynamicCount;
+        CHECK(dynamicCount == 0);
+        CHECK(values.rpos() == values.size());
+    }
+
     CHECK(MopUpdateObject::RepackUnitBytes0(0x04030201u) == 0x03040201u);
     CHECK(MopUpdateObject::TranslateUnitDynamicFlags(0x000000A5u) == 0x0000014Au);
     CHECK(MopUpdateObject::TranslateUnitDynamicFlags(0xFFFF01A5u) == 0x0000014Au);

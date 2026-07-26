@@ -106,6 +106,10 @@ namespace
         PLAYER_SKILL_TALENT_0 + 64 ==
             MopUpdateObject::SelfSkillSourceStart + MopUpdateObject::SelfSkillFieldCount,
         "self skill translation must cover all seven legacy 64-word arrays");
+    static_assert(PLAYER_FIELD_BUYBACK_PRICE_1 == MopUpdateObject::SelfBuybackSourceStart &&
+        PLAYER_FIELD_BUYBACK_TIMESTAMP_1 + 12 ==
+            MopUpdateObject::SelfBuybackSourceStart + MopUpdateObject::SelfBuybackFieldCount,
+        "self buyback translation must cover the legacy price and timestamp arrays");
 
     bool CanBuildMopInventoryObject(Object const& object, Player* target)
     {
@@ -571,7 +575,8 @@ void Object::BuildValuesUpdateBlockForPlayer(UpdateData* data, Player* target) c
         {
             fields.reserve(25 + MopUpdateObject::ObserverVisibleItemFieldCount +
                 MopUpdateObject::SelfInventoryFieldCount +
-                MopUpdateObject::SelfSkillFieldCount);
+                MopUpdateObject::SelfSkillFieldCount +
+                MopUpdateObject::SelfBuybackFieldCount);
             auto addIfChanged = [this, &fields](uint16 sourceIndex)
             {
                 if (m_changedValues[sourceIndex])
@@ -626,6 +631,14 @@ void Object::BuildValuesUpdateBlockForPlayer(UpdateData* data, Player* target) c
             for (uint16 i = MopUpdateObject::SelfSkillSourceStart;
                  i < MopUpdateObject::SelfSkillSourceStart +
                      MopUpdateObject::SelfSkillFieldCount; ++i)
+            {
+                addIfChanged(i);
+            }
+            // The 18414 merchant UI requires the private price/timestamp
+            // arrays as well as the buyback item GUIDs before it lists a slot.
+            for (uint16 i = MopUpdateObject::SelfBuybackSourceStart;
+                 i < MopUpdateObject::SelfBuybackSourceStart +
+                     MopUpdateObject::SelfBuybackFieldCount; ++i)
             {
                 addIfChanged(i);
             }

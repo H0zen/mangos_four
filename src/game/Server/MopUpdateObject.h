@@ -52,6 +52,9 @@ namespace MopUpdateObject
     static constexpr uint16 SelfSkillSourceStart = 1146;
     static constexpr uint16 SelfSkillTargetStart = 1153;
     static constexpr uint16 SelfSkillFieldCount = 448;
+    static constexpr uint16 SelfBuybackSourceStart = 1857;
+    static constexpr uint16 SelfBuybackTargetStart = 1865;
+    static constexpr uint16 SelfBuybackFieldCount = 24;
     static constexpr uint16 ObserverVisibleItemSourceStart = 916;
     static constexpr uint16 ObserverVisibleItemTargetStart = 921;
     static constexpr uint16 ObserverVisibleItemFieldCount = 38;
