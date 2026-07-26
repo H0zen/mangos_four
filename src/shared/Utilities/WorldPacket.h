@@ -28,10 +28,19 @@
 
 #include "Common.h"
 #include "ByteBuffer.h"
-#include "Opcodes.h"
 
 // Note: m_opcode and size stored in platfom dependent format
 // ignore endianess until send, and converted at receive
+//
+// The opcode is a plain uint16, NOT OpcodesList (src/game/Server/Opcodes.h's 1,382-entry enum).
+// WorldPacket lives in src/shared/, which src/proto/ links; Opcodes.h pulls the full game header
+// surface (WorldSession.h et al. -- see Opcodes.h's own opcode-table-size rationale) and proto must
+// not link game. Giving two libraries the same quote-included "Opcodes.h" name for two different
+// enums is also unsafe the moment both are linked into one binary. Callers keep passing OpcodesList
+// values (SMSG_*/CMSG_* constants) unchanged -- an unscoped enum converts to its integer value
+// implicitly -- and read the opcode back through game's own LookupOpcodeName(GetOpcode()) rather
+// than a member of this class. 0x1001 below is MSG_NULL_ACTION's value (Opcodes.h:75); duplicated
+// as a literal for the same reason the enum itself cannot be named here.
 /**
  * @brief
  *
@@ -43,7 +52,7 @@ class WorldPacket : public ByteBuffer
          * @brief just container for later use
          *
          */
-        WorldPacket() : ByteBuffer(0), m_opcode(MSG_NULL_ACTION)
+        WorldPacket() : ByteBuffer(0), m_opcode(0x1001)
         {
         }
         /**
@@ -52,7 +61,7 @@ class WorldPacket : public ByteBuffer
          * @param opcode
          * @param res
          */
-        explicit WorldPacket(OpcodesList opcode, size_t res = 200) : ByteBuffer(res), m_opcode(opcode) { }
+        explicit WorldPacket(uint16 opcode, size_t res = 200) : ByteBuffer(res), m_opcode(opcode) { }
         /**
          * @brief copy constructor
          *
@@ -68,7 +77,7 @@ class WorldPacket : public ByteBuffer
          * @param opcode
          * @param newres
          */
-        void Initialize(OpcodesList opcode, size_t newres = 200)
+        void Initialize(uint16 opcode, size_t newres = 200)
         {
             clear();
             _storage.reserve(newres);
@@ -80,15 +89,15 @@ class WorldPacket : public ByteBuffer
          *
          * @return uint16
          */
-        OpcodesList GetOpcode() const { return m_opcode; }
+        uint16 GetOpcode() const { return m_opcode; }
         /**
          * @brief
          *
          * @param opcode
          */
-        void SetOpcode(OpcodesList opcode) { m_opcode = opcode; }
+        void SetOpcode(uint16 opcode) { m_opcode = opcode; }
 
     protected:
-        OpcodesList m_opcode;
+        uint16 m_opcode;
 };
 #endif
