@@ -568,10 +568,9 @@ void WorldObject::SetPhaseMask(uint32 newPhaseMask, bool update)
  */
 void WorldObject::PlayDistanceSound(uint32 sound_id, Player const* target /*= NULL*/) const
 {
-    WorldPacket data(SMSG_PLAY_OBJECT_SOUND, 4 + 8);
-    data << uint32(sound_id);
-    data << GetObjectGuid();
-    data << GetObjectGuid();
+    WorldPacket data;
+    MopSoundPackets::BuildPlayObjectSound(
+        data, sound_id, GetObjectGuid(), GetObjectGuid());
     if (target)
     {
         target->SendDirectMessage(&data);
@@ -590,9 +589,8 @@ void WorldObject::PlayDistanceSound(uint32 sound_id, Player const* target /*= NU
  */
 void WorldObject::PlayDirectSound(uint32 sound_id, Player const* target /*= NULL*/) const
 {
-    WorldPacket data(SMSG_PLAY_SOUND, 4);
-    data << uint32(sound_id);
-    data << ObjectGuid();
+    WorldPacket data;
+    MopSoundPackets::BuildPlaySound(data, sound_id, ObjectGuid());
     if (target)
     {
         target->SendDirectMessage(&data);
@@ -611,8 +609,8 @@ void WorldObject::PlayDirectSound(uint32 sound_id, Player const* target /*= NULL
  */
 void WorldObject::PlayMusic(uint32 sound_id, Player const* target /*= NULL*/) const
 {
-    WorldPacket data(SMSG_PLAY_MUSIC, 4);
-    data << uint32(sound_id);
+    WorldPacket data;
+    MopSoundPackets::BuildPlayMusic(data, sound_id);
     if (target)
     {
         target->SendDirectMessage(&data);

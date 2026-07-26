@@ -1531,3 +1531,31 @@ foreach(mutation IN ITEMS mask_order byte_order reaction_position creature_sende
             -P ${CMAKE_CURRENT_SOURCE_DIR}/mop_ai_reaction_packets_source_test.cmake)
     set_tests_properties(mop_ai_reaction_packets_source_mutation_${mutation} PROPERTIES WILL_FAIL TRUE)
 endforeach()
+
+add_executable(mop_sound_packets_test mop_sound_packets_test.cpp)
+target_include_directories(mop_sound_packets_test PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}/..
+    ${CMAKE_SOURCE_DIR}/src/shared
+    $<TARGET_PROPERTY:game,INTERFACE_INCLUDE_DIRECTORIES>)
+set_target_properties(mop_sound_packets_test PROPERTIES CXX_STANDARD 17 CXX_STANDARD_REQUIRED ON)
+target_compile_definitions(mop_sound_packets_test PRIVATE
+    $<TARGET_PROPERTY:game,INTERFACE_COMPILE_DEFINITIONS>)
+target_link_libraries(mop_sound_packets_test PRIVATE shared)
+add_test(NAME mop_sound_packets COMMAND mop_sound_packets_test)
+
+add_test(NAME mop_sound_packets_source
+    COMMAND ${CMAKE_COMMAND} -DSOURCE_ROOT=${CMAKE_SOURCE_DIR}
+        -P ${CMAKE_CURRENT_SOURCE_DIR}/mop_sound_packets_source_test.cmake)
+
+foreach(mutation IN ITEMS direct_mask direct_bytes object_mask object_bytes
+        worldobject_sound_sender map_sound_sender battleground_sound_sender
+        object_sound_sender music_sender registration_sound registration_object
+        registration_music allowlist_sound allowlist_object allowlist_music
+        opcode_sound opcode_object opcode_music reference_sound reference_object
+        reference_music)
+    add_test(NAME mop_sound_packets_source_mutation_${mutation}
+        COMMAND ${CMAKE_COMMAND} -DSOURCE_ROOT=${CMAKE_SOURCE_DIR}
+            -DMUTATION=${mutation}
+            -P ${CMAKE_CURRENT_SOURCE_DIR}/mop_sound_packets_source_test.cmake)
+    set_tests_properties(mop_sound_packets_source_mutation_${mutation} PROPERTIES WILL_FAIL TRUE)
+endforeach()

@@ -175,8 +175,8 @@
  *   TOTAL SMSG rows                   925
  *
  * SUBSYSTEM CONFIDENCE: high=365, low=221, medium=182, none=157
- * STATUS TOTALS: ACTIVE=333, DOC=437, DORMANT=750
- *   SMSG: ACTIVE=198, DOC=270, DORMANT=457
+ * STATUS TOTALS: ACTIVE=336, DOC=437, DORMANT=747
+ *   SMSG: ACTIVE=201, DOC=270, DORMANT=454
  *   CMSG: ACTIVE=135, DOC=167, DORMANT=293
  */
 
@@ -510,7 +510,7 @@ typedef uint16_t uint16;
  *   SMSG_PVP_CREDIT                                0x100A  DORMANT 
  *   SMSG_UNKNOWN_0x101F                            0x101F  DOC      [medium-conf]
  *   SMSG_STOP_MIRROR_TIMER                         0x1026  DORMANT  [medium-conf]
- *   SMSG_PLAY_SOUND                                0x102A  DORMANT 
+ *   SMSG_PLAY_SOUND                                0x102A  ACTIVE
  *   SMSG_GM_PLAYER_INFO                            0x102B  DORMANT  [medium-conf]
  *   SMSG_CLEAR_TARGET                              0x1061  DORMANT 
  *   SMSG_PROPOSE_LEVEL_GRANT                       0x109A  DORMANT 
@@ -523,7 +523,7 @@ typedef uint16_t uint16;
  *   SMSG_UNKNOWN_0x122A                            0x122A  DOC      [low-conf]
  *   SMSG_SET_DUNGEON_DIFFICULTY                    0x1283  ACTIVE   [medium-conf]
  *   SMSG_PLAYER_DIFFICULTY_CHANGE                  0x128E  DORMANT  [medium-conf]
- *   SMSG_PLAY_OBJECT_SOUND                         0x1443  DORMANT 
+ *   SMSG_PLAY_OBJECT_SOUND                         0x1443  ACTIVE
  *   SMSG_PLAYER_SKINNED                            0x1463  DORMANT  [low-conf]
  *   SMSG_INIT_WORLD_STATES                         0x1560  ACTIVE   [medium-conf]
  *   SMSG_PAUSE_MIRROR_TIMER                        0x162E  DORMANT  [medium-conf]
@@ -900,7 +900,7 @@ typedef uint16_t uint16;
  *   SMSG_LFG_PROPOSAL_UPDATE                       0x1E3B  DORMANT  [medium-conf]
  *
  *  -- SI3ZoneSounds.cpp (1) --
- *   SMSG_PLAY_MUSIC                                0x0023  DORMANT  [medium-conf]
+ *   SMSG_PLAY_MUSIC                                0x0023  ACTIVE   [medium-conf]
  *
  *  -- SceneObject_C.cpp (1) --
  *   SMSG_UNKNOWN_0x1962                            0x1962  DOC      [medium-conf]

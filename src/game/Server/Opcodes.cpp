@@ -322,6 +322,11 @@ void InitializeOpcodes()
     DefS(SMSG_ATTACKSTART, "SMSG_ATTACKSTART");
     DefS(SMSG_ATTACKSTOP, "SMSG_ATTACKSTOP");
     DefS(SMSG_AI_REACTION, "SMSG_AI_REACTION");
+    // Directly verified 18414 sound readers: packed source GUID, two packed
+    // object GUIDs, and the single-ID music form respectively.
+    DefS(SMSG_PLAY_SOUND, "SMSG_PLAY_SOUND");
+    DefS(SMSG_PLAY_OBJECT_SOUND, "SMSG_PLAY_OBJECT_SOUND");
+    DefS(SMSG_PLAY_MUSIC, "SMSG_PLAY_MUSIC");
 
     // Single quest-giver marker query and its packed-GUID status response.
     DefC(CMSG_QUESTGIVER_STATUS_QUERY, "CMSG_QUESTGIVER_STATUS_QUERY", STATUS_LOGGEDIN, PROCESS_THREADUNSAFE, &WorldSession::HandleQuestgiverStatusQueryOpcode);

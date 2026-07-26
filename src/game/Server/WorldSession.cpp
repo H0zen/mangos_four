@@ -340,6 +340,9 @@ static bool IsEnterWorldConverted(uint16 opcode)
         case SMSG_ATTACKSTART:                     // MopCompactPackets::BuildAttackStart
         case SMSG_ATTACKSTOP:                      // MopCompactPackets::BuildAttackStop
         case SMSG_AI_REACTION:                     // packed unit GUID plus reaction; Unit_C.cpp leaf 0x80AD80
+        case SMSG_PLAY_SOUND:                      // packed source GUID plus sound ID; ClientPlaySound leaf 0xCC4275
+        case SMSG_PLAY_OBJECT_SOUND:               // two packed GUIDs plus sound ID; object-sound leaf 0xCC42F8
+        case SMSG_PLAY_MUSIC:                      // one uint32 ID; SI3 zone-sound leaf 0xCC053B
         case SMSG_QUESTGIVER_STATUS:               // MopQuestStatusPackets::BuildStatus
         case SMSG_GOSSIP_MESSAGE:                  // MopGossipPackets::BuildMessage
         case SMSG_GOSSIP_COMPLETE:                 // Direct 18414 empty reader; closes the gossip frame

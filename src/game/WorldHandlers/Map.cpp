@@ -3445,9 +3445,8 @@ void Map::MonsterYellToMap(CreatureInfo const* cinfo, int32 textId, Language lan
  */
 void Map::PlayDirectSoundToMap(uint32 soundId, uint32 zoneId /*=0*/) const
 {
-    WorldPacket data(SMSG_PLAY_SOUND, 4);
-    data << uint32(soundId);
-    data << ObjectGuid();
+    WorldPacket data;
+    MopSoundPackets::BuildPlaySound(data, soundId, ObjectGuid());
 
     Map::PlayerList const& pList = GetPlayers();
     for (PlayerList::const_iterator itr = pList.begin(); itr != pList.end(); ++itr)

@@ -28,6 +28,7 @@
 
 #include "Common.h"
 #include "ByteBuffer.h"
+#include "WorldPacket.h"
 #include "UpdateFields.h"
 #include "UpdateData.h"
 #include "ObjectGuid.h"
@@ -110,6 +111,52 @@ class TransportInfo;
 struct MangosStringLocale;
 
 typedef std::unordered_map<Player*, UpdateData> UpdateDataMapType;
+
+namespace MopSoundPackets
+{
+    inline void BuildPlaySound(WorldPacket& out, uint32 soundId,
+        ObjectGuid sourceGuid)
+    {
+        // The 18414 GameUI reader places the sound ID between the packed
+        // source-GUID mask and byte phases.
+        out.Initialize(SMSG_PLAY_SOUND, 13);
+        out.WriteGuidMask<2, 3, 7, 6, 0, 5, 4, 1>(sourceGuid);
+        out << soundId;
+        out.WriteGuidBytes<3, 2, 4, 7, 5, 0, 6, 1>(sourceGuid);
+    }
+
+    inline void BuildPlayObjectSound(WorldPacket& out, uint32 soundId,
+        ObjectGuid sourceGuid, ObjectGuid targetGuid)
+    {
+        // The 18414 object-sound reader interleaves two packed GUIDs around
+        // the sound ID. Its terminal resolves targetGuid and passes
+        // sourceGuid into the positional sound path.
+        out.Initialize(SMSG_PLAY_OBJECT_SOUND, 22);
+        out.WriteGuidMask<5>(targetGuid);
+        out.WriteGuidMask<7, 0, 3>(sourceGuid);
+        out.WriteGuidMask<1>(targetGuid);
+        out.WriteGuidMask<4>(sourceGuid);
+        out.WriteGuidMask<7, 2, 4, 3>(targetGuid);
+        out.WriteGuidMask<5, 1, 6, 2>(sourceGuid);
+        out.WriteGuidMask<6, 0>(targetGuid);
+
+        out.WriteGuidBytes<6, 2>(sourceGuid);
+        out.WriteGuidBytes<2, 5>(targetGuid);
+        out.WriteGuidBytes<7, 5, 3, 1>(sourceGuid);
+        out.WriteGuidBytes<3, 1>(targetGuid);
+        out << soundId;
+        out.WriteGuidBytes<4>(sourceGuid);
+        out.WriteGuidBytes<4, 7, 0, 6>(targetGuid);
+        out.WriteGuidBytes<0>(sourceGuid);
+    }
+
+    inline void BuildPlayMusic(WorldPacket& out, uint32 soundId)
+    {
+        // The 18414 SI3 zone-sound reader consumes one little-endian ID.
+        out.Initialize(SMSG_PLAY_MUSIC, 4);
+        out << soundId;
+    }
+}
 
 /**
  * @brief Position structure
