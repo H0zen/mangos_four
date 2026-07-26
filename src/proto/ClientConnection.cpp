@@ -1,0 +1,521 @@
+/**
+ * SPDX-License-Identifier: GPL-3.0-or-later
+ *
+ * MaNGOS is a full featured server for World of Warcraft, supporting
+ * the following clients: 1.12.x, 2.4.3, 3.3.5a, 4.3.4a and 5.4.8
+ *
+ * Copyright (C) 2005-2026 MaNGOS <https://www.getmangos.eu>
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program.  If not, see <https://www.gnu.org/licenses/>.
+ *
+ * World of Warcraft, and all World of Warcraft or Warcraft art, images,
+ * and lore are copyrighted by Blizzard Entertainment, Inc.
+ */
+
+#include "ClientConnection.h"
+
+#include "MopAuthProof.h"
+#include "MopWireCodec.h"
+
+#include "Log/Log.h"
+#include "Utilities/ByteBuffer.h"
+
+#include <atomic>
+#include <cstring>
+#include <openssl/rand.h>
+
+namespace proto
+{
+    namespace
+    {
+        // The handful of transport opcodes this file speaks. Re-derived from (grepped
+        // out of, never copied by memory from) src/game/Server/Opcodes.h -- proto does
+        // not link game, so these are proto-local constants. Values confirmed against
+        // that header on 2026-07-26:
+        //   MSG_WOW_CONNECTION   Opcodes.h:71  (0x4F57)
+        //   SMSG_AUTH_CHALLENGE  Opcodes.h:72  (0x0949)
+        //   CMSG_AUTH_SESSION    Opcodes.h:73  (0x00B2)
+        //   CMSG_PING            Opcodes.h:515 (0x0012)
+        //   SMSG_PONG            Opcodes.h:516 (0x1969)
+        //   CMSG_KEEP_ALIVE      Opcodes.h:985 (0x1A87)
+        //   CMSG_LOG_DISCONNECT  Opcodes.h:1246 (0x10B3)
+        const uint16 MSG_WOW_CONNECTION  = 0x4F57;
+        const uint16 SMSG_AUTH_CHALLENGE = 0x0949;
+        const uint16 CMSG_AUTH_SESSION   = 0x00B2;
+        const uint16 CMSG_PING           = 0x0012;
+        const uint16 SMSG_PONG           = 0x1969;
+        const uint16 CMSG_KEEP_ALIVE     = 0x1A87;
+        const uint16 CMSG_LOG_DISCONNECT = 0x10B3;
+
+        // Opcodes.h:1445 -- `#define OPCODE_TABLE_SIZE 0x2000`, the 13-bit wire space
+        // the post-crypt frame packs into. Duplicated here for the same reason the
+        // opcode constants above are: proto cannot include Opcodes.h.
+        const uint32_t OPCODE_TABLE_SIZE = 0x2000;
+
+        bool DefaultRandomBytes(uint8_t* out, size_t len)
+        {
+            return RAND_bytes(out, int(len)) == 1;
+        }
+    }
+
+    ClientConnection::ClientConnection(IWorldGateway& gateway)
+        : m_gateway(gateway),
+          m_closed(false),
+          m_connState(MopHs::CONN_GREETING),
+          m_seed(0),
+          m_session(INVALID_SESSION_ID),
+          m_hadPing(false),
+          m_fastPingRun(0),
+          m_lastDecodeLogSec(0)
+    {
+    }
+
+    ClientConnection::~ClientConnection()
+    {
+    }
+
+    std::vector<uint8_t> ClientConnection::EncodeForSend(const WorldPacket& packet, bool& fatal)
+    {
+        fatal = false;
+
+        uint8 header[4];
+        const bool postCrypt = m_crypt.IsInitialized();
+        if (!MopWire::BuildServerHeader(postCrypt, packet.size(), packet.GetOpcode(), header))
+        {
+            // Hazard H2: an opcode still on its pre-Phase-1b placeholder value (> 0x1FFF
+            // post-crypt) does not fit the 13-bit frame. DROP the packet, exactly as
+            // WorldSocket::SendPacket does (WorldSocket.cpp:226-244) -- disconnecting here
+            // was the historical bug (mid character-create teleport drops). Report each
+            // offending opcode ONCE per run; proto has no LookupOpcodeName (no Opcodes.h
+            // access), so only the raw value is logged.
+            static std::atomic<bool> s_reportedDrop[0x10000];
+            if (!s_reportedDrop[packet.GetOpcode()].exchange(true))
+            {
+                sLog.outError("proto: opcode 0x%.4X not framable in MoP -- still on a "
+                              "placeholder value; dropping it and further such packets "
+                              "silently.", packet.GetOpcode());
+            }
+            return std::vector<uint8_t>();
+        }
+
+        if (postCrypt)
+        {
+            // The cipher is a stream: two threads encrypting headers concurrently would
+            // interleave the keystream and desynchronise the client for good.
+            std::lock_guard<std::mutex> lock(m_cryptSendLock);
+            if (!m_crypt.EncryptSend(header, sizeof(header)))
+            {
+                // The header is UNDEFINED on an EVP failure (may be partially written).
+                // Dropping is not safe here -- the caller must close the connection.
+                sLog.outError("proto: header encryption failed (opcode 0x%.4X) for %s; "
+                              "closing.", packet.GetOpcode(), m_address.c_str());
+                fatal = true;
+                return std::vector<uint8_t>();
+            }
+        }
+
+        std::vector<uint8_t> wire;
+        wire.reserve(sizeof(header) + packet.size());
+        wire.insert(wire.end(), header, header + sizeof(header));
+        if (!packet.empty())
+        {
+            wire.insert(wire.end(), packet.contents(), packet.contents() + packet.size());
+        }
+        return wire;
+    }
+
+    std::vector<uint8_t> ClientConnection::onConnect()
+    {
+        // WorldSocket::open() (WorldSocket.cpp:326-381) sends ONLY the server's own
+        // greeting on connect. M4's FSM validates the client's greeting BEFORE sending
+        // the auth challenge (hazard H5) -- this is NOT Cata's fire-and-continue FSM,
+        // where both packets go out back to back. HandleWowConnection() sends the
+        // challenge later, once the client's own greeting string has checked out.
+        WorldPacket greeting(MSG_WOW_CONNECTION, 46);
+        greeting << std::string("RLD OF WARCRAFT CONNECTION - SERVER TO CLIENT");
+
+        bool fatal = false;
+        std::vector<uint8_t> wire = EncodeForSend(greeting, fatal);
+        if (fatal || wire.empty())
+        {
+            Close();
+            return std::vector<uint8_t>();
+        }
+        return wire;
+    }
+
+    std::vector<uint8_t> ClientConnection::onData(const uint8_t* data, size_t len)
+    {
+        m_frameReader.Push(data, len);
+
+        MopFrameReader::Frame frame;
+        for (;;)
+        {
+            // Header width is state-driven, derived fresh every frame -- mirrors
+            // WorldSocket::handle_input_missing_data (WorldSocket.cpp:879-887).
+            const MopFrameReader::HeaderKind kind =
+                m_crypt.IsInitialized()               ? MopFrameReader::HDR_POSTCRYPT :
+                (m_connState == MopHs::CONN_GREETING) ? MopFrameReader::HDR_GREETING :
+                                                         MopFrameReader::HDR_PRECRYPT;
+
+            const MopFrameReader::Status status =
+                m_frameReader.TryFrame(frame, kind, this, &DecryptHeaderHook, &CmdValidHook);
+
+            if (status == MopFrameReader::NEED_MORE)
+            {
+                break;
+            }
+
+            if (status == MopFrameReader::MALFORMED)
+            {
+                const int64_t nowSec =
+                    std::chrono::duration_cast<std::chrono::seconds>(
+                        std::chrono::steady_clock::now().time_since_epoch()).count();
+                const int64_t lastSec = m_lastDecodeLogSec.load();
+                if (MopHs::RateLimitElapsed(lastSec, nowSec))
+                {
+                    m_lastDecodeLogSec.store(nowSec);
+                    sLog.outError("proto: malformed frame from %s (reason=%s); closing.",
+                                  m_address.c_str(),
+                                  MalformedReasonName(m_frameReader.LastReason()));
+                }
+                Close();
+                break;
+            }
+
+            if (!DispatchFrame(frame.cmd, std::move(frame.payload)))
+            {
+                Close();
+                break;
+            }
+        }
+
+        // Every reply goes through SendPacket()/net::Sender: a reply may be produced
+        // long after this call returns (once the world side is wired in CP3), so
+        // nothing is ever returned inline here.
+        return std::vector<uint8_t>();
+    }
+
+    bool ClientConnection::DispatchFrame(uint32_t cmd, std::vector<uint8_t>&& payload)
+    {
+        WorldPacket packet(uint16(cmd), uint32(payload.size()));
+        if (!payload.empty())
+        {
+            packet.append(payload.data(), payload.size());
+        }
+
+        // Handshake-state legality allowlist -- mirrors WorldSocket::ProcessIncoming
+        // (WorldSocket.cpp:1058-1070) exactly, including running BEFORE the greeting
+        // dispatch below (a duplicate-greeting bypass otherwise).
+        const MopHs::OpcodeClass cls =
+            (cmd == MSG_WOW_CONNECTION) ? MopHs::OPC_GREETING :
+            (cmd == CMSG_AUTH_SESSION)  ? MopHs::OPC_AUTH_SESSION : MopHs::OPC_NORMAL;
+        if (!MopHs::IsHandshakeOpcodeLegal(m_connState, cls))
+        {
+            sLog.outError("proto: opcode 0x%.4X illegal in state %d from %s; closing.",
+                          cmd, int(m_connState), m_address.c_str());
+            return false;
+        }
+
+        if (cmd == MSG_WOW_CONNECTION)
+        {
+            return HandleWowConnection(packet);
+        }
+
+        try
+        {
+            switch (cmd)
+            {
+                case CMSG_PING:
+                    return HandlePing(packet);
+
+                case CMSG_AUTH_SESSION:
+                    m_connState = MopHs::CONN_AUTHENTICATING;
+                    return HandleAuthSession(packet);
+
+                case CMSG_KEEP_ALIVE:
+                    // WorldSocket.cpp:1119-1128's Eluna OnPacketReceive notification for
+                    // this opcode is a scripting hook proto has no access to; IWorldGateway
+                    // grows that call when a later checkpoint wires Eluna through the
+                    // gateway. Fire-and-forget either way, so omitting it here changes no
+                    // observable protocol behaviour.
+                    DEBUG_LOG("proto: CMSG_KEEP_ALIVE from %s.", m_address.c_str());
+                    return true;
+
+                case CMSG_LOG_DISCONNECT:
+                    packet.rfinish();                     // uint32 disconnect reason; socket notification only
+                    return true;
+
+                default:
+                    if (m_session == INVALID_SESSION_ID)
+                    {
+                        sLog.outError("proto: opcode 0x%.4X from unauthenticated peer %s; "
+                                      "closing.", cmd, m_address.c_str());
+                        return false;
+                    }
+                    m_gateway.Deliver(m_session, std::move(packet));
+                    return true;
+            }
+        }
+        catch (ByteBufferException&)
+        {
+            sLog.outError("proto: decode failure opcode 0x%.4X from %s; closing.",
+                          cmd, m_address.c_str());
+            return false;
+        }
+    }
+
+    bool ClientConnection::HandleWowConnection(WorldPacket& packet)
+    {
+        // WorldSocket::HandleWowConnection (WorldSocket.cpp:383-402). "RLD..." not
+        // "WORLD...": the leading "WO" is carried by the frame's cmd field
+        // (0x4F57 == "WO" little-endian), so the payload legitimately begins at "RLD".
+        std::string clientToServerMsg;
+        packet >> clientToServerMsg;
+
+        if (strcmp(clientToServerMsg.c_str(), "RLD OF WARCRAFT CONNECTION - CLIENT TO SERVER") != 0)
+        {
+            sLog.outError("proto: wrong data in MSG_WOW_CONNECTION from %s; closing.",
+                          m_address.c_str());
+            return false;
+        }
+
+        return SendAuthChallenge();
+    }
+
+    bool ClientConnection::SendAuthChallenge()
+    {
+        std::vector<uint8_t> payload;
+        uint32 seed = 0;
+        if (!MopHs::BuildAuthChallengePayload(&DefaultRandomBytes, payload, seed))
+        {
+            sLog.outError("proto: SendAuthChallenge: CSPRNG failure for %s; closing.",
+                          m_address.c_str());
+            return false;
+        }
+
+        WorldPacket packet(SMSG_AUTH_CHALLENGE, uint32(payload.size()));
+        packet.append(payload.data(), payload.size());
+        SendPacket(packet);
+
+        if (closed())
+        {
+            // SendPacket() no-ops once closed, so nothing reached the peer -- mirrors
+            // WorldSocket::SendAuthChallenge's `sent` check: never advance the FSM on a
+            // challenge the client never got.
+            return false;
+        }
+
+        m_seed = seed;
+        m_connState = MopHs::CONN_CHALLENGED;
+        return true;
+    }
+
+    bool ClientConnection::HandleAuthSession(WorldPacket& packet)
+    {
+        AuthRequest request;
+        request.peerAddress = m_address;
+
+        MopAuth::DecodeResult const decodeResult =
+            MopAuth::DecodeAuthSession(packet, request.fields);
+        if (decodeResult != MopAuth::DecodeResult::Ok)
+        {
+            // DEBUG_LOG, not sLog.outError: fires on every malformed body on an
+            // UNAUTHENTICATED path (WorldSocket::HandleAuthSession's own rationale).
+            // Deliberately NOT rate-limited: this closes the connection immediately,
+            // so it logs at most once per connection regardless.
+            DEBUG_LOG("proto: malformed CMSG_AUTH_SESSION from %s (result %u).",
+                      m_address.c_str(), static_cast<uint32>(decodeResult));
+            RejectAuth(AuthStatus::Failed);
+            return false;
+        }
+
+        const AuthLookup lookup = m_gateway.LookupAccount(request);
+        if (lookup.status != AuthStatus::Ok)
+        {
+            RejectAuth(lookup.status);
+            return false;
+        }
+
+        uint8 serverProof[MopAuth::AUTH_PROOF_LEN];
+        MopAuth::ComputeAuthProof(request.fields.account, request.fields.clientSeed, m_seed,
+                                  lookup.sessionKey, serverProof);
+
+        // CRYPTO_memcmp inside ProofEquals, not memcmp: a short-circuiting compare
+        // leaks how many leading proof bytes an attacker guessed right.
+        if (!MopAuth::ProofEquals(serverProof, request.fields.digest))
+        {
+            DEBUG_LOG("proto: bad login proof for account '%s' from %s.",
+                      request.fields.account.c_str(), m_address.c_str());
+            RejectAuth(AuthStatus::Failed);
+            return false;
+        }
+
+        // Everything fallible about the crypt (HMAC, ARC4 keying, drop-1024) happens
+        // in Prepare(), BEFORE the world allocates anything -- mirrors
+        // WorldSocket::HandleAuthSession's Prepare()/Activate() split exactly.
+        if (!m_crypt.Prepare(lookup.sessionKey))
+        {
+            sLog.outError("proto: crypt could not be prepared for account '%s' from %s.",
+                          request.fields.account.c_str(), m_address.c_str());
+            RejectAuth(AuthStatus::SystemError);
+            return false;
+        }
+
+        std::shared_ptr<IClientLink> link =
+            std::static_pointer_cast<ClientConnection>(shared_from_this());
+
+        const SessionId session = m_gateway.Attach(request, link, lookup.context);
+        if (session == INVALID_SESSION_ID)
+        {
+            RejectAuth(AuthStatus::SystemError);
+            return false;
+        }
+
+        // CP3 TODO (hazard H3): the real, game-side WorldGateway::Attach() must
+        // Activate() this prepared crypt from inside the SAME locked commit region
+        // World::AddSession uses (see WorldSocket::CommitAuthenticatedSession) if
+        // Attach() ever defers publication past its own return. Attach() is defined
+        // here to return synchronously, so activating only after a successful return
+        // already preserves the load-bearing invariant: no failure path can observe
+        // an activated crypt. Re-verify this ordering when CP3 implements Attach().
+        m_crypt.Activate();
+        m_connState = MopHs::CONN_AUTHED;
+        m_session = session;
+
+        DEBUG_LOG("proto: account '%s' authenticated from %s.",
+                  request.fields.account.c_str(), m_address.c_str());
+        return true;
+    }
+
+    bool ClientConnection::HandlePing(WorldPacket& packet)
+    {
+        uint32 ping = 0;
+        uint32 latency = 0;
+        packet >> ping;
+        packet >> latency;
+
+        // WorldSocket.cpp:1594-1628's 27-second overspeed-ping window.
+        static const std::chrono::seconds MIN_PING_INTERVAL(27);
+        const std::chrono::steady_clock::time_point now = std::chrono::steady_clock::now();
+
+        if (m_hadPing)
+        {
+            if (now - m_lastPing < MIN_PING_INTERVAL)
+            {
+                ++m_fastPingRun;
+            }
+            else
+            {
+                m_fastPingRun = 0;
+            }
+        }
+        m_lastPing = now;
+        m_hadPing = true;
+
+        if (!m_gateway.OnPing(m_session, latency, m_fastPingRun))
+        {
+            return false;
+        }
+
+        WorldPacket pong(SMSG_PONG, 4);
+        pong << ping;
+        SendPacket(pong);
+        return true;
+    }
+
+    void ClientConnection::RejectAuth(AuthStatus status)
+    {
+        // The sole SMSG_AUTH_RESPONSE construction site on the rejection path, via
+        // the gateway's game-side MopAuth::BuildAuthResponseError() serializer.
+        //
+        // NOT IMPLEMENTED HERE (hazard H4, explicit CP3 decision): WorldSocket's ACE
+        // drain machinery (BeginAuthErrorDrain's cancel_wakeup, MopSocketDrain's
+        // Flushing state, ScopedSendInFlight, the Update() snapshot) existed to solve
+        // one problem -- a bare TCP close must never race ahead of this response
+        // actually reaching the wire. Whether net::ISession's transport needs an
+        // equivalent depends on its own flush-before-close semantics, which CP3 must
+        // read and record before deciding (see ACE_REMOVAL_M4_PLAN.md hazard H4).
+        // This is inert code today (WorldSocket still carries all live traffic), so
+        // the caller closing immediately after this returns is not yet a live risk.
+        WorldPacket packet;
+        m_gateway.BuildAuthErrorResponse(status, packet);
+        SendPacket(packet);
+    }
+
+    bool ClientConnection::DecryptHeaderHook(void* ctx, uint8_t* header, size_t len)
+    {
+        ClientConnection* const self = static_cast<ClientConnection*>(ctx);
+
+        // Pre-crypt frames are not decrypted at all -- the reader must not treat that
+        // as a failure (mirrors WorldSocket::DecryptHeaderHook exactly).
+        if (!self->m_crypt.IsInitialized())
+        {
+            return true;
+        }
+
+        return self->m_crypt.DecryptRecv(header, len);
+    }
+
+    bool ClientConnection::CmdValidHook(void* /*ctx*/, uint32_t cmd, bool preCrypt)
+    {
+        if (!preCrypt)
+        {
+            return true;
+        }
+        return cmd == MSG_WOW_CONNECTION || cmd < OPCODE_TABLE_SIZE;
+    }
+
+    void ClientConnection::SendPacket(const WorldPacket& packet)
+    {
+        if (m_closed.load(std::memory_order_acquire) || !m_sender)
+        {
+            return;
+        }
+
+        bool fatal = false;
+        std::vector<uint8_t> wire = EncodeForSend(packet, fatal);
+        if (fatal)
+        {
+            Close();
+            return;
+        }
+        if (wire.empty())
+        {
+            return;   // dropped: opcode not framable in MoP (hazard H2)
+        }
+
+        m_sender(wire.data(), wire.size());
+    }
+
+    void ClientConnection::Close()
+    {
+        m_closed.store(true, std::memory_order_release);
+        if (m_closer)
+        {
+            m_closer();
+        }
+    }
+
+    void ClientConnection::onClose()
+    {
+        m_closed.store(true, std::memory_order_release);
+
+        if (m_session != INVALID_SESSION_ID)
+        {
+            m_gateway.Detach(m_session);
+            m_session = INVALID_SESSION_ID;
+        }
+    }
+}

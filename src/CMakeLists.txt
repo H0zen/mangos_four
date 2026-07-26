@@ -21,6 +21,11 @@
 # Build the mangos shared library
 add_subdirectory(shared)
 
+# The 5.4.8 world protocol. Sits between shared and game: it links shared, and
+# game links it back for the relocated Mop* codec/auth symbols WorldSocket.cpp
+# still calls. See src/proto/CMakeLists.txt for the link-boundary rule.
+add_subdirectory(proto)
+
 add_subdirectory(genrev)
 
 # Needs to link against mangos_world.lib

@@ -18,18 +18,33 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
+# MopWireCodec.h/MopHandshake.h/MopFrameReader.h relocated to src/proto/ (Stage 2 CP2,
+# ACE removal) -- they were already game-free and are proto's framing/handshake layer
+# now. Add proto's include dir; the bare quote-includes in mop_framing_test.cpp are
+# unchanged, they just resolve one directory further afield.
 add_executable(mop_framing_test mop_framing_test.cpp)
-target_include_directories(mop_framing_test PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/..)
+target_include_directories(mop_framing_test PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}/..
+    ${CMAKE_SOURCE_DIR}/src/proto)
 set_target_properties(mop_framing_test PROPERTIES CXX_STANDARD 17 CXX_STANDARD_REQUIRED ON)
 add_test(NAME mop_framing COMMAND mop_framing_test)
 
+# MopAuthSession.cpp/MopAuthProof.cpp/MopSocketDrain.h relocated to src/proto/ alongside
+# MopWireCodec/MopFrameReader/MopHandshake (same move); MopAuthResponse.{h,cpp} stays
+# here in Server/ because its .cpp includes Opcodes.h/SharedDefines.h. Compiling the two
+# moved .cpp files directly (as before) rather than linking the proto library avoids a
+# second definition of MopAuth::DecodeAuthSession/ComputeAuthProof turning up when this
+# target also links 'game' (which links proto): the linker only pulls archive members to
+# resolve symbols not yet defined, so once these two TUs define them directly nothing
+# from libproto.a is extracted for them.
 add_executable(mop_auth_test
     mop_auth_test.cpp
-    ${CMAKE_CURRENT_SOURCE_DIR}/../MopAuthSession.cpp
-    ${CMAKE_CURRENT_SOURCE_DIR}/../MopAuthProof.cpp
+    ${CMAKE_SOURCE_DIR}/src/proto/MopAuthSession.cpp
+    ${CMAKE_SOURCE_DIR}/src/proto/MopAuthProof.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/../MopAuthResponse.cpp)
 target_include_directories(mop_auth_test PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/..
+    ${CMAKE_SOURCE_DIR}/src/proto
     ${CMAKE_SOURCE_DIR}/src/shared)
 set_target_properties(mop_auth_test PROPERTIES CXX_STANDARD 17 CXX_STANDARD_REQUIRED ON)
 # MopAuthResponse.cpp includes Opcodes.h, which (per its own comment, ":39") includes the FULL
