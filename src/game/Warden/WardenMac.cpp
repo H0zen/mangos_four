@@ -47,13 +47,37 @@
 #include "Log.h"
 #include "Opcodes.h"
 #include "ByteBuffer.h"
-#include <openssl/md5.h>
+#include <openssl/evp.h>
 #include "World.h"
 #include "Player.h"
 #include "Util.h"
 #include "WardenMac.h"
 #include "WardenModuleMac.h"
 #include "GameTime.h"
+#include <openssl/provider.h>
+
+namespace
+{
+    /// Explicit fetch, self-loading a provider if none is currently active (see
+    /// Sha1.cpp::Initialize() for why EVP_md5() alone is not safe here). Caller must
+    /// EVP_MD_free() the non-NULL result.
+    EVP_MD* FetchMd5()
+    {
+        EVP_MD* md = EVP_MD_fetch(nullptr, "MD5", nullptr);
+        if (md)
+        {
+            return md;
+        }
+
+        OSSL_PROVIDER* ownProvider = OSSL_PROVIDER_load(nullptr, "default");
+        md = EVP_MD_fetch(nullptr, "MD5", nullptr);
+        if (ownProvider)
+        {
+            OSSL_PROVIDER_unload(ownProvider);
+        }
+        return md;
+    }
+}
 
 /**
  * @brief WardenMac constructor
@@ -126,10 +150,14 @@ ClientWardenModule* WardenMac::GetModuleForClient()
     memcpy(mod->Key, Module_0DBBF209A27B1E279A9FEC5C168A15F7_Key, 16);
 
     // md5 hash
-    MD5_CTX ctx;
-    MD5_Init(&ctx);
-    MD5_Update(&ctx, mod->CompressedData, len);
-    MD5_Final((uint8*)&mod->Id, &ctx);
+    EVP_MD_CTX* ctx = EVP_MD_CTX_new();
+    EVP_MD* md5 = FetchMd5();
+    EVP_DigestInit_ex(ctx, md5, nullptr);
+    EVP_MD_free(md5);
+    EVP_DigestUpdate(ctx, mod->CompressedData, len);
+    unsigned int mdLen = 0;
+    EVP_DigestFinal_ex(ctx, (uint8*)&mod->Id, &mdLen);
+    EVP_MD_CTX_free(ctx);
 
     return mod;
 }
@@ -297,11 +325,15 @@ void WardenMac::HandleData(ByteBuffer &buff)
         found = true;
     }
 
-    MD5_CTX ctx;
-    MD5_Init(&ctx);
-    MD5_Update(&ctx, str.c_str(), str.size());
+    EVP_MD_CTX* ctx = EVP_MD_CTX_new();
+    EVP_MD* md5b = FetchMd5();
+    EVP_DigestInit_ex(ctx, md5b, nullptr);
+    EVP_MD_free(md5b);
+    EVP_DigestUpdate(ctx, str.c_str(), str.size());
     uint8 ourMD5Hash[16];
-    MD5_Final(ourMD5Hash, &ctx);
+    unsigned int mdLen = 0;
+    EVP_DigestFinal_ex(ctx, ourMD5Hash, &mdLen);
+    EVP_MD_CTX_free(ctx);
 
     uint8 theirsMD5Hash[16];
     buff.read(theirsMD5Hash, 16);

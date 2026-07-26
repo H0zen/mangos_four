@@ -169,7 +169,7 @@ Corpse* ObjectAccessor::GetCorpseForPlayerGUID(ObjectGuid guid)
  */
 void Player2Corpse::Remove(Corpse* corpse)
 {
-    ACE_WRITE_GUARD(LockType, guard, i_lock)
+    std::unique_lock<LockType> guard(i_lock);
 
     if ( m_objectMap.end() == m_objectMap.find(corpse->GetOwnerGuid()))
     {
@@ -195,7 +195,7 @@ void ObjectAccessor::RemoveCorpse(Corpse* corpse)
 
 void Player2Corpse::Insert(Corpse* corpse)
 {
-    ACE_WRITE_GUARD(LockType, guard, i_lock)
+    std::unique_lock<LockType> guard(i_lock);
     m_objectMap[corpse->GetOwnerGuid()] = corpse;
 
     CellPair cell_pair = MaNGOS::ComputeCellPair(corpse->GetPositionX(), corpse->GetPositionY());

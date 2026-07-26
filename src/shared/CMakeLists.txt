@@ -121,10 +121,9 @@ set(SRC_GRP_LOG
 source_group("Log" FILES ${SRC_GRP_LOG})
 
 set(SRC_GRP_THREAD
-  Threading/DelayExecutor.cpp
-  Threading/DelayExecutor.h
   Threading/Threading.cpp
   Threading/Threading.h
+  Threading/ThreadLocalStore.h
 )
 source_group("Threading" FILES ${SRC_GRP_THREAD})
 
@@ -135,11 +134,7 @@ set(SRC_GRP_PLATFORM
 source_group("Platform" FILES ${SRC_GRP_PLATFORM})
 
 set(SRC_GRP_POLICIES
-  Policies/CreationPolicy.h
-  Policies/ObjectLifeTime.cpp
-  Policies/ObjectLifeTime.h
   Policies/Singleton.h
-  Policies/ThreadingModel.h
 )
 source_group("Policies" FILES ${SRC_GRP_POLICIES})
 
@@ -231,7 +226,6 @@ target_include_directories(shared
     PUBLIC
         ${CMAKE_CURRENT_BINARY_DIR}
         ${CMAKE_CURRENT_SOURCE_DIR}
-        ${OPENSSL_INCLUDE_DIR}
         ${TGT_INCL}
 )
 
@@ -249,7 +243,8 @@ target_link_libraries(shared
         ace
         utf8
         MySQL::MySQL
-        ${OPENSSL_LIBRARIES}
-        OpenSSL::Crypto
+        mangos_openssl
         $<$<BOOL:${WIN32}>:dbghelp>
+    PRIVATE
+        mangos_openssl_strict
 )

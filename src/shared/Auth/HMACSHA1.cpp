@@ -27,32 +27,48 @@
 #include "BigNumber.h"
 #include <cstring>
 
-HMACSHA1::HMACSHA1(uint32 len, const uint8 *seed) : m_valid(false)
+#include <openssl/core_names.h>
+#include <openssl/params.h>
+
+HMACSHA1::HMACSHA1(uint32 len, const uint8 *seed) : m_ctx(nullptr), m_valid(false)
 {
     memset(m_digest, 0, sizeof(m_digest));
-#if OPENSSL_VERSION_NUMBER < 0x10100000L
-    HMAC_CTX_init(&m_ctx);
-    if (HMAC_Init_ex(&m_ctx, seed, len, EVP_sha1(), NULL) != 1)
+
+    EVP_MAC* mac = EVP_MAC_fetch(nullptr, "HMAC", nullptr);
+    if (!mac)
     {
         return;
     }
-#else
-    m_ctx = HMAC_CTX_new();
-    if (!m_ctx || HMAC_Init_ex(m_ctx, seed, len, EVP_sha1(), NULL) != 1)
+
+    // The context takes its own reference on the algorithm.
+    m_ctx = EVP_MAC_CTX_new(mac);
+    EVP_MAC_free(mac);
+
+    if (!m_ctx)
     {
         return;
     }
-#endif
+
+    // OSSL_PARAM_construct_utf8_string() wants a mutable buffer.
+    char digest[] = "SHA1";
+    OSSL_PARAM params[2];
+    params[0] = OSSL_PARAM_construct_utf8_string(OSSL_MAC_PARAM_DIGEST, digest, 0);
+    params[1] = OSSL_PARAM_construct_end();
+
+    if (EVP_MAC_init(m_ctx, seed, len, params) != 1)
+    {
+        EVP_MAC_CTX_free(m_ctx);
+        m_ctx = nullptr;
+        return;
+    }
+
     m_valid = true;
 }
 
 HMACSHA1::~HMACSHA1()
 {
-#if OPENSSL_VERSION_NUMBER < 0x10100000L
-    HMAC_CTX_cleanup(&m_ctx);
-#else
-    HMAC_CTX_free(m_ctx);
-#endif
+    EVP_MAC_CTX_free(m_ctx);
+    m_ctx = nullptr;
 }
 
 void HMACSHA1::UpdateBigNumber(BigNumber *bn)
@@ -66,12 +82,8 @@ void HMACSHA1::UpdateData(const uint8 *data, int length)
     {
         return;
     }
-#if OPENSSL_VERSION_NUMBER < 0x10100000L
-    const int ok = HMAC_Update(&m_ctx, data, length);
-#else
-    const int ok = HMAC_Update(m_ctx, data, length);
-#endif
-    if (ok != 1)
+
+    if (EVP_MAC_update(m_ctx, data, size_t(length)) != 1)
     {
         m_valid = false;
         memset(m_digest, 0, sizeof(m_digest));
@@ -90,12 +102,8 @@ void HMACSHA1::Finalize()
         return;
     }
 
-    uint32 length = 0;
-#if OPENSSL_VERSION_NUMBER < 0x10100000L
-    const int ok = HMAC_Final(&m_ctx, (uint8*)m_digest, &length);
-#else
-    const int ok = HMAC_Final(m_ctx, (uint8*)m_digest, &length);
-#endif
+    size_t length = 0;
+    const int ok = EVP_MAC_final(m_ctx, (uint8*)m_digest, &length, sizeof(m_digest));
     // MANGOS_ASSERT is elided in RelWithDebInfo (/DNDEBUG), so a short digest would slip through it.
     // A real if is the only guard that actually fails closed here.
     if (ok != 1 || length != SHA_DIGEST_LENGTH)

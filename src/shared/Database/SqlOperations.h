@@ -28,7 +28,6 @@
 
 #include "Common/Common.h"
 
-#include <ace/Thread_Mutex.h>
 #include "LockedQueue/LockedQueue.h"
 #include <queue>
 #include "Utilities/Callback.h"
@@ -179,7 +178,7 @@ class SqlQueryHolderEx;                                     /// points to a hold
  * @brief
  *
  */
-class SqlResultQueue : public ACE_Based::LockedQueue<MaNGOS::IQueryCallback* , ACE_Thread_Mutex>
+class SqlResultQueue : public MaNGOS::LockedQueue<MaNGOS::IQueryCallback*>
 {
     public:
         /**

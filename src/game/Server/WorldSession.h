@@ -2168,7 +2168,7 @@ class WorldSession
         AddonsList m_addonsList;
         std::vector<std::string> m_registeredAddonPrefixes;
         bool m_filterAddonMessages = true;
-        ACE_Based::LockedQueue<WorldPacket*, ACE_Thread_Mutex> _recvQueue;
+        MaNGOS::LockedQueue<WorldPacket*> _recvQueue;
 };
 #endif
 /// @}

@@ -26,6 +26,8 @@
 #include <DetourNavMeshBuilder.h>
 #include <DetourCommon.h>
 
+#include <climits>
+
 #include "MMapCommon.h"
 #include "MapBuilder.h"
 

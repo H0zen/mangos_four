@@ -26,20 +26,50 @@
 #include "Auth/Sha1.h"
 #include "Auth/BigNumber.h"
 #include <stdarg.h>
+#include <cstring>
+#include <openssl/provider.h>
 
-Sha1Hash::Sha1Hash()
+Sha1Hash::Sha1Hash() : mC(EVP_MD_CTX_new())
 {
-    SHA1_Init(&mC);
+    Initialize();
 }
 
 Sha1Hash::~Sha1Hash()
 {
-    SHA1_Init(&mC);
+    EVP_MD_CTX_free(mC);
+    mC = nullptr;
+}
+
+Sha1Hash::Sha1Hash(const Sha1Hash& other) : mC(EVP_MD_CTX_new())
+{
+    memcpy(mDigest, other.mDigest, SHA_DIGEST_LENGTH);
+
+    // A copy of an already-finalized hash only ever has its digest read, so a
+    // context that refuses to duplicate is not fatal -- leave it freshly
+    // initialized rather than half-copied.
+    if (!mC || !other.mC || EVP_MD_CTX_copy_ex(mC, other.mC) != 1)
+    {
+        Initialize();
+    }
+}
+
+Sha1Hash& Sha1Hash::operator=(const Sha1Hash& other)
+{
+    if (this != &other)
+    {
+        memcpy(mDigest, other.mDigest, SHA_DIGEST_LENGTH);
+
+        if (!mC || !other.mC || EVP_MD_CTX_copy_ex(mC, other.mC) != 1)
+        {
+            Initialize();
+        }
+    }
+    return *this;
 }
 
 void Sha1Hash::UpdateData(const uint8* dta, int len)
 {
-    SHA1_Update(&mC, dta, len);
+    EVP_DigestUpdate(mC, dta, len);
 }
 
 void Sha1Hash::UpdateData(const std::string& str)
@@ -64,10 +94,40 @@ void Sha1Hash::UpdateBigNumbers(BigNumber* bn0, ...)
 
 void Sha1Hash::Initialize()
 {
-    SHA1_Init(&mC);
+    // ARC4 (Auth/ARC4.h) owns a PER-OBJECT OpenSSLProviderManager that explicitly
+    // loads/unloads the global "legacy"/"default" providers on every ARC4 construction
+    // and destruction. OpenSSL 3.x permanently disables the default provider's
+    // AUTO-activation for a library context the first time anything explicitly loads a
+    // provider on it -- so once any AuthCrypt/ARC4 object has existed, "SHA1" is only
+    // fetchable while an ARC4 object happens to be alive. Sha1Hash is used well outside
+    // any AuthCrypt/ARC4 lifetime (e.g. MopAuthProof::ComputeAuthProof), so both
+    // EVP_MD_fetch() and the legacy implicitly-fetched EVP_sha1() can find no provider
+    // at all there and either return NULL or dereference a stale cached implementation
+    // (reproduced: access violation at address 0). Load our own transient reference
+    // when fetch fails: the returned EVP_MD keeps the provider alive via its own
+    // refcount, so it is safe to unload ours again immediately afterwards.
+    EVP_MD* md = EVP_MD_fetch(nullptr, "SHA1", nullptr);
+    OSSL_PROVIDER* ownProvider = nullptr;
+    if (!md)
+    {
+        ownProvider = OSSL_PROVIDER_load(nullptr, "default");
+        md = EVP_MD_fetch(nullptr, "SHA1", nullptr);
+    }
+
+    if (md)
+    {
+        EVP_DigestInit_ex(mC, md, nullptr);
+        EVP_MD_free(md);
+    }
+
+    if (ownProvider)
+    {
+        OSSL_PROVIDER_unload(ownProvider);
+    }
 }
 
 void Sha1Hash::Finalize(void)
 {
-    SHA1_Final(mDigest, &mC);
+    unsigned int length = 0;
+    EVP_DigestFinal_ex(mC, mDigest, &length);
 }

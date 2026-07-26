@@ -27,8 +27,6 @@
 /// @{
 /// \file
 
-#include <ace/OS.h>
-
 #include "CliThread.h"
 #include "World.h"
 #include "Util.h"
@@ -52,6 +50,7 @@ static void prompt(void* callback = NULL, bool status = true)
 
 // Non-blocking keypress detector, when return pressed, return 1, else always return 0
 #if (PLATFORM != PLATFORM_WINDOWS)
+#include <sys/select.h>
 
 /**
  * Checks whether console input is ready without blocking on non-Windows platforms.
@@ -72,16 +71,33 @@ static int kb_hit_return()
 /**
  * Initializes the CLI thread with optional console beep support.
  */
-CliThread::CliThread(bool beep) : beep_(beep)
+CliThread::CliThread(bool beep) : m_body(nullptr), m_thread(nullptr), m_beep(beep)
 {
 }
 
-/// %Thread start
-int CliThread::svc()
+/**
+ * Joins the console thread (if still running) and releases it.
+ */
+CliThread::~CliThread()
 {
-    ACE_OS::sleep(1);
+    delete m_thread;
+}
 
-    if (beep_)
+/**
+ * Starts the CLI thread.
+ */
+void CliThread::Activate()
+{
+    m_body = new Body(m_beep);
+    m_thread = new MaNGOS::Thread(m_body);
+}
+
+/// %Thread start
+void CliThread::Body::run()
+{
+    MaNGOS::Thread::Sleep(1000);
+
+    if (m_beep)
     {
         sLog.ConsoleEmitRaw("\a");     // \a = Alert (through the writer, single-owner stdout)
     }
@@ -102,7 +118,7 @@ int CliThread::svc()
             break;
         }
 #endif
-        char* command_str = fgets(buffer_, sizeof(buffer_), stdin);
+        char* command_str = fgets(m_buffer, sizeof(m_buffer), stdin);
         if (command_str != NULL)
         {
             for (int x = 0; command_str[x]; ++x)
@@ -135,14 +151,12 @@ int CliThread::svc()
             World::StopNow(SHUTDOWN_EXIT_CODE);
         }
     }
-
-    return 0;
 }
 
 /**
  * Unblocks the CLI thread during server shutdown.
  */
-void CliThread::cli_shutdown()
+void CliThread::Shutdown()
 {
 #ifdef _WIN32
 
@@ -161,6 +175,9 @@ void CliThread::cli_shutdown()
     DWORD numb = 0;
     BOOL ret = WriteConsoleInput(hStdIn, &b, 1, &numb);
 
-    wait();
+    if (m_thread)
+    {
+        m_thread->wait();
+    }
 #endif
 }

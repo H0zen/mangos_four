@@ -53,7 +53,8 @@
 #include <iostream>
 #include <utility>
 
-#include <ace/OS_NS_unistd.h>
+#include <chrono>
+#include <thread>
 
 INSTANTIATE_SINGLETON_1(Log);
 
@@ -346,7 +347,7 @@ void Log::Flush()
     fflush(stdout);
 
     {
-        ACE_GUARD(ACE_Thread_Mutex, fileGuard, m_fileMtx);
+        std::lock_guard<std::mutex> fileGuard(m_fileMtx);
         if (logfile != NULL)
         {
             fflush(logfile);
@@ -354,7 +355,7 @@ void Log::Flush()
     }
 
     {
-        ACE_GUARD(ACE_Thread_Mutex, worldGuard, m_worldLogMtx);
+        std::lock_guard<std::mutex> worldGuard(m_worldLogMtx);
         if (worldLogfile != NULL)
         {
             fflush(worldLogfile);
@@ -479,7 +480,7 @@ void Log::StartConsoleThread()
         return;                                             // idempotent (realmd double-init)
     }
     m_consoleBody = new ConsoleLogWriter();
-    m_consoleThread = new ACE_Based::Thread(m_consoleBody); // ctor auto-starts run()
+    m_consoleThread = new MaNGOS::Thread(m_consoleBody); // ctor auto-starts run()
     m_consoleAsync = true;
 }
 
@@ -698,7 +699,7 @@ void Log::outString()
     ConsoleEmitBlank(true);
     if (logfile)
     {
-        ACE_GUARD(ACE_Thread_Mutex, fileGuard, m_fileMtx);
+        std::lock_guard<std::mutex> fileGuard(m_fileMtx);
         outTimestamp(logfile);
         fprintf(logfile, "\n");
     }
@@ -719,7 +720,7 @@ void Log::outString(const char* str, ...)
 
     if (logfile)
     {
-        ACE_GUARD(ACE_Thread_Mutex, fileGuard, m_fileMtx);
+        std::lock_guard<std::mutex> fileGuard(m_fileMtx);
         outTimestamp(logfile);
 
         va_start(ap, str);
@@ -960,7 +961,7 @@ void Log::outBasic(const char* str, ...)
 
     if (logfile && m_logFileLevel >= LOG_LVL_BASIC)
     {
-        ACE_GUARD(ACE_Thread_Mutex, fileGuard, m_fileMtx);
+        std::lock_guard<std::mutex> fileGuard(m_fileMtx);
         va_list ap;
         outTimestamp(logfile);
         va_start(ap, str);
@@ -987,7 +988,7 @@ void Log::outDetail(const char* str, ...)
 
     if (logfile && m_logFileLevel >= LOG_LVL_DETAIL)
     {
-        ACE_GUARD(ACE_Thread_Mutex, fileGuard, m_fileMtx);
+        std::lock_guard<std::mutex> fileGuard(m_fileMtx);
         outTimestamp(logfile);
 
         va_list ap;
@@ -1016,7 +1017,7 @@ void Log::outDebug(const char* str, ...)
 
     if (logfile && m_logFileLevel >= LOG_LVL_DEBUG)
     {
-        ACE_GUARD(ACE_Thread_Mutex, fileGuard, m_fileMtx);
+        std::lock_guard<std::mutex> fileGuard(m_fileMtx);
         outTimestamp(logfile);
 
         va_list ap;
@@ -1226,7 +1227,7 @@ void Log::outWorldPacketDump(uint32 socket, uint32 opcode, char const* opcodeNam
         return;
     }
 
-    ACE_GUARD(ACE_Thread_Mutex, GuardObj, m_worldLogMtx);
+    std::lock_guard<std::mutex> GuardObj(m_worldLogMtx);
 
     outTimestamp(worldLogfile);
 
@@ -1269,7 +1270,7 @@ void Log::outWorldPacketDumpRedacted(uint32 socket, uint32 opcode, char const* o
         return;
     }
 
-    ACE_GUARD(ACE_Thread_Mutex, GuardObj, m_worldLogMtx);
+    std::lock_guard<std::mutex> GuardObj(m_worldLogMtx);
 
     outTimestamp(worldLogfile);
 
@@ -1332,7 +1333,7 @@ void Log::WaitBeforeContinueIfNeed()
         for (int i = 0; i < mode; ++i)
         {
             bar.step();
-            ACE_OS::sleep(1);
+            std::this_thread::sleep_for(std::chrono::seconds(1));
         }
     }
 }
