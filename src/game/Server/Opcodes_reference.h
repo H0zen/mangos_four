@@ -175,8 +175,8 @@
  *   TOTAL SMSG rows                   925
  *
  * SUBSYSTEM CONFIDENCE: high=365, low=221, medium=182, none=157
- * STATUS TOTALS: ACTIVE=369, DOC=438, DORMANT=713
- *   SMSG: ACTIVE=229, DOC=271, DORMANT=425
+ * STATUS TOTALS: ACTIVE=370, DOC=438, DORMANT=712
+ *   SMSG: ACTIVE=230, DOC=271, DORMANT=424
  *   CMSG: ACTIVE=140, DOC=167, DORMANT=288
  */
 
@@ -829,7 +829,7 @@ typedef uint16_t uint16;
  *   SMSG_INSPECT_RESULTS                           0x1842  ACTIVE
  *   SMSG_SPELLINTERRUPTLOG                         0x1851  ACTIVE
  *   SMSG_GODMODE                                   0x1862  DORMANT  [medium-conf]
- *   SMSG_EXPLORATION_EXPERIENCE                    0x189A  DORMANT 
+ *   SMSG_EXPLORATION_EXPERIENCE                    0x189A  ACTIVE   [Wow.exe binary: sub_6BB9C1 reads area ID then experience; sub_7B1384 retained semantic]
  *   SMSG_TRAINER_LIST                              0x189F  DORMANT  [medium-conf]
  *   SMSG_REPORT_PVP_AFK_RESULT                     0x18BE  DORMANT  [medium-conf]
  *   SMSG_GROUP_SET_LEADER                          0x18BF  DORMANT  [medium-conf]

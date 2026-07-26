@@ -4118,9 +4118,8 @@ void Player::Customize(ObjectGuid guid, uint8 gender, uint8 skin, uint8 face, ui
  */
 void Player::SendExplorationExperience(uint32 Area, uint32 Experience)
 {
-    WorldPacket data(SMSG_EXPLORATION_EXPERIENCE, 8);
-    data << uint32(Area);
-    data << uint32(Experience);
+    WorldPacket data;
+    MopAreaTriggerPackets::BuildExplorationExperience(data, Area, Experience);
     GetSession()->SendPacket(&data);
 }
 

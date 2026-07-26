@@ -756,6 +756,16 @@ namespace MopAreaTriggerPackets
         // ERR_CORPSE_IS_NOT_IN_INSTANCE.
         out.Initialize(SMSG_AREA_TRIGGER_NO_CORPSE, 0);
     }
+
+    inline void BuildExplorationExperience(WorldPacket& out, uint32 areaId,
+        uint32 experience)
+    {
+        out.Initialize(SMSG_EXPLORATION_EXPERIENCE, 8);
+
+        // Wow.exe 18414 reader sub_6BB9C1 consumes the area-table key first;
+        // terminal sub_7B1384 then displays the second uint32 as awarded XP.
+        out << areaId << experience;
+    }
 }
 
 namespace MopQuestPackets
