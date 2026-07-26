@@ -35,7 +35,12 @@ static void CheckPacket(WorldPacket const& packet, OpcodesList opcode,
     {
         CHECK(index < packet.size());
         if (index < packet.size())
+        {
+            if (packet[index] != value)
+                std::fprintf(stderr, "packet byte %zu: got %02X expected %02X\n",
+                    index, unsigned(packet[index]), unsigned(value));
             CHECK(packet[index] == value);
+        }
         ++index;
     }
 }
@@ -347,6 +352,76 @@ static void TestInventoryChangeFailureBindConfirm()
         });
 }
 
+static void TestItemPushResultDense()
+{
+    MopItemPackets::ItemPushResult result;
+    result.playerGuid = UINT64_C(0x0807060504030201);
+    result.itemGuid = UINT64_C(0x1817161514131211);
+    result.received = true;
+    result.showInChat = true;
+    result.bagSlot = 0xF1;
+    result.itemSlot = 0xE1E2E3E4;
+    result.itemEntry = 0xB1B2B3B4;
+    result.suffixFactor = 0xA1A2A3A4;
+    result.randomPropertyId = int32(0xC1C2C3C4);
+    result.count = 0x55667788;
+    result.totalCount = 0xD1D2D3D4;
+    WorldPacket packet;
+
+    MopItemPackets::BuildItemPushResult(packet, result);
+    CheckPacket(packet, SMSG_ITEM_PUSH_RESULT,
+        {
+            0xFF, 0xFE, 0xD0,
+            0x03, 0x13,
+            0x00, 0x00, 0x00, 0x00,
+            0x10, 0x07, 0x02,
+            0xA4, 0xA3, 0xA2, 0xA1,
+            0x19,
+            0x00, 0x00, 0x00, 0x00,
+            0xB4, 0xB3, 0xB2, 0xB1,
+            0xC4, 0xC3, 0xC2, 0xC1,
+            0x16,
+            0x00, 0x00, 0x00, 0x00,
+            0xD4, 0xD3, 0xD2, 0xD1,
+            0x12, 0x00,
+            0x88, 0x77, 0x66, 0x55,
+            0x09, 0x17, 0x04,
+            0xE4, 0xE3, 0xE2, 0xE1,
+            0xF1, 0x05, 0x06,
+            0x00, 0x00, 0x00, 0x00,
+            0x15, 0x14
+        });
+}
+
+static void TestItemPushResultSparse()
+{
+    MopItemPackets::ItemPushResult result;
+    result.showInChat = true;
+    result.bagSlot = 0xFF;
+    result.itemSlot = 0xFFFFFFFF;
+    result.itemEntry = 0x01020304;
+    result.count = 1;
+    result.totalCount = 1;
+    WorldPacket packet;
+
+    MopItemPackets::BuildItemPushResult(packet, result);
+    CheckPacket(packet, SMSG_ITEM_PUSH_RESULT,
+        {
+            0x10, 0x00, 0x00,
+            0x00, 0x00, 0x00, 0x00,
+            0x00, 0x00, 0x00, 0x00,
+            0x00, 0x00, 0x00, 0x00,
+            0x04, 0x03, 0x02, 0x01,
+            0x00, 0x00, 0x00, 0x00,
+            0x00, 0x00, 0x00, 0x00,
+            0x01, 0x00, 0x00, 0x00,
+            0x01, 0x00, 0x00, 0x00,
+            0xFF, 0xFF, 0xFF, 0xFF,
+            0xFF,
+            0x00, 0x00, 0x00, 0x00
+        });
+}
+
 int main(int /*argc*/, char** /*argv*/)
 {
     TestSwapInvItemDense();
@@ -365,5 +440,7 @@ int main(int /*argc*/, char** /*argv*/)
     TestInventoryChangeFailureLimitCategory();
     TestInventoryChangeFailureRequiredLevel();
     TestInventoryChangeFailureBindConfirm();
+    TestItemPushResultDense();
+    TestItemPushResultSparse();
     return g_fail ? 1 : 0;
 }

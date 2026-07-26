@@ -490,6 +490,103 @@ namespace MopItemPackets
         out << duration;
     }
 
+    struct ItemPushResult
+    {
+        uint64 playerGuid = 0;
+        uint64 itemGuid = 0;
+        bool received = false;
+        bool created = false;
+        bool showInChat = true;
+        bool bonusLoot = false;
+        uint8 bagSlot = 0;
+        uint32 itemSlot = 0;
+        uint32 itemEntry = 0;
+        uint32 suffixFactor = 0;
+        int32 randomPropertyId = 0;
+        uint32 count = 0;
+        uint32 totalCount = 0;
+        uint32 battlePetSpecies = 0;
+        uint32 battlePetQuality = 0;
+        uint32 battlePetBreed = 0;
+        uint32 battlePetLevel = 0;
+    };
+
+    inline void BuildItemPushResult(WorldPacket& out,
+        ItemPushResult const& result)
+    {
+        out.Initialize(SMSG_ITEM_PUSH_RESULT, 60);
+
+        // Wow.exe 18414 reader sub_6E63A2 consumes these two GUID masks and
+        // four notification flags before any byte-aligned item fields.
+        uint8 const itemMaskA[] = { 2 };
+        uint8 const playerMaskA[] = { 4 };
+        uint8 const itemMaskB[] = { 5 };
+        uint8 const playerMaskB[] = { 1 };
+        uint8 const itemMaskC[] = { 4 };
+        uint8 const playerMaskC[] = { 6, 5, 7, 0 };
+        uint8 const itemMaskD[] = { 0, 7 };
+        uint8 const playerMaskD[] = { 2 };
+        uint8 const itemMaskE[] = { 6 };
+        uint8 const playerMaskE[] = { 3 };
+        uint8 const itemMaskF[] = { 1 };
+        uint8 const itemMaskG[] = { 3 };
+        WriteGuidMask(out, result.itemGuid, itemMaskA);
+        WriteGuidMask(out, result.playerGuid, playerMaskA);
+        WriteGuidMask(out, result.itemGuid, itemMaskB);
+        out.WriteBit(result.showInChat);
+        WriteGuidMask(out, result.playerGuid, playerMaskB);
+        out.WriteBit(result.received);
+        WriteGuidMask(out, result.itemGuid, itemMaskC);
+        WriteGuidMask(out, result.playerGuid, playerMaskC);
+        WriteGuidMask(out, result.itemGuid, itemMaskD);
+        WriteGuidMask(out, result.playerGuid, playerMaskD);
+        WriteGuidMask(out, result.itemGuid, itemMaskE);
+        out.WriteBit(result.bonusLoot);
+        WriteGuidMask(out, result.playerGuid, playerMaskE);
+        WriteGuidMask(out, result.itemGuid, itemMaskF);
+        out.WriteBit(result.created);
+        WriteGuidMask(out, result.itemGuid, itemMaskG);
+        out.FlushBits();
+
+        uint8 const playerBytesA[] = { 1 };
+        uint8 const itemBytesA[] = { 1 };
+        WriteGuidBytes(out, result.playerGuid, playerBytesA);
+        WriteGuidBytes(out, result.itemGuid, itemBytesA);
+        out << result.battlePetSpecies;
+        uint8 const itemBytesB[] = { 0 };
+        uint8 const playerBytesB[] = { 5, 2 };
+        WriteGuidBytes(out, result.itemGuid, itemBytesB);
+        WriteGuidBytes(out, result.playerGuid, playerBytesB);
+        out << result.suffixFactor;
+        uint8 const itemBytesC[] = { 7 };
+        WriteGuidBytes(out, result.itemGuid, itemBytesC);
+        out << result.battlePetQuality;
+        out << result.itemEntry;
+        out << result.randomPropertyId;
+        uint8 const itemBytesD[] = { 6 };
+        WriteGuidBytes(out, result.itemGuid, itemBytesD);
+        out << result.battlePetBreed;
+        out << result.totalCount;
+        uint8 const itemBytesE[] = { 2 };
+        uint8 const playerBytesC[] = { 0 };
+        WriteGuidBytes(out, result.itemGuid, itemBytesE);
+        WriteGuidBytes(out, result.playerGuid, playerBytesC);
+        out << result.count;
+        uint8 const playerBytesD[] = { 7 };
+        uint8 const itemBytesF[] = { 5 };
+        uint8 const playerBytesE[] = { 4 };
+        WriteGuidBytes(out, result.playerGuid, playerBytesD);
+        WriteGuidBytes(out, result.itemGuid, itemBytesF);
+        WriteGuidBytes(out, result.playerGuid, playerBytesE);
+        out << result.itemSlot;
+        out << result.bagSlot;
+        uint8 const playerBytesF[] = { 3, 6 };
+        WriteGuidBytes(out, result.playerGuid, playerBytesF);
+        out << result.battlePetLevel;
+        uint8 const itemBytesG[] = { 3, 4 };
+        WriteGuidBytes(out, result.itemGuid, itemBytesG);
+    }
+
     inline void BuildItemEnchantTimeUpdate(WorldPacket& out,
         uint64 playerGuid, uint64 itemGuid, uint32 slot, uint32 duration)
     {

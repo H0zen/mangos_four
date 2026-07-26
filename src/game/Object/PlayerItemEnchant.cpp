@@ -866,20 +866,22 @@ void Player::SendNewItem(Item* item, uint32 count, bool received, bool created, 
         return;
     }
 
-    // last check 2.0.10
-    WorldPacket data(SMSG_ITEM_PUSH_RESULT, (8 + 4 + 4 + 4 + 1 + 4 + 4 + 4 + 4 + 4));
-    data << GetObjectGuid();                                // player GUID
-    data << uint32(received);                               // 0=looted, 1=from npc
-    data << uint32(created);                                // 0=received, 1=created
-    data << uint32(1);                                      // IsShowChatMessage
-    data << uint8(item->GetBagSlot());                      // bagslot
-    // item slot, but when added to stack: 0xFFFFFFFF
-    data << uint32((item->GetCount() == count) ? item->GetSlot() : -1);
-    data << uint32(item->GetEntry());                       // item id
-    data << uint32(item->GetItemSuffixFactor());            // SuffixFactor
-    data << uint32(item->GetItemRandomPropertyId());        // random item property id
-    data << uint32(count);                                  // count of items
-    data << uint32(GetItemCount(item->GetEntry()));         // count of items in inventory
+    MopItemPackets::ItemPushResult result;
+    result.playerGuid = GetObjectGuid().GetRawValue();
+    result.itemGuid = item->GetObjectGuid().GetRawValue();
+    result.received = received;                              // false=looted, true=from NPC
+    result.created = created;
+    result.bagSlot = item->GetBagSlot();
+    // A newly extended stack has no single destination slot to announce.
+    result.itemSlot = (item->GetCount() == count) ? item->GetSlot() : uint32(-1);
+    result.itemEntry = item->GetEntry();
+    result.suffixFactor = item->GetItemSuffixFactor();
+    result.randomPropertyId = item->GetItemRandomPropertyId();
+    result.count = count;
+    result.totalCount = GetItemCount(item->GetEntry());
+
+    WorldPacket data;
+    MopItemPackets::BuildItemPushResult(data, result);
 
     if (broadcast && GetGroup())
     {

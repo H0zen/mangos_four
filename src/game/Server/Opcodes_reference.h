@@ -175,8 +175,8 @@
  *   TOTAL SMSG rows                   925
  *
  * SUBSYSTEM CONFIDENCE: high=365, low=221, medium=182, none=157
- * STATUS TOTALS: ACTIVE=342, DOC=438, DORMANT=740
- *   SMSG: ACTIVE=206, DOC=271, DORMANT=448
+ * STATUS TOTALS: ACTIVE=343, DOC=438, DORMANT=739
+ *   SMSG: ACTIVE=207, DOC=271, DORMANT=447
  *   CMSG: ACTIVE=136, DOC=167, DORMANT=292
  */
 
@@ -501,7 +501,7 @@ typedef uint16_t uint16;
  *   SMSG_AREA_TRIGGER_NO_CORPSE                    0x089E  ACTIVE   [high-conf]
  *   SMSG_GUILD_BANK_LIST                           0x0B79  DORMANT  [medium-conf]
  *   SMSG_MONEY_NOTIFY                              0x0C0F  DORMANT  [medium-conf]
- *   SMSG_ITEM_PUSH_RESULT                          0x0E0A  DORMANT 
+ *   SMSG_ITEM_PUSH_RESULT                          0x0E0A  ACTIVE
  *   SMSG_CORPSE_TRANSPORT_QUERY                    0x0E0B  ACTIVE   server-binding=SMSG_CORPSE_QUERY_RESPONSE
  *   SMSG_START_MIRROR_TIMER                        0x0E12  DORMANT 
  *   SMSG_UNKNOWN_0x0E2B                            0x0E2B  DOC     

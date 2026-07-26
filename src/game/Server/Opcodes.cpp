@@ -343,6 +343,7 @@ void InitializeOpcodes()
     DefS(SMSG_GOSSIP_POI, "SMSG_GOSSIP_POI");
     DefC(CMSG_LIST_INVENTORY, "CMSG_LIST_INVENTORY", STATUS_LOGGEDIN, PROCESS_THREADUNSAFE, &WorldSession::HandleListInventoryOpcode);
     DefS(SMSG_LIST_INVENTORY, "SMSG_LIST_INVENTORY");
+    DefS(SMSG_ITEM_PUSH_RESULT, "SMSG_ITEM_PUSH_RESULT");
 
     // Directly verified 18414 inventory-movement requests. Each handler
     // decodes the packed request before reusing the established item logic.

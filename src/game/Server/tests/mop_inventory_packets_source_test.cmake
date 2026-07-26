@@ -1,6 +1,7 @@
 file(READ "${SOURCE_ROOT}/src/game/WorldHandlers/ItemHandler.cpp" item_handler)
 file(READ "${SOURCE_ROOT}/src/game/WorldHandlers/ItemHandlerVendor.cpp" vendor_handler)
 file(READ "${SOURCE_ROOT}/src/game/Object/PlayerItemStorage.cpp" item_storage)
+file(READ "${SOURCE_ROOT}/src/game/Object/PlayerItemEnchant.cpp" item_enchant)
 file(READ "${SOURCE_ROOT}/src/game/Server/Opcodes.cpp" opcode_registry)
 file(READ "${SOURCE_ROOT}/src/game/Server/Opcodes.h" opcode_header)
 file(READ "${SOURCE_ROOT}/src/game/Server/WorldSession.cpp" world_session)
@@ -63,6 +64,19 @@ elseif(MUTATION STREQUAL "failure_opcode_value")
 elseif(MUTATION STREQUAL "failure_legacy_sender")
     string(APPEND item_storage
         "\nvoid damaged() { WorldPacket data(SMSG_INVENTORY_CHANGE_FAILURE); data << uint8(0); }\n")
+elseif(MUTATION STREQUAL "item_push_sender")
+    string(REPLACE "MopItemPackets::BuildItemPushResult(data, result);"
+        "/* removed item-push builder */" item_enchant "${item_enchant}")
+elseif(MUTATION STREQUAL "item_push_registration")
+    string(REPLACE "DefS(SMSG_ITEM_PUSH_RESULT, \"SMSG_ITEM_PUSH_RESULT\");"
+        "/* removed item-push registration */" opcode_registry "${opcode_registry}")
+elseif(MUTATION STREQUAL "item_push_admission")
+    string(REPLACE "case SMSG_ITEM_PUSH_RESULT:"
+        "case 0xFFFF: /* removed item-push admission */" world_session "${world_session}")
+elseif(MUTATION STREQUAL "item_push_opcode_value")
+    string(REPLACE "SMSG_ITEM_PUSH_RESULT                        = 0x0E0A"
+        "SMSG_ITEM_PUSH_RESULT                        = 0xFFFF"
+        opcode_header "${opcode_header}")
 elseif(MUTATION STREQUAL "legacy_reader")
     string(APPEND item_handler
         "\nvoid damaged(WorldPacket& recv_data) { uint8 srcbag, srcslot; recv_data >> srcbag >> srcslot; }\n")
@@ -122,6 +136,13 @@ require_once("${opcode_registry}"
     "inventory failure registration")
 require_once("${world_session}" "case SMSG_INVENTORY_CHANGE_FAILURE:"
     "inventory failure suppression admission")
+require_once("${item_enchant}" "MopItemPackets::BuildItemPushResult(data, result);"
+    "item-push 18414 sender")
+require_once("${opcode_registry}"
+    "DefS(SMSG_ITEM_PUSH_RESULT, \"SMSG_ITEM_PUSH_RESULT\");"
+    "item-push registration")
+require_once("${world_session}" "case SMSG_ITEM_PUSH_RESULT:"
+    "item-push suppression admission")
 
 foreach(value IN ITEMS
         "CMSG_AUTOEQUIP_ITEM                          = 0x025F"
@@ -129,12 +150,15 @@ foreach(value IN ITEMS
         "CMSG_SWAP_ITEM                               = 0x035D"
         "CMSG_SWAP_INV_ITEM                           = 0x03DF"
         "CMSG_SPLIT_ITEM                              = 0x02EC"
-        "SMSG_INVENTORY_CHANGE_FAILURE                = 0x0C1E")
+        "SMSG_INVENTORY_CHANGE_FAILURE                = 0x0C1E"
+        "SMSG_ITEM_PUSH_RESULT                        = 0x0E0A")
     require_once("${opcode_header}" "${value}" "binary-proven inventory opcode")
 endforeach()
 
 forbid("${item_storage}" "WorldPacket data(SMSG_INVENTORY_CHANGE_FAILURE"
     "legacy inventory failure sender")
+forbid("${item_enchant}" "WorldPacket data(SMSG_ITEM_PUSH_RESULT"
+    "legacy item-push sender")
 
 set(handler_sources "${item_handler}${vendor_handler}")
 foreach(legacy IN ITEMS
