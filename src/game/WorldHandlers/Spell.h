@@ -400,6 +400,17 @@ namespace MopSpellPackets
         out << itemGuid << spellId;
     }
 
+    inline void BuildClearTarget(WorldPacket& out, ObjectGuid targetGuid)
+    {
+        out.Initialize(SMSG_CLEAR_TARGET, 9);
+
+        // Wow.exe 18414 reader sub_6D4AFB reconstructs this packed GUID;
+        // terminal sub_85876E forwards it to the client target-clear routine.
+        out.WriteGuidMask<6, 2, 0, 4, 7, 1, 3, 5>(targetGuid);
+        out.FlushBits();
+        out.WriteGuidBytes<4, 0, 3, 5, 2, 7, 6, 1>(targetGuid);
+    }
+
     inline void BuildLearnedSpell(WorldPacket& out, uint32 spellId,
         bool suppressMessaging)
     {

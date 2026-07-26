@@ -206,8 +206,8 @@ void Spell::EffectBreakPlayerTargeting (SpellEffectEntry const* /*effect*/)
         return;
     }
 
-    WorldPacket data(SMSG_CLEAR_TARGET, 8);
-    data << unitTarget->GetObjectGuid();
+    WorldPacket data;
+    MopSpellPackets::BuildClearTarget(data, unitTarget->GetObjectGuid());
     unitTarget->SendMessageToSet(&data, false);
 }
 

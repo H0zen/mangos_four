@@ -175,8 +175,8 @@
  *   TOTAL SMSG rows                   925
  *
  * SUBSYSTEM CONFIDENCE: high=365, low=221, medium=182, none=157
- * STATUS TOTALS: ACTIVE=370, DOC=438, DORMANT=712
- *   SMSG: ACTIVE=230, DOC=271, DORMANT=424
+ * STATUS TOTALS: ACTIVE=371, DOC=438, DORMANT=711
+ *   SMSG: ACTIVE=231, DOC=271, DORMANT=423
  *   CMSG: ACTIVE=140, DOC=167, DORMANT=288
  */
 
@@ -512,7 +512,7 @@ typedef uint16_t uint16;
  *   SMSG_STOP_MIRROR_TIMER                         0x1026  DORMANT  [medium-conf]
  *   SMSG_PLAY_SOUND                                0x102A  ACTIVE
  *   SMSG_GM_PLAYER_INFO                            0x102B  DORMANT  [medium-conf]
- *   SMSG_CLEAR_TARGET                              0x1061  DORMANT 
+ *   SMSG_CLEAR_TARGET                              0x1061  ACTIVE   [Wow.exe binary: sub_6D4AFB packed GUID reader; sub_85876E target-clear terminal]
  *   SMSG_PROPOSE_LEVEL_GRANT                       0x109A  DORMANT 
  *   SMSG_UPDATE_INSTANCE_OWNERSHIP                 0x10E0  DORMANT  [medium-conf]
  *   SMSG_REFER_A_FRIEND_EXPIRED                    0x1143  DORMANT  [medium-conf]
