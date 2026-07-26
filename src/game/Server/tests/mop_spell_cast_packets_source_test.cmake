@@ -9,6 +9,7 @@ file(READ "${SOURCE_ROOT}/src/game/ChatCommands/DebugCommands.cpp" debug_command
 file(READ "${SOURCE_ROOT}/src/game/Object/Player.cpp" player_source)
 file(READ "${SOURCE_ROOT}/src/game/Object/PlayerItemStorage.cpp" item_storage_source)
 file(READ "${SOURCE_ROOT}/src/game/Object/PetSpells.cpp" pet_spells_source)
+file(READ "${SOURCE_ROOT}/src/game/Object/SpellCooldownMgr.cpp" spell_cooldown_mgr_source)
 file(READ "${SOURCE_ROOT}/src/game/Server/Opcodes_reference.h" opcode_reference)
 
 if(MUTATION STREQUAL "reader")
@@ -255,6 +256,46 @@ elseif(MUTATION STREQUAL "cooldown_reference")
     string(REPLACE
         "SMSG_SPELL_COOLDOWN                            0x0452  ACTIVE"
         "SMSG_SPELL_COOLDOWN                            0x0452  DORMANT"
+        opcode_reference "${opcode_reference}")
+elseif(MUTATION STREQUAL "clear_cooldowns_mask_order")
+    string(REPLACE
+        "out.WriteGuidMask<5, 6, 7, 3, 2>(ownerGuid);"
+        "out.WriteGuidMask<6, 5, 7, 3, 2>(ownerGuid);"
+        spell_header "${spell_header}")
+elseif(MUTATION STREQUAL "clear_cooldowns_count_width")
+    string(REPLACE
+        "out.WriteBits(uint32(spellIds.size()), 22);"
+        "out.WriteBits(uint32(spellIds.size()), 24);"
+        spell_header "${spell_header}")
+elseif(MUTATION STREQUAL "clear_cooldowns_byte_order")
+    string(REPLACE
+        "out.WriteGuidBytes<0, 1, 7, 4, 3, 5, 6>(ownerGuid);"
+        "out.WriteGuidBytes<1, 0, 7, 4, 3, 5, 6>(ownerGuid);"
+        spell_header "${spell_header}")
+elseif(MUTATION STREQUAL "clear_cooldowns_player_sender")
+    string(REPLACE
+        "MopSpellPackets::BuildClearCooldowns(data, target->GetObjectGuid(), {spell_id});"
+        "/* removed single cooldown-clear sender */"
+        player_source "${player_source}")
+elseif(MUTATION STREQUAL "clear_cooldowns_manager_sender")
+    string(REPLACE
+        "MopSpellPackets::BuildClearCooldowns(data, m_owner->GetObjectGuid(), spellIds);"
+        "/* removed all-cooldowns-clear sender */"
+        spell_cooldown_mgr_source "${spell_cooldown_mgr_source}")
+elseif(MUTATION STREQUAL "clear_cooldowns_registration")
+    string(REPLACE
+        "DefS(SMSG_CLEAR_COOLDOWNS, \"SMSG_CLEAR_COOLDOWNS\");"
+        "/* removed SMSG_CLEAR_COOLDOWNS registration */"
+        opcode_registry "${opcode_registry}")
+elseif(MUTATION STREQUAL "clear_cooldowns_gate")
+    string(REPLACE
+        "case SMSG_CLEAR_COOLDOWNS:"
+        "case SMSG_UNKNOWN_0:"
+        world_session "${world_session}")
+elseif(MUTATION STREQUAL "clear_cooldowns_reference")
+    string(REPLACE
+        "SMSG_CLEAR_COOLDOWNS                           0x1458  ACTIVE"
+        "SMSG_CLEAR_COOLDOWNS                           0x1458  DORMANT"
         opcode_reference "${opcode_reference}")
 endif()
 
@@ -530,6 +571,43 @@ require_once("${opcode_reference}"
 foreach(source IN ITEMS "${player_source}" "${item_storage_source}" "${pet_spells_source}")
     forbid("${source}" "WorldPacket data(SMSG_SPELL_COOLDOWN"
         "legacy spell-cooldown body")
+endforeach()
+require_once("${spell_header}"
+    "inline void BuildClearCooldowns(WorldPacket& out, ObjectGuid ownerGuid,"
+    "18414 clear-cooldowns builder")
+require_once("${spell_header}"
+    "out.WriteGuidMask<5, 6, 7, 3, 2>(ownerGuid);"
+    "clear-cooldowns leading GUID mask")
+require_once("${spell_header}"
+    "out.WriteBits(uint32(spellIds.size()), 22);"
+    "clear-cooldowns 22-bit count")
+require_once("${spell_header}"
+    "out.WriteGuidMask<1, 0, 4>(ownerGuid);"
+    "clear-cooldowns trailing GUID mask")
+require_once("${spell_header}"
+    "out.WriteGuidBytes<0, 1, 7, 4, 3, 5, 6>(ownerGuid);"
+    "clear-cooldowns leading GUID bytes")
+require_once("${spell_header}"
+    "out.WriteGuidBytes<2>(ownerGuid);"
+    "clear-cooldowns trailing GUID byte")
+require_once("${player_source}"
+    "MopSpellPackets::BuildClearCooldowns(data, target->GetObjectGuid(), {spell_id});"
+    "single cooldown-clear sender")
+require_once("${spell_cooldown_mgr_source}"
+    "MopSpellPackets::BuildClearCooldowns(data, m_owner->GetObjectGuid(), spellIds);"
+    "all-cooldowns-clear sender")
+require_once("${opcode_registry}"
+    "DefS(SMSG_CLEAR_COOLDOWNS, \"SMSG_CLEAR_COOLDOWNS\");"
+    "clear-cooldowns registration")
+require_once("${world_session}"
+    "case SMSG_CLEAR_COOLDOWNS:"
+    "clear-cooldowns sender admission")
+require_once("${opcode_reference}"
+    "SMSG_CLEAR_COOLDOWNS                           0x1458  ACTIVE"
+    "active clear-cooldowns reference")
+foreach(source IN ITEMS "${player_source}" "${spell_cooldown_mgr_source}")
+    forbid("${source}" "WorldPacket data(SMSG_CLEAR_COOLDOWNS"
+        "legacy clear-cooldowns body")
 endforeach()
 
 string(FIND "${cast_handler}" "MopSpellPackets::ReadCastSpellRequest(recvPacket, request)" reader_position)

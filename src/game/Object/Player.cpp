@@ -6033,17 +6033,8 @@ void Player::RemoveAtLoginFlag(AtLoginFlags f, bool in_db_also /*= false*/)
  */
 void Player::SendClearCooldown(uint32 spell_id, Unit* target)
 {
-    ObjectGuid guid = target->GetObjectGuid();
-
-    WorldPacket data(SMSG_CLEAR_COOLDOWNS, 1 + 8 + 4);
-    data.WriteGuidMask<1, 3, 6>(guid);
-    data.WriteBits(1, 24);      // cooldown count
-    data.WriteGuidMask<7, 5, 2, 4, 0>(guid);
-
-    data.WriteGuidBytes<7, 2, 4, 5, 1, 3>(guid);
-    data << uint32(spell_id);
-    data.WriteGuidBytes<0, 6>(guid);
-
+    WorldPacket data;
+    MopSpellPackets::BuildClearCooldowns(data, target->GetObjectGuid(), {spell_id});
     SendDirectMessage(&data);
 }
 

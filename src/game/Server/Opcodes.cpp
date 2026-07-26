@@ -567,6 +567,7 @@ void InitializeOpcodes()
     DefS(SMSG_SPELL_START, "SMSG_SPELL_START");
     DefS(SMSG_SPELL_GO, "SMSG_SPELL_GO");
     DefS(SMSG_SPELL_COOLDOWN, "SMSG_SPELL_COOLDOWN");
+    DefS(SMSG_CLEAR_COOLDOWNS, "SMSG_CLEAR_COOLDOWNS");
 
     // Live 18414 guild invite: 9-bit player-name length followed by raw bytes.
     DefC(CMSG_GUILD_INVITE, "CMSG_GUILD_INVITE", STATUS_LOGGEDIN, PROCESS_THREADUNSAFE, &WorldSession::HandleGuildInviteOpcode);

@@ -1008,6 +1008,30 @@ static void test_spell_cooldown_wire_layout()
     });
 }
 
+static void test_clear_cooldowns_wire_layout()
+{
+    WorldPacket dense;
+    MopSpellPackets::BuildClearCooldowns(dense,
+        ObjectGuid(UINT64_C(0x0807060504030201)), {0x11223344u, 0xAABBCCDDu});
+    CHECK(dense.GetOpcode() == SMSG_CLEAR_COOLDOWNS);
+    CheckBytes(dense, {
+        0xF8, 0x00, 0x00, 0x5C,
+        0x00, 0x03, 0x09, 0x04, 0x05, 0x07, 0x06,
+        0x44, 0x33, 0x22, 0x11, 0xDD, 0xCC, 0xBB, 0xAA,
+        0x02,
+    });
+
+    WorldPacket sparse;
+    MopSpellPackets::BuildClearCooldowns(sparse,
+        ObjectGuid(UINT64_C(0x08BB0000000000AA)), {0x11223344u});
+    CHECK(sparse.GetOpcode() == SMSG_CLEAR_COOLDOWNS);
+    CheckBytes(sparse, {
+        0x60, 0x00, 0x00, 0x28,
+        0xAB, 0x09, 0xBA,
+        0x44, 0x33, 0x22, 0x11,
+    });
+}
+
 int main(int, char**)
 {
     test_dense_and_guid_permutations();
@@ -1024,6 +1048,7 @@ int main(int, char**)
     test_spell_go_wire_layout();
     test_category_cooldown_request_and_response();
     test_spell_cooldown_wire_layout();
+    test_clear_cooldowns_wire_layout();
 
     if (g_fail)
     {

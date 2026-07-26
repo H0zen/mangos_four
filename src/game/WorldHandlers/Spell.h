@@ -357,6 +357,25 @@ namespace MopSpellPackets
         out.WriteGuidBytes<4, 1, 0, 2, 6>(ownerGuid);
     }
 
+    inline void BuildClearCooldowns(WorldPacket& out, ObjectGuid ownerGuid,
+        std::vector<uint32> const& spellIds)
+    {
+        MANGOS_ASSERT(spellIds.size() < (size_t(1) << 22));
+        out.Initialize(SMSG_CLEAR_COOLDOWNS, 12 + 4 * spellIds.size());
+
+        // Wow.exe 18414 reader sub_C6FCAA uses a 22-bit spell count; terminal
+        // sub_77AF67 resolves this GUID and clears every listed spell cooldown.
+        out.WriteGuidMask<5, 6, 7, 3, 2>(ownerGuid);
+        out.WriteBits(uint32(spellIds.size()), 22);
+        out.WriteGuidMask<1, 0, 4>(ownerGuid);
+        out.FlushBits();
+
+        out.WriteGuidBytes<0, 1, 7, 4, 3, 5, 6>(ownerGuid);
+        for (uint32 spellId : spellIds)
+            out << spellId;
+        out.WriteGuidBytes<2>(ownerGuid);
+    }
+
     struct CastFailedArguments
     {
         bool hasArg10 = false;

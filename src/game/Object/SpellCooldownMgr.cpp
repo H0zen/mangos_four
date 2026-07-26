@@ -252,22 +252,13 @@ void SpellCooldownMgr::RemoveAllSpellCooldown()
 {
     if (!m_cooldowns.empty())
     {
-        ObjectGuid guid = m_owner->GetObjectGuid();
-
-        WorldPacket data(SMSG_CLEAR_COOLDOWNS, 1 + 8 + m_cooldowns.size() * 4);
-        data.WriteGuidMask<1, 3, 6>(guid);
-        data.WriteBits(m_cooldowns.size(), 24);      // cooldown count
-        data.WriteGuidMask<7, 5, 2, 4, 0>(guid);
-
-        data.WriteGuidBytes<7, 2, 4, 5, 1, 3>(guid);
-
+        std::vector<uint32> spellIds;
+        spellIds.reserve(m_cooldowns.size());
         for (SpellCooldowns::const_iterator itr = m_cooldowns.begin(); itr != m_cooldowns.end(); ++itr)
-        {
-            data << uint32(itr->first);
-        }
+            spellIds.push_back(itr->first);
 
-        data.WriteGuidBytes<0, 6>(guid);
-
+        WorldPacket data;
+        MopSpellPackets::BuildClearCooldowns(data, m_owner->GetObjectGuid(), spellIds);
         m_owner->SendDirectMessage(&data);
 
         m_cooldowns.clear();
