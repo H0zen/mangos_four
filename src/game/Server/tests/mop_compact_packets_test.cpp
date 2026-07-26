@@ -124,6 +124,77 @@ static void test_attack_packets()
     CHECK(MopCompactPackets::ReadAttackSwingTarget(swing).GetRawValue() == victim);
 }
 
+static void test_attacker_state_update()
+{
+    MopCompactPackets::AttackStateUpdateData update;
+    update.hitInfo = 0x00000200u;
+    update.attacker = ObjectGuid(UINT64_C(0x0807060504030201));
+    update.target = ObjectGuid(UINT64_C(0x100F0E0D0C0B0A09));
+    update.damage = 1000;
+    update.overkill = 100;
+    update.schoolMask = 1;
+    update.victimState = 1;
+
+    WorldPacket normal;
+    MopCompactPackets::BuildAttackerStateUpdate(normal, update);
+    CHECK(normal.GetOpcode() == SMSG_ATTACKERSTATEUPDATE);
+    CHECK(BytesEqual(normal, {
+        0x00, 0x34, 0x00, 0x00, 0x00,
+        0x00, 0x02, 0x00, 0x00,
+        0xFF, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08,
+        0xFF, 0x09, 0x0A, 0x0B, 0x0C, 0x0D, 0x0E, 0x0F, 0x10,
+        0xE8, 0x03, 0x00, 0x00,
+        0x64, 0x00, 0x00, 0x00,
+        0x01,
+        0x01, 0x00, 0x00, 0x00,
+        0x00, 0x00, 0x7A, 0x44,
+        0xE8, 0x03, 0x00, 0x00,
+        0x01,
+        0x00, 0x00, 0x00, 0x00,
+        0x00, 0x00, 0x00, 0x00
+    }));
+
+    update = MopCompactPackets::AttackStateUpdateData();
+    update.hitInfo = 0x000020A0u;
+    update.damage = 50;
+    update.schoolMask = 1;
+    update.absorb = 10;
+    update.resist = 5;
+    update.victimState = 5;
+    update.blocked = 3;
+
+    WorldPacket mitigated;
+    MopCompactPackets::BuildAttackerStateUpdate(mitigated, update);
+    CHECK(BytesEqual(mitigated, {
+        0x00, 0x34, 0x00, 0x00, 0x00,
+        0xA0, 0x20, 0x00, 0x00,
+        0x00, 0x00,
+        0x32, 0x00, 0x00, 0x00,
+        0x00, 0x00, 0x00, 0x00,
+        0x01,
+        0x01, 0x00, 0x00, 0x00,
+        0x00, 0x00, 0x48, 0x42,
+        0x32, 0x00, 0x00, 0x00,
+        0x0A, 0x00, 0x00, 0x00,
+        0x05, 0x00, 0x00, 0x00,
+        0x05,
+        0x00, 0x00, 0x00, 0x00,
+        0x00, 0x00, 0x00, 0x00,
+        0x03, 0x00, 0x00, 0x00,
+        0x00, 0x00, 0x00, 0x00
+    }));
+
+    update = MopCompactPackets::AttackStateUpdateData();
+    update.hitInfo = 0x00000001u;
+    WorldPacket extended;
+    MopCompactPackets::BuildAttackerStateUpdate(extended, update);
+    std::vector<uint8_t> expectedExtended(97, 0);
+    expectedExtended[1] = 0x5C;
+    expectedExtended[5] = 0x01;
+    expectedExtended[19] = 0x01;
+    CHECK(BytesEqual(extended, expectedExtended));
+}
+
 static void test_swim_speed_guid_layouts()
 {
     {
@@ -277,6 +348,7 @@ static void test_opcode_values_are_framable()
     CHECK(uint32_t(SMSG_SET_DUNGEON_DIFFICULTY) == 0x1283u);
     CHECK(uint32_t(SMSG_ATTACKSTART) == 0x1A9Eu);
     CHECK(uint32_t(SMSG_ATTACKSTOP) == 0x12AFu);
+    CHECK(uint32_t(SMSG_ATTACKERSTATEUPDATE) == 0x06AAu);
     CHECK(uint32_t(SMSG_CANCEL_COMBAT) == 0x0E8Bu);
 
     CHECK(uint32_t(SMSG_ATTACKSWING_ERROR) <= 0x1FFFu);
@@ -287,6 +359,7 @@ static void test_opcode_values_are_framable()
     CHECK(uint32_t(SMSG_SET_DUNGEON_DIFFICULTY) <= 0x1FFFu);
     CHECK(uint32_t(SMSG_ATTACKSTART) <= 0x1FFFu);
     CHECK(uint32_t(SMSG_ATTACKSTOP) <= 0x1FFFu);
+    CHECK(uint32_t(SMSG_ATTACKERSTATEUPDATE) <= 0x1FFFu);
     CHECK(uint32_t(SMSG_CANCEL_COMBAT) <= 0x1FFFu);
 }
 
@@ -294,6 +367,7 @@ int main(int /*argc*/, char** /*argv*/)
 {
     test_attack_swing_reasons();
     test_attack_packets();
+    test_attacker_state_update();
     test_swim_speed_guid_layouts();
     test_random_roll_guid_layouts();
     test_instance_encounter_variants();

@@ -171,6 +171,74 @@ namespace MopCompactPackets
         out.WriteByteSeq(AttackGuidByte(attackerGuid, 7));
     }
 
+    struct AttackStateUpdateData
+    {
+        uint32 hitInfo = 0;
+        ObjectGuid attacker;
+        ObjectGuid target;
+        uint32 damage = 0;
+        uint32 overkill = 0;
+        uint32 schoolMask = 0;
+        uint32 absorb = 0;
+        uint32 resist = 0;
+        uint8 victimState = 0;
+        uint32 blocked = 0;
+    };
+
+    inline void BuildAttackerStateUpdate(WorldPacket& out,
+        AttackStateUpdateData const& update)
+    {
+        // The 18414 route first reads an optional-metadata bit and a byte length,
+        // then gives that exact slice to the UnitCombat_C record reader. The
+        // normal server path has no optional metadata and one sub-damage record.
+        uint32 const absorbMask = 0x00000060u;
+        uint32 const resistMask = 0x00000180u;
+        uint32 const trailingFloatMask = 0x00003000u;
+        uint32 const blockMask = 0x00002000u;
+        uint32 const rageMask = 0x00800000u;
+        uint32 const extendedMask = 0x00000001u;
+
+        ByteBuffer body(96);
+        body << update.hitInfo;
+        body.appendPackGUID(update.attacker.GetRawValue());
+        body.appendPackGUID(update.target.GetRawValue());
+        body << update.damage;
+        body << update.overkill;
+        body << uint8(1);
+        body << update.schoolMask;
+        body << float(update.damage);
+        body << update.damage;
+
+        if (update.hitInfo & absorbMask)
+            body << update.absorb;
+        if (update.hitInfo & resistMask)
+            body << update.resist;
+
+        body << update.victimState;
+        body << uint32(0); // unknown combat context
+        body << uint32(0); // melee spell id
+
+        if (update.hitInfo & blockMask)
+            body << update.blocked;
+        if (update.hitInfo & rageMask)
+            body << uint32(0);
+        if (update.hitInfo & extendedMask)
+        {
+            body << uint32(0);
+            for (uint8 i = 0; i < 12; ++i)
+                body << float(0);
+            body << uint32(0);
+        }
+        if (update.hitInfo & trailingFloatMask)
+            body << float(0);
+
+        out.Initialize(SMSG_ATTACKERSTATEUPDATE, 5 + body.size());
+        out.WriteBit(false);
+        out.FlushBits();
+        out << uint32(body.size());
+        out.append(body);
+    }
+
     inline void BuildAIReaction(WorldPacket& out, ObjectGuid guid, uint32 reaction)
     {
         // The 18414 Unit_C reader interleaves the reaction value between the

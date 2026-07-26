@@ -8,6 +8,8 @@ file(READ "${SOURCE_ROOT}/src/game/WorldHandlers/CharacterHandler.cpp" character
 file(READ "${SOURCE_ROOT}/src/game/Server/Opcodes.cpp" opcode_registry)
 file(READ "${SOURCE_ROOT}/src/game/Server/Opcodes.h" opcode_header)
 file(READ "${SOURCE_ROOT}/src/game/Object/UnitCombat.cpp" unit_combat)
+file(READ "${SOURCE_ROOT}/src/game/Object/Unit.cpp" unit)
+file(READ "${SOURCE_ROOT}/src/game/Object/Unit.h" unit_header)
 file(READ "${SOURCE_ROOT}/src/game/WorldHandlers/CombatHandler.cpp" combat_handler)
 file(READ "${SOURCE_ROOT}/src/game/Server/WorldSession.cpp" world_session)
 file(READ "${SOURCE_ROOT}/src/game/WorldHandlers/ItemHandler.cpp" item_handler)
@@ -47,6 +49,36 @@ elseif(MUTATION STREQUAL "read_item_alias")
     string(APPEND opcode_header "\nSMSG_READ_ITEM_FAILED = 0x0E8B,\n")
 elseif(MUTATION STREQUAL "read_item_sender")
     string(APPEND item_handler "\nWorldPacket stale(SMSG_READ_ITEM_FAILED, 8);\n")
+elseif(MUTATION STREQUAL "attacker_sender")
+    string(REPLACE
+        "MopCompactPackets::BuildAttackerStateUpdate(data, update);"
+        "/* removed attacker-state builder */"
+        unit "${unit}")
+elseif(MUTATION STREQUAL "attacker_registration")
+    string(REPLACE
+        "DefS(SMSG_ATTACKERSTATEUPDATE, \"SMSG_ATTACKERSTATEUPDATE\");"
+        "/* removed attacker-state registration */"
+        opcode_registry "${opcode_registry}")
+elseif(MUTATION STREQUAL "attacker_allowlist")
+    string(REPLACE
+        "case SMSG_ATTACKERSTATEUPDATE:"
+        "case 0xFFFF: /* removed attacker-state allowlist */"
+        world_session "${world_session}")
+elseif(MUTATION STREQUAL "attacker_opcode")
+    string(REPLACE
+        "SMSG_ATTACKERSTATEUPDATE                     = 0x06AA"
+        "SMSG_ATTACKERSTATEUPDATE                     = 0x06AB"
+        opcode_header "${opcode_header}")
+elseif(MUTATION STREQUAL "attacker_reference")
+    string(REPLACE
+        "SMSG_ATTACKERSTATEUPDATE                       0x06AA  ACTIVE"
+        "SMSG_ATTACKERSTATEUPDATE                       0x06AA  DORMANT"
+        opcode_reference "${opcode_reference}")
+elseif(MUTATION STREQUAL "attacker_envelope")
+    string(REPLACE
+        "out.WriteBit(false);"
+        "out.WriteBit(true);"
+        unit_header "${unit_header}")
 endif()
 
 if(player_combat MATCHES "WorldPacket[ \t]+data\\(SMSG_ATTACKSWING_NOTINRANGE")
@@ -135,4 +167,29 @@ if(opcode_header MATCHES "SMSG_READ_ITEM_FAILED")
 endif()
 if(item_handler MATCHES "SMSG_READ_ITEM_FAILED")
     message(FATAL_ERROR "read-item handler can still emit the disproved 0x0E8B identity")
+endif()
+
+if(NOT unit MATCHES "MopCompactPackets::BuildAttackerStateUpdate")
+    message(FATAL_ERROR "attacker-state sender bypasses the shared 5.4.8 serializer")
+endif()
+if(unit MATCHES "WorldPacket[ 	]+data\\(SMSG_ATTACKERSTATEUPDATE")
+    message(FATAL_ERROR "legacy bare attacker-state packet construction remains")
+endif()
+if(NOT opcode_registry MATCHES "DefS\\(SMSG_ATTACKERSTATEUPDATE,[ 	]*\"SMSG_ATTACKERSTATEUPDATE\"\\)")
+    message(FATAL_ERROR "SMSG_ATTACKERSTATEUPDATE is missing outbound opcode metadata")
+endif()
+if(NOT world_session MATCHES "case[ 	]+SMSG_ATTACKERSTATEUPDATE:")
+    message(FATAL_ERROR "SMSG_ATTACKERSTATEUPDATE is missing from the converted-packet gate")
+endif()
+if(NOT opcode_header MATCHES "SMSG_ATTACKERSTATEUPDATE[ 	]*=[ 	]*0x06AA")
+    message(FATAL_ERROR "SMSG_ATTACKERSTATEUPDATE does not use the direct 18414 value 0x06AA")
+endif()
+if(NOT opcode_reference MATCHES "SMSG_ATTACKERSTATEUPDATE[ 	]+0x06AA[ 	]+ACTIVE")
+    message(FATAL_ERROR "reference inventory does not record active 0x06AA attacker-state update")
+endif()
+if(NOT unit_header MATCHES "BuildAttackerStateUpdate")
+    message(FATAL_ERROR "5.4.8 attacker-state serializer is missing")
+endif()
+if(NOT unit_header MATCHES "out.WriteBit\\(false\\)")
+    message(FATAL_ERROR "attacker-state outer envelope does not omit optional metadata")
 endif()

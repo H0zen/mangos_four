@@ -175,8 +175,8 @@
  *   TOTAL SMSG rows                   925
  *
  * SUBSYSTEM CONFIDENCE: high=365, low=221, medium=182, none=157
- * STATUS TOTALS: ACTIVE=341, DOC=438, DORMANT=741
- *   SMSG: ACTIVE=205, DOC=271, DORMANT=449
+ * STATUS TOTALS: ACTIVE=342, DOC=438, DORMANT=740
+ *   SMSG: ACTIVE=206, DOC=271, DORMANT=448
  *   CMSG: ACTIVE=136, DOC=167, DORMANT=292
  */
 
@@ -981,7 +981,7 @@ typedef uint16_t uint16;
  *   SMSG_DESTRUCTIBLE_BUILDING_DAMAGE              0x14BF  DORMANT  [low-conf]
  *
  *  -- UnitCombat_C.cpp (7) --
- *   SMSG_ATTACKERSTATEUPDATE                       0x06AA  DORMANT 
+ *   SMSG_ATTACKERSTATEUPDATE                       0x06AA  ACTIVE
  *   SMSG_UNKNOWN_0x0C9E                            0x0C9E  DOC     
  *   SMSG_ENVIRONMENTALDAMAGELOG                    0x0DF1  DORMANT 
  *   SMSG_ATTACKSWING_ERROR                         0x11E1  ACTIVE   [low-conf]

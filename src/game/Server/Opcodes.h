@@ -366,7 +366,7 @@ enum OpcodesList
     SMSG_PENDING_RAID_LOCK                       = 0x4F17,    // (legacy; no client leaf; unframable >0x1FFF)
     SMSG_ATTACKSWING_DEADTARGET                  = 0x2B26,    // (legacy; no client leaf; unframable >0x1FFF)
     SMSG_ATTACKSWING_CANT_ATTACK                 = 0x0016,    // (legacy; no client leaf)
-    SMSG_ATTACKERSTATEUPDATE                     = 0x06AA,    // 5.4.8 18414 (Wow.exe leaf; name single-source fork)
+    SMSG_ATTACKERSTATEUPDATE                     = 0x06AA,    // 5.4.8 18414 (direct nested reader and UnitCombat_C terminal)
     SMSG_BATTLEFIELD_PORT_DENIED                 = 0x149A,    // 5.4.8 18414 (Wow.exe leaf; name single-source fork)
     SMSG_RESUME_CAST_BAR                         = 0x01D2,    // 5.4.8 18414 (Wow.exe leaf; name single-source fork)
     SMSG_CANCEL_COMBAT                           = 0x0E8B,    // 5.4.8 18414 (direct empty reader and local-player combat-cancel terminal)

@@ -183,7 +183,9 @@ add_test(NAME mop_compact_packets_source
         -P ${CMAKE_CURRENT_SOURCE_DIR}/mop_compact_packets_source_test.cmake)
 
 foreach(mutation IN ITEMS cancel_sender cancel_registration cancel_allowlist cancel_opcode
-        cancel_reference cancel_old_route read_item_alias read_item_sender)
+        cancel_reference cancel_old_route read_item_alias read_item_sender
+        attacker_sender attacker_registration attacker_allowlist attacker_opcode
+        attacker_reference attacker_envelope)
     add_test(NAME mop_compact_packets_source_mutation_${mutation}
         COMMAND ${CMAKE_COMMAND} -DSOURCE_ROOT=${CMAKE_SOURCE_DIR}
             -DMUTATION=${mutation}

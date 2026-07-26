@@ -2511,71 +2511,20 @@ void Unit::SendAttackStateUpdate(CalcDamageInfo* damageInfo)
     uint32 targetHealth = damageInfo->target->GetHealth();
     uint32 overkill = damageInfo->damage > targetHealth ? damageInfo->damage - targetHealth : 0;
 
-    uint32 count = 1;
-    WorldPacket data(SMSG_ATTACKERSTATEUPDATE, (16 + 45));  // we guess size
-    data << (uint32)damageInfo->HitInfo;
-    data << damageInfo->attacker->GetPackGUID();
-    data << damageInfo->target->GetPackGUID();
-    data << (uint32)(damageInfo->damage);     // Full damage
-    data << uint32(overkill);                               // overkill value
-    data << uint8(count);                                   // Sub damage count
+    MopCompactPackets::AttackStateUpdateData update;
+    update.hitInfo = uint32(damageInfo->HitInfo);
+    update.attacker = damageInfo->attacker->GetObjectGuid();
+    update.target = damageInfo->target->GetObjectGuid();
+    update.damage = damageInfo->damage;
+    update.overkill = overkill;
+    update.schoolMask = uint32(damageInfo->damageSchoolMask);
+    update.absorb = damageInfo->absorb;
+    update.resist = damageInfo->resist;
+    update.victimState = uint8(damageInfo->TargetState);
+    update.blocked = damageInfo->blocked_amount;
 
-    for (uint32 i = 0; i < count; ++i)
-    {
-        data << uint32(damageInfo->damageSchoolMask);       // School of sub damage
-        data << float(damageInfo->damage);                  // sub damage
-        data << uint32(damageInfo->damage);                 // Sub Damage
-    }
-
-    if (damageInfo->HitInfo & (HITINFO_ABSORB | HITINFO_ABSORB2))
-    {
-        for (uint32 i = 0; i < count; ++i)
-        {
-            data << uint32(damageInfo->absorb);             // Absorb
-        }
-    }
-
-    if (damageInfo->HitInfo & (HITINFO_RESIST | HITINFO_RESIST2))
-    {
-        for (uint32 i = 0; i < count; ++i)
-        {
-            data << uint32(damageInfo->resist);             // Resist
-        }
-    }
-
-    data << uint8(damageInfo->TargetState);
-    data << uint32(0);                                      // unknown, usually seen with -1, 0 and 1000
-    data << uint32(0);                                      // spell id, seen with heroic strike and disarm as examples.
-    // HITINFO_NOACTION normally set if spell
-
-    if (damageInfo->HitInfo & HITINFO_BLOCK)
-    {
-        data << uint32(damageInfo->blocked_amount);
-    }
-
-    if (damageInfo->HitInfo & HITINFO_UNK22)
-    {
-        data << uint32(0);                                  // count of some sort?
-    }
-
-    if (damageInfo->HitInfo & HITINFO_UNK0)
-    {
-        data << uint32(0);
-        data << float(0);
-        data << float(0);
-        data << float(0);
-        data << float(0);
-        data << float(0);
-        data << float(0);
-        data << float(0);
-        data << float(0);
-        for (uint8 i = 0; i < 5; ++i)
-        {
-            data << float(0);
-            data << float(0);
-        }
-        data << uint32(0);
-    }
+    WorldPacket data;
+    MopCompactPackets::BuildAttackerStateUpdate(data, update);
 
     SendMessageToSet(&data, true);  /**/
 }
