@@ -174,9 +174,9 @@
  *   Reforge.cpp                         1
  *   TOTAL SMSG rows                   925
  *
- * SUBSYSTEM CONFIDENCE: high=361, low=221, medium=183, none=160
- * STATUS TOTALS: ACTIVE=326, DOC=437, DORMANT=757
- *   SMSG: ACTIVE=191, DOC=270, DORMANT=464
+ * SUBSYSTEM CONFIDENCE: high=365, low=221, medium=182, none=157
+ * STATUS TOTALS: ACTIVE=330, DOC=437, DORMANT=753
+ *   SMSG: ACTIVE=195, DOC=270, DORMANT=460
  *   CMSG: ACTIVE=135, DOC=167, DORMANT=293
  */
 
@@ -726,7 +726,7 @@ typedef uint16_t uint16;
  *   SMSG_FISH_ESCAPED                              0x0227  ACTIVE
  *   SMSG_QUESTUPDATE_ADD_PVP_KILL                  0x0256  DORMANT 
  *   SMSG_QUESTGIVER_REQUEST_ITEMS                  0x0277  ACTIVE
- *   SMSG_QUESTGIVER_QUEST_INVALID                  0x027D  DORMANT 
+ *   SMSG_QUESTGIVER_QUEST_INVALID                  0x027D  ACTIVE   [high-conf]
  *   SMSG_PET_LEARNED_SPELL                         0x0282  DORMANT  [medium-conf]
  *   SMSG_PETITION_ALREADY_SIGNED                   0x0286  DORMANT  [medium-conf]
  *   SMSG_GROUPACTION_THROTTLED                     0x0287  DORMANT  [medium-conf]
@@ -753,14 +753,14 @@ typedef uint16_t uint16;
  *   SMSG_DISMOUNTRESULT                            0x062F  DORMANT  [medium-conf]
  *   SMSG_QUEST_POI_QUERY_RESPONSE                  0x067F  ACTIVE   [medium-conf]
  *   SMSG_QUESTGIVER_STATUS_MULTIPLE                0x06CE  ACTIVE   [high-conf]
- *   SMSG_QUESTUPDATE_FAILEDTIMER                   0x06FF  DORMANT 
+ *   SMSG_QUESTUPDATE_FAILEDTIMER                   0x06FF  ACTIVE   [high-conf]
  *   SMSG_QUEST_PUSH_RESULT                         0x074D  ACTIVE   [medium-conf]
  *   SMSG_QUESTGIVER_OFFER_REWARD                   0x074F  ACTIVE
  *   SMSG_QUESTUPDATE_COMPLETE                      0x0776  ACTIVE
  *   SMSG_UNKNOWN_0x07C5                            0x07C5  DOC      [medium-conf]
  *   SMSG_QUESTUPDATE_FAILED                        0x07DD  DORMANT 
  *   SMSG_UNKNOWN_0x07F5                            0x07F5  DOC     
- *   SMSG_QUESTLOG_FULL                             0x07FD  DORMANT  [medium-conf]
+ *   SMSG_QUESTLOG_FULL                             0x07FD  ACTIVE   [high-conf]
  *   SMSG_ACTION_BUTTONS                            0x081A  ACTIVE   [medium-conf]
  *   SMSG_SUMMON_REQUEST                            0x081F  DORMANT 
  *   SMSG_PETITION_RENAME_RESULT                    0x082A  DORMANT
@@ -810,7 +810,7 @@ typedef uint16_t uint16;
  *   SMSG_BINDER_CONFIRM                            0x1287  ACTIVE   [medium-conf]
  *   SMSG_LEARNED_SPELL                             0x129A  DORMANT  [medium-conf]
  *   SMSG_SOCKET_GEMS                               0x12A6  DORMANT 
- *   SMSG_QUESTGIVER_QUEST_FAILED                   0x12DE  DORMANT 
+ *   SMSG_QUESTGIVER_QUEST_FAILED                   0x12DE  ACTIVE   [high-conf]
  *   SMSG_QUESTGIVER_QUEST_DETAILS                  0x134C  ACTIVE   [high-conf]
  *   SMSG_QUEST_CONFIRM_ACCEPT                      0x13C7  ACTIVE
  *   SMSG_RANDOM_ROLL                               0x141A  ACTIVE

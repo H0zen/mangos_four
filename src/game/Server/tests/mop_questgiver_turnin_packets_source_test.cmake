@@ -82,9 +82,9 @@ if(DEFINED MUTATION)
             "case SMSG_QUESTGIVER_REQUEST_ITEMS_MUTATED:"
             WORLD_SESSION "${WORLD_SESSION}")
     elseif(MUTATION STREQUAL "reference_status")
-        string(REGEX REPLACE
-            "(SMSG_QUESTGIVER_REQUEST_ITEMS[^\\r\\n]*)ACTIVE"
-            "\\1DORMANT"
+        string(REPLACE
+            "SMSG_QUESTGIVER_REQUEST_ITEMS                  0x0277  ACTIVE"
+            "SMSG_QUESTGIVER_REQUEST_ITEMS                  0x0277  DORMANT"
             OPCODE_REFERENCE "${OPCODE_REFERENCE}")
     else()
         message(FATAL_ERROR "Unknown MUTATION=${MUTATION}")
@@ -145,6 +145,12 @@ foreach(OPCODE IN ITEMS
         "${OPCODE}[^\\n]*ACTIVE"
         "${OPCODE} active reference status")
 endforeach()
+
+# Keep the request-items mutation pinned to its own row. A broad name-to-ACTIVE
+# regex can otherwise run into the following active quest packet and pass falsely.
+require_match("${OPCODE_REFERENCE}"
+    "SMSG_QUESTGIVER_REQUEST_ITEMS[ ]+0x0277[ ]+ACTIVE"
+    "SMSG_QUESTGIVER_REQUEST_ITEMS exact active reference row")
 
 if("${GOSSIP_DEF}" MATCHES
         "WorldPacket data\\(SMSG_QUESTGIVER_(REQUEST_ITEMS|OFFER_REWARD)")

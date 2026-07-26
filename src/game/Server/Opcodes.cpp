@@ -397,6 +397,13 @@ void InitializeOpcodes()
     // The direct 18414 empty response closes the quest/gossip frame after acceptance.
     DefS(SMSG_GOSSIP_COMPLETE, "SMSG_GOSSIP_COMPLETE");
 
+    // Directly verified 18414 quest failure feedback: nullable custom text plus
+    // reason, quest ID plus InventoryResult, an empty log-full event, and one timer ID.
+    DefS(SMSG_QUESTGIVER_QUEST_INVALID, "SMSG_QUESTGIVER_QUEST_INVALID");
+    DefS(SMSG_QUESTGIVER_QUEST_FAILED, "SMSG_QUESTGIVER_QUEST_FAILED");
+    DefS(SMSG_QUESTLOG_FULL, "SMSG_QUESTLOG_FULL");
+    DefS(SMSG_QUESTUPDATE_FAILEDTIMER, "SMSG_QUESTUPDATE_FAILEDTIMER");
+
     // The 18414 abandon action carries exactly one quest-log slot byte.
     // Clearing the player's quest slot supplies the client-visible object update;
     // the client action does not require a dedicated response packet.

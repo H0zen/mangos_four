@@ -1420,6 +1420,7 @@ bool Player::SatisfyQuestLog(bool msg) const
 
     if (msg)
     {
+        // The direct 18414 leaf has no body and selects ERR_QUEST_LOG_FULL.
         WorldPacket data(SMSG_QUESTLOG_FULL, 0);
         GetSession()->SendPacket(&data);
         DEBUG_LOG("WORLD: Sent SMSG_QUESTLOG_FULL");
@@ -2927,8 +2928,9 @@ void Player::SendQuestFailed(uint32 quest_id, InventoryResult reason)
     if (quest_id)
     {
         WorldPacket data(SMSG_QUESTGIVER_QUEST_FAILED, 4 + 4);
+        // The 18414 reader stores the quest ID first and the InventoryResult second.
         data << uint32(quest_id);
-        data << uint32(reason);                             // failed reason (valid reasons: 4, 16, 50, 17, 74, other values show default message)
+        data << uint32(reason);                             // client-special reasons: 4, 16, 17, 50; others use the default message
         GetSession()->SendPacket(&data);
         DEBUG_LOG("WORLD: Sent SMSG_QUESTGIVER_QUEST_FAILED");
     }
@@ -2943,6 +2945,7 @@ void Player::SendQuestTimerFailed(uint32 quest_id)
 {
     if (quest_id)
     {
+        // The 18414 timed-failure leaf consumes exactly one quest ID.
         WorldPacket data(SMSG_QUESTUPDATE_FAILEDTIMER, 4);
         data << uint32(quest_id);
         GetSession()->SendPacket(&data);
@@ -2957,7 +2960,10 @@ void Player::SendQuestTimerFailed(uint32 quest_id)
  */
 void Player::SendCanTakeQuestResponse(uint32 msg) const
 {
-    WorldPacket data(SMSG_QUESTGIVER_QUEST_INVALID, 4);
+    // The 18414 reader starts with a nullable 9-bit custom-message string.
+    // A set leading bit means no string; the client then maps msg to its retained error text.
+    WorldPacket data(SMSG_QUESTGIVER_QUEST_INVALID, 1 + 4);
+    data.WriteBit(true);                 // no custom failure text
     data << uint32(msg);
     GetSession()->SendPacket(&data);
     DEBUG_LOG("WORLD: Sent SMSG_QUESTGIVER_QUEST_INVALID");

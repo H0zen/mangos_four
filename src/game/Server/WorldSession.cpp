@@ -364,6 +364,10 @@ static bool IsEnterWorldConverted(uint16 opcode)
         case SMSG_QUESTGIVER_STATUS_MULTIPLE:       // MopQuestStatusPackets::BuildMultipleStatus
         case SMSG_QUESTGIVER_QUEST_LIST:            // MopQuestGiverPackets::BuildQuestList
         case SMSG_QUESTGIVER_QUEST_DETAILS:         // MopQuestGiverPackets::BuildQuestDetails
+        case SMSG_QUESTGIVER_QUEST_INVALID:         // absent custom string bit, then uint32 reason
+        case SMSG_QUESTGIVER_QUEST_FAILED:          // uint32 quest ID, then uint32 InventoryResult
+        case SMSG_QUESTLOG_FULL:                    // empty; terminal selects ERR_QUEST_LOG_FULL
+        case SMSG_QUESTUPDATE_FAILEDTIMER:          // one uint32 quest ID
         case SMSG_QUESTGIVER_REQUEST_ITEMS:         // MopQuestGiverPackets::BuildQuestRequestItems
         case SMSG_QUESTGIVER_OFFER_REWARD:          // MopQuestGiverPackets::BuildQuestOfferReward
         case SMSG_QUESTGIVER_QUEST_COMPLETE:        // MopQuestGiverPackets::BuildQuestRewardSummary

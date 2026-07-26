@@ -1432,3 +1432,31 @@ foreach(mutation IN ITEMS sender registration allowlist opcode reference semanti
             -P ${CMAKE_CURRENT_SOURCE_DIR}/mop_barber_shop_packets_source_test.cmake)
     set_tests_properties(mop_barber_shop_packets_source_mutation_${mutation} PROPERTIES WILL_FAIL TRUE)
 endforeach()
+
+add_executable(mop_quest_failure_packets_test mop_quest_failure_packets_test.cpp)
+target_include_directories(mop_quest_failure_packets_test PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}/..
+    ${CMAKE_SOURCE_DIR}/src/shared)
+set_target_properties(mop_quest_failure_packets_test PROPERTIES CXX_STANDARD 17 CXX_STANDARD_REQUIRED ON)
+target_link_libraries(mop_quest_failure_packets_test PRIVATE shared)
+add_test(NAME mop_quest_failure_packets COMMAND mop_quest_failure_packets_test)
+
+add_test(NAME mop_quest_failure_packets_source
+    COMMAND ${CMAKE_COMMAND} -DSOURCE_ROOT=${CMAKE_SOURCE_DIR}
+        -P ${CMAKE_CURRENT_SOURCE_DIR}/mop_quest_failure_packets_source_test.cmake)
+
+foreach(mutation IN ITEMS invalid_body failed_order log_full_body timer_body opcodes reference
+        registration_SMSG_QUESTGIVER_QUEST_INVALID
+        registration_SMSG_QUESTGIVER_QUEST_FAILED
+        registration_SMSG_QUESTLOG_FULL
+        registration_SMSG_QUESTUPDATE_FAILEDTIMER
+        allowlist_SMSG_QUESTGIVER_QUEST_INVALID
+        allowlist_SMSG_QUESTGIVER_QUEST_FAILED
+        allowlist_SMSG_QUESTLOG_FULL
+        allowlist_SMSG_QUESTUPDATE_FAILEDTIMER)
+    add_test(NAME mop_quest_failure_packets_source_mutation_${mutation}
+        COMMAND ${CMAKE_COMMAND} -DSOURCE_ROOT=${CMAKE_SOURCE_DIR}
+            -DMUTATION=${mutation}
+            -P ${CMAKE_CURRENT_SOURCE_DIR}/mop_quest_failure_packets_source_test.cmake)
+    set_tests_properties(mop_quest_failure_packets_source_mutation_${mutation} PROPERTIES WILL_FAIL TRUE)
+endforeach()
