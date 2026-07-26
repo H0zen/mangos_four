@@ -410,6 +410,7 @@ static bool IsEnterWorldConverted(uint16 opcode)
         case SMSG_PLAYERBOUND:                 // MopBindPackets::BuildPlayerBound
         case SMSG_LFG_BOOT_PLAYER:            // MopLfgPackets::BuildBootPlayer
         case SMSG_LFG_UPDATE_STATUS:          // MopLfgPackets::BuildUpdateStatus
+        case SMSG_LFG_QUEUE_STATUS:           // MopLfgPackets::BuildQueueStatus
         case SMSG_LFG_PLAYER_INFO:            // MopLfgPackets::BuildEmptyPlayerInfo
         case SMSG_LFG_PARTY_INFO:             // MopLfgPackets::BuildEmptyPartyInfo
         case SMSG_LFG_UPDATE_SEARCH:           // MopLfgPackets::BuildEmptyLfrSearchResponse

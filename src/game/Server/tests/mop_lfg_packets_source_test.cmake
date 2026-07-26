@@ -5,6 +5,7 @@ file(READ "${SOURCE_ROOT}/src/game/Server/Opcodes.h" opcode_header)
 file(READ "${SOURCE_ROOT}/src/game/Server/WorldSession.h" session_header)
 file(READ "${SOURCE_ROOT}/src/game/Server/WorldSession.cpp" session_source)
 file(READ "${SOURCE_ROOT}/src/game/WorldHandlers/LFGMgr.h" lfg_manager_header)
+file(READ "${SOURCE_ROOT}/src/game/WorldHandlers/LFGMgr.cpp" lfg_manager_source)
 
 if(MUTATION STREQUAL "builder_call")
     string(REPLACE
@@ -131,6 +132,36 @@ elseif(MUTATION STREQUAL "lfr_bit_order")
         "out.WriteBit(false);  // top GUID[4]"
         "out.WriteBit(false);  // top GUID[0]"
         packet_builder "${packet_builder}")
+elseif(MUTATION STREQUAL "queue_builder_call")
+    string(REPLACE
+        "MopLfgPackets::BuildQueueStatus(data, update)"
+        "/* removed LFG queue-status builder */"
+        lfg_sender "${lfg_sender}")
+elseif(MUTATION STREQUAL "queue_registration")
+    string(REPLACE
+        "DefS(SMSG_LFG_QUEUE_STATUS, \"SMSG_LFG_QUEUE_STATUS\");"
+        "/* removed LFG queue-status registration */"
+        opcode_registry "${opcode_registry}")
+elseif(MUTATION STREQUAL "queue_opcode")
+    string(REPLACE
+        "SMSG_LFG_QUEUE_STATUS                        = 0x1006,"
+        "SMSG_LFG_QUEUE_STATUS                        = 0x1366,"
+        opcode_header "${opcode_header}")
+elseif(MUTATION STREQUAL "queue_allowlist")
+    string(REPLACE
+        "case SMSG_LFG_QUEUE_STATUS:"
+        "case REMOVED_LFG_QUEUE_STATUS:"
+        session_source "${session_source}")
+elseif(MUTATION STREQUAL "queue_bit_order")
+    string(REPLACE
+        "WriteGuidMask(out, update.queueGuid, { 4, 3, 5, 1, 2, 0, 6, 7 })"
+        "WriteGuidMask(out, update.queueGuid, { 3, 4, 5, 1, 2, 0, 6, 7 })"
+        packet_builder "${packet_builder}")
+elseif(MUTATION STREQUAL "queue_metadata")
+    string(REPLACE
+        "status.queueGuid = itr->GetRawValue();"
+        "status.queueGuid = 0;"
+        lfg_manager_source "${lfg_manager_source}")
 endif()
 
 function(require_once source token context)
@@ -217,6 +248,24 @@ require_once("${lfg_sender}"
 require_once("${lfg_sender}"
     "status.updateType = LFG_UPDATE_STATUS;"
     "LFG get-status update reason")
+require_once("${lfg_sender}"
+    "MopLfgPackets::BuildQueueStatus(data, update)"
+    "LFG queue-status builder call")
+require_once("${opcode_registry}"
+    "DefS(SMSG_LFG_QUEUE_STATUS, \"SMSG_LFG_QUEUE_STATUS\");"
+    "LFG queue-status registration")
+require_once("${opcode_header}"
+    "SMSG_LFG_QUEUE_STATUS                        = 0x1006,"
+    "LFG queue-status opcode value")
+require_once("${session_source}"
+    "case SMSG_LFG_QUEUE_STATUS:"
+    "LFG queue-status converted-packet allowlist")
+require_once("${lfg_manager_source}"
+    "status.queueGuid = itr->GetRawValue();"
+    "LFG queue-status queue GUID mapping")
+require_once("${lfg_manager_source}"
+    "status.joinTime = uint32(queueInfo->joinedTime);"
+    "LFG queue-status join-time mapping")
 require_once("${opcode_registry}"
     "DefC(CMSG_LFG_LFR_JOIN, \"CMSG_LFG_LFR_JOIN\""
     "LFR join registration")
@@ -347,6 +396,35 @@ endforeach()
 require_once("${lfg_sender}"
     "update.dungeonCategory = sLFGMgr.GetDungeonCategory(*status.dungeonList.begin());"
     "reference-supported LFG dungeon category mapping")
+
+foreach(token IN ITEMS
+        "WriteGuidMask(out, update.queueGuid, { 4, 3, 5, 1, 2, 0, 6, 7 })"
+        "out << update.flags"
+        "out << update.queuedTime"
+        "out << update.waitTimeAvg"
+        "out << update.waitTimeTank"
+        "out << update.waitTimeHealer"
+        "out << update.waitTimeDps"
+        "out << update.joinTime"
+        "out << update.clientQueueId"
+        "out << update.waitTime"
+        "out << update.dungeonEntry"
+        "WriteGuidBytes(out, update.queueGuid, { 5, 3, 6 })")
+    string(FIND "${packet_builder}" "${token}" position)
+    if(position EQUAL -1)
+        message(FATAL_ERROR "LFG queue-status builder missing: ${token}")
+    endif()
+endforeach()
+
+string(FIND "${opcode_header}" "SMSG_QUERY_OBJECT_POSITION" stale_queue_alias)
+if(NOT stale_queue_alias EQUAL -1)
+    message(FATAL_ERROR "stale legacy SMSG_QUERY_OBJECT_POSITION alias occupies queue-status opcode")
+endif()
+
+string(FIND "${lfg_sender}" "WorldPacket data(SMSG_LFG_QUEUE_STATUS, 31)" stale_queue_body)
+if(NOT stale_queue_body EQUAL -1)
+    message(FATAL_ERROR "legacy fixed 31-byte LFG queue-status body remains")
+endif()
 
 foreach(token IN ITEMS
         "LFG_UPDATE_JOIN                 = 6,"

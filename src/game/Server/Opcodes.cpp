@@ -548,6 +548,9 @@ void InitializeOpcodes()
     // Wave 23 unified 5.4.8 LFG player/party queue status.
     DefS(SMSG_LFG_UPDATE_STATUS, "SMSG_LFG_UPDATE_STATUS");
 
+    // Direct 18414 leaf: periodic queue wait estimates and role vacancies.
+    DefS(SMSG_LFG_QUEUE_STATUS, "SMSG_LFG_QUEUE_STATUS");
+
     // Wave 13 talent-respec confirmation request and prompt.
     DefC(CMSG_CONFIRM_RESPEC_WIPE, "CMSG_CONFIRM_RESPEC_WIPE", STATUS_LOGGEDIN, PROCESS_THREADUNSAFE, &WorldSession::HandleTalentWipeConfirmOpcode);
     DefS(SMSG_RESPEC_WIPE_CONFIRM, "SMSG_RESPEC_WIPE_CONFIRM");

@@ -784,7 +784,8 @@ foreach(mutation IN ITEMS builder_call outbound_registration opcode_value countd
         lfr_join_declaration lfr_leave_declaration lfr_join_definition lfr_leave_definition
         lfr_parser_calls lfr_builder_call lfr_dbc_lookup lfr_type_validation
         lfr_converted_packet lfr_join_opcode lfr_leave_opcode lfr_search_opcode
-        lfr_bit_order)
+        lfr_bit_order queue_builder_call queue_registration queue_opcode
+        queue_allowlist queue_bit_order queue_metadata)
     add_test(NAME mop_lfg_packets_source_mutation_${mutation}
         COMMAND ${CMAKE_COMMAND} -DSOURCE_ROOT=${CMAKE_SOURCE_DIR}
             -DMUTATION=${mutation}

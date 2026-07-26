@@ -289,18 +289,24 @@ void WorldSession::SendLfgUpdate(bool isGroup, LFGPlayerStatus status)
 
 void WorldSession::SendLfgQueueStatus(LFGQueueStatus const& status)
 {
-    WorldPacket data(SMSG_LFG_QUEUE_STATUS, 31);
+    MopLfgPackets::QueueStatusUpdate update;
+    update.queueGuid = status.queueGuid;
+    update.queuedTime = status.timeSpentInQueue;
+    update.waitTimeAvg = status.avgWaitTime;
+    update.waitTimeTank = status.tankAvgWaitTime;
+    update.tanks = status.neededTanks;
+    update.waitTimeHealer = status.healerAvgWaitTime;
+    update.healers = status.neededHeals;
+    update.waitTimeDps = status.dpsAvgWaitTime;
+    update.dps = status.neededDps;
+    update.joinTime = status.joinTime;
+    // This legacy single-queue manager has no client queue-ID allocation.
+    update.clientQueueId = 0;
+    update.waitTime = status.playerAvgWaitTime;
+    update.dungeonEntry = sLFGMgr.GetDungeonEntry(status.dungeonID);
 
-    data << uint32(status.dungeonID);
-    data << int32(status.playerAvgWaitTime);
-    data << int32(status.avgWaitTime);
-    data << int32(status.tankAvgWaitTime);
-    data << int32(status.healerAvgWaitTime);
-    data << int32(status.dpsAvgWaitTime);
-    data << uint8(status.neededTanks);
-    data << uint8(status.neededHeals);
-    data << uint8(status.neededDps);
-    data << uint32(status.timeSpentInQueue);
+    WorldPacket data(SMSG_LFG_QUEUE_STATUS, 52);
+    MopLfgPackets::BuildQueueStatus(data, update);
 
     SendPacket(&data);
 }

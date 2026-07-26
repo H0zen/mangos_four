@@ -705,11 +705,13 @@ void LFGMgr::SendQueueStatus()
                     uint32 dungeonId = *queueInfo->dungeonList.begin();
 
                     LFGQueueStatus status;
+                    status.queueGuid = itr->GetRawValue();
                     status.dungeonID        = dungeonId;
                     status.neededTanks      = queueInfo->neededTanks;
                     status.neededHeals      = queueInfo->neededHealers;
                     status.neededDps        = queueInfo->neededDps;
                     status.timeSpentInQueue = uint32(timeNow - queueInfo->joinedTime);
+                    status.joinTime = uint32(queueInfo->joinedTime);
 
                     int32 playerWaitTime;
 

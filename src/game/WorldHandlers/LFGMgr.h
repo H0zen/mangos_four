@@ -85,8 +85,27 @@ namespace MopLfgPackets
         uint32 ticketType = 3;
     };
 
+    struct QueueStatusUpdate
+    {
+        uint64 queueGuid = 0;
+        uint32 flags = 3;
+        uint32 queuedTime = 0;
+        int32 waitTimeAvg = 0;
+        int32 waitTimeTank = 0;
+        uint8 tanks = 0;
+        int32 waitTimeHealer = 0;
+        uint8 healers = 0;
+        int32 waitTimeDps = 0;
+        uint8 dps = 0;
+        uint32 joinTime = 0;
+        uint32 clientQueueId = 0;
+        int32 waitTime = 0;
+        uint32 dungeonEntry = 0;
+    };
+
     bool BuildBootPlayer(WorldPacket& out, BootUpdate const& update);
     bool BuildUpdateStatus(WorldPacket& out, StatusUpdate const& update);
+    void BuildQueueStatus(WorldPacket& out, QueueStatusUpdate const& update);
     bool ParseLfrSearchRequest(WorldPacket& in, LfrSearchRequest& request);
     void BuildEmptyLfrSearchResponse(WorldPacket& out, LfrSearchRequest const& request);
     bool ParseLockInfoRequest(WorldPacket& in, bool& forPlayer);
@@ -244,6 +263,34 @@ inline bool MopLfgPackets::BuildUpdateStatus(WorldPacket& out,
     out << update.ticketType;
     MopLfgPacketDetail::WriteGuidBytes(out, update.requesterGuid, { 7 });
     return true;
+}
+
+inline void MopLfgPackets::BuildQueueStatus(WorldPacket& out,
+    QueueStatusUpdate const& update)
+{
+    // Direct inverse of the 18414 queue-status reader reached by selector 34.
+    // The queue GUID is the player GUID for solo queues and group GUID otherwise.
+    MopLfgPacketDetail::WriteGuidMask(out, update.queueGuid, { 4, 3, 5, 1, 2, 0, 6, 7 });
+    out.FlushBits();
+
+    out << update.flags;
+    MopLfgPacketDetail::WriteGuidBytes(out, update.queueGuid, { 0 });
+    out << update.queuedTime;
+    MopLfgPacketDetail::WriteGuidBytes(out, update.queueGuid, { 4 });
+    out << update.waitTimeAvg;
+    out << update.waitTimeTank;
+    out << update.tanks;
+    out << update.waitTimeHealer;
+    out << update.healers;
+    out << update.waitTimeDps;
+    out << update.dps;
+    out << update.joinTime;
+    out << update.clientQueueId;
+    MopLfgPacketDetail::WriteGuidBytes(out, update.queueGuid, { 1 });
+    out << update.waitTime;
+    MopLfgPacketDetail::WriteGuidBytes(out, update.queueGuid, { 7, 2 });
+    out << update.dungeonEntry;
+    MopLfgPacketDetail::WriteGuidBytes(out, update.queueGuid, { 5, 3, 6 });
 }
 
 inline bool MopLfgPackets::ParseLockInfoRequest(WorldPacket& in,
@@ -552,6 +599,7 @@ struct LFGWait
 /// For SMSG_LFG_QUEUE_STATUS
 struct LFGQueueStatus
 {
+    uint64 queueGuid;             // player GUID for solo queues, group GUID otherwise
     uint32 dungeonID;             // queue info for x dungeon
     int32  playerAvgWaitTime;     // average wait time for the current player
     int32  avgWaitTime;           // average wait time for the dungeon
@@ -562,6 +610,7 @@ struct LFGQueueStatus
     uint8  neededHeals;           // amount of healers needed
     uint8  neededDps;             // amount of dps needed
     uint32 timeSpentInQueue;      // time already spent in the queue
+    uint32 joinTime;              // server epoch time when the queue entry was created
 };
 
 /// For CMSG_LFG_GET_STATUS, SMSG_LFG_UPDATE_PARTY, and SMSG_LFG_UPDATE_PLAYER

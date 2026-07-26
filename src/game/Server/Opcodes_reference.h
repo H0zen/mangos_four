@@ -174,9 +174,9 @@
  *   Reforge.cpp                         1
  *   TOTAL SMSG rows                   925
  *
- * SUBSYSTEM CONFIDENCE: high=359, low=223, medium=183, none=160
- * STATUS TOTALS: ACTIVE=320, DOC=436, DORMANT=764
- *   SMSG: ACTIVE=186, DOC=269, DORMANT=470
+ * SUBSYSTEM CONFIDENCE: high=361, low=221, medium=183, none=160
+ * STATUS TOTALS: ACTIVE=321, DOC=437, DORMANT=762
+ *   SMSG: ACTIVE=187, DOC=270, DORMANT=468
  *   CMSG: ACTIVE=134, DOC=167, DORMANT=294
  */
 
@@ -347,7 +347,7 @@ typedef uint16_t uint16;
  *   SMSG_CALENDAR_EVENT_INVITE_NOTES_ALERT         0x1286  DORMANT  [medium-conf]
  *   SMSG_COMPLAIN_RESULT                           0x128F  DORMANT  [low-conf]
  *   SMSG_CALENDAR_SEND_EVENT                       0x12AE  ACTIVE
- *   SMSG_LFG_QUEUE_STATUS                          0x1366  DORMANT  [low-conf]
+ *   SMSG_DAILY_QUESTS_RESET                        0x1366  DOC      [high-conf]
  *   SMSG_CALENDAR_COMMAND_RESULT                   0x142A  DORMANT  [low-conf]
  *   SMSG_CALENDAR_EVENT_INVITE                     0x15C3  DORMANT  [low-conf]
  *   SMSG_CALENDAR_SEND_CALENDAR                    0x1A0A  ACTIVE   [medium-conf]
@@ -606,7 +606,7 @@ typedef uint16_t uint16;
  *   SMSG_LFG_TELEPORT_DENIED                       0x063B  DORMANT  [low-conf]
  *   SMSG_LFG_SLOT_INVALID                          0x0C12  DORMANT  [low-conf]
  *   SMSG_OPEN_LFG_DUNGEON_FINDER                   0x0E8A  DORMANT  [low-conf]
- *   SMSG_QUERY_OBJECT_POSITION                     0x1006  DORMANT  [low-conf]
+ *   SMSG_LFG_QUEUE_STATUS                          0x1006  ACTIVE   [high-conf]
  *   SMSG_UNKNOWN_0x1041                            0x1041  DOC      [low-conf]
  *   SMSG_LFG_UPDATE_SEARCH                         0x1161  ACTIVE
  *   SMSG_LFG_PLAYER_REWARD                         0x121A  DORMANT  [low-conf]

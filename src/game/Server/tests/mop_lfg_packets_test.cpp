@@ -204,6 +204,47 @@ static void test_update_status_opcode()
     CHECK(uint32(CMSG_LFG_GET_STATUS) == 0x032Du);
 }
 
+static void test_queue_status_exact_fixture()
+{
+    MopLfgPackets::QueueStatusUpdate update;
+    update.queueGuid = 0x0807060504030201ULL;
+    update.flags = 3;
+    update.queuedTime = 0x11223344;
+    update.waitTimeAvg = 0x01020304;
+    update.waitTimeTank = 0x11121314;
+    update.tanks = 1;
+    update.waitTimeHealer = 0x21222324;
+    update.healers = 2;
+    update.waitTimeDps = 0x31323334;
+    update.dps = 3;
+    update.joinTime = 0x41424344;
+    update.clientQueueId = 0x51525354;
+    update.waitTime = 0x61626364;
+    update.dungeonEntry = 0x71727374;
+
+    WorldPacket packet(SMSG_LFG_QUEUE_STATUS, 52);
+    MopLfgPackets::BuildQueueStatus(packet, update);
+    CHECK(Equal(packet, {
+        0xFF,
+        0x03,0x00,0x00,0x00, 0x00,
+        0x44,0x33,0x22,0x11, 0x04,
+        0x04,0x03,0x02,0x01,
+        0x14,0x13,0x12,0x11, 0x01,
+        0x24,0x23,0x22,0x21, 0x02,
+        0x34,0x33,0x32,0x31, 0x03,
+        0x44,0x43,0x42,0x41,
+        0x54,0x53,0x52,0x51, 0x03,
+        0x64,0x63,0x62,0x61, 0x09,0x02,
+        0x74,0x73,0x72,0x71, 0x07,0x05,0x06
+    }));
+}
+
+static void test_queue_status_opcode()
+{
+    CHECK(uint32(SMSG_LFG_QUEUE_STATUS) == 0x1006u);
+    CHECK(uint32(SMSG_LFG_QUEUE_STATUS) < uint32(OPCODE_TABLE_SIZE));
+}
+
 static void test_default_player_status()
 {
     LFGPlayerStatus status;
@@ -346,6 +387,8 @@ int main(int /*argc*/, char** /*argv*/)
     test_update_status_empty_optional_fields();
     test_update_status_bounds();
     test_update_status_opcode();
+    test_queue_status_exact_fixture();
+    test_queue_status_opcode();
     test_default_player_status();
     test_lock_info_request();
     test_lock_info_request_rejects_invalid_body();
