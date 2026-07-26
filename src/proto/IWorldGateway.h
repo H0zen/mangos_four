@@ -159,6 +159,28 @@ namespace proto
             virtual AuthLookup LookupAccount(const AuthRequest& request) = 0;
 
             /**
+             * @brief Infallible crypt-activation callback, run by World::AddSession
+             *        while its add-queue lock is held.
+             *
+             * This is the other half of hazard H3's publication transaction. proto
+             * prepares the cipher (AuthCrypt::Prepare()) before calling Attach(), but
+             * must not activate it (AuthCrypt::Activate(); connection state ->
+             * AUTHED) until the moment the session is actually committed -- otherwise
+             * a failure inside Attach() (a DB error, a bad addon blob) would leave an
+             * ACTIVE crypt on a connection whose session was never published. Only
+             * proto's ClientConnection can perform that activation (the crypt lives
+             * there, not in the gateway), so the callback has to cross the seam in
+             * the opposite direction from everything else in this interface: proto
+             * hands it to Attach(), and the gateway's implementation is expected to
+             * forward it verbatim into World::AddSession(session, commit, context) --
+             * see WorldSocket::CommitAuthenticatedSession for the shape this replaces.
+             *
+             * The gateway does not need to (and must not) understand what @p commit
+             * does; it is opaque, exactly like World::SessionPublishCommit already is.
+             */
+            using AuthCommit = void (*)(void*) noexcept;
+
+            /**
              * @brief Build the world-side session for a client that proved itself.
              *
              * Called only after LookupAccount() returned Ok and the SHA-1 proof
@@ -167,17 +189,27 @@ namespace proto
              * WorldSession allocation, the fallible loads (LoadGlobalAccountData,
              * LoadTutorialsData, ReadAddonsInfo) and the World::AddSession
              * publication transaction -- see WorldSocket::HandleAuthSession for the
-             * ordering this must preserve.
+             * ordering this must preserve: every fallible step here runs BEFORE
+             * @p commit is ever reachable, so no failure path can observe an
+             * activated crypt.
              *
-             * @param link Shared rather than raw so a session outliving its socket
-             *             sends into a disarmed link instead of freed memory.
+             * @param link          Shared rather than raw so a session outliving its
+             *                      socket sends into a disarmed link instead of
+             *                      freed memory.
+             * @param commit        Infallible; MUST be forwarded into
+             *                      World::AddSession(session, commit, commitContext)
+             *                      as-is, invoked only if and when that call
+             *                      actually publishes the session. Never call it
+             *                      directly, and never call it on any failure path.
+             * @param commitContext Opaque argument @p commit must be invoked with.
              * @return A handle for later Deliver()/OnPing()/Detach(), or
              *         INVALID_SESSION_ID if the world declined to create the
-             *         session after all.
+             *         session after all (in which case @p commit was NOT invoked).
              */
             virtual SessionId Attach(const AuthRequest& request,
                                      const std::shared_ptr<IClientLink>& link,
-                                     const std::shared_ptr<AuthContext>& context) = 0;
+                                     const std::shared_ptr<AuthContext>& context,
+                                     AuthCommit commit, void* commitContext) = 0;
 
             /// Hand a decoded packet to an attached session. proto has already
             /// framed and decrypted it and knows nothing about what it means.
@@ -221,6 +253,26 @@ namespace proto
              * @param out    Receives the packet; cleared first.
              */
             virtual void BuildAuthErrorResponse(AuthStatus status, WorldPacket& out) = 0;
+
+            /**
+             * @brief Scripting hook: a pre-dispatch opcode arrived that Deliver()
+             *        never sees.
+             *
+             * WorldSocket.cpp handled CMSG_KEEP_ALIVE (:1119-1128) and
+             * CMSG_LOG_DISCONNECT (:1129-1137) itself rather than queuing them to
+             * WorldSession, but still fired Eluna's fire-and-forget OnPacketReceive
+             * notification for both -- the null WorldSession* on the (structurally
+             * impossible pre-auth, but Eluna already null-checks it) KEEP_ALIVE case
+             * included. One hook covers both opcodes: neither the veto-vs-notify
+             * shape nor the argument list differs between them.
+             *
+             * @param packet  The packet (KEEP_ALIVE's payload is empty;
+             *                LOG_DISCONNECT's uint32 reason has already been read).
+             * @param session The session, or INVALID_SESSION_ID if the peer has not
+             *                authenticated yet (only reachable for KEEP_ALIVE).
+             */
+            virtual void OnPacketReceived(WorldPacket& /*packet*/,
+                                          SessionId /*session*/) {}
     };
 }
 

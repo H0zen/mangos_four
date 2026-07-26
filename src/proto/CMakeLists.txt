@@ -37,10 +37,14 @@
 # proto reaches that serializer through IWorldGateway::BuildAuthErrorResponse()
 # instead of linking it directly.
 #
-# Stage 2 CP2: this library is NOT wired live yet. WorldSocket/WorldSocketMgr
-# still own every real connection; game links proto only because WorldSocket.cpp
-# and MopAuthResponse.cpp call the (now relocated) MopAuth::DecodeAuthSession /
-# ComputeAuthProof / ProofEquals functions.
+# Stage 2 CP3: proto::ClientConnection/Listener now carry live world traffic;
+# WorldSocket/WorldSocketMgr are deleted. MopSocketDrain.h is gone too (hazard
+# H4) -- its DrainState/ShouldCloseNow/InputStatus decisions encoded
+# ACE_TP_Reactor's suspend/resume dispatch-window reasoning, which the net::
+# engine (src/shared/net/) has no counterpart for; both its backends
+# (ReactorServer, IocpServer) already guarantee an auth rejection's response
+# reaches the wire before closing, verified from their own source. See
+# ClientConnection::RejectAuth()'s comment for the resolution in full.
 # =============================================================================
 
 set(SRC_GRP_PROTO
@@ -56,7 +60,6 @@ set(SRC_GRP_PROTO
     MopAuthSession.h
     MopFrameReader.h
     MopHandshake.h
-    MopSocketDrain.h
     MopWireCodec.h
 )
 source_group("proto" FILES ${SRC_GRP_PROTO})

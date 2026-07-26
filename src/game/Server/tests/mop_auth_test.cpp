@@ -25,7 +25,6 @@
 
 #include "MopAuthSession.h"
 #include "MopAuthProof.h"
-#include "MopSocketDrain.h"
 #include "MopAuthResponse.h"
 #include "Utilities/ByteBuffer.h"
 #include "Utilities/WorldPacket.h"
@@ -343,86 +342,21 @@ static void test_name_length_flag_set()
 }
 
 // ---------------------------------------------------------------------------------------------
-// Auth-error drain decisions (MopSocketDrain.h)
+// MopSocketDrain.h / MopSock::* -- RETIRED (Stage 2 CP3, hazard H4).
 //
-// These cover the two pure decisions only. They are NOT a test of the ACE peer/reactor lifecycle:
-// that the production socket calls them in the right places is established by inspection, not here.
+// These pure decisions encoded ACE_TP_Reactor's suspend/resume dispatch-window reasoning
+// (cancel_wakeup, a dispatch-status contract requiring a non-1 return to stop re-entry) so they
+// could be unit-tested without a live reactor. Both net:: backends (src/shared/net/) replace the
+// PROPERTY they guaranteed -- an auth rejection's response must reach the wire before the
+// connection closes -- with their own flush-before-close teardown (ReactorServer's
+// closeAfterDrain, IocpServer's closed()+out.empty() check in handleRecv/handleSend), verified by
+// reading their source, not assumed. Neither backend has an ACE_TP_Reactor dispatch loop to race,
+// so DrainState/ShouldCloseNow/InputStatus have no callers left and are deleted rather than kept
+// as dead code pretending to guard a property the engine now guards on its own. See
+// proto::ClientConnection::RejectAuth()'s comment for the resolution in full, and its onData()
+// for the one piece that does NOT come for free (refusing to act on further input from an
+// already-rejected peer while its response drains).
 // ---------------------------------------------------------------------------------------------
-
-// While Open, traffic is ordinary and must keep flowing.
-static void test_open_state_processes_input()
-{
-    CHECK(MopSock::MayProcessInput(MopSock::DrainState::Open) == true);
-}
-
-// The core of the quiesce: MopFrameReader may have already coalesced a further frame into the
-// buffer before we decided to reject. Once Flushing, that frame must never be acted upon.
-static void test_flushing_state_rejects_coalesced_next_frame()
-{
-    CHECK(MopSock::MayProcessInput(MopSock::DrainState::Flushing) == false);
-}
-
-// The bug this whole task exists to fix: closing while bytes are still buffered discards the
-// auth error response, leaving the peer with a bare TCP close and no reason for the rejection.
-static void test_buffered_output_prevents_close()
-{
-    CHECK(MopSock::ShouldCloseNow(MopSock::DrainState::Flushing, 7, true, false) == false);
-}
-
-// Same, for output that overflowed the buffer and went to the message queue instead.
-static void test_queued_output_prevents_close()
-{
-    CHECK(MopSock::ShouldCloseNow(MopSock::DrainState::Flushing, 0, false, false) == false);
-}
-
-// Neither buffer nor queue holds anything: the response is on the wire, so the socket may go.
-static void test_fully_drained_flushing_closes()
-{
-    CHECK(MopSock::ShouldCloseNow(MopSock::DrainState::Flushing, 0, true, false) == true);
-}
-
-// The dequeue_head()/send() window. handle_output_queue() removes the block from the queue and
-// only then calls send(), so mid-send the buffer is empty AND the queue is empty while the
-// response is still nothing but a local pointer. That combination previously read as "fully
-// drained" and closed the socket, discarding the auth response -- reintroducing the exact bug the
-// drain exists to fix. An in-flight write must veto the close on its own.
-static void test_in_flight_send_prevents_close()
-{
-    CHECK(MopSock::ShouldCloseNow(MopSock::DrainState::Flushing, 0, true, true) == false);
-}
-
-// In-flight vetoes regardless of what else is pending.
-static void test_in_flight_send_vetoes_with_pending_output()
-{
-    CHECK(MopSock::ShouldCloseNow(MopSock::DrainState::Flushing, 7, true, true) == false);
-    CHECK(MopSock::ShouldCloseNow(MopSock::DrainState::Flushing, 0, false, true) == false);
-}
-
-// A healthy idle socket is drained by definition; it must never be closed on that basis alone.
-static void test_open_state_never_closes()
-{
-    CHECK(MopSock::ShouldCloseNow(MopSock::DrainState::Open, 0, true, false) == false);
-    CHECK(MopSock::ShouldCloseNow(MopSock::DrainState::Open, 7, false, false) == false);
-    CHECK(MopSock::ShouldCloseNow(MopSock::DrainState::Open, 0, true, true) == false);
-}
-
-// Pins the rule handle_input_missing_data() RETURNS -- WorldSocket.cpp calls MopSock::InputStatus
-// directly and open-codes nothing, so this test covers production rather than a copy of it.
-// A full read normally reports 1, which ACE_TP_Reactor::dispatch_socket_event turns into an
-// immediate re-invocation of handle_input ("while (status > 0) status = (event_handler->*callback)
-// (handle)") without consulting the wait set -- so while draining, a full read must NOT report 1
-// or a rejected peer keeps being served.
-static void test_drain_never_requests_reactor_reentry()
-{
-    CHECK(MopSock::InputStatus(MopSock::DrainState::Open, true) == 1);      // healthy full read: keep reading
-    CHECK(MopSock::InputStatus(MopSock::DrainState::Open, false) == 2);     // healthy partial read: stop
-    CHECK(MopSock::InputStatus(MopSock::DrainState::Flushing, true) != 1);  // draining: never ask to be re-called
-    CHECK(MopSock::InputStatus(MopSock::DrainState::Flushing, false) != 1);
-}
-
-// A fresh socket must start Open, or the first Update() would tear down a healthy connection.
-static_assert(MopSock::DrainState{} == MopSock::DrainState::Open,
-              "value-initialized DrainState must be Open");
 
 static_assert(std::is_same<decltype(MopAuth::AuthSessionFields{}.builtNumberClient), uint16_t>::value,
               "auth build field must stay 16-bit");
@@ -1038,15 +972,6 @@ int main(int /*argc*/, char** /*argv*/)
     test_name_length_flag_bit_then_11_bits();
     test_name_length_flag_set();
     test_wire_field_widths();
-    test_open_state_processes_input();
-    test_flushing_state_rejects_coalesced_next_frame();
-    test_buffered_output_prevents_close();
-    test_queued_output_prevents_close();
-    test_fully_drained_flushing_closes();
-    test_in_flight_send_prevents_close();
-    test_in_flight_send_vetoes_with_pending_output();
-    test_open_state_never_closes();
-    test_drain_never_requests_reactor_reentry();
     test_raw40_from_littleendian();
     test_sessionkey_from_hex_roundtrip();
     test_authcrypt_kat();

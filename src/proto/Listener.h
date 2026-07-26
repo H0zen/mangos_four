@@ -38,15 +38,15 @@ namespace proto
     /**
      * @brief Accepts world connections and mints one ClientConnection per client.
      *
-     * NOT WIRED LIVE YET (Stage 2 CP2): nothing constructs a Listener outside this
-     * checkpoint's own compile. WorldSocketMgr keeps owning the real listen socket
-     * until CP3 deletes it and swaps WorldThread over to this class.
+     * Live since Stage 2 CP3: WorldNetwork owns one of these (alongside the
+     * WorldGateway it is constructed with) and WorldThread starts/stops it in
+     * place of the deleted WorldSocketMgr::StartNetwork()/StopNetwork().
      *
-     * Once wired, this is all that survives of WorldSocketMgr: accepting, the
-     * thread pool, socket options, output buffering, backpressure and teardown all
-     * live in the shared net:: engine, so what is left is the two things that were
-     * ever specific to the world server -- which port to listen on, and what to
-     * make of a connection once it arrives.
+     * This is all that survives of WorldSocketMgr: accepting, the thread pool,
+     * socket options, output buffering, backpressure and teardown all live in the
+     * shared net:: engine, so what is left is the two things that were ever
+     * specific to the world server -- which port to listen on, and what to make
+     * of a connection once it arrives.
      */
     class Listener
     {

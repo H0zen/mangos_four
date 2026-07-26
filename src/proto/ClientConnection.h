@@ -47,9 +47,8 @@ namespace proto
     /**
      * @brief One client connection, speaking the 5.4.8 world protocol.
      *
-     * NOT WIRED LIVE YET (Stage 2 CP2): WorldSocket still owns every real
-     * connection. This class exists so the seam and its build graph exist and
-     * compile; CP3 replaces WorldSocket/WorldSocketMgr with this plus Listener.
+     * Live since Stage 2 CP3: this class plus Listener replace the deleted
+     * WorldSocket/WorldSocketMgr and now own every real world connection.
      *
      * Reuses M4's own Mop* codec verbatim (MopFrameReader/MopWireCodec/
      * MopHandshake/MopAuth*) -- nothing about the wire bytes, the handshake FSM
@@ -143,14 +142,21 @@ namespace proto
             bool HandleAuthSession(WorldPacket& packet);
             bool HandlePing(WorldPacket& packet);
 
+            /// IWorldGateway::AuthCommit callback: the infallible PREPARED->ACTIVE
+            /// crypt transition, run by World::AddSession while its add-queue lock
+            /// is held (hazard H3). ctx is always the ClientConnection that prepared
+            /// the crypt and called Attach() -- see HandleAuthSession(). Must stay
+            /// noexcept: the lock is held across it and IWorldGateway::AuthCommit's
+            /// type statically enforces this.
+            static void CommitCrypt(void* ctx) noexcept;
+
             /// Queue the canonical SMSG_AUTH_RESPONSE error variant via the
             /// gateway's game-side serializer (IWorldGateway::BuildAuthErrorResponse)
-            /// and send it. Does NOT implement WorldSocket's ACE drain machinery
-            /// (cancel_wakeup/ScopedSendInFlight/Update() snapshot) -- hazard H4 is
-            /// an explicit CP3 decision, made once the engine's actual
-            /// flush-before-close semantics are confirmed. For now this sends and
-            /// relies on the caller's Close() to happen only after the send has
-            /// been handed to net::Sender.
+            /// and send it. Deliberately does NOT reimplement WorldSocket's ACE
+            /// drain machinery (cancel_wakeup/ScopedSendInFlight/Update() snapshot)
+            /// -- hazard H4, resolved by reading both net:: backends' source: they
+            /// already guarantee flush-before-close on their own. See this method's
+            /// definition for the full resolution.
             void RejectAuth(AuthStatus status);
 
             /// MopFrameReader::DecryptFn hook: in-place ARC4 on the header only.

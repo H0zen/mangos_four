@@ -157,6 +157,24 @@ namespace proto
 
     std::vector<uint8_t> ClientConnection::onData(const uint8_t* data, size_t len)
     {
+        // Hazard H4 input guard. Both net:: backends re-arm reads once a session is
+        // closed() but its outbound buffer is still draining (ReactorServer checks
+        // channel->out.empty() before tearing down; IocpServer's handleRecv()
+        // re-posts a receive for exactly the same reason) -- deliberately, so the
+        // teardown has a completion to hang off even if the peer goes quiet. That
+        // means onData() CAN be re-entered after Close() was already called (e.g.
+        // an auth rejection still flushing its SMSG_AUTH_RESPONSE). A peer already
+        // rejected must not have anything it sends acted upon, so refuse outright.
+        // This replaces WorldSocket-era MopSock::MayProcessInput/DrainState: those
+        // encoded ACE_TP_Reactor's suspend-window mechanics (cancel_wakeup, a
+        // dispatch-status contract requiring a non-1 return to stop re-entry), which
+        // have no counterpart in either net:: backend and would not mean anything
+        // here. The PROPERTY those mechanics existed to guarantee is what survives.
+        if (closed())
+        {
+            return std::vector<uint8_t>();
+        }
+
         m_frameReader.Push(data, len);
 
         MopFrameReader::Frame frame;
@@ -202,8 +220,8 @@ namespace proto
         }
 
         // Every reply goes through SendPacket()/net::Sender: a reply may be produced
-        // long after this call returns (once the world side is wired in CP3), so
-        // nothing is ever returned inline here.
+        // long after this call returns (e.g. SendAuthWaitQue, from the world
+        // thread), so nothing is ever returned inline here.
         return std::vector<uint8_t>();
     }
 
@@ -241,20 +259,26 @@ namespace proto
                     return HandlePing(packet);
 
                 case CMSG_AUTH_SESSION:
+                    // WorldSocket.cpp:1113-1116: the Eluna OnPacketReceive hook for this
+                    // opcode is DELIBERATELY not invoked -- a script must never observe
+                    // the raw auth body (digest included) before it is parsed. This is a
+                    // Phase 4 decision, not an oversight; CP3 carries the absence intact
+                    // rather than "restoring" a hook M4 never had (contrast MangosThree,
+                    // whose WorldSocket did call it and whose IWorldGateway therefore
+                    // grew an OnAuthPacketReceived veto point -- not applicable here).
                     m_connState = MopHs::CONN_AUTHENTICATING;
                     return HandleAuthSession(packet);
 
                 case CMSG_KEEP_ALIVE:
-                    // WorldSocket.cpp:1119-1128's Eluna OnPacketReceive notification for
-                    // this opcode is a scripting hook proto has no access to; IWorldGateway
-                    // grows that call when a later checkpoint wires Eluna through the
-                    // gateway. Fire-and-forget either way, so omitting it here changes no
-                    // observable protocol behaviour.
+                    // WorldSocket.cpp:1119-1128: fire-and-forget Eluna notification, no veto.
                     DEBUG_LOG("proto: CMSG_KEEP_ALIVE from %s.", m_address.c_str());
+                    m_gateway.OnPacketReceived(packet, m_session);
                     return true;
 
                 case CMSG_LOG_DISCONNECT:
                     packet.rfinish();                     // uint32 disconnect reason; socket notification only
+                    // WorldSocket.cpp:1129-1137: fire-and-forget Eluna notification, no veto.
+                    m_gateway.OnPacketReceived(packet, m_session);
                     return true;
 
                 default:
@@ -376,27 +400,36 @@ namespace proto
         std::shared_ptr<IClientLink> link =
             std::static_pointer_cast<ClientConnection>(shared_from_this());
 
-        const SessionId session = m_gateway.Attach(request, link, lookup.context);
+        // Hazard H3, resolved: Activate() must NOT run here. It runs only from
+        // CommitCrypt, which the gateway is contractually required to forward into
+        // World::AddSession(session, commit, context) verbatim (see
+        // IWorldGateway::Attach()'s doc comment) -- so it executes while the
+        // add-queue lock is held, exactly where WorldSocket::CommitAuthenticatedSession
+        // used to run, and only once the session is genuinely about to be published.
+        // Every fallible step (the DB loads inside Attach(), the queue insertion
+        // inside AddSession) has already happened by the time commit is reachable,
+        // so no failure path -- including this one, on INVALID_SESSION_ID -- can
+        // observe an activated crypt.
+        const SessionId session = m_gateway.Attach(request, link, lookup.context,
+                                                   &ClientConnection::CommitCrypt, this);
         if (session == INVALID_SESSION_ID)
         {
             RejectAuth(AuthStatus::SystemError);
             return false;
         }
 
-        // CP3 TODO (hazard H3): the real, game-side WorldGateway::Attach() must
-        // Activate() this prepared crypt from inside the SAME locked commit region
-        // World::AddSession uses (see WorldSocket::CommitAuthenticatedSession) if
-        // Attach() ever defers publication past its own return. Attach() is defined
-        // here to return synchronously, so activating only after a successful return
-        // already preserves the load-bearing invariant: no failure path can observe
-        // an activated crypt. Re-verify this ordering when CP3 implements Attach().
-        m_crypt.Activate();
-        m_connState = MopHs::CONN_AUTHED;
         m_session = session;
 
         DEBUG_LOG("proto: account '%s' authenticated from %s.",
                   request.fields.account.c_str(), m_address.c_str());
         return true;
+    }
+
+    void ClientConnection::CommitCrypt(void* ctx) noexcept
+    {
+        ClientConnection* const self = static_cast<ClientConnection*>(ctx);
+        self->m_crypt.Activate();
+        self->m_connState = MopHs::CONN_AUTHED;
     }
 
     bool ClientConnection::HandlePing(WorldPacket& packet)
@@ -440,15 +473,32 @@ namespace proto
         // The sole SMSG_AUTH_RESPONSE construction site on the rejection path, via
         // the gateway's game-side MopAuth::BuildAuthResponseError() serializer.
         //
-        // NOT IMPLEMENTED HERE (hazard H4, explicit CP3 decision): WorldSocket's ACE
-        // drain machinery (BeginAuthErrorDrain's cancel_wakeup, MopSocketDrain's
-        // Flushing state, ScopedSendInFlight, the Update() snapshot) existed to solve
-        // one problem -- a bare TCP close must never race ahead of this response
-        // actually reaching the wire. Whether net::ISession's transport needs an
-        // equivalent depends on its own flush-before-close semantics, which CP3 must
-        // read and record before deciding (see ACE_REMOVAL_M4_PLAN.md hazard H4).
-        // This is inert code today (WorldSocket still carries all live traffic), so
-        // the caller closing immediately after this returns is not yet a live risk.
+        // Hazard H4, RESOLVED (read from the engine source, not assumed): a bare
+        // close must never race ahead of this response reaching the wire, and both
+        // net:: backends already guarantee that on their own --
+        //   - ReactorServer: onData()'s caller checks `session->closed()`, and if
+        //     `channel->out` is non-empty (this packet, already queued below) sets
+        //     closeAfterDrain instead of tearing the connection down immediately;
+        //     drainSendRequests()/the EvWrite path only call closeConn() once the
+        //     buffer has actually emptied via a real send().
+        //   - IocpServer: handleRecv()/handleSend() run the identical
+        //     `closed() && channel->out.empty()` check before markDead(); while
+        //     false they keep the connection alive (re-posting a receive, in
+        //     handleRecv()'s case) so a completion exists to carry the eventual
+        //     teardown.
+        // That is WorldSocket-era BeginAuthErrorDrain's entire job -- cancel_wakeup,
+        // MopSocketDrain's Flushing state, ScopedSendInFlight, the Update() snapshot
+        // -- done by the transport itself. None of those ACE_TP_Reactor-specific
+        // mechanics have a counterpart here (there is no suspend/resume dispatch
+        // window to race), so they are not ported; MopSocketDrain.h and its unit
+        // tests are retired in this same commit rather than kept as dead code
+        // pretending to guard a property the engine now guards on its own.
+        //
+        // What does NOT come for free, and IS still this class's job: refusing to
+        // act on further input from a peer already rejected while its response
+        // drains (onData()'s closed() guard) -- the property MopSock::MayProcessInput
+        // used to express, now checked directly rather than through a dedicated
+        // state enum.
         WorldPacket packet;
         m_gateway.BuildAuthErrorResponse(status, packet);
         SendPacket(packet);

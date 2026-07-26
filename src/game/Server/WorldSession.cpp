@@ -42,11 +42,11 @@
  * - World::UpdateSessions() context: Process all packets
  *
  * @see WorldSession for the session class
- * @see WorldSocket for the network socket
+ * @see proto::ClientConnection for the network connection
  * @see Opcodes.cpp for opcode registration
  */
 
-#include "WorldSocket.h"                                    // must be first to make ACE happy with ACE includes in it
+#include "IClientLink.h"
 #include "Common.h"
 #include "Database/DatabaseEnv.h"
 #include "Log.h"
@@ -79,7 +79,9 @@
 // Warden
 #include "WardenWin.h"
 #include "WardenMac.h"
+#include <cstring>
 #include <mutex>
+#include <utility>
 
 /**
  * @brief Helper for Map session filtering
@@ -153,16 +155,19 @@ bool WorldSessionFilter::Process(WorldPacket* packet)
 }
 
 /// WorldSession constructor
-WorldSession::WorldSession(uint32 id, WorldSocket* sock, AccountTypes sec, uint8 expansion, time_t mute_time, LocaleConstant locale) :
-    m_muteTime(mute_time), _player(NULL), m_Socket(sock), _security(sec), _accountId(id), m_expansion(expansion), _logoutTime(0),
+WorldSession::WorldSession(uint32 id, std::shared_ptr<proto::IClientLink> link,
+                           AccountTypes sec, uint8 expansion, time_t mute_time, LocaleConstant locale,
+                           const uint8 (&sessionKey)[MopAuth::SESSION_KEY_LEN]) :
+    m_muteTime(mute_time), _player(NULL), m_Socket(std::move(link)), _security(sec), _accountId(id), m_expansion(expansion), _logoutTime(0),
     m_inQueue(false), m_playerLoading(false), m_suppressWorldSends(false), m_playerLogout(false), m_playerRecentlyLogout(false), m_playerSave(false),
     m_sessionDbcLocale(sWorld.GetAvailableDbcLocale(locale)), m_sessionDbLocaleIndex(sObjectMgr.GetIndexForLocale(locale)),
     m_latency(0), m_clientTimeDelay(0), m_tutorialState(TUTORIALDATA_UNCHANGED)
 {
-    if (sock)
+    std::memcpy(m_sessionKey, sessionKey, sizeof(m_sessionKey));
+
+    if (m_Socket)
     {
-        m_Address = sock->GetRemoteAddress();
-        sock->AddReference();
+        m_Address = m_Socket->GetRemoteAddress();
     }
 }
 
@@ -175,12 +180,13 @@ WorldSession::~WorldSession()
         LogoutPlayer(true);
     }
 
-    /// - If have unclosed socket, close it
+    /// - If the connection is still up, close it. Dropping the shared_ptr is all the
+    /// bookkeeping there is now: the transport (proto::ClientConnection / the net:: engine)
+    /// owns the actual socket, and the link stays safe to call even after the peer is gone.
     if (m_Socket)
     {
-        m_Socket->CloseSocket();
-        m_Socket->RemoveReference();
-        m_Socket = NULL;
+        m_Socket->Close();
+        m_Socket.reset();
     }
 
     // CAUSES CRASH ON PLAYER EXITING TO LOGIN SCREEN
@@ -196,22 +202,17 @@ WorldSession::~WorldSession()
     }
 }
 
-/// Release the session's extra socket reference without closing the socket.
+/// Drop the session's reference to its link without closing it.
 ///
-/// Valid only before the session has been published to World: it balances the single
-/// sock->AddReference() taken by the constructor. m_Socket is nulled FIRST so ~WorldSession()
-/// skips its own CloseSocket()/RemoveReference() teardown -- the socket must stay alive to drain
-/// an auth error through it, and re-releasing here would over-release the reference.
-void WorldSession::AbandonUnpublishedSocket() noexcept
+/// Valid only before the session has been published to World: the connection must stay alive
+/// to drain an auth-error response through it (WorldGateway::Attach() calls this, then deletes
+/// the session, on any post-allocation failure -- the rejection is sent by
+/// proto::ClientConnection AFTER Attach() returns INVALID_SESSION_ID). Resetting this session's
+/// own shared_ptr is all that is needed: the caller's own copy of the link keeps the connection
+/// alive, and ~WorldSession() skips its Close() call because m_Socket is already empty.
+void WorldSession::AbandonUnpublishedLink() noexcept
 {
-    if (!m_Socket)
-    {
-        return;
-    }
-
-    WorldSocket* socket = m_Socket;
-    m_Socket = NULL;                    // destructor must not CloseSocket() on the auth-error drain
-    socket->RemoveReference();          // release the AddReference() taken by the constructor
+    m_Socket.reset();
 }
 
 /**
@@ -534,10 +535,9 @@ void WorldSession::SendPacket(WorldPacket const* packet, bool bypassSuppress)
 
 #endif                                                  // !MANGOS_DEBUG
 
-    if (m_Socket->SendPacket(*packet) == -1)
-    {
-        m_Socket->CloseSocket();
-    }
+    // SendPacket() is void and safe to call on a dead link -- unlike the old
+    // WorldSocket::SendPacket, there is no -1 failure to react to here.
+    m_Socket->SendPacket(*packet);
 }
 
 /// Add an incoming packet to the queue
@@ -706,8 +706,7 @@ bool WorldSession::Update(PacketFilter& updater)
     ///- Cleanup socket pointer if need
     if (m_Socket && m_Socket->IsClosed())
     {
-        m_Socket->RemoveReference();
-        m_Socket = NULL;
+        m_Socket.reset();
     }
 
  // WARDEN ISSUE - commented out to stop crash
@@ -1038,7 +1037,7 @@ void WorldSession::KickPlayer()
 {
     if (m_Socket)
     {
-        m_Socket->CloseSocket();
+        m_Socket->Close();
     }
 }
 
@@ -1214,7 +1213,7 @@ void WorldSession::Handle_NULL(WorldPacket& recvPacket)
  */
 void WorldSession::Handle_EarlyProccess(WorldPacket& recvPacket)
 {
-    sLog.outError("SESSION: received opcode %s (0x%.4X) that must be processed in WorldSocket::OnRead",
+    sLog.outError("SESSION: received opcode %s (0x%.4X) that must be processed by proto::ClientConnection",
                   LookupOpcodeName(DIR_CLIENT, recvPacket.GetOpcode()),
                   recvPacket.GetOpcode());
 }
@@ -1256,7 +1255,7 @@ void WorldSession::SendAuthWaitQue(uint32 position)
     // where the defect actually bit.
     //
     // Expansion() is the account's entitlement ALREADY CLAMPED to the realm (see
-    // WorldSocket::HandleAuthSession's expansion clamp); the config value is the realm's own cap.
+    // WorldGateway::LookupAccount's expansion clamp); the config value is the realm's own cap.
     // They differ only for a restricted account.
     // BuildAuthResponseQueued routes position 0 to Accepted itself, so the release rule lives in
     // the serializer rather than in every caller that has to remember it.
@@ -1618,7 +1617,7 @@ void WorldSession::SendRedirectClient(std::string& ip, uint16 port)
     // Both are fixed by using the canonical raw-40 K. (SendRedirectClient has ZERO call sites, so
     // neither bug is live today; it is migrated because Phase 3 puts it on a reachable path and
     // because leaving one BigNumber K consumer behind is how the short-K bug returns.)
-    HMACSHA1 sha1(uint32(MopAuth::SESSION_KEY_LEN), m_Socket->GetSessionKeyRaw());
+    HMACSHA1 sha1(uint32(MopAuth::SESSION_KEY_LEN), GetSessionKeyRaw());
     sha1.UpdateData((uint8*)&ip2, 4);
     sha1.UpdateData((uint8*)&port, 2);
     sha1.Finalize();
