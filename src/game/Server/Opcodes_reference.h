@@ -175,8 +175,8 @@
  *   TOTAL SMSG rows                   925
  *
  * SUBSYSTEM CONFIDENCE: high=365, low=221, medium=182, none=157
- * STATUS TOTALS: ACTIVE=363, DOC=438, DORMANT=719
- *   SMSG: ACTIVE=223, DOC=271, DORMANT=431
+ * STATUS TOTALS: ACTIVE=364, DOC=438, DORMANT=718
+ *   SMSG: ACTIVE=224, DOC=271, DORMANT=430
  *   CMSG: ACTIVE=140, DOC=167, DORMANT=288
  */
 
@@ -782,7 +782,7 @@ typedef uint16_t uint16;
  *   SMSG_UNKNOWN_0x0C3B                            0x0C3B  DOC      [medium-conf]
  *   SMSG_UNKNOWN_0x0C8E                            0x0C8E  DOC     
  *   SMSG_UNKNOWN_0x0D51                            0x0D51  DOC      [medium-conf]
- *   SMSG_SPELLENERGIZELOG                          0x0D79  DORMANT  [medium-conf]
+ *   SMSG_SPELLENERGIZELOG                          0x0D79  ACTIVE   [medium-conf]
  *   SMSG_SPELLDISPELLOG                            0x0DF9  ACTIVE
  *   SMSG_MOUNTRESULT                               0x0E0F  DORMANT  [medium-conf]
  *   SMSG_ITEM_EXPIRE_PURCHASE_REFUND               0x0E33  DORMANT

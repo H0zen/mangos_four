@@ -3544,12 +3544,14 @@ void Unit::SendHealSpellLog(Unit* pVictim, uint32 SpellID, uint32 Damage, uint32
  */
 void Unit::SendEnergizeSpellLog(Unit* pVictim, uint32 SpellID, uint32 Damage, Powers powertype)
 {
-    WorldPacket data(SMSG_SPELLENERGIZELOG, (8 + 8 + 4 + 4 + 4 + 1));
-    data << pVictim->GetPackGUID();
-    data << GetPackGUID();
-    data << uint32(SpellID);
-    data << uint32(powertype);
-    data << uint32(Damage);
+    MopCombatLogPackets::SpellEnergizeLog log = {};
+    log.targetGuid = pVictim->GetObjectGuid().GetRawValue();
+    log.casterGuid = GetObjectGuid().GetRawValue();
+    log.amount = Damage;
+    log.spellId = SpellID;
+    log.powerType = powertype;
+    WorldPacket data(SMSG_SPELLENERGIZELOG, 28);
+    MopCombatLogPackets::BuildSpellEnergizeLog(data, log);
     SendMessageToSet(&data, true);
 }
 

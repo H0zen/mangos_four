@@ -1469,6 +1469,15 @@ namespace MopCombatLogPackets
         uint32 spellId;
     };
 
+    struct SpellEnergizeLog
+    {
+        uint64 targetGuid;
+        uint64 casterGuid;
+        uint32 amount;
+        uint32 spellId;
+        uint32 powerType;
+    };
+
     inline void BuildSpellInstakillLog(WorldPacket& out, SpellInstakillLog const& log)
     {
         // The 18414 reader interleaves both packed-GUID masks before consuming
@@ -1505,6 +1514,38 @@ namespace MopCombatLogPackets
         out.WriteByteSeq(GuidByte(log.casterGuid, 2));
         for (size_t i = 1; i < sizeof(victimBytes); ++i)
             out.WriteByteSeq(GuidByte(log.victimGuid, victimBytes[i]));
+    }
+
+    inline void BuildSpellEnergizeLog(WorldPacket& out, SpellEnergizeLog const& log)
+    {
+        // The optional bit controls a client cast-log extension that the
+        // server's energize event does not populate.
+        uint8 const mask[][2] = {
+            { 7, 0 }, { 3, 0 }, { 1, 1 }, { 4, 0 }, { 2, 0 }, { 3, 1 }, { 5, 0 },
+            { 7, 1 }, { 0, 1 }, { 2, 1 }, { 4, 1 }, { 6, 1 }, { 6, 0 }, { 1, 0 },
+            { 0, 0 }, { 5, 1 }
+        };
+        for (size_t i = 0; i < 7; ++i)
+            out.WriteBit(GuidByte(mask[i][1] ? log.casterGuid : log.targetGuid, mask[i][0]) != 0);
+        out.WriteBit(false);
+        for (size_t i = 7; i < 16; ++i)
+            out.WriteBit(GuidByte(mask[i][1] ? log.casterGuid : log.targetGuid, mask[i][0]) != 0);
+        out.FlushBits();
+
+        uint8 const bytesA[][2] = {
+            { 0, 0 }, { 5, 1 }, { 6, 0 }, { 6, 1 }, { 2, 0 }, { 0, 1 }, { 1, 0 }
+        };
+        for (auto const& byte : bytesA)
+            out.WriteByteSeq(GuidByte(byte[1] ? log.casterGuid : log.targetGuid, byte[0]));
+        out << uint32(log.amount);
+        uint8 const bytesB[][2] = {
+            { 4, 0 }, { 1, 1 }, { 7, 1 }, { 5, 0 }, { 2, 1 }, { 3, 1 },
+            { 7, 0 }, { 4, 1 }, { 3, 0 }
+        };
+        for (auto const& byte : bytesB)
+            out.WriteByteSeq(GuidByte(byte[1] ? log.casterGuid : log.targetGuid, byte[0]));
+        out << uint32(log.spellId);
+        out << uint32(log.powerType);
     }
 
     inline bool BuildSpellExecuteLog(WorldPacket& out, SpellExecuteLog const& log)
