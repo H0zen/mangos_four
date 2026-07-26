@@ -182,11 +182,17 @@ void WorldSession::HandleSellItemOpcode(WorldPacket& recv_data)
  */
 void WorldSession::HandleBuybackItem(WorldPacket& recv_data)
 {
-    DEBUG_LOG("WORLD: Received opcode CMSG_BUYBACK_ITEM");
-    ObjectGuid vendorGuid;
-    uint32 slot;
+    MopItemPackets::BuybackItemRequest request;
+    if (!MopItemPackets::ParseBuybackItem(recv_data, request))
+    {
+        DEBUG_LOG("WORLD: CMSG_BUYBACK_ITEM has a malformed 18414 body");
+        return;
+    }
 
-    recv_data >> vendorGuid >> slot;
+    ObjectGuid const vendorGuid = request.vendorGuid;
+    uint32 const slot = request.slot;
+    DEBUG_LOG("WORLD: Received opcode CMSG_BUYBACK_ITEM, vendorguid: %s, slot: %u",
+        vendorGuid.GetString().c_str(), slot);
 
     Creature* pCreature = GetPlayer()->GetNPCIfCanInteractWith(vendorGuid, UNIT_NPC_FLAG_VENDOR);
     if (!pCreature)

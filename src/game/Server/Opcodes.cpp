@@ -350,6 +350,9 @@ void InitializeOpcodes()
     // The 18414 client writes the count followed by interleaved item/vendor
     // GUIDs and reads the paired packed-GUID result around an 8-bit status.
     DefC(CMSG_SELL_ITEM, "CMSG_SELL_ITEM", STATUS_LOGGEDIN, PROCESS_THREADUNSAFE, &WorldSession::HandleSellItemOpcode);
+    // Writer sub_68BC3D sends the logical slot before one packed vendor GUID;
+    // success is represented by the ordinary private player/item updates.
+    DefC(CMSG_BUYBACK_ITEM, "CMSG_BUYBACK_ITEM", STATUS_LOGGEDIN, PROCESS_THREADUNSAFE, &WorldSession::HandleBuybackItem);
     DefS(SMSG_SELL_ITEM, "SMSG_SELL_ITEM");
     // Writer sub_68E11F proves the request. The response names retain reference
     // provenance; their 18414 readers and terminals directly prove purchase

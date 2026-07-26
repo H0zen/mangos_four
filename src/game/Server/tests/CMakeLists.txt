@@ -1092,7 +1092,8 @@ foreach(mutation IN ITEMS request_reader response_builder client_registration se
         sell_request_reader sell_response_builder sell_client_registration sell_server_registration sell_whitelist
         buy_request_reader buy_success_builder buy_failure_builder buy_client_registration
         buy_success_registration buy_failure_registration buy_success_whitelist buy_failure_whitelist
-        buy_legacy_request buy_legacy_success buy_legacy_failure)
+        buy_legacy_request buy_legacy_success buy_legacy_failure
+        buyback_request_reader buyback_client_registration buyback_legacy_request)
     add_test(NAME mop_vendor_packets_source_mutation_${mutation}
         COMMAND ${CMAKE_COMMAND} -DSOURCE_ROOT=${CMAKE_SOURCE_DIR}
             -DMUTATION=${mutation}

@@ -466,6 +466,34 @@ namespace MopItemPackets
         uint8 type = 0;
     };
 
+    struct BuybackItemRequest
+    {
+        ObjectGuid vendorGuid;
+        uint32 slot = 0;
+    };
+
+    inline bool ParseBuybackItem(WorldPacket& in, BuybackItemRequest& request)
+    {
+        // Wow.exe 18414 writer sub_68BC3D emits the logical buyback slot
+        // before one packed vendor GUID.
+        if (in.size() - in.rpos() < 5)
+            return RejectRequest(in);
+
+        BuybackItemRequest parsed;
+        in >> parsed.slot;
+        in.ReadGuidMask<2, 3, 0, 4, 1, 7, 5, 6>(parsed.vendorGuid);
+
+        size_t packedBytes = 0;
+        for (uint8 index = 0; index < 8; ++index)
+            packedBytes += GuidByte(parsed.vendorGuid.GetRawValue(), index) != 0;
+        if (in.size() - in.rpos() != packedBytes)
+            return RejectRequest(in);
+
+        in.ReadGuidBytes<0, 6, 1, 7, 5, 2, 3, 4>(parsed.vendorGuid);
+        request = parsed;
+        return true;
+    }
+
     inline bool ParseBuyItem(WorldPacket& in, BuyItemRequest& request)
     {
         // Wow.exe 18414 writer sub_68E11F emits four uint32 fields before
