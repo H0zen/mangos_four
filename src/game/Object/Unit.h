@@ -195,6 +195,19 @@ namespace MopCompactPackets
         out.WriteGuidBytes<2, 3, 5, 0>(guid);
     }
 
+    inline void BuildPetActionFeedback(WorldPacket& out, uint8 feedback,
+        uint32 spellId = 0)
+    {
+        // The 18414 reader uses an inverse presence bit: one omits the spell
+        // context, while zero appends it after the feedback selector.
+        out.Initialize(SMSG_PET_ACTION_FEEDBACK, spellId ? 6 : 2);
+        out.WriteBit(spellId == 0);
+        out.FlushBits();
+        out << feedback;
+        if (spellId != 0)
+            out << spellId;
+    }
+
     inline uint8 SwimSpeedGuidByte(uint64 guid, uint8 index)
     {
         return uint8(guid >> (8 * index));
@@ -4147,7 +4160,7 @@ class Unit : public WorldObject
         void ClearComboPointHolders();
 
         ///----------Pet responses methods-----------------
-        void SendPetActionFeedback(uint8 msg);
+        void SendPetActionFeedback(uint8 msg, uint32 spellId = 0);
         void SendPetTalk(uint32 pettalk);
         void SendPetAIReaction();
         ///----------End of Pet responses methods----------

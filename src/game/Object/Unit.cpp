@@ -5540,9 +5540,10 @@ Player* Unit::GetSpellModOwner() const
 /**
  * @brief Sends a pet action feedback packet to the owner.
  *
- * @param msg The feedback opcode payload.
+ * @param msg The feedback selector.
+ * @param spellId Optional spell context used by target-related feedback.
  */
-void Unit::SendPetActionFeedback(uint8 msg)
+void Unit::SendPetActionFeedback(uint8 msg, uint32 spellId)
 {
     Unit* owner = GetOwner();
     if (!owner || owner->GetTypeId() != TYPEID_PLAYER)
@@ -5550,8 +5551,8 @@ void Unit::SendPetActionFeedback(uint8 msg)
         return;
     }
 
-    WorldPacket data(SMSG_PET_ACTION_FEEDBACK, 1);
-    data << uint8(msg);
+    WorldPacket data;
+    MopCompactPackets::BuildPetActionFeedback(data, msg, spellId);
     ((Player*)owner)->GetSession()->SendPacket(&data);
 }
 

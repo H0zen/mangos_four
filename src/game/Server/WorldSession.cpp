@@ -344,6 +344,7 @@ static bool IsEnterWorldConverted(uint16 opcode)
         case SMSG_PLAY_OBJECT_SOUND:               // two packed GUIDs plus sound ID; object-sound leaf 0xCC42F8
         case SMSG_PLAY_MUSIC:                      // one uint32 ID; SI3 zone-sound leaf 0xCC053B
         case SMSG_PET_ACTION_SOUND:                // packed pet GUID plus action; Unit_C leaf 0x80ADB2
+        case SMSG_PET_ACTION_FEEDBACK:             // inverse spell-ID presence bit plus feedback; leaf 0x93E7D0
         case SMSG_QUESTGIVER_STATUS:               // MopQuestStatusPackets::BuildStatus
         case SMSG_GOSSIP_MESSAGE:                  // MopGossipPackets::BuildMessage
         case SMSG_GOSSIP_COMPLETE:                 // Direct 18414 empty reader; closes the gossip frame

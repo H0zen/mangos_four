@@ -706,7 +706,7 @@ enum OpcodesList
     CMSG_VIOLENCE_LEVEL                         = 0x0040, // 5.4.8 18414 (Wow.exe writer sub_6904E5; literal in sub_C63D45)
     SMSG_INIT_WORLD_STATES                       = 0x1560,    // 5.4.8 18414 (Wow.exe binary; reader sub_7341EC/sub_732740)
     SMSG_UPDATE_WORLD_STATE                      = 0x121B,    // 5.4.8 18414 (Wow.exe leaf; name reference-consensus)
-    SMSG_PET_ACTION_FEEDBACK                     = 0x080E,    // 5.4.8 18414 (Wow.exe leaf; name reference-consensus)
+    SMSG_PET_ACTION_FEEDBACK                     = 0x080E, // 5.4.8 18414 (Wow.exe reader sub_6E3D04; semantic leaf sub_93E7D0)
     CMSG_CHAR_RENAME                             = 0x0963, // 5.4.8 18414 (Wow.exe binary)
     SMSG_CHAR_RENAME                             = 0x0CBF,    // 5.4.8 18414 (Wow.exe leaf; name reference-consensus)
     CMSG_MOVE_SPLINE_DONE                        = 0x11D9, // 5.4.8 18414 (Wow.exe binary)

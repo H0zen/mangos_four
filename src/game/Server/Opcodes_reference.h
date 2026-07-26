@@ -175,8 +175,8 @@
  *   TOTAL SMSG rows                   925
  *
  * SUBSYSTEM CONFIDENCE: high=365, low=221, medium=182, none=157
- * STATUS TOTALS: ACTIVE=337, DOC=437, DORMANT=746
- *   SMSG: ACTIVE=202, DOC=270, DORMANT=453
+ * STATUS TOTALS: ACTIVE=338, DOC=437, DORMANT=745
+ *   SMSG: ACTIVE=203, DOC=270, DORMANT=452
  *   CMSG: ACTIVE=135, DOC=167, DORMANT=293
  */
 
@@ -882,7 +882,7 @@ typedef uint16_t uint16;
  *
  *  -- ResearchFrame.cpp (9) --
  *   SMSG_UNKNOWN_0x069A                            0x069A  DOC      [low-conf]
- *   SMSG_PET_ACTION_FEEDBACK                       0x080E  DORMANT  [low-conf]
+ *   SMSG_PET_ACTION_FEEDBACK                       0x080E  ACTIVE   [low-conf]
  *   SMSG_RESEARCH_SETUP_HISTORY                    0x08AB  DORMANT
  *   SMSG_RESEARCH_COMPLETE                         0x0C0E  DORMANT
  *   SMSG_UNKNOWN_0x0C59                            0x0C59  DOC      [low-conf]
