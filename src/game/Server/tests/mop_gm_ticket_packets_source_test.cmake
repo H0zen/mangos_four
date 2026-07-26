@@ -80,6 +80,9 @@ elseif(MUTATION STREQUAL "vulnerable_response_whitelist")
 elseif(MUTATION STREQUAL "vulnerable_response_builder")
     string(APPEND ticket_header
         "\nWorldPacket packet(SMSG_GM_TICKET_RESPONSE, 0);")
+elseif(MUTATION STREQUAL "vulnerable_response_foreign_builder")
+    string(APPEND session_source
+        "\nWorldPacket packet(SMSG_GM_TICKET_RESPONSE, 0);")
 endif()
 
 function(require_once source token context)
@@ -138,6 +141,39 @@ if(ticket_header MATCHES "SMSG_GM_TICKET_RESPONSE"
         OR ticket_handler MATCHES "SMSG_GM_TICKET_RESPONSE")
     message(FATAL_ERROR "vulnerable GM-ticket response must not have an unbounded sender")
 endif()
+
+# Scan the complete production game tree rather than assuming that a future
+# sender will remain in the two owning GM-ticket files. Opcodes.h and the
+# reference inventory are the only intentional declarations of this dormant
+# value; any other production use must first replace this quarantine with a
+# directly proved, capacity-bounded serializer.
+file(GLOB_RECURSE game_sources LIST_DIRECTORIES false
+    "${SOURCE_ROOT}/src/game/*.c"
+    "${SOURCE_ROOT}/src/game/*.cc"
+    "${SOURCE_ROOT}/src/game/*.cpp"
+    "${SOURCE_ROOT}/src/game/*.h"
+    "${SOURCE_ROOT}/src/game/*.hpp")
+foreach(source_path IN LISTS game_sources)
+    if(source_path STREQUAL "${SOURCE_ROOT}/src/game/Server/Opcodes.h"
+            OR source_path STREQUAL "${SOURCE_ROOT}/src/game/Server/Opcodes_reference.h")
+        continue()
+    endif()
+
+    if(source_path STREQUAL "${SOURCE_ROOT}/src/game/Object/GMTicketMgr.h")
+        set(source_text "${ticket_header}")
+    elseif(source_path STREQUAL "${SOURCE_ROOT}/src/game/WorldHandlers/GMTicketHandler.cpp")
+        set(source_text "${ticket_handler}")
+    elseif(source_path STREQUAL "${SOURCE_ROOT}/src/game/Server/WorldSession.cpp")
+        set(source_text "${session_source}")
+    else()
+        file(READ "${source_path}" source_text)
+    endif()
+
+    if(source_text MATCHES "SMSG_GM_TICKET_RESPONSE")
+        message(FATAL_ERROR
+            "vulnerable GM-ticket response production use is quarantined: ${source_path}")
+    endif()
+endforeach()
 
 require_once("${opcode_registry}"
     "DefS\\(SMSG_GM_TICKET_UPDATE,[ \\t]*\"SMSG_GM_TICKET_UPDATE\"\\)"
