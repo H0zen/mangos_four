@@ -1388,3 +1388,25 @@ foreach(mutation IN ITEMS request_reader response_builder client_registration
             -P ${CMAKE_CURRENT_SOURCE_DIR}/mop_inspect_packets_source_test.cmake)
     set_tests_properties(mop_inspect_packets_source_mutation_${mutation} PROPERTIES WILL_FAIL TRUE)
 endforeach()
+
+add_executable(mop_fishing_packets_test mop_fishing_packets_test.cpp)
+target_include_directories(mop_fishing_packets_test PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}/..
+    ${CMAKE_SOURCE_DIR}/src/shared)
+set_target_properties(mop_fishing_packets_test PROPERTIES CXX_STANDARD 17 CXX_STANDARD_REQUIRED ON)
+target_link_libraries(mop_fishing_packets_test PRIVATE shared)
+add_test(NAME mop_fishing_packets COMMAND mop_fishing_packets_test)
+
+add_test(NAME mop_fishing_packets_source
+    COMMAND ${CMAKE_COMMAND} -DSOURCE_ROOT=${CMAKE_SOURCE_DIR}
+        -P ${CMAKE_CURRENT_SOURCE_DIR}/mop_fishing_packets_source_test.cmake)
+
+foreach(mutation IN ITEMS escaped_sender not_hooked_senders escaped_registration
+        not_hooked_registration escaped_allowlist not_hooked_allowlist
+        escaped_opcode not_hooked_opcode)
+    add_test(NAME mop_fishing_packets_source_mutation_${mutation}
+        COMMAND ${CMAKE_COMMAND} -DSOURCE_ROOT=${CMAKE_SOURCE_DIR}
+            -DMUTATION=${mutation}
+            -P ${CMAKE_CURRENT_SOURCE_DIR}/mop_fishing_packets_source_test.cmake)
+    set_tests_properties(mop_fishing_packets_source_mutation_${mutation} PROPERTIES WILL_FAIL TRUE)
+endforeach()

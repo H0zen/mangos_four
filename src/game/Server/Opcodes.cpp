@@ -369,6 +369,11 @@ void InitializeOpcodes()
     DefS(SMSG_GAMEOBJECT_DESPAWN_ANIM, "SMSG_GAMEOBJECT_DESPAWN_ANIM");
     DefS(SMSG_GAMEOBJECT_PAGETEXT, "SMSG_GAMEOBJECT_PAGETEXT");
 
+    // The direct 18414 terminal leaves consume no payload and display the
+    // matching ERR_FISH_ESCAPED / ERR_FISH_NOT_HOOKED client errors.
+    DefS(SMSG_FISH_ESCAPED, "SMSG_FISH_ESCAPED");
+    DefS(SMSG_FISH_NOT_HOOKED, "SMSG_FISH_NOT_HOOKED");
+
     // Directly verified 18414 world/quest interactions. Area-trigger reports
     // distinguish enter from leave; the quest marker reply batches packed GUIDs.
     DefC(CMSG_AREATRIGGER, "CMSG_AREATRIGGER", STATUS_LOGGEDIN, PROCESS_THREADUNSAFE, &WorldSession::HandleAreaTriggerOpcode);

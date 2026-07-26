@@ -144,6 +144,7 @@ void GameObject::Update(uint32 update_diff, uint32 p_time)
                             {
                                 caster->FinishSpell(CURRENT_CHANNELED_SPELL);
 
+                                // Expired bobbers use the same bodyless 18414 client error.
                                 WorldPacket data(SMSG_FISH_NOT_HOOKED, 0);
                                 ((Player*)caster)->GetSession()->SendPacket(&data);
                             }

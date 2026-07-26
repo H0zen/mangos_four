@@ -175,8 +175,8 @@
  *   TOTAL SMSG rows                   925
  *
  * SUBSYSTEM CONFIDENCE: high=361, low=221, medium=183, none=160
- * STATUS TOTALS: ACTIVE=321, DOC=437, DORMANT=762
- *   SMSG: ACTIVE=187, DOC=270, DORMANT=468
+ * STATUS TOTALS: ACTIVE=323, DOC=437, DORMANT=760
+ *   SMSG: ACTIVE=189, DOC=270, DORMANT=466
  *   CMSG: ACTIVE=134, DOC=167, DORMANT=294
  */
 
@@ -723,7 +723,7 @@ typedef uint16_t uint16;
  *   SMSG_SPELL_EXECUTE_LOG                         0x00D8  ACTIVE   [medium-conf]
  *   SMSG_UNKNOWN_0x0170                            0x0170  DOC     
  *   SMSG_CATEGORY_COOLDOWN                         0x01DB  ACTIVE   [high-conf]
- *   SMSG_FISH_ESCAPED                              0x0227  DORMANT 
+ *   SMSG_FISH_ESCAPED                              0x0227  ACTIVE
  *   SMSG_QUESTUPDATE_ADD_PVP_KILL                  0x0256  DORMANT 
  *   SMSG_QUESTGIVER_REQUEST_ITEMS                  0x0277  ACTIVE
  *   SMSG_QUESTGIVER_QUEST_INVALID                  0x027D  DORMANT 
@@ -800,7 +800,7 @@ typedef uint16_t uint16;
  *   SMSG_UNKNOWN_0x108A                            0x108A  DOC      [medium-conf]
  *   SMSG_ITEM_ENCHANT_TIME_UPDATE                  0x10A2  ACTIVE
  *   SMSG_UNKNOWN_0x10BB                            0x10BB  DOC      [medium-conf]
- *   SMSG_FISH_NOT_HOOKED                           0x10BE  DORMANT 
+ *   SMSG_FISH_NOT_HOOKED                           0x10BE  ACTIVE
  *   SMSG_UNKNOWN_0x10C1                            0x10C1  DOC     
  *   SMSG_SEND_UNLEARN_SPELLS                       0x10F1  ACTIVE
  *   SMSG_CANCEL_SCENE                              0x120E  DORMANT  [low-conf]

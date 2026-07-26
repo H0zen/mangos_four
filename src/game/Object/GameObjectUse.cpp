@@ -510,6 +510,7 @@ void GameObject::Use(Unit* user)
                         // fish escaped, can be deleted now
                         SetLootState(GO_JUST_DEACTIVATED);
 
+                        // The 18414 leaf is bodyless and displays ERR_FISH_ESCAPED.
                         WorldPacket data(SMSG_FISH_ESCAPED, 0);
                         player->GetSession()->SendPacket(&data);
                     }
@@ -521,6 +522,7 @@ void GameObject::Use(Unit* user)
                 {
                     SetLootState(GO_JUST_DEACTIVATED);
 
+                    // The 18414 leaf is bodyless and displays ERR_FISH_NOT_HOOKED.
                     WorldPacket data(SMSG_FISH_NOT_HOOKED, 0);
                     player->GetSession()->SendPacket(&data);
                     break;
