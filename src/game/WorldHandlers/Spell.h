@@ -1462,6 +1462,51 @@ namespace MopCombatLogPackets
         uint32 interruptedSpellId;
     };
 
+    struct SpellInstakillLog
+    {
+        uint64 casterGuid;
+        uint64 victimGuid;
+        uint32 spellId;
+    };
+
+    inline void BuildSpellInstakillLog(WorldPacket& out, SpellInstakillLog const& log)
+    {
+        // The 18414 reader interleaves both packed-GUID masks before consuming
+        // their XOR bytes and the spell ID.
+        uint8 const casterMaskA[] = { 6, 7, 3, 1, 2, 0, 4 };
+        uint8 const victimMaskA[] = { 0, 2 };
+        uint8 const victimMaskB[] = { 4, 7, 1, 6, 5 };
+
+        out.WriteBit(GuidByte(log.casterGuid, casterMaskA[0]) != 0);
+        out.WriteBit(GuidByte(log.victimGuid, victimMaskA[0]) != 0);
+        out.WriteBit(GuidByte(log.casterGuid, casterMaskA[1]) != 0);
+        out.WriteBit(GuidByte(log.victimGuid, victimMaskA[1]) != 0);
+        for (size_t i = 2; i < sizeof(casterMaskA); ++i)
+            out.WriteBit(GuidByte(log.casterGuid, casterMaskA[i]) != 0);
+        WriteGuidMask(out, log.victimGuid, victimMaskB);
+        out.WriteBit(GuidByte(log.casterGuid, 5) != 0);
+        out.WriteBit(GuidByte(log.victimGuid, 3) != 0);
+        out.FlushBits();
+
+        out.WriteByteSeq(GuidByte(log.casterGuid, 0));
+        out.WriteByteSeq(GuidByte(log.victimGuid, 1));
+        out.WriteByteSeq(GuidByte(log.casterGuid, 3));
+        out.WriteByteSeq(GuidByte(log.casterGuid, 4));
+        out.WriteByteSeq(GuidByte(log.casterGuid, 5));
+        out.WriteByteSeq(GuidByte(log.casterGuid, 7));
+        out.WriteByteSeq(GuidByte(log.victimGuid, 0));
+        out.WriteByteSeq(GuidByte(log.casterGuid, 6));
+        out.WriteByteSeq(GuidByte(log.victimGuid, 2));
+        out.WriteByteSeq(GuidByte(log.victimGuid, 4));
+        out.WriteByteSeq(GuidByte(log.casterGuid, 1));
+        out << uint32(log.spellId);
+        uint8 const victimBytes[] = { 3, 7, 6, 5 };
+        out.WriteByteSeq(GuidByte(log.victimGuid, victimBytes[0]));
+        out.WriteByteSeq(GuidByte(log.casterGuid, 2));
+        for (size_t i = 1; i < sizeof(victimBytes); ++i)
+            out.WriteByteSeq(GuidByte(log.victimGuid, victimBytes[i]));
+    }
+
     inline bool BuildSpellExecuteLog(WorldPacket& out, SpellExecuteLog const& log)
     {
         bool const extraAttacks = log.kind == ExecuteKind::ExtraAttacks;

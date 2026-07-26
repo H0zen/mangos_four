@@ -175,8 +175,8 @@
  *   TOTAL SMSG rows                   925
  *
  * SUBSYSTEM CONFIDENCE: high=365, low=221, medium=182, none=157
- * STATUS TOTALS: ACTIVE=362, DOC=438, DORMANT=720
- *   SMSG: ACTIVE=222, DOC=271, DORMANT=432
+ * STATUS TOTALS: ACTIVE=363, DOC=438, DORMANT=719
+ *   SMSG: ACTIVE=223, DOC=271, DORMANT=431
  *   CMSG: ACTIVE=140, DOC=167, DORMANT=288
  */
 
@@ -767,7 +767,7 @@ typedef uint16_t uint16;
  *   SMSG_PLAYERBOUND                               0x088E  ACTIVE
  *   SMSG_UNKNOWN_0x089F                            0x089F  ACTIVE   [medium-conf]  server-binding=SMSG_SAVE_GUILD_EMBLEM
  *   SMSG_UNKNOWN_0x08FB                            0x08FB  DOC     
- *   SMSG_SPELLINSTAKILLLOG                         0x09F8  DORMANT 
+ *   SMSG_SPELLINSTAKILLLOG                         0x09F8  ACTIVE
  *   SMSG_SPELLHEALLOG                              0x09FB  DORMANT 
  *   SMSG_UNKNOWN_0x0A2F                            0x0A2F  DOC      [medium-conf]
  *   SMSG_UNKNOWN_0x0A3B                            0x0A3B  DOC     

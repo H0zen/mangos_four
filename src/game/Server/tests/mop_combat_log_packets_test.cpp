@@ -108,6 +108,42 @@ static void GuidBytes(RefWriter& writer, uint64 guid, uint8 const* order, size_t
         writer.GuidByte(guid, order[i]);
 }
 
+static std::vector<uint8> ExpectedInstakill(MopCombatLogPackets::SpellInstakillLog const& log)
+{
+    static uint8 const casterMaskA[] = { 6 };
+    static uint8 const victimMaskA[] = { 0 };
+    static uint8 const casterMaskB[] = { 7 };
+    static uint8 const victimMaskB[] = { 2 };
+    static uint8 const casterMaskC[] = { 3, 1, 2, 0, 4 };
+    static uint8 const victimMaskC[] = { 4, 7, 1, 6, 5 };
+    static uint8 const casterMaskD[] = { 5 };
+    static uint8 const victimMaskD[] = { 3 };
+    static uint8 const bytesA[][2] = {
+        { 0, 0 }, { 1, 1 }, { 3, 0 }, { 4, 0 }, { 5, 0 }, { 7, 0 },
+        { 0, 1 }, { 6, 0 }, { 2, 1 }, { 4, 1 }, { 1, 0 }
+    };
+    static uint8 const bytesB[][2] = {
+        { 3, 1 }, { 2, 0 }, { 7, 1 }, { 6, 1 }, { 5, 1 }
+    };
+
+    RefWriter writer;
+    GuidBits(writer, log.casterGuid, casterMaskA, 1);
+    GuidBits(writer, log.victimGuid, victimMaskA, 1);
+    GuidBits(writer, log.casterGuid, casterMaskB, 1);
+    GuidBits(writer, log.victimGuid, victimMaskB, 1);
+    GuidBits(writer, log.casterGuid, casterMaskC, 5);
+    GuidBits(writer, log.victimGuid, victimMaskC, 5);
+    GuidBits(writer, log.casterGuid, casterMaskD, 1);
+    GuidBits(writer, log.victimGuid, victimMaskD, 1);
+    writer.Align();
+    for (auto const& byte : bytesA)
+        writer.GuidByte(byte[1] ? log.victimGuid : log.casterGuid, byte[0]);
+    writer.U32(log.spellId);
+    for (auto const& byte : bytesB)
+        writer.GuidByte(byte[1] ? log.victimGuid : log.casterGuid, byte[0]);
+    return writer.Bytes();
+}
+
 static std::vector<uint8> ExpectedExecute(MopCombatLogPackets::SpellExecuteLog const& log)
 {
     static uint8 const casterMaskPre[] = { 0, 6, 5, 7, 2 };
@@ -376,6 +412,28 @@ static void test_execute_variants()
     CHECK(invalid.size() == 1 && invalid.contents()[0] == 0xAA);
 }
 
+static void test_spell_instakill_log()
+{
+    MopCombatLogPackets::SpellInstakillLog dense = {};
+    dense.casterGuid = 0x0123456789ABCDEFull;
+    dense.victimGuid = 0xF1E2D3C4B5A69788ull;
+    dense.spellId = 0x11223344u;
+
+    WorldPacket densePacket(SMSG_SPELLINSTAKILLLOG, 24);
+    MopCombatLogPackets::BuildSpellInstakillLog(densePacket, dense);
+    CHECK(densePacket.GetOpcode() == SMSG_SPELLINSTAKILLLOG);
+    CHECK(Equal(densePacket, ExpectedInstakill(dense)));
+
+    MopCombatLogPackets::SpellInstakillLog sparse = {};
+    sparse.casterGuid = 0x0002000400060008ull;
+    sparse.victimGuid = 0x0100030005000700ull;
+    sparse.spellId = 5;
+
+    WorldPacket sparsePacket(SMSG_SPELLINSTAKILLLOG, 24);
+    MopCombatLogPackets::BuildSpellInstakillLog(sparsePacket, sparse);
+    CHECK(Equal(sparsePacket, ExpectedInstakill(sparse)));
+}
+
 static void CheckPeriodic(MopCombatLogPackets::PeriodicAuraLog const& log)
 {
     WorldPacket packet(SMSG_SPELL_PERIODIC_AURA_LOG, 64);
@@ -481,6 +539,7 @@ static void test_spell_interrupt_log()
 
 static void test_successor_opcodes_are_framable()
 {
+    CHECK(uint32(SMSG_SPELLINSTAKILLLOG) == 0x09F8u);
     CHECK(uint32(SMSG_SPELL_EXECUTE_LOG) == 0x00D8u);
     CHECK(uint32(SMSG_SPELL_PERIODIC_AURA_LOG) == 0x0CF2u);
     CHECK(uint32(SMSG_SPELLDISPELLOG) == 0x0DF9u);
@@ -493,6 +552,11 @@ static void test_successor_opcodes_are_framable()
     CHECK(executePacket.size() == 29);
 
     uint8 header[4] = {};
+    MopCombatLogPackets::SpellInstakillLog instakill = {};
+    WorldPacket instakillPacket(SMSG_SPELLINSTAKILLLOG, 6);
+    MopCombatLogPackets::BuildSpellInstakillLog(instakillPacket, instakill);
+    CHECK(MopWire::BuildServerHeader(true, instakillPacket.size(), instakillPacket.GetOpcode(), header));
+
     CHECK(MopWire::BuildServerHeader(true, executePacket.size(), executePacket.GetOpcode(), header));
     CHECK(header[0] == 0xD8 && header[1] == 0xA0 && header[2] == 0x03 && header[3] == 0x00);
 
@@ -522,6 +586,7 @@ static void test_successor_opcodes_are_framable()
 
 int main(int, char**)
 {
+    test_spell_instakill_log();
     test_execute_variants();
     test_periodic_variants();
     test_dispel_and_steal_variants();

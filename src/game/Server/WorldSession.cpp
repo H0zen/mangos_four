@@ -335,6 +335,7 @@ static bool IsEnterWorldConverted(uint16 opcode)
         case SMSG_SPELL_PERIODIC_AURA_LOG:         // MopCombatLogPackets::BuildPeriodicAuraLog
         case SMSG_SPELLDISPELLOG:                  // MopCombatLogPackets::BuildDispelLog
         case SMSG_SPELLINTERRUPTLOG:               // MopCombatLogPackets::BuildSpellInterruptLog
+        case SMSG_SPELLINSTAKILLLOG:               // MopCombatLogPackets::BuildSpellInstakillLog
         case SMSG_CAST_FAILED:                     // MopSpellPackets::BuildCastFailed
         case SMSG_PET_CAST_FAILED:                 // MopSpellPackets::BuildCastFailed (pet bit order)
         case SMSG_SPELL_START:                     // MopSpellPackets::BuildSpellStart
