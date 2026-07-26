@@ -113,6 +113,21 @@ namespace MopGuildPackets
         out << result;
     }
 
+    inline bool ReadGuildInvite(WorldPacket& in, std::string& name)
+    {
+        name.clear();
+        if (in.size() - in.rpos() < 2)
+            return false;
+
+        // Live 18414 capture: 9-bit byte length followed by the raw player name.
+        uint32 const nameLength = in.ReadBits(9);
+        if (nameLength != in.size() - in.rpos())
+            return false;
+
+        name = in.ReadString(nameLength);
+        return in.rpos() == in.size();
+    }
+
     inline bool BuildGuildMotd(WorldPacket& out, std::string const& motd)
     {
         if (motd.size() >= (size_t(1) << 10))

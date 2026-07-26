@@ -153,7 +153,7 @@ enum OpcodesList
     SMSG_PARTY_MEMBER_STATS                      = 0x0A9A,    // 5.4.8 18414 (Wow.exe leaf; name reference-consensus)
     SMSG_PARTY_COMMAND_RESULT                    = 0x0F86,    // 5.4.8 18414 (Wow.exe leaf; name reference-consensus)
     CMSG_GUILD_CREATE                            = 0x1082, // not in 5.4.8 (legacy; handler retained)
-    CMSG_GUILD_INVITE                            = 0x0869, // 5.4.8 18414 (Wow.exe binary)
+    CMSG_GUILD_INVITE                            = 0x0869, // 5.4.8 18414 (live client: 9-bit name length plus raw name)
     SMSG_GUILD_INVITE                            = 0x0F71,    // 5.4.8 18414 (Wow.exe leaf; name reference-consensus)
     CMSG_GUILD_ACCEPT                            = 0x18A2, // 5.4.8 18414 (Wow.exe binary)
     CMSG_GUILD_DECLINE                           = 0x147B, // 5.4.8 18414 (Wow.exe binary)

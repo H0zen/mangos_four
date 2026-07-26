@@ -337,6 +337,42 @@ static void test_guild_command_result()
     CHECK(uint32(SMSG_GUILD_COMMAND_RESULT) == 0x0EF1u);
 }
 
+static void test_guild_invite_request()
+{
+    WorldPacket live(CMSG_GUILD_INVITE, 19);
+    Append(live, {
+        0x08, 0x80,
+        0x4E, 0x6F, 0x73, 0x75, 0x63, 0x68, 0x70, 0x6C, 0x61,
+        0x79, 0x65, 0x72, 0x31, 0x32, 0x33, 0x34, 0x35
+    });
+    std::string name;
+    CHECK(MopGuildPackets::ReadGuildInvite(live, name));
+    CHECK(name == "Nosuchplayer12345");
+    CHECK(live.rpos() == live.size());
+
+    WorldPacket truncated(CMSG_GUILD_INVITE, 1);
+    Append(truncated, { 0x08 });
+    CHECK(!MopGuildPackets::ReadGuildInvite(truncated, name));
+
+    WorldPacket wrongLength(CMSG_GUILD_INVITE, 19);
+    Append(wrongLength, {
+        0x09, 0x00,
+        0x4E, 0x6F, 0x73, 0x75, 0x63, 0x68, 0x70, 0x6C, 0x61,
+        0x79, 0x65, 0x72, 0x31, 0x32, 0x33, 0x34, 0x35
+    });
+    CHECK(!MopGuildPackets::ReadGuildInvite(wrongLength, name));
+
+    WorldPacket trailing(CMSG_GUILD_INVITE, 20);
+    Append(trailing, {
+        0x08, 0x80,
+        0x4E, 0x6F, 0x73, 0x75, 0x63, 0x68, 0x70, 0x6C, 0x61,
+        0x79, 0x65, 0x72, 0x31, 0x32, 0x33, 0x34, 0x35, 0x00
+    });
+    CHECK(!MopGuildPackets::ReadGuildInvite(trailing, name));
+
+    CHECK(uint32(CMSG_GUILD_INVITE) == 0x0869u);
+}
+
 int main(int /*argc*/, char** /*argv*/)
 {
     test_empty_motd();
@@ -358,6 +394,7 @@ int main(int /*argc*/, char** /*argv*/)
     test_guild_event_opcodes();
     test_guild_bank_money_withdrawn();
     test_guild_command_result();
+    test_guild_invite_request();
 
     if (g_fail)
     {

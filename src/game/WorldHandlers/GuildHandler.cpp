@@ -144,7 +144,12 @@ void WorldSession::HandleGuildInviteOpcode(WorldPacket& recvPacket)
     std::string Invitedname, plname;
     Player* player = NULL;
 
-    Invitedname = recvPacket.ReadString(recvPacket.ReadBits(7));
+    if (!MopGuildPackets::ReadGuildInvite(recvPacket, Invitedname))
+    {
+        sLog.outError("WORLD: Malformed CMSG_GUILD_INVITE from player %s",
+            GetPlayer()->GetName());
+        return;
+    }
 
     if (normalizePlayerName(Invitedname))
     {

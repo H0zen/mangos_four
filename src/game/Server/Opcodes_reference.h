@@ -175,9 +175,9 @@
  *   TOTAL SMSG rows                   925
  *
  * SUBSYSTEM CONFIDENCE: high=365, low=221, medium=182, none=157
- * STATUS TOTALS: ACTIVE=340, DOC=438, DORMANT=742
+ * STATUS TOTALS: ACTIVE=341, DOC=438, DORMANT=741
  *   SMSG: ACTIVE=205, DOC=271, DORMANT=449
- *   CMSG: ACTIVE=135, DOC=167, DORMANT=293
+ *   CMSG: ACTIVE=136, DOC=167, DORMANT=292
  */
 
 // CAVEATS -- read before trusting any single row:
@@ -1568,7 +1568,7 @@ typedef uint16_t uint16;
  *   CMSG_CREATURE_QUERY                            0x0842  ACTIVE
  *   CMSG_MOVE_HOVER_ACK                            0x0858  DORMANT 
  *   CMSG_SUBMIT_BUG                                0x0861  DOC     
- *   CMSG_GUILD_INVITE                              0x0869  DORMANT 
+ *   CMSG_GUILD_INVITE                              0x0869  ACTIVE   [high-conf]  live 18414 capture: 9-bit name length plus raw name
  *   CMSG_UNKNOWN_0x0870                            0x0870  DOC     
  *   CMSG_MOVE_SET_CAN_TURN_WHILE_FALLING_ACK       0x0873  DOC     
  *   CMSG_UNKNOWN_0x087A                            0x087A  DOC     

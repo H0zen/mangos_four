@@ -162,6 +162,26 @@ elseif(MUTATION STREQUAL "command_opcode")
         "SMSG_GUILD_COMMAND_RESULT                    = 0x0EF1"
         "SMSG_GUILD_COMMAND_RESULT                    = 0x0EF0"
         opcode_header "${opcode_header}")
+elseif(MUTATION STREQUAL "invite_reader")
+    string(REPLACE
+        "MopGuildPackets::ReadGuildInvite(recvPacket, Invitedname)"
+        "false /* removed guild-invite reader */"
+        guild_handler "${guild_handler}")
+elseif(MUTATION STREQUAL "invite_registration")
+    string(REPLACE
+        "DefC(CMSG_GUILD_INVITE, \"CMSG_GUILD_INVITE\", STATUS_LOGGEDIN, PROCESS_THREADUNSAFE, &WorldSession::HandleGuildInviteOpcode);"
+        "/* removed guild-invite registration */"
+        opcode_registry "${opcode_registry}")
+elseif(MUTATION STREQUAL "invite_length_width")
+    string(REPLACE
+        "uint32 const nameLength = in.ReadBits(9);"
+        "uint32 const nameLength = in.ReadBits(7);"
+        packet_builder "${packet_builder}")
+elseif(MUTATION STREQUAL "invite_opcode")
+    string(REPLACE
+        "CMSG_GUILD_INVITE                            = 0x0869"
+        "CMSG_GUILD_INVITE                            = 0x0868"
+        opcode_header "${opcode_header}")
 endif()
 
 function(require_once source token context)
@@ -248,6 +268,18 @@ require_once("${world_session}"
 require_once("${opcode_header}"
     "SMSG_GUILD_COMMAND_RESULT                    = 0x0EF1"
     "guild-command-result opcode value")
+require_once("${guild_handler}"
+    "MopGuildPackets::ReadGuildInvite(recvPacket, Invitedname)"
+    "guild-invite request reader")
+require_once("${opcode_registry}"
+    "DefC(CMSG_GUILD_INVITE, \"CMSG_GUILD_INVITE\", STATUS_LOGGEDIN, PROCESS_THREADUNSAFE, &WorldSession::HandleGuildInviteOpcode);"
+    "guild-invite request registration")
+require_once("${packet_builder}"
+    "uint32 const nameLength = in.ReadBits(9);"
+    "guild-invite 9-bit name length")
+require_once("${opcode_header}"
+    "CMSG_GUILD_INVITE                            = 0x0869"
+    "guild-invite opcode value")
 
 foreach(token IN ITEMS
         "CMSG_TABARD_VENDOR_ACTIVATE                 = 0x11C3"

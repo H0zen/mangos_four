@@ -549,6 +549,9 @@ void InitializeOpcodes()
     DefS(SMSG_SPELL_START, "SMSG_SPELL_START");
     DefS(SMSG_SPELL_GO, "SMSG_SPELL_GO");
 
+    // Live 18414 guild invite: 9-bit player-name length followed by raw bytes.
+    DefC(CMSG_GUILD_INVITE, "CMSG_GUILD_INVITE", STATUS_LOGGEDIN, PROCESS_THREADUNSAFE, &WorldSession::HandleGuildInviteOpcode);
+
     // Guild event packets split from the pre-MoP generic guild-event packet.
     DefS(SMSG_GUILD_EVENT_MOTD, "SMSG_GUILD_EVENT_MOTD");
     DefS(SMSG_GUILD_EVENT_PLAYER_JOINED, "SMSG_GUILD_EVENT_PLAYER_JOINED");
