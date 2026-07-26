@@ -396,6 +396,48 @@ static void test_duel_state_packets()
     CHECK(BytesEqual(countdown, { 0x78, 0x56, 0x34, 0x12 }));
 }
 
+static void test_duel_request_and_winner_packets()
+{
+    WorldPacket requested;
+    MopDuelPackets::BuildRequested(
+        requested,
+        ObjectGuid(UINT64_C(0x0807060504030201)),
+        ObjectGuid(UINT64_C(0x100F0E0D0C0B0A09)));
+    CHECK(requested.GetOpcode() == SMSG_DUEL_REQUESTED);
+    CHECK(BytesEqual(requested, {
+        0xFF, 0xFF,
+        0x07, 0x05, 0x11, 0x0C,
+        0x09, 0x0D, 0x0E, 0x08,
+        0x04, 0x0A, 0x0B, 0x00,
+        0x02, 0x06, 0x03, 0x0F,
+    }));
+
+    WorldPacket winner;
+    CHECK(MopDuelPackets::BuildWinner(
+        winner, false, "Winner", 0x10203040u, "Loser", 0xA1B2C3D4u));
+    CHECK(winner.GetOpcode() == SMSG_DUEL_WINNER);
+    CHECK(BytesEqual(winner, {
+        0x0C, 0x28,
+        0xD4, 0xC3, 0xB2, 0xA1,
+        'W', 'i', 'n', 'n', 'e', 'r',
+        0x40, 0x30, 0x20, 0x10,
+        'L', 'o', 's', 'e', 'r',
+    }));
+
+    WorldPacket retreat;
+    CHECK(MopDuelPackets::BuildWinner(
+        retreat, true, "Winner", 0x10203040u, "Loser", 0xA1B2C3D4u));
+    CHECK(retreat[0] == 0x8C);
+
+    WorldPacket maximum;
+    CHECK(MopDuelPackets::BuildWinner(
+        maximum, false, std::string(63, 'W'), 1, std::string(63, 'L'), 2));
+    WorldPacket tooLong;
+    CHECK(!MopDuelPackets::BuildWinner(
+        tooLong, false, std::string(64, 'W'), 1, "L", 2));
+    CHECK(tooLong.empty());
+}
+
 static void test_opcode_values_are_framable()
 {
     CHECK(uint32_t(SMSG_ATTACKSWING_ERROR) == 0x11E1u);
@@ -413,6 +455,8 @@ static void test_opcode_values_are_framable()
     CHECK(uint32_t(SMSG_DUEL_INBOUNDS) == 0x163Au);
     CHECK(uint32_t(SMSG_DUEL_COMPLETE) == 0x1C0Au);
     CHECK(uint32_t(SMSG_DUEL_COUNTDOWN) == 0x129Fu);
+    CHECK(uint32_t(SMSG_DUEL_REQUESTED) == 0x0022u);
+    CHECK(uint32_t(SMSG_DUEL_WINNER) == 0x10E1u);
 
     CHECK(uint32_t(SMSG_ATTACKSWING_ERROR) <= 0x1FFFu);
     CHECK(uint32_t(SMSG_MOVE_SET_SWIM_SPEED) <= 0x1FFFu);
@@ -429,6 +473,8 @@ static void test_opcode_values_are_framable()
     CHECK(uint32_t(SMSG_DUEL_INBOUNDS) <= 0x1FFFu);
     CHECK(uint32_t(SMSG_DUEL_COMPLETE) <= 0x1FFFu);
     CHECK(uint32_t(SMSG_DUEL_COUNTDOWN) <= 0x1FFFu);
+    CHECK(uint32_t(SMSG_DUEL_REQUESTED) <= 0x1FFFu);
+    CHECK(uint32_t(SMSG_DUEL_WINNER) <= 0x1FFFu);
 }
 
 int main(int /*argc*/, char** /*argv*/)
@@ -444,6 +490,7 @@ int main(int /*argc*/, char** /*argv*/)
     test_cancel_combat();
     test_party_kill_log();
     test_duel_state_packets();
+    test_duel_request_and_winner_packets();
     test_opcode_values_are_framable();
 
     if (g_fail)

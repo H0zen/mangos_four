@@ -192,7 +192,10 @@ foreach(mutation IN ITEMS cancel_sender cancel_registration cancel_allowlist can
         party_kill_mask party_kill_bytes party_kill_sender party_kill_registration
         party_kill_allowlist party_kill_reference
         duel_complete_bit duel_countdown_width duel_sender duel_registration
-        duel_allowlist duel_reference)
+        duel_allowlist duel_reference
+        duel_request_mask duel_request_bytes duel_winner_bits duel_winner_realm_order
+        duel_request_sender duel_winner_sender duel_pair_registration
+        duel_pair_allowlist duel_pair_reference)
     add_test(NAME mop_compact_packets_source_mutation_${mutation}
         COMMAND ${CMAKE_COMMAND} -DSOURCE_ROOT=${CMAKE_SOURCE_DIR}
             -DMUTATION=${mutation}

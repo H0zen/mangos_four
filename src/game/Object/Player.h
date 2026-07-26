@@ -769,6 +769,32 @@ namespace MopProgressionPackets
 
 namespace MopDuelPackets
 {
+    inline void BuildRequested(WorldPacket& out, ObjectGuid arbiter,
+        ObjectGuid initiator)
+    {
+        out.Initialize(SMSG_DUEL_REQUESTED, 18);
+
+        // Reader sub_6CA34C interleaves the duel flag and initiator masks.
+        out.WriteGuidMask<5>(arbiter);
+        out.WriteGuidMask<4, 2, 7>(initiator);
+        out.WriteGuidMask<0>(arbiter);
+        out.WriteGuidMask<5>(initiator);
+        out.WriteGuidMask<4, 6>(arbiter);
+        out.WriteGuidMask<1, 3, 6>(initiator);
+        out.WriteGuidMask<7, 3, 2, 1>(arbiter);
+        out.WriteGuidMask<0>(initiator);
+        out.FlushBits();
+
+        out.WriteGuidBytes<5, 3>(arbiter);
+        out.WriteGuidBytes<7, 4>(initiator);
+        out.WriteGuidBytes<7>(arbiter);
+        out.WriteGuidBytes<3, 6, 0>(initiator);
+        out.WriteGuidBytes<4>(arbiter);
+        out.WriteGuidBytes<2, 1>(initiator);
+        out.WriteGuidBytes<0, 2, 6, 1>(arbiter);
+        out.WriteGuidBytes<5>(initiator);
+    }
+
     inline void BuildOutOfBounds(WorldPacket& out)
     {
         // Wow.exe 18414 routes 0x001A through the fieldless reader sub_6BC12D.
@@ -797,6 +823,31 @@ namespace MopDuelPackets
         // Reader sub_6D9F28 consumes one uint32; terminal sub_9BFFD4
         // divides it by 1000 before updating the duel countdown UI.
         out << milliseconds;
+    }
+
+    inline bool BuildWinner(WorldPacket& out, bool retreat,
+        std::string const& winnerName, uint32 winnerRealmAddress,
+        std::string const& loserName, uint32 loserRealmAddress)
+    {
+        if (winnerName.size() > 63 || loserName.size() > 63)
+            return false;
+
+        out.Initialize(SMSG_DUEL_WINNER,
+            2 + 2 * sizeof(uint32) + winnerName.size() + loserName.size());
+
+        // Reader sub_6CFDCC consumes the outcome followed by two six-bit
+        // lengths. Its realm-address fields are crossed around the names;
+        // terminal sub_9C0069 pairs them back as winner then loser.
+        out.WriteBit(retreat);
+        out.WriteBits(uint32(winnerName.size()), 6);
+        out.WriteBits(uint32(loserName.size()), 6);
+        out.FlushBits();
+
+        out << loserRealmAddress;
+        out.append(winnerName.c_str(), winnerName.size());
+        out << winnerRealmAddress;
+        out.append(loserName.c_str(), loserName.size());
+        return true;
     }
 }
 

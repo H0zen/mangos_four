@@ -1,6 +1,7 @@
 file(READ "${SOURCE_ROOT}/src/game/Object/PlayerCombat.cpp" player_combat)
 file(READ "${SOURCE_ROOT}/src/game/Object/PlayerDuel.cpp" player_duel)
 file(READ "${SOURCE_ROOT}/src/game/Object/Player.h" player_header)
+file(READ "${SOURCE_ROOT}/src/game/WorldHandlers/SpellEffectObjectCombat.cpp" spell_effect_object_combat)
 file(READ "${SOURCE_ROOT}/src/game/Object/UnitSpeed.cpp" unit_speed)
 file(READ "${SOURCE_ROOT}/src/game/ChatCommands/PlayerStatsMods.cpp" player_stats_mods)
 file(READ "${SOURCE_ROOT}/src/game/WorldHandlers/GroupHandler.cpp" group_handler)
@@ -175,6 +176,51 @@ elseif(MUTATION STREQUAL "duel_reference")
     string(REPLACE
         "SMSG_DUEL_COMPLETE                             0x1C0A  ACTIVE"
         "SMSG_DUEL_COMPLETE                             0x1C0A  DORMANT"
+        opcode_reference "${opcode_reference}")
+elseif(MUTATION STREQUAL "duel_request_mask")
+    string(REPLACE
+        "out.WriteGuidMask<4, 2, 7>(initiator);"
+        "out.WriteGuidMask<2, 4, 7>(initiator);"
+        player_header "${player_header}")
+elseif(MUTATION STREQUAL "duel_request_bytes")
+    string(REPLACE
+        "out.WriteGuidBytes<5, 3>(arbiter);"
+        "out.WriteGuidBytes<3, 5>(arbiter);"
+        player_header "${player_header}")
+elseif(MUTATION STREQUAL "duel_winner_bits")
+    string(REPLACE
+        "out.WriteBits(uint32(winnerName.size()), 6);"
+        "out.WriteBits(uint32(winnerName.size()), 5);"
+        player_header "${player_header}")
+elseif(MUTATION STREQUAL "duel_winner_realm_order")
+    string(REPLACE
+        "out << loserRealmAddress;"
+        "out << winnerRealmAddress;"
+        player_header "${player_header}")
+elseif(MUTATION STREQUAL "duel_request_sender")
+    string(REPLACE
+        "MopDuelPackets::BuildRequested("
+        "/* removed duel-request sender */ ("
+        spell_effect_object_combat "${spell_effect_object_combat}")
+elseif(MUTATION STREQUAL "duel_winner_sender")
+    string(REPLACE
+        "MopDuelPackets::BuildWinner(data, type != DUEL_WON,"
+        "/* removed duel-winner sender */ (data, type != DUEL_WON,"
+        player_duel "${player_duel}")
+elseif(MUTATION STREQUAL "duel_pair_registration")
+    string(REPLACE
+        "DefS(SMSG_DUEL_WINNER, \"SMSG_DUEL_WINNER\");"
+        "/* removed duel-winner registration */"
+        opcode_registry "${opcode_registry}")
+elseif(MUTATION STREQUAL "duel_pair_allowlist")
+    string(REPLACE
+        "case SMSG_DUEL_REQUESTED:"
+        "case 0xFFFF: /* removed duel-request allowlist */"
+        world_session "${world_session}")
+elseif(MUTATION STREQUAL "duel_pair_reference")
+    string(REPLACE
+        "SMSG_DUEL_WINNER                               0x10E1  ACTIVE"
+        "SMSG_DUEL_WINNER                               0x10E1  DORMANT"
         opcode_reference "${opcode_reference}")
 endif()
 
@@ -369,4 +415,40 @@ foreach(server_name IN ITEMS
 endforeach()
 if(player_duel MATCHES "WorldPacket[ \\t]+data\\(SMSG_DUEL_(OUTOFBOUNDS|INBOUNDS|COMPLETE|COUNTDOWN)")
     message(FATAL_ERROR "legacy raw duel-state packet construction remains")
+endif()
+
+if(NOT player_header MATCHES "out.WriteGuidMask<4, 2, 7>\\(initiator\\)")
+    message(FATAL_ERROR "duel-request initiator mask order does not match reader sub_6CA34C")
+endif()
+if(NOT player_header MATCHES "out.WriteGuidBytes<5, 3>\\(arbiter\\)")
+    message(FATAL_ERROR "duel-request arbiter byte order does not match reader sub_6CA34C")
+endif()
+if(NOT player_header MATCHES "out.WriteBits\\(uint32\\(winnerName.size\\(\\)\\), 6\\)")
+    message(FATAL_ERROR "duel-winner name length is not six bits")
+endif()
+if(NOT player_header MATCHES "out << loserRealmAddress;")
+    message(FATAL_ERROR "duel-winner crossed realm/name order does not match reader sub_6CFDCC")
+endif()
+if(NOT spell_effect_object_combat MATCHES "MopDuelPackets::BuildRequested")
+    message(FATAL_ERROR "duel-request sender bypasses the 18414 serializer")
+endif()
+if(NOT player_duel MATCHES "MopDuelPackets::BuildWinner")
+    message(FATAL_ERROR "duel-winner sender bypasses the 18414 serializer")
+endif()
+foreach(server_name IN ITEMS SMSG_DUEL_REQUESTED SMSG_DUEL_WINNER)
+    if(NOT opcode_registry MATCHES "DefS\\(${server_name},[ \\t]*\"${server_name}\"\\)")
+        message(FATAL_ERROR "${server_name} is missing outbound opcode metadata")
+    endif()
+    if(NOT world_session MATCHES "case[ \\t]+${server_name}:")
+        message(FATAL_ERROR "${server_name} is missing from the converted-packet gate")
+    endif()
+    if(NOT opcode_reference MATCHES "${server_name}[ \\t]+0x[0-9A-F]+[ \\t]+ACTIVE")
+        message(FATAL_ERROR "reference inventory does not record active ${server_name}")
+    endif()
+endforeach()
+if(spell_effect_object_combat MATCHES "WorldPacket[ \\t]+data\\(SMSG_DUEL_REQUESTED")
+    message(FATAL_ERROR "legacy raw duel-request construction remains")
+endif()
+if(player_duel MATCHES "Initialize\\(SMSG_DUEL_WINNER")
+    message(FATAL_ERROR "legacy guessed duel-winner construction remains")
 endif()
