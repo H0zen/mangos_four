@@ -175,8 +175,8 @@
  *   TOTAL SMSG rows                   925
  *
  * SUBSYSTEM CONFIDENCE: high=365, low=221, medium=182, none=157
- * STATUS TOTALS: ACTIVE=355, DOC=438, DORMANT=727
- *   SMSG: ACTIVE=216, DOC=271, DORMANT=438
+ * STATUS TOTALS: ACTIVE=357, DOC=438, DORMANT=725
+ *   SMSG: ACTIVE=218, DOC=271, DORMANT=436
  *   CMSG: ACTIVE=139, DOC=167, DORMANT=289
  */
 
@@ -727,7 +727,7 @@ typedef uint16_t uint16;
  *   SMSG_QUESTUPDATE_ADD_PVP_KILL                  0x0256  DORMANT 
  *   SMSG_QUESTGIVER_REQUEST_ITEMS                  0x0277  ACTIVE
  *   SMSG_QUESTGIVER_QUEST_INVALID                  0x027D  ACTIVE   [high-conf]
- *   SMSG_PET_LEARNED_SPELL                         0x0282  DORMANT  [medium-conf]
+ *   SMSG_PET_LEARNED_SPELL                         0x0282  ACTIVE   [medium-conf]
  *   SMSG_PETITION_ALREADY_SIGNED                   0x0286  DORMANT  [medium-conf]
  *   SMSG_GROUPACTION_THROTTLED                     0x0287  DORMANT  [medium-conf]
  *   SMSG_PET_NAME_INVALID                          0x028E  DORMANT 
@@ -848,7 +848,7 @@ typedef uint16_t uint16;
  *   SMSG_PLAY_SCENE                                0x1C3A  DORMANT  [low-conf]
  *   SMSG_SET_ITEM_PURCHASE_DATA                    0x1C9A  DORMANT 
  *   SMSG_VOID_TRANSFER_RESULT                      0x1C9E  DORMANT  [medium-conf]
- *   SMSG_PET_REMOVED_SPELL                         0x1CAE  DORMANT 
+ *   SMSG_PET_REMOVED_SPELL                         0x1CAE  ACTIVE
  *   SMSG_SHOWTAXINODES                             0x1E1A  DORMANT  [medium-conf]
  *   SMSG_BATTLEGROUND_INFO_THROTTLED               0x1E1E  DORMANT  [medium-conf]
  *   SMSG_CROSSED_INEBRIATION_THRESHOLD             0x1E9E  DORMANT 

@@ -400,6 +400,29 @@ namespace MopSpellPackets
         out << spellId;
     }
 
+    inline void BuildPetLearnedSpell(WorldPacket& out, uint32 spellId)
+    {
+        out.Initialize(SMSG_PET_LEARNED_SPELL, 7);
+
+        // Wow.exe 18414 constructor sub_6B0B96 delegates to shared reader
+        // sub_6B0AD9: a 22-bit count followed by the pet spell-ID array;
+        // semantic handler sub_7B8F82 consumes it as newly learned pet spells.
+        out.WriteBits(1, 22);
+        out.FlushBits();
+        out << spellId;
+    }
+
+    inline void BuildPetRemovedSpell(WorldPacket& out, uint32 spellId)
+    {
+        out.Initialize(SMSG_PET_REMOVED_SPELL, 7);
+
+        // Both pet mutation routes share sub_6B0AD9; semantic handler
+        // sub_7B906D consumes this array as removed pet spells.
+        out.WriteBits(1, 22);
+        out.FlushBits();
+        out << spellId;
+    }
+
     inline void BuildSupersededSpell(WorldPacket& out, uint32 oldSpellId,
         uint32 newSpellId)
     {

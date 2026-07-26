@@ -601,8 +601,8 @@ bool Pet::learnSpell(uint32 spell_id)
         Unit* owner = GetOwner();
         if (owner && owner->GetTypeId() == TYPEID_PLAYER)
         {
-            WorldPacket data(SMSG_PET_LEARNED_SPELL, 4);
-            data << uint32(spell_id);
+            WorldPacket data;
+            MopSpellPackets::BuildPetLearnedSpell(data, spell_id);
             ((Player*)owner)->GetSession()->SendPacket(&data);
 
             {
@@ -680,8 +680,8 @@ bool Pet::unlearnSpell(uint32 spell_id, bool learn_prev, bool clear_ab)
             {
                 if (owner->GetTypeId() == TYPEID_PLAYER)
                 {
-                    WorldPacket data(SMSG_PET_REMOVED_SPELL, 4);
-                    data << uint32(spell_id);
+                    WorldPacket data;
+                    MopSpellPackets::BuildPetRemovedSpell(data, spell_id);
                     ((Player*)owner)->GetSession()->SendPacket(&data);
                 }
             }

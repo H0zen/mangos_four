@@ -323,6 +323,31 @@ elseif(MUTATION STREQUAL "spellbook_reference")
         "SMSG_LEARNED_SPELL                             0x129A  ACTIVE"
         "SMSG_LEARNED_SPELL                             0x129A  DORMANT"
         opcode_reference "${opcode_reference}")
+elseif(MUTATION STREQUAL "pet_spellbook_builder")
+    string(REPLACE
+        "inline void BuildPetLearnedSpell(WorldPacket& out, uint32 spellId)"
+        "inline void RemovedPetLearnedSpell(WorldPacket& out, uint32 spellId)"
+        spell_header "${spell_header}")
+elseif(MUTATION STREQUAL "pet_spellbook_sender")
+    string(REPLACE
+        "MopSpellPackets::BuildPetLearnedSpell(data, spell_id);"
+        "/* removed pet learned-spell sender */"
+        pet_spells_source "${pet_spells_source}")
+elseif(MUTATION STREQUAL "pet_spellbook_registration")
+    string(REPLACE
+        "DefS(SMSG_PET_LEARNED_SPELL, \"SMSG_PET_LEARNED_SPELL\");"
+        "/* removed pet learned-spell registration */"
+        opcode_registry "${opcode_registry}")
+elseif(MUTATION STREQUAL "pet_spellbook_gate")
+    string(REPLACE
+        "case SMSG_PET_LEARNED_SPELL:"
+        "case SMSG_UNKNOWN_0:"
+        world_session "${world_session}")
+elseif(MUTATION STREQUAL "pet_spellbook_reference")
+    string(REPLACE
+        "SMSG_PET_LEARNED_SPELL                         0x0282  ACTIVE"
+        "SMSG_PET_LEARNED_SPELL                         0x0282  DORMANT"
+        opcode_reference "${opcode_reference}")
 endif()
 
 string(FIND "${spell_handler}" "void WorldSession::HandleCastSpellOpcode" cast_start)
@@ -660,6 +685,37 @@ foreach(opcode IN ITEMS SMSG_LEARNED_SPELL SMSG_REMOVED_SPELL SMSG_SUPERCEDED_SP
     require_once("${world_session}"
         "case ${opcode}:"
         "${opcode} send admission")
+endforeach()
+
+require_once("${spell_header}"
+    "inline void BuildPetLearnedSpell(WorldPacket& out, uint32 spellId)"
+    "18414 pet learned-spell builder")
+require_once("${spell_header}"
+    "inline void BuildPetRemovedSpell(WorldPacket& out, uint32 spellId)"
+    "18414 pet removed-spell builder")
+require_once("${pet_spells_source}"
+    "MopSpellPackets::BuildPetLearnedSpell(data, spell_id);"
+    "pet learned-spell sender")
+require_once("${pet_spells_source}"
+    "MopSpellPackets::BuildPetRemovedSpell(data, spell_id);"
+    "pet removed-spell sender")
+foreach(opcode IN ITEMS SMSG_PET_LEARNED_SPELL SMSG_PET_REMOVED_SPELL)
+    require_once("${opcode_registry}"
+        "DefS(${opcode}, \"${opcode}\");"
+        "${opcode} registration")
+    require_once("${world_session}"
+        "case ${opcode}:"
+        "${opcode} send admission")
+endforeach()
+require_once("${opcode_reference}"
+    "SMSG_PET_LEARNED_SPELL                         0x0282  ACTIVE"
+    "active pet learned-spell reference")
+require_once("${opcode_reference}"
+    "SMSG_PET_REMOVED_SPELL                         0x1CAE  ACTIVE"
+    "active pet removed-spell reference")
+foreach(opcode IN ITEMS SMSG_PET_LEARNED_SPELL SMSG_PET_REMOVED_SPELL)
+    forbid("${pet_spells_source}" "WorldPacket data(${opcode}"
+        "legacy ${opcode} body")
 endforeach()
 require_once("${opcode_reference}"
     "SMSG_LEARNED_SPELL                             0x129A  ACTIVE"

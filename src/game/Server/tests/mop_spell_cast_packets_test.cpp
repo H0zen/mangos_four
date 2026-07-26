@@ -1069,6 +1069,25 @@ static void test_spellbook_mutation_wire_layouts()
     });
 }
 
+static void test_pet_spellbook_mutation_wire_layouts()
+{
+    WorldPacket learned;
+    MopSpellPackets::BuildPetLearnedSpell(learned, 0x11223344u);
+    CHECK(learned.GetOpcode() == SMSG_PET_LEARNED_SPELL);
+    CheckBytes(learned, {
+        0x00, 0x00, 0x04,
+        0x44, 0x33, 0x22, 0x11,
+    });
+
+    WorldPacket removed;
+    MopSpellPackets::BuildPetRemovedSpell(removed, 0xAABBCCDDu);
+    CHECK(removed.GetOpcode() == SMSG_PET_REMOVED_SPELL);
+    CheckBytes(removed, {
+        0x00, 0x00, 0x04,
+        0xDD, 0xCC, 0xBB, 0xAA,
+    });
+}
+
 int main(int, char**)
 {
     test_dense_and_guid_permutations();
@@ -1087,6 +1106,7 @@ int main(int, char**)
     test_spell_cooldown_wire_layout();
     test_clear_cooldowns_wire_layout();
     test_spellbook_mutation_wire_layouts();
+    test_pet_spellbook_mutation_wire_layouts();
 
     if (g_fail)
     {
