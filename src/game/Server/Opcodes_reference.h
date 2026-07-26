@@ -175,8 +175,8 @@
  *   TOTAL SMSG rows                   925
  *
  * SUBSYSTEM CONFIDENCE: high=365, low=221, medium=182, none=157
- * STATUS TOTALS: ACTIVE=359, DOC=438, DORMANT=723
- *   SMSG: ACTIVE=219, DOC=271, DORMANT=435
+ * STATUS TOTALS: ACTIVE=360, DOC=438, DORMANT=722
+ *   SMSG: ACTIVE=220, DOC=271, DORMANT=434
  *   CMSG: ACTIVE=140, DOC=167, DORMANT=288
  */
 
@@ -910,7 +910,7 @@ typedef uint16_t uint16;
  *   SMSG_TALENT_UPDATE                             0x0A9B  DORMANT  [low-conf]
  *
  *  -- SpellBookFrame.cpp (1) --
- *   SMSG_PET_SPELLS                                0x095A  DORMANT  [medium-conf]
+ *   SMSG_PET_SPELLS                                0x095A  ACTIVE   [medium-conf]
  *
  *  -- SpellVisuals.cpp (2) --
  *   SMSG_UNKNOWN_0x1086                            0x1086  DOC      [medium-conf]

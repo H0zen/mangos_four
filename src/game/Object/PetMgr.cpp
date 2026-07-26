@@ -53,8 +53,9 @@ void PetMgr::Remove(PetSaveMode mode)
 
 void PetMgr::RemoveActionBar()
 {
-    WorldPacket data(SMSG_PET_SPELLS, 8);
-    data << ObjectGuid();
+    MopPetPackets::SpellSnapshot snapshot;
+    WorldPacket data;
+    MopPetPackets::BuildSpellSnapshot(data, snapshot);
     m_owner->SendDirectMessage(&data);
 }
 

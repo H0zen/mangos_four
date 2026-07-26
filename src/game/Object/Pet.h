@@ -58,6 +58,9 @@
 #include "Creature.h"
 #include "Unit.h"
 
+#include <array>
+#include <vector>
+
 /// @brief Pet type enumeration.
 ///
 /// Defines the different categories of pets with distinct mechanics and rules.
@@ -145,6 +148,81 @@ enum PetModeFlags
 
 namespace MopPetPackets
 {
+    struct SpellCooldown
+    {
+        uint32 spellId;
+        uint16 category;
+        uint32 spellCooldown;
+        uint32 categoryCooldown;
+    };
+
+    struct SpellSnapshot
+    {
+        ObjectGuid guid;
+        std::array<uint32, MAX_UNIT_ACTION_BAR_INDEX> actionBar{};
+        std::vector<uint32> spells;
+        std::vector<SpellCooldown> cooldowns;
+        uint16 family = 0;
+        uint16 specialization = 0;
+        uint32 duration = 0;
+        uint32 mode = 0;
+    };
+
+    inline bool BuildSpellSnapshot(WorldPacket& out,
+        SpellSnapshot const& snapshot)
+    {
+        // The 18414 reader allocates these vectors from their bit counts. Four
+        // has no pet spell-charge history, so the 21-bit charge vector stays
+        // empty; the two backed vectors must remain encodable.
+        if (snapshot.spells.size() >= (size_t(1) << 22) ||
+                snapshot.cooldowns.size() >= (size_t(1) << 20))
+            return false;
+
+        out.Initialize(SMSG_PET_SPELLS,
+            69 + snapshot.spells.size() * 4 +
+                snapshot.cooldowns.size() * 14);
+
+        out.WriteBit(snapshot.guid[7]);
+        out.WriteBit(snapshot.guid[4]);
+        out.WriteBits(uint32(0), 21);                       // spell charges
+        out.WriteBits(uint32(snapshot.spells.size()), 22);
+        out.WriteBit(snapshot.guid[2]);
+        out.WriteBits(uint32(snapshot.cooldowns.size()), 20);
+        out.WriteBit(snapshot.guid[5]);
+        out.WriteBit(snapshot.guid[3]);
+        out.WriteBit(snapshot.guid[6]);
+        out.WriteBit(snapshot.guid[0]);
+        out.WriteBit(snapshot.guid[1]);
+        out.FlushBits();
+
+        for (uint32 action : snapshot.actionBar)
+            out << action;
+
+        for (SpellCooldown const& cooldown : snapshot.cooldowns)
+        {
+            out << cooldown.categoryCooldown;
+            out << cooldown.spellId;
+            out << cooldown.category;
+            out << cooldown.spellCooldown;
+        }
+
+        out.WriteByteSeq(snapshot.guid[2]);
+        for (uint32 spell : snapshot.spells)
+            out << spell;
+        out.WriteByteSeq(snapshot.guid[7]);
+        out.WriteByteSeq(snapshot.guid[0]);
+        out.WriteByteSeq(snapshot.guid[3]);
+        out << snapshot.family;
+        out << snapshot.specialization;
+        out.WriteByteSeq(snapshot.guid[1]);
+        out.WriteByteSeq(snapshot.guid[4]);
+        out.WriteByteSeq(snapshot.guid[6]);
+        out << snapshot.duration;
+        out.WriteByteSeq(snapshot.guid[5]);
+        out << snapshot.mode;
+        return true;
+    }
+
     inline void BuildMode(WorldPacket& out, ObjectGuid guid, uint32 modeFlags)
     {
         // The 18414 local-pet reader consumes all GUID mask bits first, then

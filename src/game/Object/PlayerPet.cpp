@@ -97,20 +97,14 @@ void Player::PetSpellInitialize()
 
     CharmInfo* charmInfo = pet->GetCharmInfo();
 
-    WorldPacket data(SMSG_PET_SPELLS, 8 + 2 + 4 + 4 + 4 * MAX_UNIT_ACTION_BAR_INDEX + 1 + 1);
-    data << pet->GetObjectGuid();
-    data << uint16(pet->GetCreatureInfo()->Family);         // creature family (required for pet talents)
-    data << uint32(0);
-    data << uint8(charmInfo->GetReactState()) << uint8(charmInfo->GetCommandState()) << uint16(0);
+    MopPetPackets::SpellSnapshot snapshot;
+    snapshot.guid = pet->GetObjectGuid();
+    snapshot.family = uint16(pet->GetCreatureInfo()->Family);
+    snapshot.mode = uint32(charmInfo->GetReactState()) |
+        (uint32(charmInfo->GetCommandState()) << 8);
 
-    // action bar loop
-    charmInfo->BuildActionBar(&data);
-
-    size_t spellsCountPos = data.wpos();
-
-    // spells count
-    uint8 addlist = 0;
-    data << uint8(addlist);                                 // placeholder
+    for (uint8 index = 0; index < MAX_UNIT_ACTION_BAR_INDEX; ++index)
+        snapshot.actionBar[index] = charmInfo->GetActionBarEntry(index)->packedData;
 
     if (pet->isControlled())
     {
@@ -122,15 +116,10 @@ void Player::PetSpellInitialize()
                 continue;
             }
 
-            data << uint32(MAKE_UNIT_ACTION_BUTTON(itr->first, itr->second.active));
-            ++addlist;
+            snapshot.spells.push_back(
+                uint32(MAKE_UNIT_ACTION_BUTTON(itr->first, itr->second.active)));
         }
     }
-
-    data.put<uint8>(spellsCountPos, addlist);
-
-    uint8 cooldownsCount = pet->m_CreatureSpellCooldowns.size() + pet->m_CreatureCategoryCooldowns.size();
-    data << uint8(cooldownsCount);
 
     time_t curTime = time(NULL);
 
@@ -138,22 +127,26 @@ void Player::PetSpellInitialize()
     {
         time_t cooldown = (itr->second > curTime) ? (itr->second - curTime) * IN_MILLISECONDS : 0;
 
-        data << uint32(itr->first);                         // spellid
-        data << uint16(0);                                  // spell category?
-        data << uint32(cooldown);                           // cooldown
-        data << uint32(0);                                  // category cooldown
+        snapshot.cooldowns.push_back({
+            uint32(itr->first), uint16(0), uint32(cooldown), uint32(0)
+        });
     }
 
     for (CreatureSpellCooldowns::const_iterator itr = pet->m_CreatureCategoryCooldowns.begin(); itr != pet->m_CreatureCategoryCooldowns.end(); ++itr)
     {
         time_t cooldown = (itr->second > curTime) ? (itr->second - curTime) * IN_MILLISECONDS : 0;
 
-        data << uint32(itr->first);                         // spellid
-        data << uint16(0);                                  // spell category?
-        data << uint32(0);                                  // cooldown
-        data << uint32(cooldown);                           // category cooldown
+        snapshot.cooldowns.push_back({
+            uint32(itr->first), uint16(0), uint32(0), uint32(cooldown)
+        });
     }
 
+    WorldPacket data;
+    if (!MopPetPackets::BuildSpellSnapshot(data, snapshot))
+    {
+        sLog.outError("Player::PetSpellInitialize(): pet spell snapshot exceeds 18414 count limits");
+        return;
+    }
     GetSession()->SendPacket(&data);
 }
 
@@ -191,17 +184,13 @@ void Player::PossessSpellInitialize()
         return;
     }
 
-    WorldPacket data(SMSG_PET_SPELLS, 8 + 2 + 4 + 4 + 4 * MAX_UNIT_ACTION_BAR_INDEX + 1 + 1);
-    data << charm->GetObjectGuid();
-    data << uint16(0);
-    data << uint32(0);
-    data << uint32(0);
+    MopPetPackets::SpellSnapshot snapshot;
+    snapshot.guid = charm->GetObjectGuid();
+    for (uint8 index = 0; index < MAX_UNIT_ACTION_BAR_INDEX; ++index)
+        snapshot.actionBar[index] = charmInfo->GetActionBarEntry(index)->packedData;
 
-    charmInfo->BuildActionBar(&data);
-
-    data << uint8(0);                                       // spells count
-    data << uint8(0);                                       // cooldowns count
-
+    WorldPacket data;
+    MopPetPackets::BuildSpellSnapshot(data, snapshot);
     GetSession()->SendPacket(&data);
 }
 
@@ -224,55 +213,31 @@ void Player::CharmSpellInitialize()
         return;
     }
 
-    uint8 addlist = 0;
+    MopPetPackets::SpellSnapshot snapshot;
+    snapshot.guid = charm->GetObjectGuid();
 
     if (charm->GetTypeId() != TYPEID_PLAYER)
     {
+        snapshot.mode = uint32(charmInfo->GetReactState()) |
+            (uint32(charmInfo->GetCommandState()) << 8);
+
         CreatureInfo const* cinfo = ((Creature*)charm)->GetCreatureInfo();
-
-        if (cinfo && cinfo->CreatureType == CREATURE_TYPE_DEMON && getClass() == CLASS_WARLOCK)
+        if (cinfo && cinfo->CreatureType == CREATURE_TYPE_DEMON &&
+                getClass() == CLASS_WARLOCK)
         {
-            for (uint32 i = 0; i < CREATURE_MAX_SPELLS; ++i)
+            for (uint32 index = 0; index < CREATURE_MAX_SPELLS; ++index)
             {
-                if (charmInfo->GetCharmSpell(i)->GetAction())
-                {
-                    ++addlist;
-                }
+                CharmSpellEntry* spell = charmInfo->GetCharmSpell(index);
+                if (spell->GetAction())
+                    snapshot.spells.push_back(spell->packedData);
             }
         }
     }
 
-    WorldPacket data(SMSG_PET_SPELLS, 8 + 2 + 4 + 4 + 4 * MAX_UNIT_ACTION_BAR_INDEX + 1 + 4 * addlist + 1);
-    data << charm->GetObjectGuid();
-    data << uint16(0);
-    data << uint32(0);
+    for (uint8 index = 0; index < MAX_UNIT_ACTION_BAR_INDEX; ++index)
+        snapshot.actionBar[index] = charmInfo->GetActionBarEntry(index)->packedData;
 
-    if (charm->GetTypeId() != TYPEID_PLAYER)
-    {
-        data << uint8(charmInfo->GetReactState()) << uint8(charmInfo->GetCommandState()) << uint16(0);
-    }
-    else
-    {
-        data << uint8(0) << uint8(0) << uint16(0);
-    }
-
-    charmInfo->BuildActionBar(&data);
-
-    data << uint8(addlist);
-
-    if (addlist)
-    {
-        for (uint32 i = 0; i < CREATURE_MAX_SPELLS; ++i)
-        {
-            CharmSpellEntry* cspell = charmInfo->GetCharmSpell(i);
-            if (cspell->GetAction())
-            {
-                data << uint32(cspell->packedData);
-            }
-        }
-    }
-
-    data << uint8(0);                                       // cooldowns count
-
+    WorldPacket data;
+    MopPetPackets::BuildSpellSnapshot(data, snapshot);
     GetSession()->SendPacket(&data);
 }
