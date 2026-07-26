@@ -1124,7 +1124,8 @@ foreach(mutation IN ITEMS response_width callsite registration whitelist opcode_
         system_server_registration get_whitelist system_whitelist
         case_client_registration case_server_registration case_whitelist
         create_parser_call create_registration create_message_width
-        create_attachment_bounds)
+        create_attachment_bounds vulnerable_response_registration
+        vulnerable_response_whitelist vulnerable_response_builder)
     add_test(NAME mop_gm_ticket_packets_source_mutation_${mutation}
         COMMAND ${CMAKE_COMMAND} -DSOURCE_ROOT=${CMAKE_SOURCE_DIR}
             -DMUTATION=${mutation}

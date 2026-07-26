@@ -72,6 +72,14 @@ elseif(MUTATION STREQUAL "create_attachment_bounds")
         "attachmentSize > in.size() - in.rpos()"
         "attachmentSize > in.size()"
         ticket_header "${ticket_header}")
+elseif(MUTATION STREQUAL "vulnerable_response_registration")
+    string(APPEND opcode_registry
+        "\nDefS(SMSG_GM_TICKET_RESPONSE, \"SMSG_GM_TICKET_RESPONSE\");")
+elseif(MUTATION STREQUAL "vulnerable_response_whitelist")
+    string(APPEND session_source "\ncase SMSG_GM_TICKET_RESPONSE:")
+elseif(MUTATION STREQUAL "vulnerable_response_builder")
+    string(APPEND ticket_header
+        "\nWorldPacket packet(SMSG_GM_TICKET_RESPONSE, 0);")
 endif()
 
 function(require_once source token context)
@@ -115,6 +123,21 @@ foreach(legacy IN ITEMS SMSG_GMTICKET_CREATE SMSG_GMTICKET_UPDATETEXT SMSG_GMTIC
         message(FATAL_ERROR "live legacy GM-ticket response sender remains: ${legacy}")
     endif()
 endforeach()
+
+# The 18414 client copies both 0x0207 strings into fixed stack storage without
+# validating their encoded lengths against the destination capacities. Keep the
+# route quarantined until a future implementation proves the complete body and
+# supplies a serializer that enforces both client-side bounds.
+if(opcode_registry MATCHES "DefS\\(SMSG_GM_TICKET_RESPONSE")
+    message(FATAL_ERROR "vulnerable GM-ticket response must remain unregistered")
+endif()
+if(session_source MATCHES "case[ \\t]+SMSG_GM_TICKET_RESPONSE:")
+    message(FATAL_ERROR "vulnerable GM-ticket response must remain outside the send allowlist")
+endif()
+if(ticket_header MATCHES "SMSG_GM_TICKET_RESPONSE"
+        OR ticket_handler MATCHES "SMSG_GM_TICKET_RESPONSE")
+    message(FATAL_ERROR "vulnerable GM-ticket response must not have an unbounded sender")
+endif()
 
 require_once("${opcode_registry}"
     "DefS\\(SMSG_GM_TICKET_UPDATE,[ \\t]*\"SMSG_GM_TICKET_UPDATE\"\\)"

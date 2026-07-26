@@ -1270,6 +1270,7 @@ enum OpcodesList
     SMSG_MOVE_UPDATE_FLIGHT_SPEED                = 0x00E1,    // 5.4.8 18414 (Wow.exe leaf; name fork tables)
     SMSG_MOVE_UPDATE_SWIM_SPEED                  = 0x01E2,    // 5.4.8 18414 (Wow.exe leaf; name fork tables)
     SMSG_BATTLE_PET_JOURNAL_LOCK_DENINED         = 0x0203,    // 5.4.8 18414 (Wow.exe leaf; name fork tables, low confidence)
+    // The client reader uses fixed buffers. Keep dormant until both strings are proved and bounded.
     SMSG_GM_TICKET_RESPONSE                      = 0x0207,    // 5.4.8 18414 (Wow.exe leaf; name fork tables)
     SMSG_BATTLE_PAY_DELIVERY_ENDED               = 0x020B,    // 5.4.8 18414 (Wow.exe leaf; name fork tables, low confidence)
     SMSG_PET_BATTLE_REQUEST_FAILED               = 0x022F,    // 5.4.8 18414 (Wow.exe leaf; name fork tables, low confidence)
