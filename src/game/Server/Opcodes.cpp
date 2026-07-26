@@ -356,6 +356,9 @@ void InitializeOpcodes()
     DefC(CMSG_AUTOEQUIP_ITEM, "CMSG_AUTOEQUIP_ITEM", STATUS_LOGGEDIN, PROCESS_THREADUNSAFE, &WorldSession::HandleAutoEquipItemOpcode);
     DefC(CMSG_AUTOSTORE_BAG_ITEM, "CMSG_AUTOSTORE_BAG_ITEM", STATUS_LOGGEDIN, PROCESS_THREADUNSAFE, &WorldSession::HandleAutoStoreBagItemOpcode);
     DefC(CMSG_SPLIT_ITEM, "CMSG_SPLIT_ITEM", STATUS_LOGGEDIN, PROCESS_THREADUNSAFE, &WorldSession::HandleSplitItemOpcode);
+    // Writer sub_6919D8 emits count, slot and bag; the live zero-count request
+    // deletes the complete stack from the selected backpack position.
+    DefC(CMSG_DESTROY_ITEM, "CMSG_DESTROY_ITEM", STATUS_LOGGEDIN, PROCESS_THREADUNSAFE, &WorldSession::HandleDestroyItemOpcode);
     DefS(SMSG_INVENTORY_CHANGE_FAILURE, "SMSG_INVENTORY_CHANGE_FAILURE");
 
     // Directly verified 18414 loot-window requests and replies. The handlers

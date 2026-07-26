@@ -175,9 +175,9 @@
  *   TOTAL SMSG rows                   925
  *
  * SUBSYSTEM CONFIDENCE: high=365, low=221, medium=182, none=157
- * STATUS TOTALS: ACTIVE=345, DOC=438, DORMANT=737
+ * STATUS TOTALS: ACTIVE=346, DOC=438, DORMANT=736
  *   SMSG: ACTIVE=208, DOC=271, DORMANT=446
- *   CMSG: ACTIVE=137, DOC=167, DORMANT=291
+ *   CMSG: ACTIVE=138, DOC=167, DORMANT=290
  */
 
 // CAVEATS -- read before trusting any single row:
@@ -1310,7 +1310,7 @@ typedef uint16_t uint16;
  *   CMSG_CHANNEL_MUTE                              0x000A  DORMANT 
  *   CMSG_PING                                      0x0012  ACTIVE  
  *   CMSG_UNACCEPT_TRADE                            0x0023  DORMANT 
- *   CMSG_DESTROY_ITEM                              0x0026  DORMANT 
+ *   CMSG_DESTROY_ITEM                              0x0026  ACTIVE
  *   CMSG_NEUTRAL_PLAYER_SELECT_FACTION             0x0027  DOC     
  *   CMSG_MESSAGECHAT_DND                           0x002E  DORMANT 
  *   CMSG_VIOLENCE_LEVEL                            0x0040  ACTIVE

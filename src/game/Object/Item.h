@@ -134,6 +134,13 @@ namespace MopItemPackets
         uint32 count = 0;
     };
 
+    struct DestroyItemRequest
+    {
+        uint32 count = 0;
+        uint8 slot = 0;
+        uint8 bag = 0;
+    };
+
     // Drain malformed requests so the session cannot accidentally reuse an
     // unread tail after a structural validation failure.
     inline bool RejectRequest(WorldPacket& in)
@@ -284,6 +291,19 @@ namespace MopItemPackets
         if (parsed.count == 0 || in[in.rpos()] != 0 || in.ReadBits(2) != 0)
             return RejectRequest(in);
 
+        request = parsed;
+        return true;
+    }
+
+    inline bool ParseDestroyItem(WorldPacket& in, DestroyItemRequest& request)
+    {
+        // Wow.exe 18414 serializer sub_6919D8 writes count, slot, then bag.
+        // A zero count requests whole-stack deletion.
+        if (in.size() - in.rpos() != 6)
+            return RejectRequest(in);
+
+        DestroyItemRequest parsed;
+        in >> parsed.count >> parsed.slot >> parsed.bag;
         request = parsed;
         return true;
     }

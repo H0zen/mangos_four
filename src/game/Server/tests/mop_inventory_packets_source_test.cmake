@@ -21,6 +21,9 @@ elseif(MUTATION STREQUAL "autostore_handler")
 elseif(MUTATION STREQUAL "split_handler")
     string(REPLACE "MopItemPackets::ParseSplitItem(recv_data, request)"
         "false /* removed split parser */" item_handler "${item_handler}")
+elseif(MUTATION STREQUAL "destroy_handler")
+    string(REPLACE "MopItemPackets::ParseDestroyItem(recv_data, request)"
+        "false /* removed destroy parser */" item_handler "${item_handler}")
 elseif(MUTATION MATCHES "^registration_(.+)$")
     if(CMAKE_MATCH_1 STREQUAL "swap_inv")
         set(opcode "CMSG_SWAP_INV_ITEM")
@@ -37,6 +40,9 @@ elseif(MUTATION MATCHES "^registration_(.+)$")
     elseif(CMAKE_MATCH_1 STREQUAL "split")
         set(opcode "CMSG_SPLIT_ITEM")
         set(handler "HandleSplitItemOpcode")
+    elseif(CMAKE_MATCH_1 STREQUAL "destroy")
+        set(opcode "CMSG_DESTROY_ITEM")
+        set(handler "HandleDestroyItemOpcode")
     endif()
     string(REPLACE
         "DefC(${opcode}, \"${opcode}\", STATUS_LOGGEDIN, PROCESS_THREADUNSAFE, &WorldSession::${handler});"
@@ -113,13 +119,16 @@ require_once("${vendor_handler}" "MopItemPackets::ParseAutoStoreBagItem(recv_dat
     "auto-store handler parser")
 require_once("${item_handler}" "MopItemPackets::ParseSplitItem(recv_data, request)"
     "split handler parser")
+require_once("${item_handler}" "MopItemPackets::ParseDestroyItem(recv_data, request)"
+    "destroy handler parser")
 
 foreach(binding IN ITEMS
         "CMSG_SWAP_INV_ITEM|HandleSwapInvItemOpcode"
         "CMSG_SWAP_ITEM|HandleSwapItem"
         "CMSG_AUTOEQUIP_ITEM|HandleAutoEquipItemOpcode"
         "CMSG_AUTOSTORE_BAG_ITEM|HandleAutoStoreBagItemOpcode"
-        "CMSG_SPLIT_ITEM|HandleSplitItemOpcode")
+        "CMSG_SPLIT_ITEM|HandleSplitItemOpcode"
+        "CMSG_DESTROY_ITEM|HandleDestroyItemOpcode")
     string(REPLACE "|" ";" fields "${binding}")
     list(GET fields 0 opcode)
     list(GET fields 1 handler)
@@ -150,6 +159,7 @@ foreach(value IN ITEMS
         "CMSG_SWAP_ITEM                               = 0x035D"
         "CMSG_SWAP_INV_ITEM                           = 0x03DF"
         "CMSG_SPLIT_ITEM                              = 0x02EC"
+        "CMSG_DESTROY_ITEM                            = 0x0026"
         "SMSG_INVENTORY_CHANGE_FAILURE                = 0x0C1E"
         "SMSG_ITEM_PUSH_RESULT                        = 0x0E0A")
     require_once("${opcode_header}" "${value}" "binary-proven inventory opcode")

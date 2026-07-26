@@ -84,7 +84,7 @@ enum OpcodesList
     SMSG_REFER_A_FRIEND_EXPIRED                  = 0x1143,    // 5.4.8 18414 (Wow.exe leaf; name reference-consensus)
     SMSG_GODMODE                                 = 0x1862,    // 5.4.8 18414 (Wow.exe leaf; name single-source fork)
     SMSG_DEBUG_AISTATE                           = 0x0A2A,    // 5.4.8 18414 (Wow.exe leaf; name single-source fork; via SMSG_DEBUG_AI_STATE)
-    CMSG_DESTROY_ITEM                            = 0x0026, // 5.4.8 18414 (Wow.exe binary)
+    CMSG_DESTROY_ITEM                            = 0x0026, // 5.4.8 18414 (writer sub_6919D8; live request correlated)
     SMSG_DESTRUCTIBLE_BUILDING_DAMAGE            = 0x14BF,    // 5.4.8 18414 (Wow.exe leaf; name reference-consensus)
     CMSG_CHAR_CREATE                             = 0x0F1D, // 5.4.8 18414 (Wow.exe binary)
     CMSG_CHAR_ENUM                               = 0x00E0, // 5.4.8 18414 (Wow.exe binary)

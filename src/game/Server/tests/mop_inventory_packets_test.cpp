@@ -283,6 +283,35 @@ static void TestSplitItemRejectsMalformedBodies()
     }
 }
 
+static void TestDestroyItem()
+{
+    WorldPacket packet = Packet(CMSG_DESTROY_ITEM,
+        { 0x00, 0x00, 0x00, 0x00, 0x1A, 0xFF });
+    MopItemPackets::DestroyItemRequest request;
+
+    CHECK(MopItemPackets::ParseDestroyItem(packet, request));
+    CHECK(request.count == 0);
+    CHECK(request.slot == 0x1A);
+    CHECK(request.bag == 0xFF);
+    CHECK(packet.rpos() == packet.size());
+}
+
+static void TestDestroyItemRejectsMalformedBodies()
+{
+    {
+        WorldPacket packet = Packet(CMSG_DESTROY_ITEM,
+            { 0x00, 0x00, 0x00, 0x00, 0x1A });
+        MopItemPackets::DestroyItemRequest request;
+        CHECK(!MopItemPackets::ParseDestroyItem(packet, request));
+    }
+    {
+        WorldPacket packet = Packet(CMSG_DESTROY_ITEM,
+            { 0x00, 0x00, 0x00, 0x00, 0x1A, 0xFF, 0x00 });
+        MopItemPackets::DestroyItemRequest request;
+        CHECK(!MopItemPackets::ParseDestroyItem(packet, request));
+    }
+}
+
 static void TestInventoryChangeFailureMinimumBody()
 {
     MopItemPackets::InventoryChangeFailure failure;
@@ -436,6 +465,8 @@ int main(int /*argc*/, char** /*argv*/)
     TestAutoEquipItemRejectsMalformedBodies();
     TestSplitItem();
     TestSplitItemRejectsMalformedBodies();
+    TestDestroyItem();
+    TestDestroyItemRejectsMalformedBodies();
     TestInventoryChangeFailureMinimumBody();
     TestInventoryChangeFailureLimitCategory();
     TestInventoryChangeFailureRequiredLevel();

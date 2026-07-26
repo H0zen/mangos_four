@@ -939,8 +939,8 @@ add_test(NAME mop_inventory_packets_source
     COMMAND ${CMAKE_COMMAND} -DSOURCE_ROOT=${CMAKE_SOURCE_DIR}
         -P ${CMAKE_CURRENT_SOURCE_DIR}/mop_inventory_packets_source_test.cmake)
 
-foreach(mutation IN ITEMS swap_inv_handler swap_handler autoequip_handler autostore_handler split_handler
-        registration_swap_inv registration_swap registration_autoequip registration_autostore registration_split
+foreach(mutation IN ITEMS swap_inv_handler swap_handler autoequip_handler autostore_handler split_handler destroy_handler
+        registration_swap_inv registration_swap registration_autoequip registration_autostore registration_split registration_destroy
         opcode_values legacy_reader failure_sender failure_registration failure_admission
         failure_opcode_value failure_legacy_sender item_push_sender item_push_registration
         item_push_admission item_push_opcode_value)
