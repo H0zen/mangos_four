@@ -428,6 +428,107 @@ namespace MopItemPackets
         std::vector<VendorItemRecord> items;
     };
 
+    struct SellItemRequest
+    {
+        ObjectGuid vendorGuid;
+        ObjectGuid itemGuid;
+        uint32 count = 0;
+    };
+
+    inline bool ParseSellItem(WorldPacket& in, SellItemRequest& request)
+    {
+        // Wow.exe 18414 writer sub_68C647 emits the stack count before two
+        // interleaved packed GUIDs. Ordinary UI sales use count zero to mean
+        // the whole stack.
+        if (in.size() - in.rpos() < 6)
+            return RejectRequest(in);
+
+        SellItemRequest parsed;
+        in >> parsed.count;
+        in.ReadGuidMask<4, 3, 7>(parsed.itemGuid);
+        in.ReadGuidMask<6, 5, 1>(parsed.vendorGuid);
+        in.ReadGuidMask<5, 2, 1>(parsed.itemGuid);
+        in.ReadGuidMask<2>(parsed.vendorGuid);
+        in.ReadGuidMask<6>(parsed.itemGuid);
+        in.ReadGuidMask<4, 0, 7, 3>(parsed.vendorGuid);
+        in.ReadGuidMask<0>(parsed.itemGuid);
+
+        size_t packedBytes = 0;
+        for (uint8 index = 0; index < 8; ++index)
+        {
+            packedBytes += GuidByte(parsed.itemGuid.GetRawValue(), index) != 0;
+            packedBytes += GuidByte(parsed.vendorGuid.GetRawValue(), index) != 0;
+        }
+        if (in.size() - in.rpos() != packedBytes)
+            return RejectRequest(in);
+
+        in.ReadGuidBytes<6, 3, 1>(parsed.vendorGuid);
+        in.ReadGuidBytes<1>(parsed.itemGuid);
+        in.ReadGuidBytes<2>(parsed.vendorGuid);
+        in.ReadGuidBytes<7, 5>(parsed.itemGuid);
+        in.ReadGuidBytes<7>(parsed.vendorGuid);
+        in.ReadGuidBytes<2>(parsed.itemGuid);
+        in.ReadGuidBytes<0, 5>(parsed.vendorGuid);
+        in.ReadGuidBytes<3, 6>(parsed.itemGuid);
+        in.ReadGuidBytes<4>(parsed.vendorGuid);
+        in.ReadGuidBytes<4, 0>(parsed.itemGuid);
+
+        request = parsed;
+        return true;
+    }
+
+    inline void BuildSellResult(WorldPacket& out, ObjectGuid vendorGuid,
+        ObjectGuid itemGuid, uint8 result)
+    {
+        // Wow.exe 18414 reader sub_6D0990 consumes the packed vendor and item
+        // GUIDs around the one-byte result used by terminal handler sub_7B206F.
+        uint64 const vendor = vendorGuid.GetRawValue();
+        uint64 const item = itemGuid.GetRawValue();
+        out.Initialize(SMSG_SELL_ITEM, 19);
+
+        uint8 const itemMaskA[] = { 2 };
+        uint8 const vendorMaskA[] = { 4 };
+        uint8 const itemMaskB[] = { 5, 4 };
+        uint8 const vendorMaskB[] = { 3, 5 };
+        uint8 const itemMaskC[] = { 3 };
+        uint8 const vendorMaskC[] = { 6, 0, 2 };
+        uint8 const itemMaskD[] = { 1, 7 };
+        uint8 const vendorMaskD[] = { 1 };
+        uint8 const itemMaskE[] = { 0, 6 };
+        uint8 const vendorMaskE[] = { 7 };
+        WriteGuidMask(out, item, itemMaskA);
+        WriteGuidMask(out, vendor, vendorMaskA);
+        WriteGuidMask(out, item, itemMaskB);
+        WriteGuidMask(out, vendor, vendorMaskB);
+        WriteGuidMask(out, item, itemMaskC);
+        WriteGuidMask(out, vendor, vendorMaskC);
+        WriteGuidMask(out, item, itemMaskD);
+        WriteGuidMask(out, vendor, vendorMaskD);
+        WriteGuidMask(out, item, itemMaskE);
+        WriteGuidMask(out, vendor, vendorMaskE);
+        out.FlushBits();
+
+        uint8 const itemBytesA[] = { 4, 1 };
+        uint8 const itemBytesB[] = { 2 };
+        uint8 const vendorBytesA[] = { 4, 0, 5, 2 };
+        uint8 const itemBytesC[] = { 0 };
+        uint8 const vendorBytesB[] = { 3 };
+        uint8 const itemBytesD[] = { 5, 6, 7 };
+        uint8 const vendorBytesC[] = { 6, 1 };
+        uint8 const itemBytesE[] = { 3 };
+        uint8 const vendorBytesD[] = { 7 };
+        WriteGuidBytes(out, item, itemBytesA);
+        out << result;
+        WriteGuidBytes(out, item, itemBytesB);
+        WriteGuidBytes(out, vendor, vendorBytesA);
+        WriteGuidBytes(out, item, itemBytesC);
+        WriteGuidBytes(out, vendor, vendorBytesB);
+        WriteGuidBytes(out, item, itemBytesD);
+        WriteGuidBytes(out, vendor, vendorBytesC);
+        WriteGuidBytes(out, item, itemBytesE);
+        WriteGuidBytes(out, vendor, vendorBytesD);
+    }
+
     inline ObjectGuid ReadListInventory(WorldPacket& in)
     {
         ObjectGuid guid;

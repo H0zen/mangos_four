@@ -363,6 +363,7 @@ static bool IsEnterWorldConverted(uint16 opcode)
         case SMSG_GOSSIP_COMPLETE:                 // Direct 18414 empty reader; closes the gossip frame
         case SMSG_GOSSIP_POI:                      // MopGossipPackets::BuildPointOfInterest
         case SMSG_LIST_INVENTORY:                  // MopItemPackets::BuildVendorList
+        case SMSG_SELL_ITEM:                       // MopItemPackets::BuildSellResult
         case SMSG_INVENTORY_CHANGE_FAILURE:        // MopItemPackets::BuildInventoryChangeFailure
         case SMSG_ITEM_PUSH_RESULT:                // MopItemPackets::BuildItemPushResult
         case SMSG_LOOT_RESPONSE:                   // MopLootPackets::BuildLootResponse

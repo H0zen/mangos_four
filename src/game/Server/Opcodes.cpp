@@ -343,6 +343,10 @@ void InitializeOpcodes()
     DefS(SMSG_GOSSIP_POI, "SMSG_GOSSIP_POI");
     DefC(CMSG_LIST_INVENTORY, "CMSG_LIST_INVENTORY", STATUS_LOGGEDIN, PROCESS_THREADUNSAFE, &WorldSession::HandleListInventoryOpcode);
     DefS(SMSG_LIST_INVENTORY, "SMSG_LIST_INVENTORY");
+    // The 18414 client writes the count followed by interleaved item/vendor
+    // GUIDs and reads the paired packed-GUID result around an 8-bit status.
+    DefC(CMSG_SELL_ITEM, "CMSG_SELL_ITEM", STATUS_LOGGEDIN, PROCESS_THREADUNSAFE, &WorldSession::HandleSellItemOpcode);
+    DefS(SMSG_SELL_ITEM, "SMSG_SELL_ITEM");
     DefS(SMSG_ITEM_PUSH_RESULT, "SMSG_ITEM_PUSH_RESULT");
 
     // Directly verified 18414 inventory-movement requests. Each handler

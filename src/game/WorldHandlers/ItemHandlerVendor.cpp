@@ -48,13 +48,16 @@ void WorldSession::HandleSellItemOpcode(WorldPacket& recv_data)
 {
     DEBUG_LOG("WORLD: Received opcode CMSG_SELL_ITEM");
 
-    ObjectGuid vendorGuid;
-    ObjectGuid itemGuid;
-    uint32 count;
+    MopItemPackets::SellItemRequest request;
+    if (!MopItemPackets::ParseSellItem(recv_data, request))
+    {
+        DEBUG_LOG("WORLD: CMSG_SELL_ITEM has a malformed 18414 body");
+        return;
+    }
 
-    recv_data >> vendorGuid;
-    recv_data >> itemGuid;
-    recv_data >> count;
+    ObjectGuid const vendorGuid = request.vendorGuid;
+    ObjectGuid const itemGuid = request.itemGuid;
+    uint32 count = request.count;
 
     if (!itemGuid)
     {

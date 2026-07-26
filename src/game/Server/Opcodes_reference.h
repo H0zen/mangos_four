@@ -175,9 +175,9 @@
  *   TOTAL SMSG rows                   925
  *
  * SUBSYSTEM CONFIDENCE: high=365, low=221, medium=182, none=157
- * STATUS TOTALS: ACTIVE=343, DOC=438, DORMANT=739
- *   SMSG: ACTIVE=207, DOC=271, DORMANT=447
- *   CMSG: ACTIVE=136, DOC=167, DORMANT=292
+ * STATUS TOTALS: ACTIVE=345, DOC=438, DORMANT=737
+ *   SMSG: ACTIVE=208, DOC=271, DORMANT=446
+ *   CMSG: ACTIVE=137, DOC=167, DORMANT=291
  */
 
 // CAVEATS -- read before trusting any single row:
@@ -742,7 +742,7 @@ typedef uint16_t uint16;
  *   SMSG_REQUEST_CEMETERY_LIST_RESPONSE            0x042A  ACTIVE   [medium-conf]
  *   SMSG_TRAINER_BUY_FAILED                        0x042E  ACTIVE   [medium-conf]
  *   SMSG_INITIAL_SPELLS                            0x045A  ACTIVE
- *   SMSG_SELL_ITEM                                 0x048E  DORMANT 
+ *   SMSG_SELL_ITEM                                 0x048E  ACTIVE
  *   SMSG_ITEM_PURCHASE_REFUND_RESULT               0x049E  DORMANT 
  *   SMSG_UNKNOWN_0x04AA                            0x04AA  DOC      [medium-conf]
  *   SMSG_ARENA_ERROR                               0x04BA  DORMANT  [medium-conf]
@@ -1747,7 +1747,7 @@ typedef uint16_t uint16;
  *   CMSG_FAR_SIGHT                                 0x1341  DORMANT 
  *   CMSG_LOGOUT_REQUEST                            0x1349  ACTIVE   server-binding=CMSG_LOGOUT_REQUEST_IDLE
  *   CMSG_REPOP_REQUEST                             0x134A  DORMANT 
- *   CMSG_SELL_ITEM                                 0x1358  DORMANT 
+ *   CMSG_SELL_ITEM                                 0x1358  ACTIVE
  *   CMSG_REQUEST_PET_INFO                          0x135B  DORMANT 
  *   CMSG_COMPLETE_MOVIE                            0x1362  DORMANT 
  *   CMSG_GUILD_BANK_SWAP_ITEMS                     0x136A  DORMANT 

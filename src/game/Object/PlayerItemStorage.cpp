@@ -32,6 +32,7 @@
  */
 
 #include "Player.h"
+#include "Item.h"
 #include "Log.h"
 #include "Opcodes.h"
 #include "WorldPacket.h"
@@ -1643,13 +1644,10 @@ void Player::SendBuyError(BuyResult msg, Creature* pCreature, uint32 item, uint3
 void Player::SendSellError(SellResult msg, Creature* pCreature, ObjectGuid itemGuid, uint32 param)
 {
     DEBUG_LOG("WORLD: Sent SMSG_SELL_ITEM");
-    WorldPacket data(SMSG_SELL_ITEM, (8 + 8 + (param ? 4 : 0) + 1)); // last check 2.0.10
-    data << (pCreature ? pCreature->GetObjectGuid() : ObjectGuid());
-    data << ObjectGuid(itemGuid);
-    if (param > 0)
-    {
-        data << uint32(param);
-    }
-    data << uint8(msg);
+    (void)param; // The 18414 sell-result reader has no parameter field.
+    WorldPacket data;
+    MopItemPackets::BuildSellResult(data,
+        pCreature ? pCreature->GetObjectGuid() : ObjectGuid(), itemGuid,
+        uint8(msg));
     GetSession()->SendPacket(&data);
 }

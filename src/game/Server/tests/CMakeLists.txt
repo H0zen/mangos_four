@@ -1088,7 +1088,8 @@ add_test(NAME mop_vendor_packets_source
     COMMAND ${CMAKE_COMMAND} -DSOURCE_ROOT=${CMAKE_SOURCE_DIR}
         -P ${CMAKE_CURRENT_SOURCE_DIR}/mop_vendor_packets_source_test.cmake)
 
-foreach(mutation IN ITEMS request_reader response_builder client_registration server_registration whitelist)
+foreach(mutation IN ITEMS request_reader response_builder client_registration server_registration whitelist
+        sell_request_reader sell_response_builder sell_client_registration sell_server_registration sell_whitelist)
     add_test(NAME mop_vendor_packets_source_mutation_${mutation}
         COMMAND ${CMAKE_COMMAND} -DSOURCE_ROOT=${CMAKE_SOURCE_DIR}
             -DMUTATION=${mutation}
