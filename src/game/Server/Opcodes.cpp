@@ -323,6 +323,7 @@ void InitializeOpcodes()
     DefS(SMSG_ATTACKSTOP, "SMSG_ATTACKSTOP");
     DefS(SMSG_ATTACKERSTATEUPDATE, "SMSG_ATTACKERSTATEUPDATE");
     DefS(SMSG_CANCEL_COMBAT, "SMSG_CANCEL_COMBAT");
+    DefS(SMSG_CANCEL_AUTO_REPEAT, "SMSG_CANCEL_AUTO_REPEAT");
     DefS(SMSG_AI_REACTION, "SMSG_AI_REACTION");
     // Unit_C reader sub_72B5D8 proves a 21-bit record count, packed unit GUID,
     // and repeated power-selector/value records on the 18414 route.

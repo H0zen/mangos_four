@@ -175,8 +175,8 @@
  *   TOTAL SMSG rows                   925
  *
  * SUBSYSTEM CONFIDENCE: high=365, low=221, medium=182, none=157
- * STATUS TOTALS: ACTIVE=360, DOC=438, DORMANT=722
- *   SMSG: ACTIVE=220, DOC=271, DORMANT=434
+ * STATUS TOTALS: ACTIVE=361, DOC=438, DORMANT=721
+ *   SMSG: ACTIVE=221, DOC=271, DORMANT=433
  *   CMSG: ACTIVE=140, DOC=167, DORMANT=288
  */
 
@@ -1096,7 +1096,7 @@ typedef uint16_t uint16;
  *   SMSG_SPLINE_MOVE_SET_SWIM_SPEED                0x1D8E  DORMANT 
  *   SMSG_SPLINE_MOVE_SET_FLIGHT_SPEED              0x1DAB  DORMANT 
  *   SMSG_MOVE_APPLY_MOVEMENT_FORCE                 0x1DBE  DORMANT
- *   SMSG_CANCEL_AUTO_REPEAT                        0x1E0F  DORMANT 
+ *   SMSG_CANCEL_AUTO_REPEAT                        0x1E0F  ACTIVE   [high-conf]  direct packed-GUID reader and Unit_C auto-repeat-clear terminal; name reference-consensus
  *   SMSG_UNKNOWN_0x1E12                            0x1E12  DOC     
  *   SMSG_UNKNOWN_0x1E9F                            0x1E9F  DOC     
  *   SMSG_MOVE_WATER_WALK                           0x1F9A  DORMANT 

@@ -45,6 +45,41 @@ elseif(MUTATION STREQUAL "cancel_old_route")
         "SMSG_UNKNOWN_0x0534                            0x0534  DOC"
         "SMSG_CANCEL_COMBAT                             0x0534  DORMANT"
         opcode_reference "${opcode_reference}")
+elseif(MUTATION STREQUAL "auto_repeat_mask")
+    string(REPLACE
+        "out.WriteGuidMask<1, 3, 0, 4, 6, 7, 5, 2>(guid);"
+        "out.WriteGuidMask<3, 1, 0, 4, 6, 7, 5, 2>(guid);"
+        unit_header "${unit_header}")
+elseif(MUTATION STREQUAL "auto_repeat_bytes")
+    string(REPLACE
+        "out.WriteGuidBytes<7, 6, 2, 5, 0, 4, 1, 3>(guid);"
+        "out.WriteGuidBytes<6, 7, 2, 5, 0, 4, 1, 3>(guid);"
+        unit_header "${unit_header}")
+elseif(MUTATION STREQUAL "auto_repeat_sender")
+    string(REPLACE
+        "MopCompactPackets::BuildCancelAutoRepeat("
+        "/* removed cancel-auto-repeat builder */ ("
+        player_combat "${player_combat}")
+elseif(MUTATION STREQUAL "auto_repeat_registration")
+    string(REPLACE
+        "DefS(SMSG_CANCEL_AUTO_REPEAT, \"SMSG_CANCEL_AUTO_REPEAT\");"
+        "/* removed cancel-auto-repeat registration */"
+        opcode_registry "${opcode_registry}")
+elseif(MUTATION STREQUAL "auto_repeat_allowlist")
+    string(REPLACE
+        "case SMSG_CANCEL_AUTO_REPEAT:"
+        "case 0xFFFF: /* removed cancel-auto-repeat allowlist */"
+        world_session "${world_session}")
+elseif(MUTATION STREQUAL "auto_repeat_opcode")
+    string(REPLACE
+        "SMSG_CANCEL_AUTO_REPEAT                      = 0x1E0F"
+        "SMSG_CANCEL_AUTO_REPEAT                      = 0x1E0E"
+        opcode_header "${opcode_header}")
+elseif(MUTATION STREQUAL "auto_repeat_reference")
+    string(REPLACE
+        "SMSG_CANCEL_AUTO_REPEAT                        0x1E0F  ACTIVE"
+        "SMSG_CANCEL_AUTO_REPEAT                        0x1E0F  DORMANT"
+        opcode_reference "${opcode_reference}")
 elseif(MUTATION STREQUAL "read_item_alias")
     string(APPEND opcode_header "\nSMSG_READ_ITEM_FAILED = 0x0E8B,\n")
 elseif(MUTATION STREQUAL "read_item_sender")
@@ -167,6 +202,34 @@ if(opcode_header MATCHES "SMSG_READ_ITEM_FAILED")
 endif()
 if(item_handler MATCHES "SMSG_READ_ITEM_FAILED")
     message(FATAL_ERROR "read-item handler can still emit the disproved 0x0E8B identity")
+endif()
+
+if(NOT unit_header MATCHES "BuildCancelAutoRepeat")
+    message(FATAL_ERROR "cancel-auto-repeat serializer is missing")
+endif()
+if(NOT unit_header MATCHES "WriteGuidMask<1, 3, 0, 4, 6, 7, 5, 2>\\(guid\\)")
+    message(FATAL_ERROR "cancel-auto-repeat GUID mask order does not match reader sub_6FA553")
+endif()
+if(NOT unit_header MATCHES "WriteGuidBytes<7, 6, 2, 5, 0, 4, 1, 3>\\(guid\\)")
+    message(FATAL_ERROR "cancel-auto-repeat GUID byte order does not match reader sub_6FA553")
+endif()
+if(NOT player_combat MATCHES "MopCompactPackets::BuildCancelAutoRepeat")
+    message(FATAL_ERROR "cancel-auto-repeat sender bypasses the 18414 serializer")
+endif()
+if(player_combat MATCHES "SMSG_CANCEL_AUTO_REPEAT,[^\r\n]*GetPackGUID")
+    message(FATAL_ERROR "legacy cancel-auto-repeat packed-GUID body remains")
+endif()
+if(NOT opcode_registry MATCHES "DefS\\(SMSG_CANCEL_AUTO_REPEAT,[ \t]*\"SMSG_CANCEL_AUTO_REPEAT\"\\)")
+    message(FATAL_ERROR "SMSG_CANCEL_AUTO_REPEAT is missing outbound opcode metadata")
+endif()
+if(NOT world_session MATCHES "case[ \t]+SMSG_CANCEL_AUTO_REPEAT:")
+    message(FATAL_ERROR "SMSG_CANCEL_AUTO_REPEAT is missing from the converted-packet gate")
+endif()
+if(NOT opcode_header MATCHES "SMSG_CANCEL_AUTO_REPEAT[ \t]*=[ \t]*0x1E0F")
+    message(FATAL_ERROR "SMSG_CANCEL_AUTO_REPEAT does not use the direct 18414 value 0x1E0F")
+endif()
+if(NOT opcode_reference MATCHES "SMSG_CANCEL_AUTO_REPEAT[ \t]+0x1E0F[ \t]+ACTIVE")
+    message(FATAL_ERROR "reference inventory does not record active 0x1E0F cancel auto-repeat")
 endif()
 
 if(NOT unit MATCHES "MopCompactPackets::BuildAttackerStateUpdate")

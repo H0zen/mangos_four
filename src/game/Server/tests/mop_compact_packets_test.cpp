@@ -122,6 +122,20 @@ static void test_attack_packets()
     WorldPacket swing(CMSG_ATTACKSWING, sizeof(swingBody));
     swing.append(swingBody, sizeof(swingBody));
     CHECK(MopCompactPackets::ReadAttackSwingTarget(swing).GetRawValue() == victim);
+
+    WorldPacket denseCancel;
+    MopCompactPackets::BuildCancelAutoRepeat(
+        denseCancel, UINT64_C(0x0807060504030201));
+    CHECK(denseCancel.GetOpcode() == SMSG_CANCEL_AUTO_REPEAT);
+    CHECK(BytesEqual(denseCancel, {
+        0xFF,
+        0x09, 0x06, 0x02, 0x07, 0x00, 0x04, 0x03, 0x05
+    }));
+
+    WorldPacket sparseCancel;
+    MopCompactPackets::BuildCancelAutoRepeat(
+        sparseCancel, UINT64_C(0x000000BB0000AA00));
+    CHECK(BytesEqual(sparseCancel, { 0x90, 0xBA, 0xAB }));
 }
 
 static void test_attacker_state_update()

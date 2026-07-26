@@ -669,7 +669,7 @@ enum OpcodesList
     SMSG_RESET_RANGED_COMBAT_TIMER               = 0x1299,    // (legacy; no client leaf)
     SMSG_CHAT_NOT_IN_PARTY                       = 0x0A8A,    // 5.4.8 18414 (Wow.exe leaf; name single-source fork)
     CMSG_CANCEL_GROWTH_AURA                      = 0x0237, // not in 5.4.8 (legacy)
-    SMSG_CANCEL_AUTO_REPEAT                      = 0x1E0F,    // 5.4.8 18414 (Wow.exe leaf; name reference-consensus)
+    SMSG_CANCEL_AUTO_REPEAT                      = 0x1E0F,    // 5.4.8 18414 (direct packed-GUID reader and Unit_C clear terminal; name reference-consensus)
     SMSG_STANDSTATE_UPDATE                       = 0x1C12,    // 5.4.8 18414 (Wow.exe Unit_C.cpp leaf 0x810583; one uint8)
     SMSG_LOOT_ALL_PASSED                         = 0x0EBB,    // 5.4.8 18414 (Wow.exe leaf; name reference-consensus)
     SMSG_LOOT_ROLL_WON                           = 0x0A3A,    // 5.4.8 18414 (Wow.exe leaf; name reference-consensus)

@@ -139,7 +139,8 @@ void Player::SendAttackSwingBadFacingAttack()
  */
 void Player::SendAutoRepeatCancel(Unit* target)
 {
-    WorldPacket data(SMSG_CANCEL_AUTO_REPEAT, target->GetPackGUID().size());
-    data << target->GetPackGUID();
+    WorldPacket data;
+    MopCompactPackets::BuildCancelAutoRepeat(
+        data, target->GetObjectGuid().GetRawValue());
     GetSession()->SendPacket(&data);
 }

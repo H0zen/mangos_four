@@ -171,6 +171,16 @@ namespace MopCompactPackets
         out.WriteByteSeq(AttackGuidByte(attackerGuid, 7));
     }
 
+    inline void BuildCancelAutoRepeat(WorldPacket& out, uint64 targetGuid)
+    {
+        // The 18414 reader sub_6FA553 consumes one packed unit GUID. Its
+        // Unit_C terminal clears that unit's auto-repeat/ranged state.
+        ObjectGuid guid(targetGuid);
+        out.Initialize(SMSG_CANCEL_AUTO_REPEAT, 9);
+        out.WriteGuidMask<1, 3, 0, 4, 6, 7, 5, 2>(guid);
+        out.WriteGuidBytes<7, 6, 2, 5, 0, 4, 1, 3>(guid);
+    }
+
     struct AttackStateUpdateData
     {
         uint32 hitInfo = 0;
