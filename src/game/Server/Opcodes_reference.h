@@ -175,8 +175,8 @@
  *   TOTAL SMSG rows                   925
  *
  * SUBSYSTEM CONFIDENCE: high=365, low=221, medium=182, none=157
- * STATUS TOTALS: ACTIVE=377, DOC=438, DORMANT=705
- *   SMSG: ACTIVE=237, DOC=271, DORMANT=417
+ * STATUS TOTALS: ACTIVE=381, DOC=438, DORMANT=701
+ *   SMSG: ACTIVE=241, DOC=271, DORMANT=413
  *   CMSG: ACTIVE=140, DOC=167, DORMANT=288
  */
 
@@ -442,13 +442,13 @@ typedef uint16_t uint16;
  *   SMSG_UNKNOWN_0x14E0                            0x14E0  DOC      [low-conf]
  *
  *  -- DuelInfo.cpp (7) --
- *   SMSG_DUEL_OUTOFBOUNDS                          0x001A  DORMANT  [low-conf]
+ *   SMSG_DUEL_OUTOFBOUNDS                          0x001A  ACTIVE   [high-conf]
  *   SMSG_DUEL_REQUESTED                            0x0022  DORMANT 
  *   SMSG_UNKNOWN_0x083F                            0x083F  DOC     
  *   SMSG_DUEL_WINNER                               0x10E1  DORMANT  [low-conf]
- *   SMSG_DUEL_COUNTDOWN                            0x129F  DORMANT  [low-conf]
- *   SMSG_DUEL_INBOUNDS                             0x163A  DORMANT  [low-conf]
- *   SMSG_DUEL_COMPLETE                             0x1C0A  DORMANT  [low-conf]
+ *   SMSG_DUEL_COUNTDOWN                            0x129F  ACTIVE   [high-conf]
+ *   SMSG_DUEL_INBOUNDS                             0x163A  ACTIVE   [high-conf]
+ *   SMSG_DUEL_COMPLETE                             0x1C0A  ACTIVE   [high-conf]
  *
  *  -- Effect_C.cpp (1) --
  *   SMSG_ACHIEVEMENT_EARNED                        0x080B  DORMANT  [medium-conf]

@@ -1,4 +1,6 @@
 file(READ "${SOURCE_ROOT}/src/game/Object/PlayerCombat.cpp" player_combat)
+file(READ "${SOURCE_ROOT}/src/game/Object/PlayerDuel.cpp" player_duel)
+file(READ "${SOURCE_ROOT}/src/game/Object/Player.h" player_header)
 file(READ "${SOURCE_ROOT}/src/game/Object/UnitSpeed.cpp" unit_speed)
 file(READ "${SOURCE_ROOT}/src/game/ChatCommands/PlayerStatsMods.cpp" player_stats_mods)
 file(READ "${SOURCE_ROOT}/src/game/WorldHandlers/GroupHandler.cpp" group_handler)
@@ -143,6 +145,36 @@ elseif(MUTATION STREQUAL "party_kill_reference")
     string(REPLACE
         "SMSG_PARTYKILLLOG                              0x048A  ACTIVE"
         "SMSG_PARTYKILLLOG                              0x048A  DORMANT"
+        opcode_reference "${opcode_reference}")
+elseif(MUTATION STREQUAL "duel_complete_bit")
+    string(REPLACE
+        "out.WriteBit(completed);"
+        "out << uint8(completed);"
+        player_header "${player_header}")
+elseif(MUTATION STREQUAL "duel_countdown_width")
+    string(REPLACE
+        "out << milliseconds;"
+        "out << uint16(milliseconds);"
+        player_header "${player_header}")
+elseif(MUTATION STREQUAL "duel_sender")
+    string(REPLACE
+        "MopDuelPackets::BuildComplete(data, type != DUEL_INTERRUPTED);"
+        "data.Initialize(SMSG_DUEL_COMPLETE, 1);"
+        player_duel "${player_duel}")
+elseif(MUTATION STREQUAL "duel_registration")
+    string(REPLACE
+        "DefS(SMSG_DUEL_COMPLETE, \"SMSG_DUEL_COMPLETE\");"
+        "/* removed duel-complete registration */"
+        opcode_registry "${opcode_registry}")
+elseif(MUTATION STREQUAL "duel_allowlist")
+    string(REPLACE
+        "case SMSG_DUEL_COMPLETE:"
+        "case 0xFFFF: /* removed duel-complete allowlist */"
+        world_session "${world_session}")
+elseif(MUTATION STREQUAL "duel_reference")
+    string(REPLACE
+        "SMSG_DUEL_COMPLETE                             0x1C0A  ACTIVE"
+        "SMSG_DUEL_COMPLETE                             0x1C0A  DORMANT"
         opcode_reference "${opcode_reference}")
 endif()
 
@@ -307,4 +339,34 @@ if(NOT world_session MATCHES "case[ \\t]+SMSG_PARTYKILLLOG:")
 endif()
 if(NOT opcode_reference MATCHES "SMSG_PARTYKILLLOG[ \\t]+0x048A[ \\t]+ACTIVE")
     message(FATAL_ERROR "reference inventory does not record active party-kill log")
+endif()
+
+if(NOT player_header MATCHES "namespace MopDuelPackets")
+    message(FATAL_ERROR "duel-state serializers are missing from owning player code")
+endif()
+if(NOT player_header MATCHES "out.WriteBit\\(completed\\)")
+    message(FATAL_ERROR "duel-complete body is not the one-bit 18414 layout")
+endif()
+if(NOT player_header MATCHES "out << milliseconds;")
+    message(FATAL_ERROR "duel-countdown body is not the one-uint32 18414 layout")
+endif()
+foreach(builder IN ITEMS BuildOutOfBounds BuildInBounds BuildComplete BuildCountdown)
+    if(NOT player_duel MATCHES "MopDuelPackets::${builder}")
+        message(FATAL_ERROR "duel sender bypasses ${builder}")
+    endif()
+endforeach()
+foreach(server_name IN ITEMS
+        SMSG_DUEL_OUTOFBOUNDS SMSG_DUEL_INBOUNDS SMSG_DUEL_COMPLETE SMSG_DUEL_COUNTDOWN)
+    if(NOT opcode_registry MATCHES "DefS\\(${server_name},[ \\t]*\"${server_name}\"\\)")
+        message(FATAL_ERROR "${server_name} is missing outbound opcode metadata")
+    endif()
+    if(NOT world_session MATCHES "case[ \\t]+${server_name}:")
+        message(FATAL_ERROR "${server_name} is missing from the converted-packet gate")
+    endif()
+    if(NOT opcode_reference MATCHES "${server_name}[ \\t]+0x[0-9A-F]+[ \\t]+ACTIVE")
+        message(FATAL_ERROR "reference inventory does not record active ${server_name}")
+    endif()
+endforeach()
+if(player_duel MATCHES "WorldPacket[ \\t]+data\\(SMSG_DUEL_(OUTOFBOUNDS|INBOUNDS|COMPLETE|COUNTDOWN)")
+    message(FATAL_ERROR "legacy raw duel-state packet construction remains")
 endif()

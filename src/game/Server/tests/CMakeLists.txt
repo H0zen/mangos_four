@@ -190,7 +190,9 @@ foreach(mutation IN ITEMS cancel_sender cancel_registration cancel_allowlist can
         attacker_sender attacker_registration attacker_allowlist attacker_opcode
         attacker_reference attacker_envelope
         party_kill_mask party_kill_bytes party_kill_sender party_kill_registration
-        party_kill_allowlist party_kill_reference)
+        party_kill_allowlist party_kill_reference
+        duel_complete_bit duel_countdown_width duel_sender duel_registration
+        duel_allowlist duel_reference)
     add_test(NAME mop_compact_packets_source_mutation_${mutation}
         COMMAND ${CMAKE_COMMAND} -DSOURCE_ROOT=${CMAKE_SOURCE_DIR}
             -DMUTATION=${mutation}

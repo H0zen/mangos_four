@@ -767,6 +767,39 @@ namespace MopProgressionPackets
     }
 }
 
+namespace MopDuelPackets
+{
+    inline void BuildOutOfBounds(WorldPacket& out)
+    {
+        // Wow.exe 18414 routes 0x001A through the fieldless reader sub_6BC12D.
+        out.Initialize(SMSG_DUEL_OUTOFBOUNDS, 0);
+    }
+
+    inline void BuildInBounds(WorldPacket& out)
+    {
+        // Wow.exe 18414 routes 0x163A through the same fieldless reader.
+        out.Initialize(SMSG_DUEL_INBOUNDS, 0);
+    }
+
+    inline void BuildComplete(WorldPacket& out, bool completed)
+    {
+        out.Initialize(SMSG_DUEL_COMPLETE, 1);
+
+        // Reader sub_6D3E7C consumes exactly one MSB-first completion bit.
+        out.WriteBit(completed);
+        out.FlushBits();
+    }
+
+    inline void BuildCountdown(WorldPacket& out, uint32 milliseconds)
+    {
+        out.Initialize(SMSG_DUEL_COUNTDOWN, sizeof(milliseconds));
+
+        // Reader sub_6D9F28 consumes one uint32; terminal sub_9BFFD4
+        // divides it by 1000 before updating the duel countdown UI.
+        out << milliseconds;
+    }
+}
+
 namespace MopAreaTriggerPackets
 {
     struct Request

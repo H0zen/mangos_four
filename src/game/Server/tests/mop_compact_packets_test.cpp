@@ -369,6 +369,33 @@ static void test_party_kill_log()
     }));
 }
 
+static void test_duel_state_packets()
+{
+    WorldPacket outOfBounds;
+    MopDuelPackets::BuildOutOfBounds(outOfBounds);
+    CHECK(outOfBounds.GetOpcode() == SMSG_DUEL_OUTOFBOUNDS);
+    CHECK(outOfBounds.empty());
+
+    WorldPacket inBounds;
+    MopDuelPackets::BuildInBounds(inBounds);
+    CHECK(inBounds.GetOpcode() == SMSG_DUEL_INBOUNDS);
+    CHECK(inBounds.empty());
+
+    WorldPacket completed;
+    MopDuelPackets::BuildComplete(completed, true);
+    CHECK(completed.GetOpcode() == SMSG_DUEL_COMPLETE);
+    CHECK(BytesEqual(completed, { 0x80 }));
+
+    WorldPacket interrupted;
+    MopDuelPackets::BuildComplete(interrupted, false);
+    CHECK(BytesEqual(interrupted, { 0x00 }));
+
+    WorldPacket countdown;
+    MopDuelPackets::BuildCountdown(countdown, 0x12345678u);
+    CHECK(countdown.GetOpcode() == SMSG_DUEL_COUNTDOWN);
+    CHECK(BytesEqual(countdown, { 0x78, 0x56, 0x34, 0x12 }));
+}
+
 static void test_opcode_values_are_framable()
 {
     CHECK(uint32_t(SMSG_ATTACKSWING_ERROR) == 0x11E1u);
@@ -382,6 +409,10 @@ static void test_opcode_values_are_framable()
     CHECK(uint32_t(SMSG_ATTACKERSTATEUPDATE) == 0x06AAu);
     CHECK(uint32_t(SMSG_CANCEL_COMBAT) == 0x0E8Bu);
     CHECK(uint32_t(SMSG_PARTYKILLLOG) == 0x048Au);
+    CHECK(uint32_t(SMSG_DUEL_OUTOFBOUNDS) == 0x001Au);
+    CHECK(uint32_t(SMSG_DUEL_INBOUNDS) == 0x163Au);
+    CHECK(uint32_t(SMSG_DUEL_COMPLETE) == 0x1C0Au);
+    CHECK(uint32_t(SMSG_DUEL_COUNTDOWN) == 0x129Fu);
 
     CHECK(uint32_t(SMSG_ATTACKSWING_ERROR) <= 0x1FFFu);
     CHECK(uint32_t(SMSG_MOVE_SET_SWIM_SPEED) <= 0x1FFFu);
@@ -394,6 +425,10 @@ static void test_opcode_values_are_framable()
     CHECK(uint32_t(SMSG_ATTACKERSTATEUPDATE) <= 0x1FFFu);
     CHECK(uint32_t(SMSG_CANCEL_COMBAT) <= 0x1FFFu);
     CHECK(uint32_t(SMSG_PARTYKILLLOG) <= 0x1FFFu);
+    CHECK(uint32_t(SMSG_DUEL_OUTOFBOUNDS) <= 0x1FFFu);
+    CHECK(uint32_t(SMSG_DUEL_INBOUNDS) <= 0x1FFFu);
+    CHECK(uint32_t(SMSG_DUEL_COMPLETE) <= 0x1FFFu);
+    CHECK(uint32_t(SMSG_DUEL_COUNTDOWN) <= 0x1FFFu);
 }
 
 int main(int /*argc*/, char** /*argv*/)
@@ -408,6 +443,7 @@ int main(int /*argc*/, char** /*argv*/)
     test_dungeon_difficulty();
     test_cancel_combat();
     test_party_kill_log();
+    test_duel_state_packets();
     test_opcode_values_are_framable();
 
     if (g_fail)
