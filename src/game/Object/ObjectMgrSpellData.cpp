@@ -189,6 +189,7 @@ void ObjectMgr::LoadCreatureTemplateSpells()
         {
             sLog.outErrorDb("LoadCreatureTemplateSpells: Spells found for creature entry %u, but creature does not exist, skipping", itr->entry);
             sCreatureTemplateSpellsStorage.EraseEntry(itr->entry);
+            continue;
         }
         for (uint8 i = 0; i < CREATURE_MAX_SPELLS; ++i)
         {

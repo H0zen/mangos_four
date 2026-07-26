@@ -498,6 +498,13 @@ void Player::UpdateRating(CombatRating cr)
         case CR_MASTERY:
             UpdateMasteryAuras();
             break;
+        case CR_PVP_POWER:
+        {
+            float pct = GetRatingBonusValue(CR_PVP_POWER);
+            SetFloatValue(PLAYER_FIELD_PVP_POWER_DAMAGE, pct);
+            SetFloatValue(PLAYER_FIELD_PVP_POWER_HEALING, pct);
+            break;
+        }
         // deprecated
         case CR_HIT_TAKEN_MELEE:
         case CR_HIT_TAKEN_RANGED:

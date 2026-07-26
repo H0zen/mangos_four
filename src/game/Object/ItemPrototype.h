@@ -81,10 +81,11 @@ enum ItemModType
     ITEM_MOD_HOLY_RESISTANCE          = 53,
     ITEM_MOD_SHADOW_RESISTANCE        = 54,
     ITEM_MOD_NATURE_RESISTANCE        = 55,
-    ITEM_MOD_ARCANE_RESISTANCE        = 56
+    ITEM_MOD_ARCANE_RESISTANCE        = 56,
+    ITEM_MOD_PVP_POWER                = 57                  // 5.x
 };
 
-#define MAX_ITEM_MOD                    57
+#define MAX_ITEM_MOD                    58
 
 enum ItemSpelltriggerType
 {
@@ -199,7 +200,7 @@ enum SocketColor
     SOCKET_COLOR_COGWHEEL                       = 32,
 };
 
-#define SOCKET_COLOR_ALL (SOCKET_COLOR_META | SOCKET_COLOR_RED | SOCKET_COLOR_YELLOW | SOCKET_COLOR_BLUE | SOCKET_COLOR_COGWHEEL)
+#define SOCKET_COLOR_ALL (SOCKET_COLOR_META | SOCKET_COLOR_RED | SOCKET_COLOR_YELLOW | SOCKET_COLOR_BLUE | SOCKET_COLOR_HYDRAULIC | SOCKET_COLOR_COGWHEEL)
 
 enum InventoryType
 {

@@ -889,10 +889,11 @@ enum CombatRating
     CR_WEAPON_SKILL_RANGED      = 22,                       // obsolete
     CR_EXPERTISE                = 23,
     CR_ARMOR_PENETRATION        = 24,
-    CR_MASTERY                  = 25
+    CR_MASTERY                  = 25,
+    CR_PVP_POWER                = 26                        // 5.x: PLAYER_FIELD_COMBAT_RATING_1[26]
 };
 
-#define MAX_COMBAT_RATING         26
+#define MAX_COMBAT_RATING         27
 
 /// internal used flags for marking special auras - for example some dummy-auras
 enum UnitAuraFlags

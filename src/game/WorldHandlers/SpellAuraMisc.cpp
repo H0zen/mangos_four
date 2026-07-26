@@ -523,10 +523,12 @@ void Aura::HandleModRatingFromStat(bool apply, bool Real)
     }
     // Just recalculate ratings
     for (uint32 rating = 0; rating < MAX_COMBAT_RATING; ++rating)
+    {
         if (m_modifier.m_miscvalue & (1 << rating))
         {
             ((Player*)GetTarget())->ApplyRatingMod(CombatRating(rating), 0, apply);
         }
+    }
 }
 
 void Aura::HandleForceMoveForward(bool apply, bool Real)
