@@ -2339,16 +2339,15 @@ void Player::SetGMVisible(bool on)
  */
 void Player::SendLogXPGain(uint32 GivenXP, Unit* victim, uint32 RestXP)
 {
-    WorldPacket data(SMSG_LOG_XPGAIN, 21);
-    data << (victim ? victim->GetObjectGuid() : ObjectGuid());// guid
-    data << uint32(GivenXP + RestXP);                       // given experience
-    data << uint8(victim ? 0 : 1);                          // 00-kill_xp type, 01-non_kill_xp type
-    if (victim)
-    {
-        data << uint32(GivenXP);                            // experience without rested bonus
-        data << float(1);                                   // 1 - none 0 - 100% group bonus output
-    }
-    data << uint8(0);                                       // new 2.4.0
+    MopProgressionPackets::ExperienceGain packetInfo;
+    packetInfo.sourceGuid = victim ? victim->GetObjectGuid() : ObjectGuid();
+    packetInfo.totalExperience = GivenXP + RestXP;
+    packetInfo.type = victim ? 0 : 1;
+    packetInfo.hasBaseExperience = victim != nullptr;
+    packetInfo.baseExperience = GivenXP;
+
+    WorldPacket data;
+    MopProgressionPackets::BuildExperienceGain(data, packetInfo);
     GetSession()->SendPacket(&data);
 }
 

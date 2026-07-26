@@ -1567,7 +1567,8 @@ add_test(NAME mop_player_progression_packets_source
     COMMAND ${CMAKE_COMMAND} -DSOURCE_ROOT=${CMAKE_SOURCE_DIR}
         -P ${CMAKE_CURRENT_SOURCE_DIR}/mop_player_progression_packets_source_test.cmake)
 
-foreach(mutation IN ITEMS wire_order sender registration admission reference)
+foreach(mutation IN ITEMS wire_order xp_wire_order sender xp_sender registration admission reference
+        xp_registration xp_admission xp_reference)
     add_test(NAME mop_player_progression_packets_source_mutation_${mutation}
         COMMAND ${CMAKE_COMMAND} -DSOURCE_ROOT=${CMAKE_SOURCE_DIR}
             -DMUTATION=${mutation}

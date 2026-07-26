@@ -175,8 +175,8 @@
  *   TOTAL SMSG rows                   925
  *
  * SUBSYSTEM CONFIDENCE: high=365, low=221, medium=182, none=157
- * STATUS TOTALS: ACTIVE=372, DOC=438, DORMANT=710
- *   SMSG: ACTIVE=232, DOC=271, DORMANT=422
+ * STATUS TOTALS: ACTIVE=373, DOC=438, DORMANT=709
+ *   SMSG: ACTIVE=233, DOC=271, DORMANT=421
  *   CMSG: ACTIVE=140, DOC=167, DORMANT=288
  */
 
@@ -390,7 +390,7 @@ typedef uint16_t uint16;
  *   SMSG_EXPECTED_SPAM_RECORDS                     0x18C0  DORMANT  [medium-conf]
  *   SMSG_MESSAGECHAT                               0x1A9A  ACTIVE   [medium-conf]
  *   SMSG_DURABILITY_DAMAGE_DEATH                   0x1E3E  ACTIVE   [Wow.exe binary: empty route to retained DURABILITYDAMAGE_DEATH semantic]
- *   SMSG_LOG_XPGAIN                                0x1E9A  DORMANT 
+ *   SMSG_LOG_XPGAIN                                0x1E9A  ACTIVE   [Wow.exe binary: sub_6F7E25 packed reader; sub_CE07DA combat-log semantic]
  *
  *  -- CheckExecutableSignature.cpp (1) --
  *   SMSG_UI_TIME                                   0x0027  ACTIVE   [low-conf]

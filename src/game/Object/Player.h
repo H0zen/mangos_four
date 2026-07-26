@@ -710,6 +710,39 @@ namespace MopReputationPackets
 
 namespace MopProgressionPackets
 {
+    struct ExperienceGain
+    {
+        ObjectGuid sourceGuid;
+        uint32 totalExperience = 0;
+        uint8 type = 0;
+        bool hasBaseExperience = false;
+        uint32 baseExperience = 0;
+    };
+
+    inline void BuildExperienceGain(WorldPacket& out,
+        ExperienceGain const& info)
+    {
+        out.Initialize(SMSG_LOG_XPGAIN, 19);
+
+        // Wow.exe 18414 reader sub_6F7E25 uses an inverted presence bit for
+        // base XP. The current backend has no group-rate or recruit-a-friend
+        // inputs, so their directly verified neutral bits are emitted here.
+        out.WriteBit(!info.hasBaseExperience);
+        out.WriteGuidMask<1, 2, 7, 4, 3>(info.sourceGuid);
+        out.WriteBit(false); // no recruit-a-friend bonus
+        out.WriteGuidMask<0, 5, 6>(info.sourceGuid);
+        out.WriteBit(true);  // default group rate 1.0; no float follows
+        out.FlushBits();
+
+        out.WriteGuidBytes<4, 2>(info.sourceGuid);
+        out << info.type;
+        out.WriteGuidBytes<7, 1, 3, 6>(info.sourceGuid);
+        out << info.totalExperience;
+        if (info.hasBaseExperience)
+            out << info.baseExperience;
+        out.WriteGuidBytes<0, 5>(info.sourceGuid);
+    }
+
     struct LevelUpInfo
     {
         uint32 talentDelta = 0;

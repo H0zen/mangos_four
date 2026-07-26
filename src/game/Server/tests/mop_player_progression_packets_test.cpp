@@ -70,9 +70,42 @@ static void TestLevelUpInfo()
     });
 }
 
+static void TestExperienceGain()
+{
+    MopProgressionPackets::ExperienceGain kill;
+    kill.sourceGuid = ObjectGuid(UINT64_C(0x8877665544332211));
+    kill.totalExperience = 0x11223344u;
+    kill.type = 0;
+    kill.hasBaseExperience = true;
+    kill.baseExperience = 0x55667788u;
+
+    WorldPacket killPacket;
+    MopProgressionPackets::BuildExperienceGain(killPacket, kill);
+    CHECK(killPacket.GetOpcode() == SMSG_LOG_XPGAIN);
+    CheckBytes(killPacket, {
+        0x7D, 0xE0,
+        0x54, 0x32, 0x00, 0x89, 0x23, 0x45, 0x76,
+        0x44, 0x33, 0x22, 0x11,
+        0x88, 0x77, 0x66, 0x55,
+        0x10, 0x67,
+    });
+
+    MopProgressionPackets::ExperienceGain quest;
+    quest.totalExperience = 0xA1B2C3D4u;
+    quest.type = 1;
+
+    WorldPacket questPacket;
+    MopProgressionPackets::BuildExperienceGain(questPacket, quest);
+    CheckBytes(questPacket, {
+        0x80, 0x20, 0x01,
+        0xD4, 0xC3, 0xB2, 0xA1,
+    });
+}
+
 int main()
 {
     TestLevelUpInfo();
+    TestExperienceGain();
     if (g_fail != 0)
         return 1;
 
