@@ -240,11 +240,21 @@ void WorldSession::HandleBuybackItem(WorldPacket& recv_data)
  */
 void WorldSession::HandleBuyItemOpcode(WorldPacket& recv_data)
 {
-    ObjectGuid vendorGuid, bagGuid;
-    uint32 item, slot, count;
-    uint8 type, bagSlot;
+    MopItemPackets::BuyItemRequest request;
+    if (!MopItemPackets::ParseBuyItem(recv_data, request))
+    {
+        DEBUG_LOG("WORLD: CMSG_BUY_ITEM has a malformed 18414 body");
+        return;
+    }
 
-    recv_data >> vendorGuid >> type >> item >> slot >> count >> bagGuid >> bagSlot;
+    ObjectGuid const vendorGuid = request.vendorGuid;
+    ObjectGuid const bagGuid = request.destinationBagGuid;
+    uint32 const item = request.itemId;
+    uint32 slot = request.vendorSlot;
+    uint32 const count = request.count;
+    uint8 const type = request.type;
+    uint8 const bagSlot = request.destinationBagSlot;
+
     DEBUG_LOG("WORLD: Received opcode CMSG_BUY_ITEM, vendorguid: %s, type: %u, item: %u, slot: %u, count: %u, bagGuid: %s, bagSlog: %u",
         vendorGuid.GetString().c_str(), type, item, slot, count, bagGuid.GetString().c_str(), bagSlot);
 

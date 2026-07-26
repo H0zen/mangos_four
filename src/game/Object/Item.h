@@ -455,6 +455,111 @@ namespace MopItemPackets
         uint32 count = 0;
     };
 
+    struct BuyItemRequest
+    {
+        ObjectGuid vendorGuid;
+        ObjectGuid destinationBagGuid;
+        uint8 destinationBagSlot = 0;
+        uint32 count = 0;
+        uint32 itemId = 0;
+        uint32 vendorSlot = 0;
+        uint8 type = 0;
+    };
+
+    inline bool ParseBuyItem(WorldPacket& in, BuyItemRequest& request)
+    {
+        // Wow.exe 18414 writer sub_68E11F emits four uint32 fields before
+        // two interleaved packed GUIDs and the two-bit vendor-item type.
+        if (in.size() - in.rpos() < 19)
+            return RejectRequest(in);
+
+        BuyItemRequest parsed;
+        uint32 destinationBagSlot = 0;
+        in >> destinationBagSlot >> parsed.count >> parsed.itemId >>
+            parsed.vendorSlot;
+        if (destinationBagSlot > 0xFF)
+            return RejectRequest(in);
+        parsed.destinationBagSlot = uint8(destinationBagSlot);
+
+        in.ReadGuidMask<6>(parsed.vendorGuid);
+        in.ReadGuidMask<6, 4>(parsed.destinationBagGuid);
+        in.ReadGuidMask<4>(parsed.vendorGuid);
+        parsed.type = uint8(in.ReadBits(2));
+        in.ReadGuidMask<0, 3>(parsed.vendorGuid);
+        in.ReadGuidMask<3>(parsed.destinationBagGuid);
+        in.ReadGuidMask<7, 5>(parsed.vendorGuid);
+        in.ReadGuidMask<2>(parsed.destinationBagGuid);
+        in.ReadGuidMask<1>(parsed.vendorGuid);
+        in.ReadGuidMask<7>(parsed.destinationBagGuid);
+        in.ReadGuidMask<2>(parsed.vendorGuid);
+        in.ReadGuidMask<1, 0, 5>(parsed.destinationBagGuid);
+
+        size_t packedBytes = 0;
+        for (uint8 index = 0; index < 8; ++index)
+        {
+            packedBytes += GuidByte(parsed.vendorGuid.GetRawValue(), index) != 0;
+            packedBytes += GuidByte(parsed.destinationBagGuid.GetRawValue(), index) != 0;
+        }
+        if (in.size() - in.rpos() != packedBytes)
+            return RejectRequest(in);
+
+        in.ReadGuidBytes<5, 0>(parsed.vendorGuid);
+        in.ReadGuidBytes<3, 1, 6>(parsed.destinationBagGuid);
+        in.ReadGuidBytes<2, 7, 6>(parsed.vendorGuid);
+        in.ReadGuidBytes<0, 5>(parsed.destinationBagGuid);
+        in.ReadGuidBytes<4>(parsed.vendorGuid);
+        in.ReadGuidBytes<2>(parsed.destinationBagGuid);
+        in.ReadGuidBytes<3>(parsed.vendorGuid);
+        in.ReadGuidBytes<7>(parsed.destinationBagGuid);
+        in.ReadGuidBytes<1>(parsed.vendorGuid);
+        in.ReadGuidBytes<4>(parsed.destinationBagGuid);
+
+        request = parsed;
+        return true;
+    }
+
+    inline void BuildBuyItemResult(WorldPacket& out, ObjectGuid vendorGuid,
+        uint32 count, uint32 remainingCount, uint32 vendorSlot)
+    {
+        // Reader sub_6E1DCB and terminal sub_7B204A update the active merchant
+        // record using vendorSlot and remainingCount; count is retained in the
+        // parsed record but is not consumed by that terminal.
+        uint64 const vendor = vendorGuid.GetRawValue();
+        uint8 const mask[] = { 3, 4, 7, 6, 0, 2, 1, 5 };
+        uint8 const bytesA[] = { 6, 7 };
+        uint8 const bytesB[] = { 1, 3, 5, 2 };
+        uint8 const bytesC[] = { 0, 4 };
+
+        out.Initialize(SMSG_BUY_ITEM, 21);
+        WriteGuidMask(out, vendor, mask);
+        out.FlushBits();
+        WriteGuidBytes(out, vendor, bytesA);
+        out << count;
+        WriteGuidBytes(out, vendor, bytesB);
+        out << remainingCount;
+        WriteGuidBytes(out, vendor, bytesC);
+        out << vendorSlot;
+    }
+
+    inline void BuildBuyFailed(WorldPacket& out, ObjectGuid vendorGuid,
+        uint32 itemId, uint8 result)
+    {
+        // Reader sub_6EB397 and terminal sub_7AB1AA consume this packed vendor
+        // GUID, item identifier and one-byte result to select purchase errors.
+        uint64 const vendor = vendorGuid.GetRawValue();
+        uint8 const mask[] = { 6, 3, 1, 2, 4, 5, 0, 7 };
+        uint8 const bytesA[] = { 2, 7 };
+        uint8 const bytesB[] = { 4, 5, 1, 3, 6, 0 };
+
+        out.Initialize(SMSG_BUY_FAILED, 14);
+        WriteGuidMask(out, vendor, mask);
+        out.FlushBits();
+        out << result;
+        WriteGuidBytes(out, vendor, bytesA);
+        out << itemId;
+        WriteGuidBytes(out, vendor, bytesB);
+    }
+
     inline bool ParseSellItem(WorldPacket& in, SellItemRequest& request)
     {
         // Wow.exe 18414 writer sub_68C647 emits the stack count before two

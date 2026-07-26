@@ -1622,14 +1622,11 @@ void Player::SendEquipError(InventoryResult msg, Item* pItem, Item* pItem2, uint
 void Player::SendBuyError(BuyResult msg, Creature* pCreature, uint32 item, uint32 param)
 {
     DEBUG_LOG("WORLD: Sent SMSG_BUY_FAILED");
-    WorldPacket data(SMSG_BUY_FAILED, (8 + 4 + 4 + 1));
-    data << (pCreature ? pCreature->GetObjectGuid() : ObjectGuid());
-    data << uint32(item);
-    if (param > 0)
-    {
-        data << uint32(param);
-    }
-    data << uint8(msg);
+    (void)param; // The 18414 purchase-failure reader has no parameter field.
+    WorldPacket data;
+    MopItemPackets::BuildBuyFailed(data,
+        pCreature ? pCreature->GetObjectGuid() : ObjectGuid(), item,
+        uint8(msg));
     GetSession()->SendPacket(&data);
 }
 

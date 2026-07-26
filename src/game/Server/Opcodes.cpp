@@ -347,6 +347,12 @@ void InitializeOpcodes()
     // GUIDs and reads the paired packed-GUID result around an 8-bit status.
     DefC(CMSG_SELL_ITEM, "CMSG_SELL_ITEM", STATUS_LOGGEDIN, PROCESS_THREADUNSAFE, &WorldSession::HandleSellItemOpcode);
     DefS(SMSG_SELL_ITEM, "SMSG_SELL_ITEM");
+    // Writer sub_68E11F proves the request. The response names retain reference
+    // provenance; their 18414 readers and terminals directly prove purchase
+    // stock updates and concrete failure feedback on these wire routes.
+    DefC(CMSG_BUY_ITEM, "CMSG_BUY_ITEM", STATUS_LOGGEDIN, PROCESS_THREADUNSAFE, &WorldSession::HandleBuyItemOpcode);
+    DefS(SMSG_BUY_ITEM, "SMSG_BUY_ITEM");
+    DefS(SMSG_BUY_FAILED, "SMSG_BUY_FAILED");
     DefS(SMSG_ITEM_PUSH_RESULT, "SMSG_ITEM_PUSH_RESULT");
 
     // Directly verified 18414 inventory-movement requests. Each handler

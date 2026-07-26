@@ -126,6 +126,101 @@ static void TestSellItemResult()
     }));
 }
 
+static void TestBuyItemRequest()
+{
+    WorldPacket packet(CMSG_BUY_ITEM, 35);
+    uint8 const body[] = {
+        0x1A, 0x00, 0x00, 0x00,
+        0x14, 0x13, 0x12, 0x11,
+        0x24, 0x23, 0x22, 0x21,
+        0x34, 0x33, 0x32, 0x31,
+        0xFB, 0xFF, 0xC0,
+        0x07, 0x00, 0x15, 0x13, 0x16, 0x02, 0x09, 0x06,
+        0x10, 0x17, 0x04, 0x12, 0x05, 0x19, 0x03, 0x14
+    };
+    packet.append(body, sizeof(body));
+
+    MopItemPackets::BuyItemRequest request;
+    CHECK(MopItemPackets::ParseBuyItem(packet, request));
+    CHECK(request.destinationBagSlot == 0x1A);
+    CHECK(request.count == 0x11121314);
+    CHECK(request.itemId == 0x21222324);
+    CHECK(request.vendorSlot == 0x31323334);
+    CHECK(request.type == 2);
+    CHECK(request.vendorGuid == ObjectGuid(UINT64_C(0x0807060504030201)));
+    CHECK(request.destinationBagGuid == ObjectGuid(UINT64_C(0x1817161514131211)));
+    CHECK(packet.rpos() == packet.size());
+}
+
+static void TestBuyItemRequestRejectsMalformedBodies()
+{
+    {
+        WorldPacket packet(CMSG_BUY_ITEM, 19);
+        uint8 const body[] = {
+            0x00, 0x01, 0x00, 0x00,
+            0x01, 0x00, 0x00, 0x00,
+            0x02, 0x00, 0x00, 0x00,
+            0x01, 0x00, 0x00, 0x00,
+            0x00, 0x00, 0x00
+        };
+        packet.append(body, sizeof(body));
+        MopItemPackets::BuyItemRequest request;
+        CHECK(!MopItemPackets::ParseBuyItem(packet, request));
+        CHECK(packet.rpos() == packet.size());
+    }
+    {
+        WorldPacket packet(CMSG_BUY_ITEM, 20);
+        uint8 const body[] = {
+            0xFF, 0x00, 0x00, 0x00,
+            0x01, 0x00, 0x00, 0x00,
+            0x02, 0x00, 0x00, 0x00,
+            0x01, 0x00, 0x00, 0x00,
+            0x00, 0x00, 0x00, 0x00
+        };
+        packet.append(body, sizeof(body));
+        MopItemPackets::BuyItemRequest request;
+        CHECK(!MopItemPackets::ParseBuyItem(packet, request));
+        CHECK(packet.rpos() == packet.size());
+    }
+}
+
+static void TestBuyItemResult()
+{
+    WorldPacket packet;
+    MopItemPackets::BuildBuyItemResult(packet,
+        ObjectGuid(UINT64_C(0x0807060504030201)),
+        0x11121314, 0x21222324, 0x31323334);
+
+    CHECK(packet.GetOpcode() == SMSG_BUY_ITEM);
+    CHECK(BytesEqual(packet, {
+        0xFF, 0x06, 0x09,
+        0x14, 0x13, 0x12, 0x11,
+        0x03, 0x05, 0x07, 0x02,
+        0x24, 0x23, 0x22, 0x21,
+        0x00, 0x04,
+        0x34, 0x33, 0x32, 0x31
+    }));
+}
+
+static void TestBuyFailedResult()
+{
+    WorldPacket packet;
+    MopItemPackets::BuildBuyFailed(packet,
+        ObjectGuid(UINT64_C(0x0807060504030201)), 0x21222324, 5);
+
+    CHECK(packet.GetOpcode() == SMSG_BUY_FAILED);
+    CHECK(BytesEqual(packet, {
+        0xFF, 0x05, 0x02, 0x09,
+        0x24, 0x23, 0x22, 0x21,
+        0x04, 0x07, 0x03, 0x05, 0x06, 0x00
+    }));
+
+    MopItemPackets::BuildBuyFailed(packet, ObjectGuid(), 0x01020304, 1);
+    CHECK(BytesEqual(packet, {
+        0x00, 0x01, 0x04, 0x03, 0x02, 0x01
+    }));
+}
+
 int main(int /*argc*/, char** /*argv*/)
 {
     TestListInventoryRequest();
@@ -133,5 +228,9 @@ int main(int /*argc*/, char** /*argv*/)
     TestSellItemRequest();
     TestSellItemRequestRejectsTrailingData();
     TestSellItemResult();
+    TestBuyItemRequest();
+    TestBuyItemRequestRejectsMalformedBodies();
+    TestBuyItemResult();
+    TestBuyFailedResult();
     return g_fail ? 1 : 0;
 }

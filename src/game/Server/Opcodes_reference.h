@@ -175,9 +175,9 @@
  *   TOTAL SMSG rows                   925
  *
  * SUBSYSTEM CONFIDENCE: high=365, low=221, medium=182, none=157
- * STATUS TOTALS: ACTIVE=346, DOC=438, DORMANT=736
- *   SMSG: ACTIVE=208, DOC=271, DORMANT=446
- *   CMSG: ACTIVE=138, DOC=167, DORMANT=290
+ * STATUS TOTALS: ACTIVE=349, DOC=438, DORMANT=733
+ *   SMSG: ACTIVE=210, DOC=271, DORMANT=444
+ *   CMSG: ACTIVE=139, DOC=167, DORMANT=289
  */
 
 // CAVEATS -- read before trusting any single row:
@@ -792,7 +792,7 @@ typedef uint16_t uint16;
  *   SMSG_GUILD_MEMBER_RECIPES                      0x0EE1  DORMANT
  *   SMSG_GUILD_COMMAND_RESULT                      0x0EF1  ACTIVE   [high-conf]  direct command/result/name reader and guild-error consumer
  *   SMSG_GUILD_RECIPES                             0x0FF1  DORMANT
- *   SMSG_BUY_ITEM                                  0x101A  DORMANT 
+ *   SMSG_BUY_ITEM                                  0x101A  ACTIVE
  *   SMSG_UNKNOWN_0x1023                            0x1023  DOC     
  *   SMSG_RESURRECT_REQUEST                         0x1062  DORMANT 
  *   SMSG_DEATH_RELEASE_LOC                         0x1063  ACTIVE   [medium-conf]
@@ -818,7 +818,7 @@ typedef uint16_t uint16;
  *   SMSG_SPELLNONMELEEDAMAGELOG                    0x1450  DORMANT  [medium-conf]
  *   SMSG_VOID_STORAGE_TRANSFER_CHANGES             0x14BA  DORMANT  [medium-conf]
  *   SMSG_REMOVED_SPELL                             0x14C3  DORMANT  [medium-conf]
- *   SMSG_BUY_FAILED                                0x1563  DORMANT  [medium-conf]
+ *   SMSG_BUY_FAILED                                0x1563  ACTIVE   [medium-conf]
  *   SMSG_SPELLLOGMISS                              0x1570  DORMANT 
  *   SMSG_SHOW_NEURTRAL_PLAYER_FACTION_SELECT_UI    0x15E0  DORMANT  [medium-conf]
  *   SMSG_UNKNOWN_0x161A                            0x161A  DOC      [medium-conf]
@@ -1402,7 +1402,7 @@ typedef uint16_t uint16;
  *   CMSG_QUESTGIVER_HELLO                          0x02DB  ACTIVE   [high-conf]
  *   CMSG_WRAP_ITEM                                 0x02DF  DORMANT 
  *   CMSG_TAXINODE_STATUS_QUERY                     0x02E1  DORMANT 
- *   CMSG_BUY_ITEM                                  0x02E2  DORMANT 
+ *   CMSG_BUY_ITEM                                  0x02E2  ACTIVE
  *   CMSG_TAXIQUERYAVAILABLENODES                   0x02E3  DORMANT 
  *   CMSG_ATTACKSWING                               0x02E7  ACTIVE
  *   CMSG_EQUIPMENT_SET_DELETE                      0x02E8  DORMANT 

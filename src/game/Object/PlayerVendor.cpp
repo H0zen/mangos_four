@@ -357,11 +357,10 @@ bool Player::BuyItemFromVendorSlot(ObjectGuid vendorGuid, uint32 vendorslot, uin
 
     uint32 new_count = pCreature->UpdateVendorItemCurrentCount(crItem, totalCount);
 
-    WorldPacket data(SMSG_BUY_ITEM, 8 + 4 + 4 + 4);
-    data << pCreature->GetObjectGuid();
-    data << uint32(vendorslot + 1);                 // numbered from 1 at client
-    data << uint32(crItem->maxcount > 0 ? new_count : 0xFFFFFFFF);
-    data << uint32(count);
+    WorldPacket data;
+    MopItemPackets::BuildBuyItemResult(data, pCreature->GetObjectGuid(),
+        count, crItem->maxcount > 0 ? new_count : 0xFFFFFFFF,
+        vendorslot + 1);                            // numbered from 1 at client
     GetSession()->SendPacket(&data);
 
     SendNewItem(pItem, totalCount, true, false, false);
