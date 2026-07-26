@@ -2487,15 +2487,16 @@ void Unit::ProcDamageAndSpell(Unit* pVictim, uint32 procAttacker, uint32 procVic
  */
 void Unit::SendSpellMiss(Unit* target, uint32 spellID, SpellMissInfo missInfo)
 {
-    WorldPacket data(SMSG_SPELLLOGMISS, (4 + 8 + 1 + 4 + 8 + 1));
-    data << uint32(spellID);
-    data << GetObjectGuid();
-    data << uint8(0);                                       // can be 0 or 1, flag
-    data << uint32(1);                                      // target count
-    // for(i = 0; i < target count; ++i)
-    data << target->GetObjectGuid();                        // target GUID
-    data << uint8(missInfo);
-    // end loop
+    MopCombatLogPackets::SpellMissTarget miss = {};
+    miss.guid = target->GetObjectGuid().GetRawValue();
+    miss.missReason = uint8(missInfo);
+    MopCombatLogPackets::SpellMissLog log = {};
+    log.casterGuid = GetObjectGuid().GetRawValue();
+    log.spellId = spellID;
+    log.targets = &miss;
+    log.targetCount = 1;
+    WorldPacket data(SMSG_SPELLLOGMISS, 32);
+    MopCombatLogPackets::BuildSpellMissLog(data, log);
     SendMessageToSet(&data, true);
 }
 

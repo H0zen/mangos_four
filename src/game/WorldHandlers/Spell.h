@@ -1500,6 +1500,20 @@ namespace MopCombatLogPackets
         uint32 resist;
     };
 
+    struct SpellMissTarget
+    {
+        uint64 guid;
+        uint8 missReason;
+    };
+
+    struct SpellMissLog
+    {
+        uint64 casterGuid;
+        uint32 spellId;
+        SpellMissTarget const* targets;
+        size_t targetCount;
+    };
+
     inline void BuildSpellInstakillLog(WorldPacket& out, SpellInstakillLog const& log)
     {
         // The 18414 reader interleaves both packed-GUID masks before consuming
@@ -1644,6 +1658,38 @@ namespace MopCombatLogPackets
         out.WriteByteSeq(GuidByte(log.casterGuid, 2));
         out << uint32(log.schoolMask);
         out.WriteByteSeq(GuidByte(log.targetGuid, 3));
+    }
+
+    inline bool BuildSpellMissLog(WorldPacket& out, SpellMissLog const& log)
+    {
+        if (log.targetCount >= (size_t(1) << 23) || (log.targetCount && !log.targets))
+            return false;
+
+        uint8 const casterMask[] = { 5, 1, 4, 0, 7, 3, 2, 6 };
+        uint8 const targetMask[] = { 0, 1, 6, 2, 5, 3, 4, 7 };
+        WriteGuidMask(out, log.casterGuid, casterMask);
+        out.WriteBits(uint32(log.targetCount), 23);
+        for (size_t i = 0; i < log.targetCount; ++i)
+        {
+            WriteGuidMask(out, log.targets[i].guid, targetMask);
+            // The client can carry two optional target-position floats; this
+            // server event identifies targets by GUID only.
+            out.WriteBit(false);
+        }
+        out.FlushBits();
+
+        uint8 const targetBytes[] = { 7, 5, 0, 6, 3, 2, 1, 4 };
+        for (size_t i = 0; i < log.targetCount; ++i)
+        {
+            out << uint8(log.targets[i].missReason);
+            WriteGuidBytes(out, log.targets[i].guid, targetBytes);
+        }
+        uint8 const casterBytesA[] = { 6, 4, 2, 0, 1 };
+        uint8 const casterBytesB[] = { 3, 7, 5 };
+        WriteGuidBytes(out, log.casterGuid, casterBytesA);
+        out << uint32(log.spellId);
+        WriteGuidBytes(out, log.casterGuid, casterBytesB);
+        return true;
     }
 
     inline bool BuildSpellExecuteLog(WorldPacket& out, SpellExecuteLog const& log)
