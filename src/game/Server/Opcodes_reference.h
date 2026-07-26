@@ -175,8 +175,8 @@
  *   TOTAL SMSG rows                   925
  *
  * SUBSYSTEM CONFIDENCE: high=365, low=221, medium=182, none=157
- * STATUS TOTALS: ACTIVE=373, DOC=438, DORMANT=709
- *   SMSG: ACTIVE=233, DOC=271, DORMANT=421
+ * STATUS TOTALS: ACTIVE=374, DOC=438, DORMANT=708
+ *   SMSG: ACTIVE=234, DOC=271, DORMANT=420
  *   CMSG: ACTIVE=140, DOC=167, DORMANT=288
  */
 
@@ -973,7 +973,7 @@ typedef uint16_t uint16;
  *   SMSG_SET_PLAY_HOVER_ANIM                       0x069F  DORMANT
  *
  *  -- UnitCombatLog_C.cpp (6) --
- *   SMSG_PARTYKILLLOG                              0x048A  DORMANT 
+ *   SMSG_PARTYKILLLOG                              0x048A  ACTIVE   [Wow.exe binary: sub_6F2FE4 reads killer/victim GUIDs; sub_841B83 emits party-kill event]
  *   SMSG_DISPEL_FAILED                             0x085B  DORMANT 
  *   SMSG_SPELL_PERIODIC_AURA_LOG                   0x0CF2  ACTIVE
  *   SMSG_ENCHANTMENTLOG                            0x12A3  DORMANT 

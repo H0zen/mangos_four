@@ -888,9 +888,9 @@ uint32 Unit::DealDamage(Unit* pVictim, uint32 damage, CleanDamage const* cleanDa
         {
             player_tap->ProcDamageAndSpell(pVictim, PROC_FLAG_KILL, PROC_FLAG_KILLED, PROC_EX_NONE, 0);
 
-            WorldPacket data(SMSG_PARTYKILLLOG, (8 + 8));   // send event PARTY_KILL
-            data << player_tap->GetObjectGuid();            // player with killing blow
-            data << pVictim->GetObjectGuid();               // victim
+            WorldPacket data;
+            MopCompactPackets::BuildPartyKillLog(data,
+                player_tap->GetObjectGuid(), pVictim->GetObjectGuid());
 
             if (group_tap)
             {

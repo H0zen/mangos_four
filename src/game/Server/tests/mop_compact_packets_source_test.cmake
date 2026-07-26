@@ -114,6 +114,36 @@ elseif(MUTATION STREQUAL "attacker_envelope")
         "out.WriteBit(false);"
         "out.WriteBit(true);"
         unit_header "${unit_header}")
+elseif(MUTATION STREQUAL "party_kill_mask")
+    string(REPLACE
+        "out.WriteGuidMask<7, 2>(victim);"
+        "out.WriteGuidMask<2, 7>(victim);"
+        unit_header "${unit_header}")
+elseif(MUTATION STREQUAL "party_kill_bytes")
+    string(REPLACE
+        "out.WriteGuidBytes<0, 5>(victim);"
+        "out.WriteGuidBytes<5, 0>(victim);"
+        unit_header "${unit_header}")
+elseif(MUTATION STREQUAL "party_kill_sender")
+    string(REPLACE
+        "MopCompactPackets::BuildPartyKillLog(data,"
+        "/* removed party-kill sender */ (data,"
+        unit "${unit}")
+elseif(MUTATION STREQUAL "party_kill_registration")
+    string(REPLACE
+        "DefS(SMSG_PARTYKILLLOG, \"SMSG_PARTYKILLLOG\");"
+        "/* removed party-kill registration */"
+        opcode_registry "${opcode_registry}")
+elseif(MUTATION STREQUAL "party_kill_allowlist")
+    string(REPLACE
+        "case SMSG_PARTYKILLLOG:"
+        "case 0xFFFF: /* removed party-kill allowlist */"
+        world_session "${world_session}")
+elseif(MUTATION STREQUAL "party_kill_reference")
+    string(REPLACE
+        "SMSG_PARTYKILLLOG                              0x048A  ACTIVE"
+        "SMSG_PARTYKILLLOG                              0x048A  DORMANT"
+        opcode_reference "${opcode_reference}")
 endif()
 
 if(player_combat MATCHES "WorldPacket[ \t]+data\\(SMSG_ATTACKSWING_NOTINRANGE")
@@ -255,4 +285,26 @@ if(NOT unit_header MATCHES "BuildAttackerStateUpdate")
 endif()
 if(NOT unit_header MATCHES "out.WriteBit\\(false\\)")
     message(FATAL_ERROR "attacker-state outer envelope does not omit optional metadata")
+endif()
+
+if(NOT unit_header MATCHES "WriteGuidMask<7, 2>\\(victim\\)")
+    message(FATAL_ERROR "party-kill GUID mask order does not match reader sub_6F2FE4")
+endif()
+if(NOT unit_header MATCHES "WriteGuidBytes<0, 5>\\(victim\\)")
+    message(FATAL_ERROR "party-kill GUID byte order does not match reader sub_6F2FE4")
+endif()
+if(NOT unit MATCHES "MopCompactPackets::BuildPartyKillLog\\(data,")
+    message(FATAL_ERROR "party-kill sender bypasses the 18414 serializer")
+endif()
+if(unit MATCHES "WorldPacket[ \\t]+data\\(SMSG_PARTYKILLLOG")
+    message(FATAL_ERROR "legacy raw party-kill sender remains")
+endif()
+if(NOT opcode_registry MATCHES "DefS\\(SMSG_PARTYKILLLOG,[ \\t]*\"SMSG_PARTYKILLLOG\"\\)")
+    message(FATAL_ERROR "SMSG_PARTYKILLLOG is missing outbound opcode metadata")
+endif()
+if(NOT world_session MATCHES "case[ \\t]+SMSG_PARTYKILLLOG:")
+    message(FATAL_ERROR "SMSG_PARTYKILLLOG is missing from the converted-packet gate")
+endif()
+if(NOT opcode_reference MATCHES "SMSG_PARTYKILLLOG[ \\t]+0x048A[ \\t]+ACTIVE")
+    message(FATAL_ERROR "reference inventory does not record active party-kill log")
 endif()

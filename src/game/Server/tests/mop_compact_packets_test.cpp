@@ -352,6 +352,23 @@ static void test_cancel_combat()
     CHECK(uint32_t(packet.GetOpcode()) == 0x0E8Bu);
 }
 
+static void test_party_kill_log()
+{
+    WorldPacket packet;
+    MopCompactPackets::BuildPartyKillLog(
+        packet,
+        ObjectGuid(UINT64_C(0x8877665544332211)),
+        ObjectGuid(UINT64_C(0xFFEEDDCCBBAA9901)));
+    CHECK(packet.GetOpcode() == SMSG_PARTYKILLLOG);
+    CHECK(BytesEqual(packet, {
+        0xFF, 0xFF,
+        0x00, 0xDC, 0x10, 0x32,
+        0xFE, 0xEF, 0x98, 0xCD,
+        0x54, 0x23, 0xAB, 0x76,
+        0x45, 0x67, 0x89, 0xBA,
+    }));
+}
+
 static void test_opcode_values_are_framable()
 {
     CHECK(uint32_t(SMSG_ATTACKSWING_ERROR) == 0x11E1u);
@@ -364,6 +381,7 @@ static void test_opcode_values_are_framable()
     CHECK(uint32_t(SMSG_ATTACKSTOP) == 0x12AFu);
     CHECK(uint32_t(SMSG_ATTACKERSTATEUPDATE) == 0x06AAu);
     CHECK(uint32_t(SMSG_CANCEL_COMBAT) == 0x0E8Bu);
+    CHECK(uint32_t(SMSG_PARTYKILLLOG) == 0x048Au);
 
     CHECK(uint32_t(SMSG_ATTACKSWING_ERROR) <= 0x1FFFu);
     CHECK(uint32_t(SMSG_MOVE_SET_SWIM_SPEED) <= 0x1FFFu);
@@ -375,6 +393,7 @@ static void test_opcode_values_are_framable()
     CHECK(uint32_t(SMSG_ATTACKSTOP) <= 0x1FFFu);
     CHECK(uint32_t(SMSG_ATTACKERSTATEUPDATE) <= 0x1FFFu);
     CHECK(uint32_t(SMSG_CANCEL_COMBAT) <= 0x1FFFu);
+    CHECK(uint32_t(SMSG_PARTYKILLLOG) <= 0x1FFFu);
 }
 
 int main(int /*argc*/, char** /*argv*/)
@@ -388,6 +407,7 @@ int main(int /*argc*/, char** /*argv*/)
     test_raid_difficulty();
     test_dungeon_difficulty();
     test_cancel_combat();
+    test_party_kill_log();
     test_opcode_values_are_framable();
 
     if (g_fail)

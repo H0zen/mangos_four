@@ -366,6 +366,7 @@ static bool IsEnterWorldConverted(uint16 opcode)
         case SMSG_ATTACKSTART:                     // MopCompactPackets::BuildAttackStart
         case SMSG_ATTACKSTOP:                      // MopCompactPackets::BuildAttackStop
         case SMSG_ATTACKERSTATEUPDATE:             // nested UnitCombat_C record; reader sub_858A94
+        case SMSG_PARTYKILLLOG:                    // MopCompactPackets::BuildPartyKillLog
         case SMSG_CANCEL_COMBAT:                   // Empty reader; terminal clears local-player combat state
         case SMSG_CANCEL_AUTO_REPEAT:              // packed unit GUID; Unit_C leaf 0x819546 clears auto-repeat
         case SMSG_AI_REACTION:                     // packed unit GUID plus reaction; Unit_C.cpp leaf 0x80AD80

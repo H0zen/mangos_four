@@ -181,6 +181,34 @@ namespace MopCompactPackets
         out.WriteGuidBytes<7, 6, 2, 5, 0, 4, 1, 3>(guid);
     }
 
+    inline void BuildPartyKillLog(WorldPacket& out, ObjectGuid killer,
+        ObjectGuid victim)
+    {
+        out.Initialize(SMSG_PARTYKILLLOG, 18);
+
+        // Wow.exe 18414 reader sub_6F2FE4 consumes two packed GUIDs;
+        // terminal sub_841B83 treats them as credited killer then victim.
+        out.WriteGuidMask<7, 2>(victim);
+        out.WriteGuidMask<1>(killer);
+        out.WriteGuidMask<4>(victim);
+        out.WriteGuidMask<2, 5>(killer);
+        out.WriteGuidMask<3, 1, 0>(victim);
+        out.WriteGuidMask<3, 0, 4>(killer);
+        out.WriteGuidMask<6>(victim);
+        out.WriteGuidMask<7>(killer);
+        out.WriteGuidMask<5>(victim);
+        out.WriteGuidMask<6>(killer);
+        out.FlushBits();
+
+        out.WriteGuidBytes<0, 5>(victim);
+        out.WriteGuidBytes<0, 2>(killer);
+        out.WriteGuidBytes<7, 6, 1, 4>(victim);
+        out.WriteGuidBytes<4, 1>(killer);
+        out.WriteGuidBytes<2>(victim);
+        out.WriteGuidBytes<6, 3, 5, 7>(killer);
+        out.WriteGuidBytes<3>(victim);
+    }
+
     struct AttackStateUpdateData
     {
         uint32 hitInfo = 0;
