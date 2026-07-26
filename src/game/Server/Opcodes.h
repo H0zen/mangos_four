@@ -446,7 +446,7 @@ enum OpcodesList
     SMSG_QUESTUPDATE_FAILED                      = 0x07DD,    // 5.4.8 18414 (Wow.exe leaf; name reference-consensus)
     SMSG_QUESTUPDATE_FAILEDTIMER                 = 0x06FF, // 5.4.8 18414 (Wow.exe uint32 quest reader; timed-quest failure callback)
     SMSG_QUESTUPDATE_COMPLETE                    = 0x0776,    // 5.4.8 18414 (Wow.exe leaf; name reference-consensus)
-    SMSG_QUESTUPDATE_ADD_KILL                    = 0x1645,    // 5.4.8 18414 (Wow.exe leaf; name single-source fork; via SMSG_QUEST_UPDATE_ADD_KILL)
+    SMSG_QUESTUPDATE_ADD_KILL                    = 0x1645, // 5.4.8 18414 (Wow.exe quest-progress reader; name reference-backed)
     SMSG_QUESTUPDATE_ADD_ITEM_OBSOLETE           = 0x119B,    // (legacy; no client leaf)
     CMSG_QUEST_CONFIRM_ACCEPT                    = 0x124B, // 5.4.8 18414 (Wow.exe writer; ConfirmAcceptQuest path)
     SMSG_QUEST_CONFIRM_ACCEPT                    = 0x13C7, // 5.4.8 18414 (Wow.exe reader; QUEST_ACCEPT_CONFIRM event)

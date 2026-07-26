@@ -865,6 +865,41 @@ namespace MopQuestPackets
             out.WriteByteSeq(GuidByte(guid, index));
     }
 
+    // Numeric values are consumed by the 18414 quest-progress terminal. Types
+    // 0/3 resolve the object through creaturecache.wdb; type 2 uses
+    // gameobjectcache.wdb.
+    enum class QuestProgressObjectiveType : uint8
+    {
+        CreatureKill = 0,
+        GameObject = 2,
+        CreatureInteract = 3,
+    };
+
+    struct QuestProgressCredit
+    {
+        uint16 count = 0;
+        QuestProgressObjectiveType type =
+            QuestProgressObjectiveType::CreatureKill;
+        uint32 questId = 0;
+        uint16 requiredCount = 0;
+        uint32 objectId = 0;
+        uint64 targetGuid = 0;
+    };
+
+    inline void BuildQuestProgressCredit(WorldPacket& out,
+        QuestProgressCredit const& credit)
+    {
+        out.Initialize(SMSG_QUESTUPDATE_ADD_KILL, 22);
+        out << credit.count << uint8(credit.type) << credit.questId;
+        out << credit.requiredCount << credit.objectId;
+
+        uint8 const maskOrder[] = { 0, 4, 2, 6, 1, 5, 7, 3 };
+        uint8 const byteOrder[] = { 2, 7, 3, 0, 4, 5, 1, 6 };
+        WriteGuidMask(out, credit.targetGuid, maskOrder);
+        out.FlushBits();
+        WriteGuidBytes(out, credit.targetGuid, byteOrder);
+    }
+
     inline bool BuildQuestConfirmAccept(WorldPacket& out, uint32 questId,
         std::string const& title, uint64 sharerGuid)
     {
@@ -3403,7 +3438,9 @@ class Player : public Unit
         // Send a quest update for adding an item
 
         // Send a quest update for adding a creature or game object
-        void SendQuestUpdateAddCreatureOrGo(Quest const* pQuest, ObjectGuid guid, uint32 creatureOrGO_idx, uint32 count);
+        void SendQuestUpdateAddCreatureOrGo(Quest const* pQuest, ObjectGuid guid,
+            uint32 creatureOrGO_idx, uint32 count,
+            MopQuestPackets::QuestProgressObjectiveType objectiveType);
         void SendQuestGiverStatusMultiple();
 
         // Get the divider GUID

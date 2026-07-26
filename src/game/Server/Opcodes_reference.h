@@ -175,8 +175,8 @@
  *   TOTAL SMSG rows                   925
  *
  * SUBSYSTEM CONFIDENCE: high=365, low=221, medium=182, none=157
- * STATUS TOTALS: ACTIVE=330, DOC=437, DORMANT=753
- *   SMSG: ACTIVE=195, DOC=270, DORMANT=460
+ * STATUS TOTALS: ACTIVE=331, DOC=437, DORMANT=752
+ *   SMSG: ACTIVE=196, DOC=270, DORMANT=459
  *   CMSG: ACTIVE=135, DOC=167, DORMANT=293
  */
 
@@ -823,7 +823,7 @@ typedef uint16_t uint16;
  *   SMSG_SHOW_NEURTRAL_PLAYER_FACTION_SELECT_UI    0x15E0  DORMANT  [medium-conf]
  *   SMSG_UNKNOWN_0x161A                            0x161A  DOC      [medium-conf]
  *   SMSG_GMTICKET_SYSTEMSTATUS                     0x163B  ACTIVE   [medium-conf]
- *   SMSG_QUESTUPDATE_ADD_KILL                      0x1645  DORMANT 
+ *   SMSG_QUESTUPDATE_ADD_KILL                      0x1645  ACTIVE
  *   SMSG_MINIMAP_PING                              0x168F  ACTIVE
  *   SMSG_FEATURE_SYSTEM_STATUS                     0x16BB  ACTIVE  
  *   SMSG_INSPECT_RESULTS                           0x1842  ACTIVE

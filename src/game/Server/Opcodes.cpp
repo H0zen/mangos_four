@@ -404,6 +404,10 @@ void InitializeOpcodes()
     DefS(SMSG_QUESTLOG_FULL, "SMSG_QUESTLOG_FULL");
     DefS(SMSG_QUESTUPDATE_FAILEDTIMER, "SMSG_QUESTUPDATE_FAILEDTIMER");
 
+    // Direct 18414 reader proof: uint16 progress, objective type, quest ID,
+    // uint16 target count, object template ID, then a packed credited GUID.
+    DefS(SMSG_QUESTUPDATE_ADD_KILL, "SMSG_QUESTUPDATE_ADD_KILL");
+
     // The 18414 abandon action carries exactly one quest-log slot byte.
     // Clearing the player's quest slot supplies the client-visible object update;
     // the client action does not require a dedicated response packet.

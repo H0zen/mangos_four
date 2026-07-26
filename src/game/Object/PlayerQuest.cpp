@@ -2520,7 +2520,9 @@ void Player::KilledMonsterCredit(uint32 entry, ObjectGuid guid)
                                 q_status.uState = QUEST_CHANGED;
                             }
 
-                            SendQuestUpdateAddCreatureOrGo(qInfo, guid, j, q_status.m_creatureOrGOcount[j]);
+                            SendQuestUpdateAddCreatureOrGo(qInfo, guid, j,
+                                q_status.m_creatureOrGOcount[j],
+                                MopQuestPackets::QuestProgressObjectiveType::CreatureKill);
                         }
 
                         if (CanCompleteQuest(questid))
@@ -2626,7 +2628,12 @@ void Player::CastedCreatureOrGO(uint32 entry, ObjectGuid guid, uint32 spell_id, 
                     q_status.uState = QUEST_CHANGED;
                 }
 
-                SendQuestUpdateAddCreatureOrGo(qInfo, guid, j, q_status.m_creatureOrGOcount[j]);
+                // A spell cast on a creature is an interaction objective, while
+                // a cast on a GameObject remains a GameObject objective.
+                SendQuestUpdateAddCreatureOrGo(qInfo, guid, j,
+                    q_status.m_creatureOrGOcount[j],
+                    isCreature ? MopQuestPackets::QuestProgressObjectiveType::CreatureInteract :
+                        MopQuestPackets::QuestProgressObjectiveType::GameObject);
             }
 
             if (CanCompleteQuest(questid))
@@ -2701,7 +2708,9 @@ void Player::TalkedToCreature(uint32 entry, ObjectGuid guid)
                                 q_status.uState = QUEST_CHANGED;
                             }
 
-                            SendQuestUpdateAddCreatureOrGo(qInfo, guid, j, q_status.m_creatureOrGOcount[j]);
+                            SendQuestUpdateAddCreatureOrGo(qInfo, guid, j,
+                                q_status.m_creatureOrGOcount[j],
+                                MopQuestPackets::QuestProgressObjectiveType::CreatureInteract);
                         }
                         if (CanCompleteQuest(questid))
                         {
@@ -3018,25 +3027,39 @@ void Player::SendPushToPartyResponse(Player* pPlayer, uint32 msg)
  * @param guid The GUID of the credited target.
  * @param creatureOrGO_idx The objective index.
  * @param count The updated progress count.
+ * @param objectiveType The 18414 objective discriminator for this credit path.
  */
-void Player::SendQuestUpdateAddCreatureOrGo(Quest const* pQuest, ObjectGuid guid, uint32 creatureOrGO_idx, uint32 count)
+void Player::SendQuestUpdateAddCreatureOrGo(Quest const* pQuest, ObjectGuid guid,
+    uint32 creatureOrGO_idx, uint32 count,
+    MopQuestPackets::QuestProgressObjectiveType objectiveType)
 {
-    MANGOS_ASSERT(count < 65536 && "mob/GO count store in 16 bits 2^16 = 65536 (0..65536)");
-
-    int32 entry = pQuest->ReqCreatureOrGOId[ creatureOrGO_idx ];
-    if (entry < 0)
-        // client expected gameobject template id in form (id|0x80000000)
+    uint32 const requiredCount =
+        pQuest->ReqCreatureOrGOCount[creatureOrGO_idx];
+    if (count >= 65536 || requiredCount >= 65536)
     {
-        entry = (-entry) | 0x80000000;
+        sLog.outError("WORLD: Cannot send SMSG_QUESTUPDATE_ADD_KILL for quest "
+            "%u: count %u/%u exceeds the 18414 uint16 fields",
+            pQuest->GetQuestId(), count, requiredCount);
+        return;
     }
 
-    WorldPacket data(SMSG_QUESTUPDATE_ADD_KILL, (4 * 4 + 8));
+    int32 const signedEntry = pQuest->ReqCreatureOrGOId[creatureOrGO_idx];
+    uint32 const objectId = signedEntry < 0 ? uint32(-int64(signedEntry)) :
+        uint32(signedEntry);
+
+    MopQuestPackets::QuestProgressCredit credit;
+    credit.count = uint16(count);
+    credit.type = objectiveType;
+    credit.questId = pQuest->GetQuestId();
+    credit.requiredCount = uint16(requiredCount);
+    // The discriminator selects the client's cache, so GameObject IDs are
+    // positive template IDs rather than the legacy high-bit encoding.
+    credit.objectId = objectId;
+    credit.targetGuid = guid.GetRawValue();
+
+    WorldPacket data;
+    MopQuestPackets::BuildQuestProgressCredit(data, credit);
     DEBUG_LOG("WORLD: Sent SMSG_QUESTUPDATE_ADD_KILL");
-    data << uint32(pQuest->GetQuestId());
-    data << uint32(entry);
-    data << uint32(count);
-    data << uint32(pQuest->ReqCreatureOrGOCount[ creatureOrGO_idx ]);
-    data << guid;
     GetSession()->SendPacket(&data);
 
     uint16 log_slot = FindQuestSlot(pQuest->GetQuestId());
