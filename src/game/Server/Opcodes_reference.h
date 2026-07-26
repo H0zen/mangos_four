@@ -175,8 +175,8 @@
  *   TOTAL SMSG rows                   925
  *
  * SUBSYSTEM CONFIDENCE: high=365, low=221, medium=182, none=157
- * STATUS TOTALS: ACTIVE=371, DOC=438, DORMANT=711
- *   SMSG: ACTIVE=231, DOC=271, DORMANT=423
+ * STATUS TOTALS: ACTIVE=372, DOC=438, DORMANT=710
+ *   SMSG: ACTIVE=232, DOC=271, DORMANT=422
  *   CMSG: ACTIVE=140, DOC=167, DORMANT=288
  */
 
@@ -836,7 +836,7 @@ typedef uint16_t uint16;
  *   SMSG_ITEM_TIME_UPDATE                          0x18C1  ACTIVE
  *   SMSG_PETGODMODE                                0x1940  DORMANT  [medium-conf]
  *   SMSG_SUPERCEDED_SPELL                          0x1943  ACTIVE   [high-conf]
- *   SMSG_LEVELUP_INFO                              0x1961  DORMANT 
+ *   SMSG_LEVELUP_INFO                              0x1961  ACTIVE   [Wow.exe binary: sub_6BAC39 reads 13 uint32 fields; sub_7B12E9 maps them to PLAYER_LEVEL_UP]
  *   SMSG_UNKNOWN_0x19C2                            0x19C2  DOC      [medium-conf]
  *   SMSG_CONVERT_RUNE                              0x1A1B  DORMANT  [medium-conf]
  *   SMSG_UNKNOWN_0x1A2B                            0x1A2B  DOC      [medium-conf]

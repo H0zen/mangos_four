@@ -1555,6 +1555,26 @@ foreach(mutation IN ITEMS field_order gameobject_type interact_type guid_mask gu
     set_tests_properties(mop_quest_progress_packets_source_mutation_${mutation} PROPERTIES WILL_FAIL TRUE)
 endforeach()
 
+add_executable(mop_player_progression_packets_test mop_player_progression_packets_test.cpp)
+target_include_directories(mop_player_progression_packets_test PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}/..
+    ${CMAKE_SOURCE_DIR}/src/shared)
+set_target_properties(mop_player_progression_packets_test PROPERTIES CXX_STANDARD 17 CXX_STANDARD_REQUIRED ON)
+target_link_libraries(mop_player_progression_packets_test PRIVATE game)
+add_test(NAME mop_player_progression_packets COMMAND mop_player_progression_packets_test)
+
+add_test(NAME mop_player_progression_packets_source
+    COMMAND ${CMAKE_COMMAND} -DSOURCE_ROOT=${CMAKE_SOURCE_DIR}
+        -P ${CMAKE_CURRENT_SOURCE_DIR}/mop_player_progression_packets_source_test.cmake)
+
+foreach(mutation IN ITEMS wire_order sender registration admission reference)
+    add_test(NAME mop_player_progression_packets_source_mutation_${mutation}
+        COMMAND ${CMAKE_COMMAND} -DSOURCE_ROOT=${CMAKE_SOURCE_DIR}
+            -DMUTATION=${mutation}
+            -P ${CMAKE_CURRENT_SOURCE_DIR}/mop_player_progression_packets_source_test.cmake)
+    set_tests_properties(mop_player_progression_packets_source_mutation_${mutation} PROPERTIES WILL_FAIL TRUE)
+endforeach()
+
 add_executable(mop_world_state_packets_test mop_world_state_packets_test.cpp)
 target_include_directories(mop_world_state_packets_test PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/..

@@ -708,6 +708,32 @@ namespace MopReputationPackets
     }
 }
 
+namespace MopProgressionPackets
+{
+    struct LevelUpInfo
+    {
+        uint32 talentDelta = 0;
+        uint32 healthDelta = 0;
+        std::array<uint32, MAX_STATS> statDeltas = {{}};
+        uint32 level = 0;
+        std::array<uint32, MAX_STORED_POWERS> powerDeltas = {{}};
+    };
+
+    inline void BuildLevelUpInfo(WorldPacket& out, LevelUpInfo const& info)
+    {
+        out.Initialize(SMSG_LEVELUP_INFO, 13 * sizeof(uint32));
+
+        // Wow.exe 18414 reader sub_6BAC39 consumes thirteen uint32 values.
+        // Terminal sub_7B12E9 maps these slots to PLAYER_LEVEL_UP arguments.
+        out << info.talentDelta << info.healthDelta;
+        for (uint32 delta : info.statDeltas)
+            out << delta;
+        out << info.level;
+        for (uint32 delta : info.powerDeltas)
+            out << delta;
+    }
+}
+
 namespace MopAreaTriggerPackets
 {
     struct Request

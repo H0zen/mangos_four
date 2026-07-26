@@ -2453,22 +2453,17 @@ void Player::GiveLevel(uint32 level)
     uint32 basehp = 0, basemana = 0;
     sObjectMgr.GetPlayerClassLevelInfo(getClass(), level, basehp, basemana);
 
-    // send levelup info to client
-    WorldPacket data(SMSG_LEVELUP_INFO, (4 + 4 + MAX_STORED_POWERS * 4 + MAX_STATS * 4));
-    data << uint32(level);
-    data << uint32(int32(basehp) - int32(GetCreateHealth()));
-    // for(int i = 0; i < MAX_POWERS; ++i)                  // Powers loop (0-4)
-    data << uint32(int32(basemana)   - int32(GetCreateMana()));
-    data << uint32(0);
-    data << uint32(0);
-    data << uint32(0);
-    data << uint32(0);
-    // end for
-    for (int i = STAT_STRENGTH; i < MAX_STATS; ++i)         // Stats loop (0-4)
-    {
-        data << uint32(int32(info.stats[i]) - GetCreateStat(Stats(i)));
-    }
+    MopProgressionPackets::LevelUpInfo packetInfo;
+    packetInfo.level = level;
+    packetInfo.healthDelta = uint32(int32(basehp) - int32(GetCreateHealth()));
+    packetInfo.powerDeltas[POWER_MANA] =
+        uint32(int32(basemana) - int32(GetCreateMana()));
+    for (int i = STAT_STRENGTH; i < MAX_STATS; ++i)
+        packetInfo.statDeltas[i] =
+            uint32(int32(info.stats[i]) - GetCreateStat(Stats(i)));
 
+    WorldPacket data;
+    MopProgressionPackets::BuildLevelUpInfo(data, packetInfo);
     GetSession()->SendPacket(&data);
 
     SetUInt32Value(PLAYER_NEXT_LEVEL_XP, sObjectMgr.GetXPForLevel(level));
