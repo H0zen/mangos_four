@@ -23,46 +23,52 @@
  * and lore are copyrighted by Blizzard Entertainment, Inc.
  */
 
-#ifndef ANTIFREEZE_THREAD
-#define ANTIFREEZE_THREAD
+#include "Listener.h"
 
-#include "Common.h"
-#include "Threading/Threading.h"
+#include "ClientConnection.h"
 
-/**
- * @brief Watchdog thread that bang-crashes the process if the world loop hangs.
- */
-class AntiFreezeThread
+#include <memory>
+
+namespace proto
 {
-    public:
-        explicit AntiFreezeThread(uint32 delay);
-        ~AntiFreezeThread();
+    Listener::Listener(IWorldGateway& gateway)
+        : m_gateway(gateway),
+          m_running(false)
+    {
+    }
 
-        /// Starts the watchdog thread.
-        void Activate();
+    Listener::~Listener()
+    {
+        Stop();
+    }
 
-    private:
-        /// Runnable body driving the watchdog loop.
-        class Body : public MaNGOS::Runnable
+    bool Listener::Start(uint16_t port, const std::string& bindIp)
+    {
+        if (m_running)
         {
-            public:
-                explicit Body(uint32 delay)
-                    : m_loops(0), m_lastchange(0), w_loops(0), w_lastchange(0), m_delayTime(delay)
-                {
-                }
+            return true;
+        }
 
-                void run() override;
+        IWorldGateway* gateway = &m_gateway;
 
-            private:
-                uint32 m_loops;
-                uint32 m_lastchange;
-                uint32 w_loops;
-                uint32 w_lastchange;
-                uint32 m_delayTime;
-        };
+        m_running = m_server.start(port,
+            [gateway]() -> std::shared_ptr<net::ISession>
+            {
+                return std::make_shared<ClientConnection>(*gateway);
+            },
+            bindIp);
 
-        uint32          m_delayTime;
-        MaNGOS::Thread* m_thread;
-};
+        return m_running;
+    }
 
-#endif
+    void Listener::Stop()
+    {
+        if (!m_running)
+        {
+            return;
+        }
+
+        m_server.stop();
+        m_running = false;
+    }
+}

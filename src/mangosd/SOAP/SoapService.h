@@ -23,50 +23,53 @@
  * and lore are copyrighted by Blizzard Entertainment, Inc.
  */
 
-/// \addtogroup mangosd
-/// @{
-/// \file
+#ifndef MANGOS_H_SOAPSERVICE
+#define MANGOS_H_SOAPSERVICE
 
-#ifndef MANGOS_H_CLITHREAD
-#define MANGOS_H_CLITHREAD
+#include "SoapThread.h"
 
-#include "Threading/Threading.h"
+#include "../Service.h"
+
+#include "Platform/Define.h"
+
+#include <string>
+#include <thread>
 
 /**
- * @brief Command Line Interface handling thread
+ * @brief The gSOAP listener, as an IService.
  *
+ * SoapThread() already polls World::IsStopped() in its own loop (it was never
+ * ACE, just a bare std::thread mangosd.cpp spun up and joined by hand), so
+ * there is nothing to signal here: the world stopping is the stop request,
+ * and Join() only has to wait for the thread to notice.
  */
-class CliThread
+class SoapService : public IService
 {
     public:
-        explicit CliThread(bool beep);
-        ~CliThread();
 
-        /// Starts the CLI thread.
-        void Activate();
+        SoapService(const std::string& host, uint16 port)
+            : m_host(host), m_port(port) {}
 
-        /// Unblocks the CLI thread during server shutdown and joins it.
-        void Shutdown();
+        const char* Name() const override { return "SOAP"; }
+
+        void Start() override
+        {
+            m_thread = std::thread(SoapThread, m_host, m_port);
+        }
+
+        void Join() override
+        {
+            if (m_thread.joinable())
+            {
+                m_thread.join();
+            }
+        }
 
     private:
-        /// Runnable body driving the console read/dispatch loop.
-        class Body : public MaNGOS::Runnable
-        {
-            public:
-                enum { BUFFSIZE = 256 };
 
-                explicit Body(bool beep) : m_beep(beep) {}
-
-                void run() override;
-
-            private:
-                char m_buffer[BUFFSIZE];
-                bool m_beep;
-        };
-
-        Body*           m_body;
-        MaNGOS::Thread* m_thread;
-        bool            m_beep;
+        std::string m_host;
+        uint16      m_port;
+        std::thread m_thread;
 };
+
 #endif
-/// @}

@@ -32,6 +32,7 @@
 
 #include "Common.h"
 #include "Auth/BigNumber.h"
+#include "Auth/MopAuthKey.h"
 #include "SharedDefines.h"
 #include "ObjectGuid.h"
 #include "AuctionHouseMgr.h"
@@ -41,6 +42,7 @@
 #include "WorldPacket.h"
 
 #include <array>
+#include <memory>
 #include <mutex>
 #include <string>
 #include <vector>
@@ -58,13 +60,14 @@ class Player;
 class Unit;
 class Warden;
 class WorldPacket;
-class WorldSocket;
 class QueryResult;
 class LoginQueryHolder;
 class CharacterHandler;
 class GMTicket;
 class MovementInfo;
 class WorldSession;
+
+namespace proto { class IClientLink; }
 
 namespace MopTradePackets
 {
@@ -1342,12 +1345,23 @@ class WorldSession
         /**
          * @brief Constructor
          * @param id Session ID
-         * @param sock World socket
+         * @param link How to talk back to this client (proto::IClientLink; the
+         *             transport underneath -- ClientConnection, the net::
+         *             engine -- is opaque to WorldSession)
          * @param sec Account security level
          * @param mute_time Mute time
          * @param locale Locale
+         * @param sessionKey The account's canonical raw-40 session key (K),
+         *             carried in from WorldGateway::LookupAccount rather than
+         *             re-read: SendRedirectClient()'s HMAC seed and (once
+         *             re-enabled) Warden both need it, and re-deriving it a
+         *             second time from the DB is how a stale/second read
+         *             desyncs from the key proto already proved the client
+         *             holds.
          */
-        WorldSession(uint32 id, WorldSocket* sock, AccountTypes sec, uint8 expansion, time_t mute_time, LocaleConstant locale);
+        WorldSession(uint32 id, std::shared_ptr<proto::IClientLink> link,
+                     AccountTypes sec, uint8 expansion, time_t mute_time, LocaleConstant locale,
+                     const uint8 (&sessionKey)[MopAuth::SESSION_KEY_LEN]);
 
         /**
          * @brief Destructor
@@ -1416,6 +1430,13 @@ class WorldSession
         void SendSetPhaseShift(uint32 phaseMask, uint16 mapId = 0);
         void SendQueryTimeResponse();
         void SendRedirectClient(std::string& ip, uint16 port);
+
+        /// The canonical raw-40 session key (K). Replaces
+        /// WorldSocket::GetSessionKeyRaw() now that the crypt/proof live in
+        /// proto::ClientConnection, not on a socket WorldSession could reach
+        /// into: WorldGateway::Attach() carries K in via the constructor, so
+        /// this is a plain accessor rather than a round trip through the link.
+        const uint8* GetSessionKeyRaw() const { return m_sessionKey; }
 
         AccountTypes GetSecurity() const
         {
@@ -1611,7 +1632,7 @@ class WorldSession
 
         // opcodes handlers
         void Handle_NULL(WorldPacket& recvPacket);          // not used
-        void Handle_EarlyProccess(WorldPacket& recvPacket); // just mark packets processed in WorldSocket::OnRead
+        void Handle_EarlyProccess(WorldPacket& recvPacket); // STATUS_NEVER stub; these opcodes are fully owned by proto::ClientConnection and must never reach here
         void Handle_ServerSide(WorldPacket& recvPacket);    // sever side only, can't be accepted from client
         void Handle_Deprecated(WorldPacket& recvPacket);    // never used anymore by client
 
@@ -2120,11 +2141,16 @@ class WorldSession
 
         void HandleLoadScreenOpcode(WorldPacket& recvPacket);
     private:
-        friend class WorldSocket;
+        friend class WorldGateway;
 
-        /// Release the session's extra socket reference without closing the socket. Valid only
-        /// before the session has been published to World.
-        void AbandonUnpublishedSocket() noexcept;
+        /// Drop the session's reference to its link without closing it. Valid only before the
+        /// session has been published to World: the connection must survive to deliver an
+        /// auth-error response, which happens through proto::ClientConnection after
+        /// WorldGateway::Attach() returns INVALID_SESSION_ID. Replaces the ACE-era
+        /// AbandonUnpublishedSocket(), which had to release an extra AddReference() taken by
+        /// the constructor; a shared_ptr needs no such bookkeeping -- resetting this session's
+        /// own copy is the whole of it.
+        void AbandonUnpublishedLink() noexcept;
 
         // private trade methods
         void moveItems(Item* myItems[], Item* hisItems[]);
@@ -2140,8 +2166,11 @@ class WorldSession
 
         uint32 m_GUIDLow;                                   // set logged or recently logout player (while m_playerRecentlyLogout set)
         Player* _player;
-        WorldSocket* m_Socket;
+        std::shared_ptr<proto::IClientLink> m_Socket;
         std::string m_Address;
+
+        /// Canonical raw-40 session key (K); see GetSessionKeyRaw()'s doc comment.
+        uint8 m_sessionKey[MopAuth::SESSION_KEY_LEN];
 
         AccountTypes _security;
         uint32 _accountId;

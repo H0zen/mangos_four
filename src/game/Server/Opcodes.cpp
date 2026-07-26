@@ -143,7 +143,7 @@ static void AssertLoginClosureIntegrity()
  *
  * Fills both direction tables with unhandled defaults, then registers the Phase 1a
  * login closure and asserts its integrity. The greeting (MSG_WOW_CONNECTION) is NOT
- * registered; it is handled out-of-band by WorldSocket.
+ * registered; it is handled out-of-band by proto::ClientConnection.
  */
 void InitializeOpcodes()
 {

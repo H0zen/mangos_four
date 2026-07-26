@@ -28,6 +28,9 @@
 #include <cstdio>
 #include <iostream>
 #include <fstream>
+// umask() lived here transitively through an ACE header before Stage 2; now
+// that ACE is gone from src/ entirely, this TU needs the declaration itself.
+#include <sys/stat.h>
 
 pid_t parent_pid = 0, sid = 0;
 

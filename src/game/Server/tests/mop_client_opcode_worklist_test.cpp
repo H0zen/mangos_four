@@ -40,8 +40,8 @@ static int g_fail = 0;
 
 static void test_hotfix_request()
 {
-    ObjectGuid first(0x0800000500000001ull);
-    ObjectGuid second(0x0007060004000200ull);
+    ObjectGuid first(uint64(0x0800000500000001ull));
+    ObjectGuid second(uint64(0x0007060004000200ull));
     WorldPacket packet(CMSG_REQUEST_HOTFIX, 40);
     packet << uint32(0x11223344u);
     packet.WriteBits(2, 21);

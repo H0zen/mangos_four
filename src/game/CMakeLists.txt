@@ -284,6 +284,12 @@ target_compile_definitions(game
 target_link_libraries(game
     PUBLIC
         shared
+        # WorldSocket.cpp and MopAuthResponse.cpp call the relocated
+        # MopAuth::DecodeAuthSession/ComputeAuthProof/ProofEquals functions
+        # (src/proto/, Stage 2 CP2). PUBLIC so targets that link game (the mop_*
+        # tests) inherit proto's include dir through the same usage-requirements
+        # path they already use for shared's.
+        proto
         RecastNavigation::Detour
         ZLIB::ZLIB
         g3dlite

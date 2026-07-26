@@ -115,7 +115,7 @@ static void test_set_active_mover()
 
 static void test_client_move_time_skipped()
 {
-    ObjectGuid guid(0x8070605040302010ull);
+    ObjectGuid guid(uint64(0x8070605040302010ull));
     WorldPacket packet(CMSG_MOVE_TIME_SKIPPED, 13);
     packet << uint32(0x11223344u);
     packet.WriteGuidMask<5, 0, 7, 4, 1, 2, 6, 3>(guid);
@@ -131,7 +131,7 @@ static void test_client_move_time_skipped()
 
 static void test_client_set_active_mover()
 {
-    ObjectGuid guid(0x8070605040302010ull);
+    ObjectGuid guid(uint64(0x8070605040302010ull));
     WorldPacket packet(CMSG_SET_ACTIVE_MOVER, 10);
     packet.WriteBit(false); // GUID is not zero
     packet.WriteGuidMask<3, 0, 2, 1, 5, 4, 7, 6>(guid);

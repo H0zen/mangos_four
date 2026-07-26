@@ -23,44 +23,48 @@
  * and lore are copyrighted by Blizzard Entertainment, Inc.
  */
 
-/// \addtogroup mangosd
-/// @{
-/// \file
-
-#ifndef MANGOS_H_WORLDTHREAD
-#define MANGOS_H_WORLDTHREAD
-
-#include <ace/INET_Addr.h>
-
-#include "Common.h"
-#include "Threading/Threading.h"
-
-/**
- * @brief Heartbeat thread for the World
- *
+/** \file
+ \ingroup realmd
  */
-class WorldThread
+
+#include <cstdint>
+#include <string>
+#include "AuthServer.h"
+#include "AuthSocket.h"
+
+#include "net/Server.hpp"
+
+#include <memory>
+
+/// Holds the value-type networking engine, kept in the .cpp so its platform
+/// headers stay out of AuthServer.h (and therefore out of Main.cpp).
+struct AuthServer::Impl
 {
-    public:
-        explicit WorldThread(uint16 port, const char* host);
-        ~WorldThread();
-
-        /// Starts the world socket network listener and spawns the update loop.
-        bool Open();
-
-        /// Blocks until the update loop has stopped.
-        void Wait();
-
-    private:
-        /// Runnable body driving the world update loop.
-        class Body : public MaNGOS::Runnable
-        {
-            public:
-                void run() override;
-        };
-
-        ACE_INET_Addr   m_listenAddr;
-        MaNGOS::Thread* m_thread;
+    net::Server server;
 };
-#endif
-/// @}
+
+AuthServer::AuthServer()
+    : m_impl(new Impl())
+{
+}
+
+AuthServer::~AuthServer()
+{
+    Stop();
+}
+
+bool AuthServer::Start(uint16_t port, const std::string& bindIp)
+{
+    return m_impl->server.start(port, []() -> std::shared_ptr<net::ISession>
+    {
+        return std::make_shared<AuthSocket>();
+    }, bindIp);
+}
+
+void AuthServer::Stop()
+{
+    if (m_impl)
+    {
+        m_impl->server.stop();
+    }
+}
