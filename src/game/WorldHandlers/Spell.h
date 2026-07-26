@@ -376,6 +376,44 @@ namespace MopSpellPackets
         out.WriteGuidBytes<2>(ownerGuid);
     }
 
+    inline void BuildLearnedSpell(WorldPacket& out, uint32 spellId,
+        bool suppressMessaging)
+    {
+        out.Initialize(SMSG_LEARNED_SPELL, 7);
+
+        // Wow.exe 18414 reader sub_70D8B8 consumes a 22-bit count followed
+        // by the conventional suppress-messaging bit, then the spell IDs.
+        out.WriteBits(1, 22);
+        out.WriteBit(suppressMessaging);
+        out.FlushBits();
+        out << spellId;
+    }
+
+    inline void BuildRemovedSpell(WorldPacket& out, uint32 spellId)
+    {
+        out.Initialize(SMSG_REMOVED_SPELL, 7);
+
+        // Wow.exe 18414 reader sub_6B0AD9 consumes a 22-bit count before the
+        // removed spell-ID array.
+        out.WriteBits(1, 22);
+        out.FlushBits();
+        out << spellId;
+    }
+
+    inline void BuildSupersededSpell(WorldPacket& out, uint32 oldSpellId,
+        uint32 newSpellId)
+    {
+        out.Initialize(SMSG_SUPERCEDED_SPELL, 14);
+
+        // Wow.exe 18414 reader sub_716563 reads old/new 22-bit counts, then
+        // consumes the new-ID array before the old-ID array. Semantic leaf
+        // sub_7C1033 removes the old spell and installs the new one.
+        out.WriteBits(1, 22);
+        out.WriteBits(1, 22);
+        out.FlushBits();
+        out << newSpellId << oldSpellId;
+    }
+
     struct CastFailedArguments
     {
         bool hasArg10 = false;

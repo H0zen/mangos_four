@@ -175,8 +175,8 @@
  *   TOTAL SMSG rows                   925
  *
  * SUBSYSTEM CONFIDENCE: high=365, low=221, medium=182, none=157
- * STATUS TOTALS: ACTIVE=352, DOC=438, DORMANT=730
- *   SMSG: ACTIVE=213, DOC=271, DORMANT=441
+ * STATUS TOTALS: ACTIVE=355, DOC=438, DORMANT=727
+ *   SMSG: ACTIVE=216, DOC=271, DORMANT=438
  *   CMSG: ACTIVE=139, DOC=167, DORMANT=289
  */
 
@@ -808,7 +808,7 @@ typedef uint16_t uint16;
  *   SMSG_QUESTGIVER_STATUS                         0x1275  ACTIVE
  *   SMSG_UNKNOWN_0x1282                            0x1282  DOC      [medium-conf]
  *   SMSG_BINDER_CONFIRM                            0x1287  ACTIVE   [medium-conf]
- *   SMSG_LEARNED_SPELL                             0x129A  DORMANT  [medium-conf]
+ *   SMSG_LEARNED_SPELL                             0x129A  ACTIVE   [high-conf]
  *   SMSG_SOCKET_GEMS                               0x12A6  DORMANT 
  *   SMSG_QUESTGIVER_QUEST_FAILED                   0x12DE  ACTIVE   [high-conf]
  *   SMSG_QUESTGIVER_QUEST_DETAILS                  0x134C  ACTIVE   [high-conf]
@@ -817,7 +817,7 @@ typedef uint16_t uint16;
  *   SMSG_UNKNOWN_0x1441                            0x1441  DOC     
  *   SMSG_SPELLNONMELEEDAMAGELOG                    0x1450  DORMANT  [medium-conf]
  *   SMSG_VOID_STORAGE_TRANSFER_CHANGES             0x14BA  DORMANT  [medium-conf]
- *   SMSG_REMOVED_SPELL                             0x14C3  DORMANT  [medium-conf]
+ *   SMSG_REMOVED_SPELL                             0x14C3  ACTIVE   [high-conf]
  *   SMSG_BUY_FAILED                                0x1563  ACTIVE   [medium-conf]
  *   SMSG_SPELLLOGMISS                              0x1570  DORMANT 
  *   SMSG_SHOW_NEURTRAL_PLAYER_FACTION_SELECT_UI    0x15E0  DORMANT  [medium-conf]
@@ -835,7 +835,7 @@ typedef uint16_t uint16;
  *   SMSG_GROUP_SET_LEADER                          0x18BF  DORMANT  [medium-conf]
  *   SMSG_ITEM_TIME_UPDATE                          0x18C1  ACTIVE
  *   SMSG_PETGODMODE                                0x1940  DORMANT  [medium-conf]
- *   SMSG_SUPERCEDED_SPELL                          0x1943  DORMANT  [medium-conf]
+ *   SMSG_SUPERCEDED_SPELL                          0x1943  ACTIVE   [high-conf]
  *   SMSG_LEVELUP_INFO                              0x1961  DORMANT 
  *   SMSG_UNKNOWN_0x19C2                            0x19C2  DOC      [medium-conf]
  *   SMSG_CONVERT_RUNE                              0x1A1B  DORMANT  [medium-conf]

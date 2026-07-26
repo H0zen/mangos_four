@@ -9,6 +9,7 @@ file(READ "${SOURCE_ROOT}/src/game/ChatCommands/DebugCommands.cpp" debug_command
 file(READ "${SOURCE_ROOT}/src/game/Object/Player.cpp" player_source)
 file(READ "${SOURCE_ROOT}/src/game/Object/PlayerItemStorage.cpp" item_storage_source)
 file(READ "${SOURCE_ROOT}/src/game/Object/PetSpells.cpp" pet_spells_source)
+file(READ "${SOURCE_ROOT}/src/game/Object/PlayerSpell.cpp" player_spell_source)
 file(READ "${SOURCE_ROOT}/src/game/Object/SpellCooldownMgr.cpp" spell_cooldown_mgr_source)
 file(READ "${SOURCE_ROOT}/src/game/Server/Opcodes_reference.h" opcode_reference)
 
@@ -296,6 +297,31 @@ elseif(MUTATION STREQUAL "clear_cooldowns_reference")
     string(REPLACE
         "SMSG_CLEAR_COOLDOWNS                           0x1458  ACTIVE"
         "SMSG_CLEAR_COOLDOWNS                           0x1458  DORMANT"
+        opcode_reference "${opcode_reference}")
+elseif(MUTATION STREQUAL "spellbook_wire_order")
+    string(REPLACE
+        "out << newSpellId << oldSpellId;"
+        "out << oldSpellId << newSpellId;"
+        spell_header "${spell_header}")
+elseif(MUTATION STREQUAL "spellbook_sender")
+    string(REPLACE
+        "MopSpellPackets::BuildLearnedSpell(data, spell_id, false);"
+        "/* removed learned-spell sender */"
+        player_spell_source "${player_spell_source}")
+elseif(MUTATION STREQUAL "spellbook_registration")
+    string(REPLACE
+        "DefS(SMSG_LEARNED_SPELL, \"SMSG_LEARNED_SPELL\");"
+        "/* removed learned-spell registration */"
+        opcode_registry "${opcode_registry}")
+elseif(MUTATION STREQUAL "spellbook_gate")
+    string(REPLACE
+        "case SMSG_LEARNED_SPELL:"
+        "case SMSG_UNKNOWN_0:"
+        world_session "${world_session}")
+elseif(MUTATION STREQUAL "spellbook_reference")
+    string(REPLACE
+        "SMSG_LEARNED_SPELL                             0x129A  ACTIVE"
+        "SMSG_LEARNED_SPELL                             0x129A  DORMANT"
         opcode_reference "${opcode_reference}")
 endif()
 
@@ -608,6 +634,45 @@ require_once("${opcode_reference}"
 foreach(source IN ITEMS "${player_source}" "${spell_cooldown_mgr_source}")
     forbid("${source}" "WorldPacket data(SMSG_CLEAR_COOLDOWNS"
         "legacy clear-cooldowns body")
+endforeach()
+require_once("${spell_header}"
+    "inline void BuildLearnedSpell(WorldPacket& out, uint32 spellId,"
+    "18414 learned-spell builder")
+require_once("${spell_header}"
+    "inline void BuildRemovedSpell(WorldPacket& out, uint32 spellId)"
+    "18414 removed-spell builder")
+require_once("${spell_header}"
+    "inline void BuildSupersededSpell(WorldPacket& out, uint32 oldSpellId,"
+    "18414 superseded-spell builder")
+require_once("${spell_header}"
+    "out.WriteBit(suppressMessaging);"
+    "learned-spell suppress-messaging bit")
+require_once("${spell_header}"
+    "out << newSpellId << oldSpellId;"
+    "superseded-spell new/old wire order")
+require_once("${player_spell_source}"
+    "MopSpellPackets::BuildLearnedSpell(data, spell_id, false);"
+    "player learned-spell sender")
+foreach(opcode IN ITEMS SMSG_LEARNED_SPELL SMSG_REMOVED_SPELL SMSG_SUPERCEDED_SPELL)
+    require_once("${opcode_registry}"
+        "DefS(${opcode}, \"${opcode}\");"
+        "${opcode} registration")
+    require_once("${world_session}"
+        "case ${opcode}:"
+        "${opcode} send admission")
+endforeach()
+require_once("${opcode_reference}"
+    "SMSG_LEARNED_SPELL                             0x129A  ACTIVE"
+    "active learned-spell reference")
+require_once("${opcode_reference}"
+    "SMSG_REMOVED_SPELL                             0x14C3  ACTIVE"
+    "active removed-spell reference")
+require_once("${opcode_reference}"
+    "SMSG_SUPERCEDED_SPELL                          0x1943  ACTIVE"
+    "active superseded-spell reference")
+foreach(opcode IN ITEMS SMSG_LEARNED_SPELL SMSG_REMOVED_SPELL SMSG_SUPERCEDED_SPELL)
+    forbid("${player_spell_source}" "WorldPacket data(${opcode}"
+        "legacy ${opcode} body")
 endforeach()
 
 string(FIND "${cast_handler}" "MopSpellPackets::ReadCastSpellRequest(recvPacket, request)" reader_position)

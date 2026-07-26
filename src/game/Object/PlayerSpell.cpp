@@ -204,15 +204,15 @@ bool Player::addSpell(uint32 spell_id, bool active, bool learning, bool dependen
                 if (next_active_spell_id)
                 {
                     // update spell ranks in spellbook and action bar
-                    WorldPacket data(SMSG_SUPERCEDED_SPELL, 4 + 4);
-                    data << uint32(spell_id);
-                    data << uint32(next_active_spell_id);
+                    WorldPacket data;
+                    MopSpellPackets::BuildSupersededSpell(data,
+                        spell_id, next_active_spell_id);
                     GetSession()->SendPacket(&data);
                 }
                 else
                 {
-                    WorldPacket data(SMSG_REMOVED_SPELL, 4);
-                    data << uint32(spell_id);
+                    WorldPacket data;
+                    MopSpellPackets::BuildRemovedSpell(data, spell_id);
                     GetSession()->SendPacket(&data);
                 }
             }
@@ -321,9 +321,9 @@ bool Player::addSpell(uint32 spell_id, bool active, bool learning, bool dependen
                         {
                             if (IsInWorld())                // not send spell (re-/over-)learn packets at loading
                             {
-                                WorldPacket data(SMSG_SUPERCEDED_SPELL, 4 + 4);
-                                data << uint32(itr2->first);
-                                data << uint32(spell_id);
+                                WorldPacket data;
+                                MopSpellPackets::BuildSupersededSpell(data,
+                                    itr2->first, spell_id);
                                 GetSession()->SendPacket(&data);
                             }
 
@@ -339,9 +339,9 @@ bool Player::addSpell(uint32 spell_id, bool active, bool learning, bool dependen
                         {
                             if (IsInWorld())                // not send spell (re-/over-)learn packets at loading
                             {
-                                WorldPacket data(SMSG_SUPERCEDED_SPELL, 4 + 4);
-                                data << uint32(spell_id);
-                                data << uint32(itr2->first);
+                                WorldPacket data;
+                                MopSpellPackets::BuildSupersededSpell(data,
+                                    spell_id, itr2->first);
                                 GetSession()->SendPacket(&data);
                             }
 
@@ -571,9 +571,8 @@ void Player::learnSpell(uint32 spell_id, bool dependent)
     // prevent duplicated entires in spell book, also not send if not in world (loading)
     if (learning && IsInWorld())
     {
-        WorldPacket data(SMSG_LEARNED_SPELL, 6);
-        data << uint32(spell_id);
-        data << uint32(0);                                  // 3.3.3 unk
+        WorldPacket data;
+        MopSpellPackets::BuildLearnedSpell(data, spell_id, false);
         GetSession()->SendPacket(&data);
     }
 
@@ -832,9 +831,9 @@ void Player::removeSpell(uint32 spell_id, bool disabled, bool learn_low_rank, bo
                     if (addSpell(prev_id, true, false, spell.dependent, spell.disabled))
                     {
                         // downgrade spell ranks in spellbook and action bar
-                        WorldPacket data(SMSG_SUPERCEDED_SPELL, 4 + 4);
-                        data << uint32(spell_id);
-                        data << uint32(prev_id);
+                        WorldPacket data;
+                        MopSpellPackets::BuildSupersededSpell(data,
+                            spell_id, prev_id);
                         GetSession()->SendPacket(&data);
                         prev_activate = true;
                     }
@@ -870,8 +869,8 @@ void Player::removeSpell(uint32 spell_id, bool disabled, bool learn_low_rank, bo
     // remove from spell book if not replaced by lesser rank
     if (!prev_activate && sendUpdate)
     {
-        WorldPacket data(SMSG_REMOVED_SPELL, 4);
-        data << uint32(spell_id);
+        WorldPacket data;
+        MopSpellPackets::BuildRemovedSpell(data, spell_id);
         GetSession()->SendPacket(&data);
     }
 

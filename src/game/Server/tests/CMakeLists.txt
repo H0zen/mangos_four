@@ -1360,7 +1360,8 @@ foreach(mutation IN ITEMS reader registration target_initializer target_mapping 
         cooldown_gate cooldown_reference
         clear_cooldowns_mask_order clear_cooldowns_count_width clear_cooldowns_byte_order
         clear_cooldowns_player_sender clear_cooldowns_manager_sender clear_cooldowns_registration
-        clear_cooldowns_gate clear_cooldowns_reference)
+        clear_cooldowns_gate clear_cooldowns_reference
+        spellbook_wire_order spellbook_sender spellbook_registration spellbook_gate spellbook_reference)
     add_test(NAME mop_spell_cast_packets_source_mutation_${mutation}
         COMMAND ${CMAKE_COMMAND} -DSOURCE_ROOT=${CMAKE_SOURCE_DIR}
             -DMUTATION=${mutation}
