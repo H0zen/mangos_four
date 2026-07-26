@@ -243,13 +243,22 @@ void WorldSession::HandleAlterAppearanceOpcode(WorldPacket& recv_data)
 {
     DEBUG_LOG("CMSG_ALTER_APPEARANCE");
 
-    uint32 Hair, Color, FacialHair, skinTone;
-    recv_data >> Hair >> Color >> FacialHair >> skinTone;
+    // The 18414 writer sub_6862C2 emits four uint32 values in this exact order.
+    // Reject truncated or extended bodies before any DBC lookup or player mutation.
+    if (recv_data.size() != 16)
+    {
+        sLog.outError("CMSG_ALTER_APPEARANCE: malformed %u-byte request from account %u",
+                      uint32(recv_data.size()), GetAccountId());
+        return;
+    }
+
+    uint32 skinStyle, color, hairStyle, facialHairStyle;
+    recv_data >> skinStyle >> color >> hairStyle >> facialHairStyle;
 
     uint32 skinTone_id = -1;
     if (_player->getRace() == RACE_TAUREN)
     {
-        BarberShopStyleEntry const* bs_skinTone = sBarberShopStyleStore.LookupEntry(skinTone);
+        BarberShopStyleEntry const* bs_skinTone = sBarberShopStyleStore.LookupEntry(skinStyle);
         if (!bs_skinTone || bs_skinTone->Type != 3 || bs_skinTone->Race != _player->getRace() || bs_skinTone->Sex != _player->getGender())
         {
             return;
@@ -257,21 +266,21 @@ void WorldSession::HandleAlterAppearanceOpcode(WorldPacket& recv_data)
         skinTone_id = bs_skinTone->Data;
     }
 
-    BarberShopStyleEntry const* bs_hair = sBarberShopStyleStore.LookupEntry(Hair);
+    BarberShopStyleEntry const* bs_hair = sBarberShopStyleStore.LookupEntry(hairStyle);
 
     if (!bs_hair || bs_hair->Type != 0 || bs_hair->Race != _player->getRace() || bs_hair->Sex != _player->getGender())
     {
         return;
     }
 
-    BarberShopStyleEntry const* bs_facialHair = sBarberShopStyleStore.LookupEntry(FacialHair);
+    BarberShopStyleEntry const* bs_facialHair = sBarberShopStyleStore.LookupEntry(facialHairStyle);
 
     if (!bs_facialHair || bs_facialHair->Type != 2 || bs_facialHair->Race != _player->getRace() || bs_facialHair->Sex != _player->getGender())
     {
         return;
     }
 
-    uint32 Cost = _player->GetBarberShopCost(bs_hair->Data, Color, bs_facialHair->Data, skinTone_id);
+    uint32 Cost = _player->GetBarberShopCost(bs_hair->Data, color, bs_facialHair->Data, skinTone_id);
 
     // 0 - ok
     // 1,3 - not enough money
@@ -294,7 +303,7 @@ void WorldSession::HandleAlterAppearanceOpcode(WorldPacket& recv_data)
     _player->GetAchievementMgr().UpdateAchievementCriteria(ACHIEVEMENT_CRITERIA_TYPE_GOLD_SPENT_AT_BARBER, Cost);
 
     _player->SetByteValue(PLAYER_BYTES, 2, uint8(bs_hair->Data));
-    _player->SetByteValue(PLAYER_BYTES, 3, uint8(Color));
+    _player->SetByteValue(PLAYER_BYTES, 3, uint8(color));
     _player->SetByteValue(PLAYER_BYTES_2, 0, uint8(bs_facialHair->Data));
     if (_player->getRace() == RACE_TAUREN)
     {

@@ -357,6 +357,7 @@ static bool IsEnterWorldConverted(uint16 opcode)
         case SMSG_GAMEOBJECT_DESPAWN_ANIM:         // MopGameObjectPackets::BuildDespawnAnimation
         case SMSG_GAMEOBJECT_PAGETEXT:             // MopGameObjectPackets::BuildPageText
         case SMSG_ENABLE_BARBER_SHOP:              // empty; direct terminal fires BARBER_SHOP_OPEN
+        case SMSG_BARBER_SHOP_RESULT:              // uint32 result; success fires BARBER_SHOP_SUCCESS
         case SMSG_FISH_ESCAPED:                    // empty; direct terminal leaf displays ERR_FISH_ESCAPED
         case SMSG_FISH_NOT_HOOKED:                 // empty; direct terminal leaf displays ERR_FISH_NOT_HOOKED
         case SMSG_AREA_TRIGGER_NO_CORPSE:           // MopAreaTriggerPackets::BuildNoCorpse

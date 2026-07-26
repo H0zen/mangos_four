@@ -175,9 +175,9 @@
  *   TOTAL SMSG rows                   925
  *
  * SUBSYSTEM CONFIDENCE: high=361, low=221, medium=183, none=160
- * STATUS TOTALS: ACTIVE=324, DOC=437, DORMANT=759
- *   SMSG: ACTIVE=190, DOC=270, DORMANT=465
- *   CMSG: ACTIVE=134, DOC=167, DORMANT=294
+ * STATUS TOTALS: ACTIVE=326, DOC=437, DORMANT=757
+ *   SMSG: ACTIVE=191, DOC=270, DORMANT=464
+ *   CMSG: ACTIVE=135, DOC=167, DORMANT=293
  */
 
 // CAVEATS -- read before trusting any single row:
@@ -865,7 +865,7 @@ typedef uint16_t uint16;
  *
  *  -- RaidMarkers.cpp (3) --
  *   SMSG_RAID_TARGET_UPDATE_ALL                    0x0283  ACTIVE
- *   SMSG_BARBER_SHOP_RESULT                        0x0C3F  DORMANT  [low-conf]
+ *   SMSG_BARBER_SHOP_RESULT                        0x0C3F  ACTIVE   [high-conf]
  *   SMSG_RAID_TARGET_UPDATE_SINGLE                 0x160B  ACTIVE
  *
  *  -- Reforge.cpp (1) --
@@ -1555,7 +1555,7 @@ typedef uint16_t uint16;
  *   CMSG_TEXT_EMOTE                                0x07E9  ACTIVE
  *   CMSG_GUILD_BANK_WITHDRAW_MONEY                 0x07EA  DORMANT 
  *   CMSG_UNKNOWN_0x07EB                            0x07EB  DOC     
- *   CMSG_ALTER_APPEARANCE                          0x07F0  DORMANT 
+ *   CMSG_ALTER_APPEARANCE                          0x07F0  ACTIVE
  *   CMSG_REQUEST_PARTY_MEMBER_STATS                0x0806  ACTIVE
  *   CMSG_BATTLE_PAY_CONFIRM_PURCHASE_RESPONSE      0x0812  DOC     
  *   CMSG_CALENDAR_GET_NUM_PENDING                  0x0813  ACTIVE

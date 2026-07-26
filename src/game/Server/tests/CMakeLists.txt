@@ -1423,7 +1423,9 @@ add_test(NAME mop_barber_shop_packets_source
     COMMAND ${CMAKE_COMMAND} -DSOURCE_ROOT=${CMAKE_SOURCE_DIR}
         -P ${CMAKE_CURRENT_SOURCE_DIR}/mop_barber_shop_packets_source_test.cmake)
 
-foreach(mutation IN ITEMS sender registration allowlist opcode reference semantic_comment)
+foreach(mutation IN ITEMS sender registration allowlist opcode reference semantic_comment
+        request_registration result_registration result_allowlist request_order request_size
+        request_skin_lookup request_hair_lookup request_facial_lookup result_success)
     add_test(NAME mop_barber_shop_packets_source_mutation_${mutation}
         COMMAND ${CMAKE_COMMAND} -DSOURCE_ROOT=${CMAKE_SOURCE_DIR}
             -DMUTATION=${mutation}

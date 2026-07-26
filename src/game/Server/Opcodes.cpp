@@ -369,9 +369,11 @@ void InitializeOpcodes()
     DefS(SMSG_GAMEOBJECT_DESPAWN_ANIM, "SMSG_GAMEOBJECT_DESPAWN_ANIM");
     DefS(SMSG_GAMEOBJECT_PAGETEXT, "SMSG_GAMEOBJECT_PAGETEXT");
 
-    // The direct 18414 terminal takes no packet body and dispatches the retained
-    // BARBER_SHOP_OPEN UI event after preparing the local barber state.
+    // The direct 18414 opener takes no body. The appearance request writes four
+    // uint32 fields; the one-uint32 result fires BARBER_SHOP_SUCCESS or an error.
     DefS(SMSG_ENABLE_BARBER_SHOP, "SMSG_ENABLE_BARBER_SHOP");
+    DefC(CMSG_ALTER_APPEARANCE, "CMSG_ALTER_APPEARANCE", STATUS_LOGGEDIN, PROCESS_THREADUNSAFE, &WorldSession::HandleAlterAppearanceOpcode);
+    DefS(SMSG_BARBER_SHOP_RESULT, "SMSG_BARBER_SHOP_RESULT");
 
     // The direct 18414 terminal leaves consume no payload and display the
     // matching ERR_FISH_ESCAPED / ERR_FISH_NOT_HOOKED client errors.
