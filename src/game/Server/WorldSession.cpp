@@ -339,6 +339,7 @@ static bool IsEnterWorldConverted(uint16 opcode)
         case SMSG_STANDSTATE_UPDATE:               // one uint8 stand state; Unit_C.cpp leaf 0x810583
         case SMSG_ATTACKSTART:                     // MopCompactPackets::BuildAttackStart
         case SMSG_ATTACKSTOP:                      // MopCompactPackets::BuildAttackStop
+        case SMSG_CANCEL_COMBAT:                   // Empty reader; terminal clears local-player combat state
         case SMSG_AI_REACTION:                     // packed unit GUID plus reaction; Unit_C.cpp leaf 0x80AD80
         case SMSG_PLAY_SOUND:                      // packed source GUID plus sound ID; ClientPlaySound leaf 0xCC4275
         case SMSG_PLAY_OBJECT_SOUND:               // two packed GUIDs plus sound ID; object-sound leaf 0xCC42F8
@@ -419,6 +420,7 @@ static bool IsEnterWorldConverted(uint16 opcode)
         case SMSG_GUILD_RANKS_UPDATE:         // MopGuildPackets::BuildGuildMemberRankUpdate
         case SMSG_GUILD_EVENT_NEW_LEADER:     // MopGuildPackets::BuildGuildNewLeader
         case SMSG_GUILD_EVENT_DISBANDED:      // MopGuildPackets::BuildGuildDisbanded
+        case SMSG_GUILD_COMMAND_RESULT:       // command, result, 8-bit name length, raw name
         case SMSG_GUILD_BANK_MONEY_WITHDRAWN: // one uint64 remaining allowance; sub_660A2A -> sub_40F370
         case SMSG_TABARD_VENDOR_ACTIVATE:     // MopGuildPackets::BuildTabardVendorActivate
         case SMSG_SAVE_GUILD_EMBLEM:          // MopGuildPackets::BuildSaveGuildEmblemResult

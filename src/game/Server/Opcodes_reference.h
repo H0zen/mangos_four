@@ -175,8 +175,8 @@
  *   TOTAL SMSG rows                   925
  *
  * SUBSYSTEM CONFIDENCE: high=365, low=221, medium=182, none=157
- * STATUS TOTALS: ACTIVE=338, DOC=437, DORMANT=745
- *   SMSG: ACTIVE=203, DOC=270, DORMANT=452
+ * STATUS TOTALS: ACTIVE=340, DOC=438, DORMANT=742
+ *   SMSG: ACTIVE=205, DOC=271, DORMANT=449
  *   CMSG: ACTIVE=135, DOC=167, DORMANT=293
  */
 
@@ -787,10 +787,10 @@ typedef uint16_t uint16;
  *   SMSG_MOUNTRESULT                               0x0E0F  DORMANT  [medium-conf]
  *   SMSG_ITEM_EXPIRE_PURCHASE_REFUND               0x0E33  DORMANT
  *   SMSG_BINDPOINTUPDATE                           0x0E3B  ACTIVE   [medium-conf]
- *   SMSG_READ_ITEM_FAILED                          0x0E8B  DORMANT  [medium-conf]
+ *   SMSG_CANCEL_COMBAT                             0x0E8B  ACTIVE   [high-conf]  direct empty reader and local-player combat-cancel terminal
  *   SMSG_FORCED_DEATH_UPDATE                       0x0E8F  DORMANT  [medium-conf]
  *   SMSG_GUILD_MEMBER_RECIPES                      0x0EE1  DORMANT
- *   SMSG_GUILD_COMMAND_RESULT                      0x0EF1  DORMANT  [medium-conf]
+ *   SMSG_GUILD_COMMAND_RESULT                      0x0EF1  ACTIVE   [high-conf]  direct command/result/name reader and guild-error consumer
  *   SMSG_GUILD_RECIPES                             0x0FF1  DORMANT
  *   SMSG_BUY_ITEM                                  0x101A  DORMANT 
  *   SMSG_UNKNOWN_0x1023                            0x1023  DOC     
@@ -1180,7 +1180,7 @@ typedef uint16_t uint16;
  *   SMSG_UNKNOWN_0x04AE                            0x04AE  DOC      [unattributed]  handler never installed in this build
  *   SMSG_UNKNOWN_0x04F0                            0x04F0  DOC      [unattributed]  handler never installed in this build
  *   SMSG_FRIEND_STATUS                             0x0532  DORMANT  [unattributed]  dynamic slot 154 installed by 0xA6C177
- *   SMSG_CANCEL_COMBAT                             0x0534  DORMANT  [unattributed]  dynamic slot 156 installed by 0x7C170E
+ *   SMSG_UNKNOWN_0x0534                            0x0534  DOC      [unattributed]  alternate guild-command-result route; canonical purpose unresolved
  *   SMSG_UNKNOWN_0x0569                            0x0569  DOC      [unattributed]  special-control (ingress)
  *   SMSG_SET_RAID_DIFFICULTY                       0x0591  ACTIVE   [unattributed]  dynamic slot 169 installed by 0xCD3E18
  *   SMSG_UNKNOWN_0x061F                            0x061F  DOC      [unattributed]  handler never installed in this build

@@ -119,6 +119,7 @@ void Player::SendAttackSwingCancelAttack()
     {
         return;
     }
+    // The 18414 0x0E8B reader is empty and its terminal clears local-player combat state.
     WorldPacket data(SMSG_CANCEL_COMBAT, 0);
     GetSession()->SendPacket(&data);
 }

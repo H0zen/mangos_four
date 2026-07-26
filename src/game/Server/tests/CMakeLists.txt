@@ -167,6 +167,15 @@ add_test(NAME mop_compact_packets_source
         -DSOURCE_ROOT=${CMAKE_SOURCE_DIR}
         -P ${CMAKE_CURRENT_SOURCE_DIR}/mop_compact_packets_source_test.cmake)
 
+foreach(mutation IN ITEMS cancel_sender cancel_registration cancel_allowlist cancel_opcode
+        cancel_reference cancel_old_route read_item_alias read_item_sender)
+    add_test(NAME mop_compact_packets_source_mutation_${mutation}
+        COMMAND ${CMAKE_COMMAND} -DSOURCE_ROOT=${CMAKE_SOURCE_DIR}
+            -DMUTATION=${mutation}
+            -P ${CMAKE_CURRENT_SOURCE_DIR}/mop_compact_packets_source_test.cmake)
+    set_tests_properties(mop_compact_packets_source_mutation_${mutation} PROPERTIES WILL_FAIL TRUE)
+endforeach()
+
 add_executable(mop_combat_log_packets_test mop_combat_log_packets_test.cpp)
 target_include_directories(mop_combat_log_packets_test PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/..
@@ -802,7 +811,8 @@ foreach(mutation IN ITEMS login_builder broadcast_builder outbound_registration 
         save_registration tabard_allowlist design_bounds joined_builder presence_builder
         rank_builder leader_builder left_builder disband_builder event_registration
         event_allowlist event_opcode presence_calls removed_member_copy legacy_info legacy_event
-        money_client_registration money_server_registration money_gate)
+        money_client_registration money_server_registration money_gate command_builder
+        command_registration command_allowlist command_opcode)
     add_test(NAME mop_guild_packets_source_mutation_${mutation}
         COMMAND ${CMAKE_COMMAND} -DSOURCE_ROOT=${CMAKE_SOURCE_DIR}
             -DMUTATION=${mutation}

@@ -260,6 +260,13 @@ static void test_dungeon_difficulty()
     CHECK(BytesEqual(packet, { 0x02, 0x00, 0x00, 0x00 }));
 }
 
+static void test_cancel_combat()
+{
+    WorldPacket packet(SMSG_CANCEL_COMBAT, 0);
+    CHECK(packet.empty());
+    CHECK(uint32_t(packet.GetOpcode()) == 0x0E8Bu);
+}
+
 static void test_opcode_values_are_framable()
 {
     CHECK(uint32_t(SMSG_ATTACKSWING_ERROR) == 0x11E1u);
@@ -270,6 +277,7 @@ static void test_opcode_values_are_framable()
     CHECK(uint32_t(SMSG_SET_DUNGEON_DIFFICULTY) == 0x1283u);
     CHECK(uint32_t(SMSG_ATTACKSTART) == 0x1A9Eu);
     CHECK(uint32_t(SMSG_ATTACKSTOP) == 0x12AFu);
+    CHECK(uint32_t(SMSG_CANCEL_COMBAT) == 0x0E8Bu);
 
     CHECK(uint32_t(SMSG_ATTACKSWING_ERROR) <= 0x1FFFu);
     CHECK(uint32_t(SMSG_MOVE_SET_SWIM_SPEED) <= 0x1FFFu);
@@ -279,6 +287,7 @@ static void test_opcode_values_are_framable()
     CHECK(uint32_t(SMSG_SET_DUNGEON_DIFFICULTY) <= 0x1FFFu);
     CHECK(uint32_t(SMSG_ATTACKSTART) <= 0x1FFFu);
     CHECK(uint32_t(SMSG_ATTACKSTOP) <= 0x1FFFu);
+    CHECK(uint32_t(SMSG_CANCEL_COMBAT) <= 0x1FFFu);
 }
 
 int main(int /*argc*/, char** /*argv*/)
@@ -290,6 +299,7 @@ int main(int /*argc*/, char** /*argv*/)
     test_instance_encounter_variants();
     test_raid_difficulty();
     test_dungeon_difficulty();
+    test_cancel_combat();
     test_opcode_values_are_framable();
 
     if (g_fail)

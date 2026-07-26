@@ -142,6 +142,26 @@ elseif(MUTATION STREQUAL "money_gate")
         "case SMSG_GUILD_BANK_MONEY_WITHDRAWN:"
         "/* removed guild-bank money framing gate */"
         world_session "${world_session}")
+elseif(MUTATION STREQUAL "command_builder")
+    string(REPLACE
+        "MopGuildPackets::BuildGuildCommandResult(data, typecmd, str, cmdresult)"
+        "false /* removed guild-command-result builder */"
+        guild_handler "${guild_handler}")
+elseif(MUTATION STREQUAL "command_registration")
+    string(REPLACE
+        "DefS(SMSG_GUILD_COMMAND_RESULT, \"SMSG_GUILD_COMMAND_RESULT\");"
+        "/* removed guild-command-result registration */"
+        opcode_registry "${opcode_registry}")
+elseif(MUTATION STREQUAL "command_allowlist")
+    string(REPLACE
+        "case SMSG_GUILD_COMMAND_RESULT:"
+        "case 0xFFFF: /* removed guild-command-result allowlist */"
+        world_session "${world_session}")
+elseif(MUTATION STREQUAL "command_opcode")
+    string(REPLACE
+        "SMSG_GUILD_COMMAND_RESULT                    = 0x0EF1"
+        "SMSG_GUILD_COMMAND_RESULT                    = 0x0EF0"
+        opcode_header "${opcode_header}")
 endif()
 
 function(require_once source token context)
@@ -216,6 +236,18 @@ require_once("${guild_bank_sender}"
 require_once("${world_session}"
     "case SMSG_GUILD_BANK_MONEY_WITHDRAWN:"
     "guild-bank money framing gate")
+require_once("${guild_handler}"
+    "MopGuildPackets::BuildGuildCommandResult(data, typecmd, str, cmdresult)"
+    "guild-command-result builder call")
+require_once("${opcode_registry}"
+    "DefS(SMSG_GUILD_COMMAND_RESULT, \"SMSG_GUILD_COMMAND_RESULT\");"
+    "guild-command-result registration")
+require_once("${world_session}"
+    "case SMSG_GUILD_COMMAND_RESULT:"
+    "guild-command-result framing gate")
+require_once("${opcode_header}"
+    "SMSG_GUILD_COMMAND_RESULT                    = 0x0EF1"
+    "guild-command-result opcode value")
 
 foreach(token IN ITEMS
         "CMSG_TABARD_VENDOR_ACTIVATE                 = 0x11C3"

@@ -410,20 +410,18 @@ void WorldSession::HandleReadItemOpcode(WorldPacket& recv_data)
 
     if (pItem && pItem->GetProto()->PageText)
     {
-        WorldPacket data;
-
         InventoryResult msg = _player->CanUseItem(pItem);
-        if (msg == EQUIP_ERR_OK)
+        if (msg != EQUIP_ERR_OK)
         {
-            data.Initialize(SMSG_READ_ITEM_OK, 8);
-            DETAIL_LOG("STORAGE: Item page sent");
-        }
-        else
-        {
-            data.Initialize(SMSG_READ_ITEM_FAILED, 8);
             DETAIL_LOG("STORAGE: Unable to read item");
+            // The inherited failed-result value is the 18414 empty cancel-combat packet.
+            // Report the inventory error until a failed read-item opcode is binary-proven.
             _player->SendEquipError(msg, pItem, NULL);
+            return;
         }
+
+        WorldPacket data(SMSG_READ_ITEM_OK, 8);
+        DETAIL_LOG("STORAGE: Item page sent");
         data << pItem->GetObjectGuid();
         SendPacket(&data);
     }

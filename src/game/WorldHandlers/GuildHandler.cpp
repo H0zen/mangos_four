@@ -1070,11 +1070,12 @@ void WorldSession::HandleGuildDelRankOpcode(WorldPacket& recvPacket)
  */
 void WorldSession::SendGuildCommandResult(uint32 typecmd, const std::string& str, uint32 cmdresult)
 {
-    WorldPacket data(SMSG_GUILD_COMMAND_RESULT, 8 + str.size() + 1);
-    data << typecmd;
-    data << cmdresult;
-    data.WriteBits(str.length(), 8);
-    data.WriteStringData(str);
+    WorldPacket data;
+    if (!MopGuildPackets::BuildGuildCommandResult(data, typecmd, str, cmdresult))
+    {
+        sLog.outError("WORLD: Guild command result name is too long (%u bytes)", uint32(str.size()));
+        return;
+    }
     SendPacket(&data);
 
     DEBUG_LOG("WORLD: Sent (SMSG_GUILD_COMMAND_RESULT)");

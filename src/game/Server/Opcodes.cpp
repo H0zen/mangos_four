@@ -321,6 +321,7 @@ void InitializeOpcodes()
     DefC(CMSG_ATTACKSTOP, "CMSG_ATTACKSTOP", STATUS_LOGGEDIN, PROCESS_THREADUNSAFE, &WorldSession::HandleAttackStopOpcode);
     DefS(SMSG_ATTACKSTART, "SMSG_ATTACKSTART");
     DefS(SMSG_ATTACKSTOP, "SMSG_ATTACKSTOP");
+    DefS(SMSG_CANCEL_COMBAT, "SMSG_CANCEL_COMBAT");
     DefS(SMSG_AI_REACTION, "SMSG_AI_REACTION");
     // Directly verified 18414 sound readers: packed source GUID, two packed
     // object GUIDs, and the single-ID music form respectively.
@@ -556,6 +557,7 @@ void InitializeOpcodes()
     DefS(SMSG_GUILD_RANKS_UPDATE, "SMSG_GUILD_RANKS_UPDATE");
     DefS(SMSG_GUILD_EVENT_NEW_LEADER, "SMSG_GUILD_EVENT_NEW_LEADER");
     DefS(SMSG_GUILD_EVENT_DISBANDED, "SMSG_GUILD_EVENT_DISBANDED");
+    DefS(SMSG_GUILD_COMMAND_RESULT, "SMSG_GUILD_COMMAND_RESULT");
 
     // Live-log guild-bank withdrawal allowance query. The 18414 request is
     // empty and its response contains one uint64 remaining allowance.

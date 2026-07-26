@@ -124,6 +124,22 @@ namespace MopGuildPackets
         return true;
     }
 
+    inline bool BuildGuildCommandResult(WorldPacket& out, uint32 command,
+        std::string const& name, uint32 result)
+    {
+        // The direct 18414 reader consumes command, result, an 8-bit byte count,
+        // then the raw name. Reject values the on-wire length cannot represent.
+        if (name.size() >= (size_t(1) << 8))
+            return false;
+
+        out.Initialize(SMSG_GUILD_COMMAND_RESULT, 9 + name.size());
+        out << command;
+        out << result;
+        out.WriteBits(name.size(), 8);
+        out.WriteStringData(name);
+        return true;
+    }
+
     template <size_t N>
     inline void WriteGuidMask(WorldPacket& out, uint64 guid,
         uint8 const (&order)[N])
