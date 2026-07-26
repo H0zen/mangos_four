@@ -1481,3 +1481,29 @@ foreach(mutation IN ITEMS field_order gameobject_type interact_type guid_mask gu
             -P ${CMAKE_CURRENT_SOURCE_DIR}/mop_quest_progress_packets_source_test.cmake)
     set_tests_properties(mop_quest_progress_packets_source_mutation_${mutation} PROPERTIES WILL_FAIL TRUE)
 endforeach()
+
+add_executable(mop_world_state_packets_test mop_world_state_packets_test.cpp)
+target_include_directories(mop_world_state_packets_test PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}/..
+    ${CMAKE_SOURCE_DIR}/src/shared)
+set_target_properties(mop_world_state_packets_test PROPERTIES CXX_STANDARD 17 CXX_STANDARD_REQUIRED ON)
+target_link_libraries(mop_world_state_packets_test PRIVATE game)
+add_test(NAME mop_world_state_packets COMMAND mop_world_state_packets_test)
+if(WIN32)
+    get_filename_component(MOP_WORLD_STATE_MYSQL_RUNTIME_DIR "${MySQL_LIBRARY}" DIRECTORY)
+    set_tests_properties(mop_world_state_packets PROPERTIES
+        ENVIRONMENT_MODIFICATION "PATH=path_list_prepend:${MOP_WORLD_STATE_MYSQL_RUNTIME_DIR}")
+endif()
+
+add_test(NAME mop_world_state_packets_source
+    COMMAND ${CMAKE_COMMAND} -DSOURCE_ROOT=${CMAKE_SOURCE_DIR}
+        -P ${CMAKE_CURRENT_SOURCE_DIR}/mop_world_state_packets_source_test.cmake)
+
+foreach(mutation IN ITEMS bit_order field_order player_sender battleground_sender
+        registration allowlist opcode reference)
+    add_test(NAME mop_world_state_packets_source_mutation_${mutation}
+        COMMAND ${CMAKE_COMMAND} -DSOURCE_ROOT=${CMAKE_SOURCE_DIR}
+            -DMUTATION=${mutation}
+            -P ${CMAKE_CURRENT_SOURCE_DIR}/mop_world_state_packets_source_test.cmake)
+    set_tests_properties(mop_world_state_packets_source_mutation_${mutation} PROPERTIES WILL_FAIL TRUE)
+endforeach()

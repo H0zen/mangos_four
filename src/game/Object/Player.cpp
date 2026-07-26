@@ -3783,10 +3783,8 @@ bool Player::CanUseCapturePoint()
  */
 void Player::SendUpdateWorldState(uint32 Field, uint32 Value)
 {
-    WorldPacket data(SMSG_UPDATE_WORLD_STATE, 8 + 1);
-    data << Field;
-    data << Value;
-    data << uint8(0);
+    WorldPacket data(SMSG_UPDATE_WORLD_STATE, 9);
+    MopWorldEntryPackets::BuildUpdateWorldState(data, Field, Value);
     GetSession()->SendPacket(&data);
 }
 

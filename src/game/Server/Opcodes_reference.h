@@ -175,8 +175,8 @@
  *   TOTAL SMSG rows                   925
  *
  * SUBSYSTEM CONFIDENCE: high=365, low=221, medium=182, none=157
- * STATUS TOTALS: ACTIVE=331, DOC=437, DORMANT=752
- *   SMSG: ACTIVE=196, DOC=270, DORMANT=459
+ * STATUS TOTALS: ACTIVE=332, DOC=437, DORMANT=751
+ *   SMSG: ACTIVE=197, DOC=270, DORMANT=458
  *   CMSG: ACTIVE=135, DOC=167, DORMANT=293
  */
 
@@ -518,7 +518,7 @@ typedef uint16_t uint16;
  *   SMSG_REFER_A_FRIEND_EXPIRED                    0x1143  DORMANT  [medium-conf]
  *   SMSG_DIFFERENT_INSTANCE_FROM_PARTY             0x120B  DORMANT
  *   SMSG_ENCOUNTER_END                             0x120F  DORMANT  [name: binary-derived]
- *   SMSG_UPDATE_WORLD_STATE                        0x121B  DORMANT  [low-conf]
+ *   SMSG_UPDATE_WORLD_STATE                        0x121B  ACTIVE   [low-conf]
  *   SMSG_UNKNOWN_0x1223                            0x1223  DOC      [medium-conf]
  *   SMSG_UNKNOWN_0x122A                            0x122A  DOC      [low-conf]
  *   SMSG_SET_DUNGEON_DIFFICULTY                    0x1283  ACTIVE   [medium-conf]

@@ -1130,6 +1130,16 @@ namespace MopWorldEntryPackets
         out.append(states);
     }
 
+    inline void BuildUpdateWorldState(WorldPacket& out, uint32 field,
+        uint32 value, bool hidden = false)
+    {
+        // The 18414 reader consumes the hidden bit before its byte phase,
+        // then reads the value before the world-state field identifier.
+        out.WriteBit(hidden);
+        out.FlushBits();
+        out << value << field;
+    }
+
     inline void BuildMoveTeleport(WorldPacket& out, uint64 moverGuid,
         uint64 transportGuid, uint32 counter, float x, float y, float z,
         float orientation)
