@@ -1007,7 +1007,7 @@ enum OpcodesList
     SMSG_SPLINE_MOVE_UNSET_FLYING                = 0x0DE2,    // 5.4.8 18414 (Wow.exe leaf; name reference-consensus)
     SMSG_SUMMON_CANCEL                           = 0x000A,    // 5.4.8 18414 (Wow.exe leaf; name single-source fork)
     CMSG_ALTER_APPEARANCE                        = 0x07F0, // 5.4.8 18414 (Wow.exe binary)
-    SMSG_ENABLE_BARBER_SHOP                      = 0x1222,    // 5.4.8 18414 (Wow.exe leaf; name reference-consensus)
+    SMSG_ENABLE_BARBER_SHOP                      = 0x1222,    // 5.4.8 18414 (Wow.exe binary: BARBER_SHOP_OPEN event)
     SMSG_BARBER_SHOP_RESULT                      = 0x0C3F,    // 5.4.8 18414 (Wow.exe leaf; name reference-consensus)
     CMSG_CALENDAR_GET_CALENDAR                   = 0x1F9F, // 5.4.8 18414 (Wow.exe binary)
     CMSG_CALENDAR_GET_EVENT                      = 0x030C, // 5.4.8 18414 (Wow.exe binary)

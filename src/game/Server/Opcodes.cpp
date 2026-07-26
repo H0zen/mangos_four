@@ -369,6 +369,10 @@ void InitializeOpcodes()
     DefS(SMSG_GAMEOBJECT_DESPAWN_ANIM, "SMSG_GAMEOBJECT_DESPAWN_ANIM");
     DefS(SMSG_GAMEOBJECT_PAGETEXT, "SMSG_GAMEOBJECT_PAGETEXT");
 
+    // The direct 18414 terminal takes no packet body and dispatches the retained
+    // BARBER_SHOP_OPEN UI event after preparing the local barber state.
+    DefS(SMSG_ENABLE_BARBER_SHOP, "SMSG_ENABLE_BARBER_SHOP");
+
     // The direct 18414 terminal leaves consume no payload and display the
     // matching ERR_FISH_ESCAPED / ERR_FISH_NOT_HOOKED client errors.
     DefS(SMSG_FISH_ESCAPED, "SMSG_FISH_ESCAPED");

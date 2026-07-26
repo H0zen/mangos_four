@@ -175,8 +175,8 @@
  *   TOTAL SMSG rows                   925
  *
  * SUBSYSTEM CONFIDENCE: high=361, low=221, medium=183, none=160
- * STATUS TOTALS: ACTIVE=323, DOC=437, DORMANT=760
- *   SMSG: ACTIVE=189, DOC=270, DORMANT=466
+ * STATUS TOTALS: ACTIVE=324, DOC=437, DORMANT=759
+ *   SMSG: ACTIVE=190, DOC=270, DORMANT=465
  *   CMSG: ACTIVE=134, DOC=167, DORMANT=294
  */
 
@@ -699,7 +699,7 @@ typedef uint16_t uint16;
  *   SMSG_UNKNOWN_0x0A1A                            0x0A1A  DOC      [medium-conf]
  *   SMSG_UNKNOWN_0x0E9E                            0x0E9E  DOC      [low-conf]
  *   SMSG_UNKNOWN_0x1003                            0x1003  DOC      [medium-conf]
- *   SMSG_ENABLE_BARBER_SHOP                        0x1222  DORMANT  [low-conf]
+ *   SMSG_ENABLE_BARBER_SHOP                        0x1222  ACTIVE   [high-conf]
  *   SMSG_BATTLE_PET_JOURNAL                        0x1542  ACTIVE   [low-conf]
  *   SMSG_UNKNOWN_0x1612                            0x1612  DOC      [medium-conf]
  *   SMSG_UNKNOWN_0x162F                            0x162F  DOC      [low-conf]

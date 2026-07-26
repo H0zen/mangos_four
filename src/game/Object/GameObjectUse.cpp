@@ -823,6 +823,7 @@ void GameObject::Use(Unit* user)
             // fallback, will always work
             player->TeleportTo(GetMapId(), GetPositionX(), GetPositionY(), GetPositionZ(), GetOrientation(), TELE_TO_NOT_LEAVE_TRANSPORT | TELE_TO_NOT_LEAVE_COMBAT | TELE_TO_NOT_UNSUMMON_PET);
 
+            // The 18414 terminal consumes no payload and fires BARBER_SHOP_OPEN.
             WorldPacket data(SMSG_ENABLE_BARBER_SHOP, 0);
             player->GetSession()->SendPacket(&data);
 
