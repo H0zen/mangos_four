@@ -5585,9 +5585,8 @@ void Unit::SendPetAIReaction()
         return;
     }
 
-    WorldPacket data(SMSG_AI_REACTION, 8 + 4);
-    data << GetObjectGuid();
-    data << uint32(AI_REACTION_HOSTILE);
+    WorldPacket data;
+    MopCompactPackets::BuildAIReaction(data, GetObjectGuid(), AI_REACTION_HOSTILE);
     ((Player*)owner)->GetSession()->SendPacket(&data);
 }
 

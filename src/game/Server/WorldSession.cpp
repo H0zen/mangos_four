@@ -339,6 +339,7 @@ static bool IsEnterWorldConverted(uint16 opcode)
         case SMSG_STANDSTATE_UPDATE:               // one uint8 stand state; Unit_C.cpp leaf 0x810583
         case SMSG_ATTACKSTART:                     // MopCompactPackets::BuildAttackStart
         case SMSG_ATTACKSTOP:                      // MopCompactPackets::BuildAttackStop
+        case SMSG_AI_REACTION:                     // packed unit GUID plus reaction; Unit_C.cpp leaf 0x80AD80
         case SMSG_QUESTGIVER_STATUS:               // MopQuestStatusPackets::BuildStatus
         case SMSG_GOSSIP_MESSAGE:                  // MopGossipPackets::BuildMessage
         case SMSG_GOSSIP_COMPLETE:                 // Direct 18414 empty reader; closes the gossip frame

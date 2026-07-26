@@ -2459,10 +2459,8 @@ bool Creature::IsVisibleInGridForPlayer(Player* pl) const
  */
 void Creature::SendAIReaction(AiReaction reactionType)
 {
-    WorldPacket data(SMSG_AI_REACTION, 12);
-
-    data << GetObjectGuid();
-    data << uint32(reactionType);
+    WorldPacket data;
+    MopCompactPackets::BuildAIReaction(data, GetObjectGuid(), reactionType);
 
     ((WorldObject*)this)->SendMessageToSet(&data, true);
 

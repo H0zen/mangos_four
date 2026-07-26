@@ -321,6 +321,7 @@ void InitializeOpcodes()
     DefC(CMSG_ATTACKSTOP, "CMSG_ATTACKSTOP", STATUS_LOGGEDIN, PROCESS_THREADUNSAFE, &WorldSession::HandleAttackStopOpcode);
     DefS(SMSG_ATTACKSTART, "SMSG_ATTACKSTART");
     DefS(SMSG_ATTACKSTOP, "SMSG_ATTACKSTOP");
+    DefS(SMSG_AI_REACTION, "SMSG_AI_REACTION");
 
     // Single quest-giver marker query and its packed-GUID status response.
     DefC(CMSG_QUESTGIVER_STATUS_QUERY, "CMSG_QUESTGIVER_STATUS_QUERY", STATUS_LOGGEDIN, PROCESS_THREADUNSAFE, &WorldSession::HandleQuestgiverStatusQueryOpcode);

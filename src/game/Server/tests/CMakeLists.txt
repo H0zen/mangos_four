@@ -1507,3 +1507,27 @@ foreach(mutation IN ITEMS bit_order field_order player_sender battleground_sende
             -P ${CMAKE_CURRENT_SOURCE_DIR}/mop_world_state_packets_source_test.cmake)
     set_tests_properties(mop_world_state_packets_source_mutation_${mutation} PROPERTIES WILL_FAIL TRUE)
 endforeach()
+
+add_executable(mop_ai_reaction_packets_test mop_ai_reaction_packets_test.cpp)
+target_include_directories(mop_ai_reaction_packets_test PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}/..
+    ${CMAKE_SOURCE_DIR}/src/shared
+    $<TARGET_PROPERTY:game,INTERFACE_INCLUDE_DIRECTORIES>)
+set_target_properties(mop_ai_reaction_packets_test PROPERTIES CXX_STANDARD 17 CXX_STANDARD_REQUIRED ON)
+target_compile_definitions(mop_ai_reaction_packets_test PRIVATE
+    $<TARGET_PROPERTY:game,INTERFACE_COMPILE_DEFINITIONS>)
+target_link_libraries(mop_ai_reaction_packets_test PRIVATE shared)
+add_test(NAME mop_ai_reaction_packets COMMAND mop_ai_reaction_packets_test)
+
+add_test(NAME mop_ai_reaction_packets_source
+    COMMAND ${CMAKE_COMMAND} -DSOURCE_ROOT=${CMAKE_SOURCE_DIR}
+        -P ${CMAKE_CURRENT_SOURCE_DIR}/mop_ai_reaction_packets_source_test.cmake)
+
+foreach(mutation IN ITEMS mask_order byte_order reaction_position creature_sender pet_sender
+        registration allowlist opcode reference)
+    add_test(NAME mop_ai_reaction_packets_source_mutation_${mutation}
+        COMMAND ${CMAKE_COMMAND} -DSOURCE_ROOT=${CMAKE_SOURCE_DIR}
+            -DMUTATION=${mutation}
+            -P ${CMAKE_CURRENT_SOURCE_DIR}/mop_ai_reaction_packets_source_test.cmake)
+    set_tests_properties(mop_ai_reaction_packets_source_mutation_${mutation} PROPERTIES WILL_FAIL TRUE)
+endforeach()

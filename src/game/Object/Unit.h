@@ -171,6 +171,17 @@ namespace MopCompactPackets
         out.WriteByteSeq(AttackGuidByte(attackerGuid, 7));
     }
 
+    inline void BuildAIReaction(WorldPacket& out, ObjectGuid guid, uint32 reaction)
+    {
+        // The 18414 Unit_C reader interleaves the reaction value between the
+        // first three and final five packed-GUID bytes.
+        out.Initialize(SMSG_AI_REACTION, 13);
+        out.WriteGuidMask<5, 7, 0, 4, 6, 2, 3, 1>(guid);
+        out.WriteGuidBytes<4, 6, 5>(guid);
+        out << reaction;
+        out.WriteGuidBytes<7, 1, 2, 0, 3>(guid);
+    }
+
     inline uint8 SwimSpeedGuidByte(uint64 guid, uint8 index)
     {
         return uint8(guid >> (8 * index));
