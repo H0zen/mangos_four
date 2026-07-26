@@ -110,13 +110,6 @@
 #include "LockedQueue/LockedQueue.h"
 #include "Threading/Threading.h"
 
-// ACE_Thread_Mutex survives here (rather than moving to the two callers
-// that still need it) because those callers -- WorldSocketMgr.h,
-// realmd/Patch/PatchHandler.cpp -- are socket-layer files Stage 1 does not
-// touch; they reach ACE_Thread_Mutex transitively through this header
-// today, and Stage 2's engine swap is what gives them their own includes.
-#include <ace/Thread_Mutex.h>
-
 // Old ACE versions (pre-ACE-5.5.4) not have this type (add for allow use at Unix side external old ACE versions)
 #if PLATFORM != PLATFORM_WINDOWS
 #  ifndef ACE_OFF_T
