@@ -1354,7 +1354,10 @@ foreach(mutation IN ITEMS reader registration target_initializer target_mapping 
         spell_go_sender spell_go_registration spell_go_gate spell_go_miss_reason_width
         spell_go_hit_mask spell_go_string_bound spell_go_trajectory
         category_request_registration category_response_registration category_response_gate
-        category_request_reader category_response_layout category_aura_aggregation)
+        category_request_reader category_response_layout category_aura_aggregation
+        cooldown_mask_order cooldown_presence_bit cooldown_count_width cooldown_byte_order
+        cooldown_player_sender cooldown_item_sender cooldown_pet_sender cooldown_registration
+        cooldown_gate cooldown_reference)
     add_test(NAME mop_spell_cast_packets_source_mutation_${mutation}
         COMMAND ${CMAKE_COMMAND} -DSOURCE_ROOT=${CMAKE_SOURCE_DIR}
             -DMUTATION=${mutation}

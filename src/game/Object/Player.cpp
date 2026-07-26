@@ -4240,9 +4240,8 @@ void Player::HandleStealthedUnitsDetection()
 void Player::ProhibitSpellSchool(SpellSchoolMask idSchoolMask, uint32 unTimeMs)
 {
     // last check 4.3.4
-    WorldPacket data(SMSG_SPELL_COOLDOWN, 8 + 1 + m_spells.size() * 8);
-    data << GetObjectGuid();
-    data << uint8(0x0);                                     // flags (0x1, 0x2)
+    std::vector<MopSpellPackets::SpellCooldown> cooldowns;
+    cooldowns.reserve(m_spells.size());
     time_t curTime = time(NULL);
     for (PlayerSpellMap::const_iterator itr = m_spells.begin(); itr != m_spells.end(); ++itr)
     {
@@ -4262,11 +4261,13 @@ void Player::ProhibitSpellSchool(SpellSchoolMask idSchoolMask, uint32 unTimeMs)
 
         if ((idSchoolMask & GetSpellSchoolMask(spellInfo)) && GetSpellCooldownDelay(unSpellId) < unTimeMs)
         {
-            data << uint32(unSpellId);
-            data << uint32(unTimeMs);                       // in m.secs
+            cooldowns.push_back({unSpellId, unTimeMs});
             AddSpellCooldown(unSpellId, 0, curTime + unTimeMs / IN_MILLISECONDS);
         }
     }
+
+    WorldPacket data;
+    MopSpellPackets::BuildSpellCooldown(data, GetObjectGuid(), 0, cooldowns);
     GetSession()->SendPacket(&data);
 }
 

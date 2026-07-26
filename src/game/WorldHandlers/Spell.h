@@ -327,6 +327,36 @@ namespace MopSpellPackets
             out << record.cooldownModifier << record.category;
     }
 
+    struct SpellCooldown
+    {
+        uint32 spellId = 0;
+        uint32 cooldownMs = 0;
+    };
+
+    inline void BuildSpellCooldown(WorldPacket& out, ObjectGuid ownerGuid,
+        uint8 flags, std::vector<SpellCooldown> const& cooldowns)
+    {
+        MANGOS_ASSERT(cooldowns.size() < (size_t(1) << 21));
+        out.Initialize(SMSG_SPELL_COOLDOWN, 13 + 8 * cooldowns.size());
+
+        // Wow.exe 18414 reader sub_C7C5FE uses an inverse presence bit for
+        // the optional flags byte, followed by a 21-bit cooldown count.
+        out.WriteGuidMask<0, 6>(ownerGuid);
+        out.WriteBit(flags == 0);
+        out.WriteGuidMask<7, 3, 1, 5>(ownerGuid);
+        out.WriteBits(uint32(cooldowns.size()), 21);
+        out.WriteGuidMask<2, 4>(ownerGuid);
+        out.FlushBits();
+
+        for (SpellCooldown const& cooldown : cooldowns)
+            out << cooldown.spellId << cooldown.cooldownMs;
+
+        out.WriteGuidBytes<5, 3, 7>(ownerGuid);
+        if (flags != 0)
+            out << flags;
+        out.WriteGuidBytes<4, 1, 0, 2, 6>(ownerGuid);
+    }
+
     struct CastFailedArguments
     {
         bool hasArg10 = false;

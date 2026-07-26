@@ -976,6 +976,38 @@ static void test_category_cooldown_request_and_response()
     CHECK(uint32(SMSG_CATEGORY_COOLDOWN) < uint32(OPCODE_TABLE_SIZE));
 }
 
+static void test_spell_cooldown_wire_layout()
+{
+    WorldPacket dense;
+    std::vector<MopSpellPackets::SpellCooldown> denseRecords = {
+        { 0x11223344u, 0x55667788u },
+        { 0x99AABBCCu, 0xDDEEFF00u },
+    };
+    MopSpellPackets::BuildSpellCooldown(dense,
+        ObjectGuid(UINT64_C(0x0807060504030201)), 0x05, denseRecords);
+    CHECK(dense.GetOpcode() == SMSG_SPELL_COOLDOWN);
+    CheckBytes(dense, {
+        0xDE, 0x00, 0x00, 0x2C,
+        0x44, 0x33, 0x22, 0x11, 0x88, 0x77, 0x66, 0x55,
+        0xCC, 0xBB, 0xAA, 0x99, 0x00, 0xFF, 0xEE, 0xDD,
+        0x07, 0x05, 0x09, 0x05,
+        0x04, 0x03, 0x00, 0x02, 0x06,
+    });
+
+    WorldPacket sparse;
+    std::vector<MopSpellPackets::SpellCooldown> sparseRecords = {
+        { 1, 0 },
+    };
+    MopSpellPackets::BuildSpellCooldown(sparse,
+        ObjectGuid(UINT64_C(0x00BB0000000000AA)), 0, sparseRecords);
+    CHECK(sparse.GetOpcode() == SMSG_SPELL_COOLDOWN);
+    CheckBytes(sparse, {
+        0xE0, 0x00, 0x00, 0x10,
+        0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+        0xAB, 0xBA,
+    });
+}
+
 int main(int, char**)
 {
     test_dense_and_guid_permutations();
@@ -991,6 +1023,7 @@ int main(int, char**)
     test_spell_start_wire_layout();
     test_spell_go_wire_layout();
     test_category_cooldown_request_and_response();
+    test_spell_cooldown_wire_layout();
 
     if (g_fail)
     {

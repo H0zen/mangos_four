@@ -6,6 +6,10 @@ file(READ "${SOURCE_ROOT}/src/game/Server/Opcodes.cpp" opcode_registry)
 file(READ "${SOURCE_ROOT}/src/game/Server/Opcodes.h" opcode_header)
 file(READ "${SOURCE_ROOT}/src/game/Server/WorldSession.cpp" world_session)
 file(READ "${SOURCE_ROOT}/src/game/ChatCommands/DebugCommands.cpp" debug_commands)
+file(READ "${SOURCE_ROOT}/src/game/Object/Player.cpp" player_source)
+file(READ "${SOURCE_ROOT}/src/game/Object/PlayerItemStorage.cpp" item_storage_source)
+file(READ "${SOURCE_ROOT}/src/game/Object/PetSpells.cpp" pet_spells_source)
+file(READ "${SOURCE_ROOT}/src/game/Server/Opcodes_reference.h" opcode_reference)
 
 if(MUTATION STREQUAL "reader")
     string(REPLACE
@@ -202,6 +206,56 @@ elseif(MUTATION STREQUAL "category_aura_aggregation")
         "GetAurasByType(SPELL_AURA_MOD_SPELL_CATEGORY_COOLDOWN)"
         "GetAurasByType(SPELL_AURA_DUMMY)"
         spell_handler "${spell_handler}")
+elseif(MUTATION STREQUAL "cooldown_mask_order")
+    string(REPLACE
+        "out.WriteGuidMask<0, 6>(ownerGuid);"
+        "out.WriteGuidMask<6, 0>(ownerGuid);"
+        spell_header "${spell_header}")
+elseif(MUTATION STREQUAL "cooldown_presence_bit")
+    string(REPLACE
+        "out.WriteBit(flags == 0);"
+        "out.WriteBit(flags != 0);"
+        spell_header "${spell_header}")
+elseif(MUTATION STREQUAL "cooldown_count_width")
+    string(REPLACE
+        "out.WriteBits(uint32(cooldowns.size()), 21);"
+        "out.WriteBits(uint32(cooldowns.size()), 20);"
+        spell_header "${spell_header}")
+elseif(MUTATION STREQUAL "cooldown_byte_order")
+    string(REPLACE
+        "out.WriteGuidBytes<5, 3, 7>(ownerGuid);"
+        "out.WriteGuidBytes<3, 5, 7>(ownerGuid);"
+        spell_header "${spell_header}")
+elseif(MUTATION STREQUAL "cooldown_player_sender")
+    string(REPLACE
+        "MopSpellPackets::BuildSpellCooldown(data, GetObjectGuid(), 0, cooldowns);"
+        "/* removed player cooldown sender */"
+        player_source "${player_source}")
+elseif(MUTATION STREQUAL "cooldown_item_sender")
+    string(REPLACE
+        "MopSpellPackets::BuildSpellCooldown(data, GetObjectGuid(), 1, cooldowns);"
+        "/* removed item cooldown sender */"
+        item_storage_source "${item_storage_source}")
+elseif(MUTATION STREQUAL "cooldown_pet_sender")
+    string(REPLACE
+        "MopSpellPackets::BuildSpellCooldown(data, GetObjectGuid(), 0, cooldowns);"
+        "/* removed pet cooldown sender */"
+        pet_spells_source "${pet_spells_source}")
+elseif(MUTATION STREQUAL "cooldown_registration")
+    string(REPLACE
+        "DefS(SMSG_SPELL_COOLDOWN, \"SMSG_SPELL_COOLDOWN\");"
+        "/* removed SMSG_SPELL_COOLDOWN registration */"
+        opcode_registry "${opcode_registry}")
+elseif(MUTATION STREQUAL "cooldown_gate")
+    string(REPLACE
+        "case SMSG_SPELL_COOLDOWN:"
+        "case SMSG_UNKNOWN_0:"
+        world_session "${world_session}")
+elseif(MUTATION STREQUAL "cooldown_reference")
+    string(REPLACE
+        "SMSG_SPELL_COOLDOWN                            0x0452  ACTIVE"
+        "SMSG_SPELL_COOLDOWN                            0x0452  DORMANT"
+        opcode_reference "${opcode_reference}")
 endif()
 
 string(FIND "${spell_handler}" "void WorldSession::HandleCastSpellOpcode" cast_start)
@@ -431,6 +485,52 @@ require_once("${spell_header}"
 require_once("${spell_header}"
     "out << record.cooldownModifier << record.category;"
     "category-cooldown record wire order")
+require_once("${spell_header}"
+    "inline void BuildSpellCooldown(WorldPacket& out, ObjectGuid ownerGuid,"
+    "18414 spell-cooldown builder")
+require_once("${spell_header}"
+    "out.WriteGuidMask<0, 6>(ownerGuid);"
+    "spell-cooldown leading GUID mask")
+require_once("${spell_header}"
+    "out.WriteBit(flags == 0);"
+    "spell-cooldown inverse flags-presence bit")
+require_once("${spell_header}"
+    "out.WriteGuidMask<7, 3, 1, 5>(ownerGuid);"
+    "spell-cooldown middle GUID mask")
+require_once("${spell_header}"
+    "out.WriteBits(uint32(cooldowns.size()), 21);"
+    "spell-cooldown 21-bit record count")
+require_once("${spell_header}"
+    "out.WriteGuidMask<2, 4>(ownerGuid);"
+    "spell-cooldown trailing GUID mask")
+require_once("${spell_header}"
+    "out.WriteGuidBytes<5, 3, 7>(ownerGuid);"
+    "spell-cooldown leading GUID bytes")
+require_once("${spell_header}"
+    "out.WriteGuidBytes<4, 1, 0, 2, 6>(ownerGuid);"
+    "spell-cooldown trailing GUID bytes")
+require_once("${player_source}"
+    "MopSpellPackets::BuildSpellCooldown(data, GetObjectGuid(), 0, cooldowns);"
+    "player school-lockout cooldown sender")
+require_once("${item_storage_source}"
+    "MopSpellPackets::BuildSpellCooldown(data, GetObjectGuid(), 1, cooldowns);"
+    "weapon-switch cooldown sender")
+require_once("${pet_spells_source}"
+    "MopSpellPackets::BuildSpellCooldown(data, GetObjectGuid(), 0, cooldowns);"
+    "pet cooldown sender")
+require_once("${opcode_registry}"
+    "DefS(SMSG_SPELL_COOLDOWN, \"SMSG_SPELL_COOLDOWN\");"
+    "spell-cooldown registration")
+require_once("${world_session}"
+    "case SMSG_SPELL_COOLDOWN:"
+    "spell-cooldown sender admission")
+require_once("${opcode_reference}"
+    "SMSG_SPELL_COOLDOWN                            0x0452  ACTIVE"
+    "active direct-client reference")
+foreach(source IN ITEMS "${player_source}" "${item_storage_source}" "${pet_spells_source}")
+    forbid("${source}" "WorldPacket data(SMSG_SPELL_COOLDOWN"
+        "legacy spell-cooldown body")
+endforeach()
 
 string(FIND "${cast_handler}" "MopSpellPackets::ReadCastSpellRequest(recvPacket, request)" reader_position)
 string(FIND "${cast_handler}" "sSpellStore.LookupEntry(spellId)" lookup_position)

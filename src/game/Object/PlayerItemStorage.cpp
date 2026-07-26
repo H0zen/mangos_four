@@ -38,6 +38,7 @@
 #include "WorldPacket.h"
 #include "WorldSession.h"
 #include "ObjectMgr.h"
+#include "Spell.h"
 #include "Database/DatabaseEnv.h"
 #include "DBCStores.h"
 #ifdef ENABLE_ELUNA
@@ -289,11 +290,14 @@ Item* Player::EquipItem(uint16 pos, Item* pItem, bool update)
                 {
                     m_weaponChangeTimer = spellProto->GetStartRecoveryTime();
 
-                    WorldPacket data(SMSG_SPELL_COOLDOWN, 8 + 1 + 4);
-                    data << GetObjectGuid();
-                    data << uint8(1);
-                    data << uint32(cooldownSpell);
-                    data << uint32(0);
+                    // Flags 0x1 preserves the weapon-switch cooldown mode used
+                    // by the existing gameplay path; the helper supplies the
+                    // 18414 packed GUID and 21-bit record count.
+                    std::vector<MopSpellPackets::SpellCooldown> cooldowns = {
+                        {cooldownSpell, 0}
+                    };
+                    WorldPacket data;
+                    MopSpellPackets::BuildSpellCooldown(data, GetObjectGuid(), 1, cooldowns);
                     GetSession()->SendPacket(&data);
                 }
             }

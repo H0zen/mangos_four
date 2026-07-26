@@ -34,6 +34,7 @@
 #include "CreatureAI.h"
 #include "Unit.h"
 #include "Util.h"
+#include "Spell.h"
 
 /**
  * @file PetSpells.cpp
@@ -54,9 +55,8 @@ void Pet::_LoadSpellCooldowns()
     {
         time_t curTime = time(NULL);
 
-        WorldPacket data(SMSG_SPELL_COOLDOWN, (8 + 1 + size_t(result->GetRowCount()) * 8));
-        data << ObjectGuid(GetObjectGuid());
-        data << uint8(0x0);                                 // flags (0x1, 0x2)
+        std::vector<MopSpellPackets::SpellCooldown> cooldowns;
+        cooldowns.reserve(result->GetRowCount());
 
         do
         {
@@ -77,8 +77,7 @@ void Pet::_LoadSpellCooldowns()
                 continue;
             }
 
-            data << uint32(spell_id);
-            data << uint32(uint32(db_time - curTime)*IN_MILLISECONDS);
+            cooldowns.push_back({spell_id, uint32(db_time - curTime) * IN_MILLISECONDS});
 
             _AddCreatureSpellCooldown(spell_id, db_time);
 
@@ -90,6 +89,8 @@ void Pet::_LoadSpellCooldowns()
 
         if (!m_CreatureSpellCooldowns.empty() && GetOwner())
         {
+            WorldPacket data;
+            MopSpellPackets::BuildSpellCooldown(data, GetObjectGuid(), 0, cooldowns);
             ((Player*)GetOwner())->GetSession()->SendPacket(&data);
         }
     }

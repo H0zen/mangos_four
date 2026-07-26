@@ -339,6 +339,7 @@ static bool IsEnterWorldConverted(uint16 opcode)
         case SMSG_PET_CAST_FAILED:                 // MopSpellPackets::BuildCastFailed (pet bit order)
         case SMSG_SPELL_START:                     // MopSpellPackets::BuildSpellStart
         case SMSG_SPELL_GO:                        // MopSpellPackets::BuildSpellGo
+        case SMSG_SPELL_COOLDOWN:                  // MopSpellPackets::BuildSpellCooldown
         case SMSG_MESSAGECHAT:                     // MopChatPackets::BuildMessage
         case SMSG_CHANNEL_NOTIFY:                  // MopChannelPackets direct 18414 subtype serializers
         case SMSG_CHANNEL_LIST:                    // MopChannelPackets::BuildList
