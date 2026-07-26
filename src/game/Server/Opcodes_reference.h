@@ -175,8 +175,8 @@
  *   TOTAL SMSG rows                   925
  *
  * SUBSYSTEM CONFIDENCE: high=359, low=223, medium=183, none=160
- * STATUS TOTALS: ACTIVE=319, DOC=436, DORMANT=765
- *   SMSG: ACTIVE=185, DOC=269, DORMANT=471
+ * STATUS TOTALS: ACTIVE=320, DOC=436, DORMANT=764
+ *   SMSG: ACTIVE=186, DOC=269, DORMANT=470
  *   CMSG: ACTIVE=134, DOC=167, DORMANT=294
  */
 
@@ -654,7 +654,7 @@ typedef uint16_t uint16;
  *
  *  -- LossOfControlUI.cpp (8) --
  *   SMSG_UNKNOWN_0x021F                            0x021F  DOC      [low-conf]
- *   SMSG_WEEKLY_RESET_CURRENCY                     0x023E  DORMANT  [low-conf]
+ *   SMSG_WEEKLY_RESET_CURRENCY                     0x023E  ACTIVE   [low-conf]  server-binding=SMSG_WEEKLY_RESET_CURRENCIES
  *   SMSG_UNKNOWN_0x049A                            0x049A  DOC      [medium-conf]
  *   SMSG_UNKNOWN_0x0C13                            0x0C13  DOC      [medium-conf]
  *   SMSG_SET_CURRENCY_WEEK_LIMIT                   0x0E2A  DORMANT  [low-conf]

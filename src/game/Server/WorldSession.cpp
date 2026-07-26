@@ -318,6 +318,7 @@ static bool IsEnterWorldConverted(uint16 opcode)
         case SMSG_GM_TICKET_CASE_STATUS:            // MopGMTicketPackets::BuildCaseStatus
         case SMSG_UPDATE_CURRENCY:                 // MopCurrencyPackets::BuildUpdateCurrency
         case SMSG_SETUP_CURRENCY:                  // MopCurrencyPackets::BuildSetupCurrency
+        case SMSG_WEEKLY_RESET_CURRENCIES:         // Empty 18414 weekly-counter reset
         case SMSG_SPELL_EXECUTE_LOG:               // MopCombatLogPackets::BuildSpellExecuteLog
         case SMSG_SPELL_PERIODIC_AURA_LOG:         // MopCombatLogPackets::BuildPeriodicAuraLog
         case SMSG_SPELLDISPELLOG:                  // MopCombatLogPackets::BuildDispelLog

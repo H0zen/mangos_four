@@ -319,6 +319,15 @@ add_test(NAME mop_currency_packets_source
     COMMAND ${CMAKE_COMMAND} -DSOURCE_ROOT=${CMAKE_SOURCE_DIR}
         -P ${CMAKE_CURRENT_SOURCE_DIR}/mop_currency_packets_source_test.cmake)
 
+foreach(mutation IN ITEMS weekly_registration weekly_admission weekly_body
+        weekly_value weekly_reference)
+    add_test(NAME mop_currency_packets_source_mutation_${mutation}
+        COMMAND ${CMAKE_COMMAND} -DSOURCE_ROOT=${CMAKE_SOURCE_DIR}
+            -DMUTATION=${mutation}
+            -P ${CMAKE_CURRENT_SOURCE_DIR}/mop_currency_packets_source_test.cmake)
+    set_tests_properties(mop_currency_packets_source_mutation_${mutation} PROPERTIES WILL_FAIL TRUE)
+endforeach()
+
 add_test(NAME mop_initial_mover_source
     COMMAND ${CMAKE_COMMAND}
         -DSOURCE_ROOT=${CMAKE_SOURCE_DIR}

@@ -233,6 +233,8 @@ void CurrencyMgr::ResetWeekCounts()
         itr->second.state = PLAYERCURRENCY_CHANGED;
     }
 
+    // 18414 consumes no payload: receipt clears the client's weekly currency
+    // counters, rebuilds its currency display, and fires CURRENCY_DISPLAY_UPDATE.
     WorldPacket data(SMSG_WEEKLY_RESET_CURRENCIES, 0);
     m_owner->SendDirectMessage(&data);
 }

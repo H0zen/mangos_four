@@ -171,8 +171,10 @@ static void test_successor_opcodes_are_framable()
 {
     CHECK(uint32_t(SMSG_UPDATE_CURRENCY) == 0x129Eu);
     CHECK(uint32_t(SMSG_SETUP_CURRENCY) == 0x1A8Bu);
+    CHECK(uint32_t(SMSG_WEEKLY_RESET_CURRENCIES) == 0x023Eu);
     CHECK(uint32_t(SMSG_UPDATE_CURRENCY) <= 0x1FFFu);
     CHECK(uint32_t(SMSG_SETUP_CURRENCY) <= 0x1FFFu);
+    CHECK(uint32_t(SMSG_WEEKLY_RESET_CURRENCIES) <= 0x1FFFu);
 
     uint8_t header[4] = {};
     CHECK(MopWire::BuildServerHeader(true, 13, SMSG_UPDATE_CURRENCY, header));
@@ -180,6 +182,9 @@ static void test_successor_opcodes_are_framable()
 
     CHECK(MopWire::BuildServerHeader(true, 3, SMSG_SETUP_CURRENCY, header));
     CHECK(header[0] == 0x8B && header[1] == 0x7A && header[2] == 0x00 && header[3] == 0x00);
+
+    CHECK(MopWire::BuildServerHeader(true, 0, SMSG_WEEKLY_RESET_CURRENCIES, header));
+    CHECK(header[0] == 0x3E && header[1] == 0x02 && header[2] == 0x00 && header[3] == 0x00);
 }
 
 int main(int /*argc*/, char** /*argv*/)
