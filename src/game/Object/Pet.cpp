@@ -1173,9 +1173,8 @@ void Pet::SetModeFlags(PetModeFlags mode)
         return;
     }
 
-    WorldPacket data(SMSG_PET_MODE, 12);
-    data << GetObjectGuid();
-    data << uint32(m_petModeFlags);
+    WorldPacket data;
+    MopPetPackets::BuildMode(data, GetObjectGuid(), uint32(mode));
     ((Player*)owner)->GetSession()->SendPacket(&data);
 }
 
@@ -1222,8 +1221,7 @@ void Pet::ApplyModeFlags(PetModeFlags mode, bool apply)
         return;
     }
 
-    WorldPacket data(SMSG_PET_MODE, 12);
-    data << GetObjectGuid();
-    data << uint32(m_petModeFlags);
+    WorldPacket data;
+    MopPetPackets::BuildMode(data, GetObjectGuid(), uint32(m_petModeFlags));
     ((Player*)owner)->GetSession()->SendPacket(&data);
 }

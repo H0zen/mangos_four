@@ -143,6 +143,19 @@ enum PetModeFlags
     PET_MODE_DEFAULT           = PET_MODE_FOLLOW | PET_MODE_DEFENSIVE,
 };
 
+namespace MopPetPackets
+{
+    inline void BuildMode(WorldPacket& out, ObjectGuid guid, uint32 modeFlags)
+    {
+        // The 18414 local-pet reader consumes all GUID mask bits first, then
+        // the mode value, followed by the present GUID bytes in this order.
+        out.Initialize(SMSG_PET_MODE, 13);
+        out.WriteGuidMask<5, 0, 6, 3, 7, 2, 4, 1>(guid);
+        out << modeFlags;
+        out.WriteGuidBytes<2, 5, 4, 0, 1, 7, 3, 6>(guid);
+    }
+}
+
 enum PetSpellState
 {
     PETSPELL_UNCHANGED = 0,

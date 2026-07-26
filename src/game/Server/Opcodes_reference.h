@@ -175,8 +175,8 @@
  *   TOTAL SMSG rows                   925
  *
  * SUBSYSTEM CONFIDENCE: high=365, low=221, medium=182, none=157
- * STATUS TOTALS: ACTIVE=357, DOC=438, DORMANT=725
- *   SMSG: ACTIVE=218, DOC=271, DORMANT=436
+ * STATUS TOTALS: ACTIVE=358, DOC=438, DORMANT=724
+ *   SMSG: ACTIVE=219, DOC=271, DORMANT=435
  *   CMSG: ACTIVE=139, DOC=167, DORMANT=289
  */
 
@@ -635,7 +635,7 @@ typedef uint16_t uint16;
  *   SMSG_LOOT_RESPONSE                             0x128A  ACTIVE
  *   SMSG_LOOT_MONEY_NOTIFY                         0x14C0  ACTIVE   [medium-conf]
  *   SMSG_LOOT_CLEAR_MONEY                          0x1632  ACTIVE   [medium-conf]
- *   SMSG_PET_MODE                                  0x163F  DORMANT  [low-conf]
+ *   SMSG_PET_MODE                                  0x163F  ACTIVE   [low-conf]
  *   SMSG_INSPECT_HONOR_STATS                       0x1A1E  DORMANT  [low-conf]
  *
  *  -- LootHistory.cpp (3) --

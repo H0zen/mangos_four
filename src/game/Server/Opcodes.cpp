@@ -334,6 +334,7 @@ void InitializeOpcodes()
     DefS(SMSG_PLAY_MUSIC, "SMSG_PLAY_MUSIC");
     DefS(SMSG_PET_ACTION_SOUND, "SMSG_PET_ACTION_SOUND");
     DefS(SMSG_PET_ACTION_FEEDBACK, "SMSG_PET_ACTION_FEEDBACK");
+    DefS(SMSG_PET_MODE, "SMSG_PET_MODE");
 
     // Single quest-giver marker query and its packed-GUID status response.
     DefC(CMSG_QUESTGIVER_STATUS_QUERY, "CMSG_QUESTGIVER_STATUS_QUERY", STATUS_LOGGEDIN, PROCESS_THREADUNSAFE, &WorldSession::HandleQuestgiverStatusQueryOpcode);
