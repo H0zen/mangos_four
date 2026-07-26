@@ -39,7 +39,18 @@ namespace
 
         size_t index = 0;
         for (uint8 byte : expected)
+        {
+            uint8 actual = packet.contents()[index];
+            if (actual != byte)
+            {
+                std::fprintf(stderr, "byte %zu: actual 0x%02X expected 0x%02X\n", index, actual, byte);
+                std::fprintf(stderr, "actual packet:");
+                for (size_t i = 0; i < packet.size(); ++i)
+                    std::fprintf(stderr, " 0x%02X", packet.contents()[i]);
+                std::fprintf(stderr, "\n");
+            }
             CHECK(packet.contents()[index++] == byte);
+        }
     }
 
     struct MovementFixture
@@ -1088,6 +1099,31 @@ static void test_pet_spellbook_mutation_wire_layouts()
     });
 }
 
+static void test_cooldown_event_wire_layout()
+{
+    WorldPacket dense;
+    MopSpellPackets::BuildCooldownEvent(dense,
+        ObjectGuid(UINT64_C(0x0807060504030201)), 0x11223344u);
+    CHECK(dense.GetOpcode() == SMSG_COOLDOWN_EVENT);
+    CheckBytes(dense, {
+        0xFF,
+        0x07, 0x09,
+        0x44, 0x33, 0x22, 0x11,
+        0x05, 0x03, 0x02, 0x04, 0x06, 0x00,
+    });
+
+    WorldPacket sparse;
+    MopSpellPackets::BuildCooldownEvent(sparse,
+        ObjectGuid(UINT64_C(0x08BB0000000000AA)), 0xA1B2C3D4u);
+    CHECK(sparse.GetOpcode() == SMSG_COOLDOWN_EVENT);
+    CheckBytes(sparse, {
+        0x4C,
+        0x09,
+        0xD4, 0xC3, 0xB2, 0xA1,
+        0xBA, 0xAB,
+    });
+}
+
 int main(int, char**)
 {
     test_dense_and_guid_permutations();
@@ -1105,6 +1141,7 @@ int main(int, char**)
     test_category_cooldown_request_and_response();
     test_spell_cooldown_wire_layout();
     test_clear_cooldowns_wire_layout();
+    test_cooldown_event_wire_layout();
     test_spellbook_mutation_wire_layouts();
     test_pet_spellbook_mutation_wire_layouts();
 

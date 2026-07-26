@@ -341,6 +341,7 @@ static bool IsEnterWorldConverted(uint16 opcode)
         case SMSG_SPELL_GO:                        // MopSpellPackets::BuildSpellGo
         case SMSG_SPELL_COOLDOWN:                  // MopSpellPackets::BuildSpellCooldown
         case SMSG_CLEAR_COOLDOWNS:                 // MopSpellPackets::BuildClearCooldowns
+        case SMSG_COOLDOWN_EVENT:                  // MopSpellPackets::BuildCooldownEvent
         case SMSG_LEARNED_SPELL:                   // MopSpellPackets::BuildLearnedSpell
         case SMSG_REMOVED_SPELL:                   // MopSpellPackets::BuildRemovedSpell
         case SMSG_SUPERCEDED_SPELL:                // MopSpellPackets::BuildSupersededSpell

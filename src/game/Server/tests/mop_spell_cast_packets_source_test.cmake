@@ -348,6 +348,36 @@ elseif(MUTATION STREQUAL "pet_spellbook_reference")
         "SMSG_PET_LEARNED_SPELL                         0x0282  ACTIVE"
         "SMSG_PET_LEARNED_SPELL                         0x0282  DORMANT"
         opcode_reference "${opcode_reference}")
+elseif(MUTATION STREQUAL "cooldown_event_mask_order")
+    string(REPLACE
+        "out.WriteGuidMask<4, 7, 1, 5, 6, 0, 2, 3>(ownerGuid);"
+        "out.WriteGuidMask<7, 4, 1, 5, 6, 0, 2, 3>(ownerGuid);"
+        spell_header "${spell_header}")
+elseif(MUTATION STREQUAL "cooldown_event_byte_order")
+    string(REPLACE
+        "out.WriteGuidBytes<5, 7>(ownerGuid);"
+        "out.WriteGuidBytes<7, 5>(ownerGuid);"
+        spell_header "${spell_header}")
+elseif(MUTATION STREQUAL "cooldown_event_sender")
+    string(REPLACE
+        "MopSpellPackets::BuildCooldownEvent(data, m_owner->GetObjectGuid(), spellInfo->ID);"
+        "/* removed cooldown-event sender */"
+        spell_cooldown_mgr_source "${spell_cooldown_mgr_source}")
+elseif(MUTATION STREQUAL "cooldown_event_registration")
+    string(REPLACE
+        "DefS(SMSG_COOLDOWN_EVENT, \"SMSG_COOLDOWN_EVENT\");"
+        "/* removed SMSG_COOLDOWN_EVENT registration */"
+        opcode_registry "${opcode_registry}")
+elseif(MUTATION STREQUAL "cooldown_event_gate")
+    string(REPLACE
+        "case SMSG_COOLDOWN_EVENT:"
+        "case SMSG_UNKNOWN_0:"
+        world_session "${world_session}")
+elseif(MUTATION STREQUAL "cooldown_event_reference")
+    string(REPLACE
+        "SMSG_COOLDOWN_EVENT                            0x1163  ACTIVE"
+        "SMSG_COOLDOWN_EVENT                            0x1163  DORMANT"
+        opcode_reference "${opcode_reference}")
 endif()
 
 string(FIND "${spell_handler}" "void WorldSession::HandleCastSpellOpcode" cast_start)
@@ -660,6 +690,32 @@ foreach(source IN ITEMS "${player_source}" "${spell_cooldown_mgr_source}")
     forbid("${source}" "WorldPacket data(SMSG_CLEAR_COOLDOWNS"
         "legacy clear-cooldowns body")
 endforeach()
+require_once("${spell_header}"
+    "inline void BuildCooldownEvent(WorldPacket& out, ObjectGuid ownerGuid,"
+    "18414 cooldown-event builder")
+require_once("${spell_header}"
+    "out.WriteGuidMask<4, 7, 1, 5, 6, 0, 2, 3>(ownerGuid);"
+    "cooldown-event GUID mask order")
+require_once("${spell_header}"
+    "out.WriteGuidBytes<5, 7>(ownerGuid);"
+    "cooldown-event leading GUID bytes")
+require_once("${spell_header}"
+    "out.WriteGuidBytes<3, 1, 2, 4, 6, 0>(ownerGuid);"
+    "cooldown-event trailing GUID bytes")
+require_once("${spell_cooldown_mgr_source}"
+    "MopSpellPackets::BuildCooldownEvent(data, m_owner->GetObjectGuid(), spellInfo->ID);"
+    "cooldown-event sender")
+require_once("${opcode_registry}"
+    "DefS(SMSG_COOLDOWN_EVENT, \"SMSG_COOLDOWN_EVENT\");"
+    "cooldown-event registration")
+require_once("${world_session}"
+    "case SMSG_COOLDOWN_EVENT:"
+    "cooldown-event send admission")
+require_once("${opcode_reference}"
+    "SMSG_COOLDOWN_EVENT                            0x1163  ACTIVE"
+    "active cooldown-event reference")
+forbid("${spell_cooldown_mgr_source}" "WorldPacket data(SMSG_COOLDOWN_EVENT"
+    "legacy cooldown-event body")
 require_once("${spell_header}"
     "inline void BuildLearnedSpell(WorldPacket& out, uint32 spellId,"
     "18414 learned-spell builder")

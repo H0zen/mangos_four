@@ -376,6 +376,20 @@ namespace MopSpellPackets
         out.WriteGuidBytes<2>(ownerGuid);
     }
 
+    inline void BuildCooldownEvent(WorldPacket& out, ObjectGuid ownerGuid,
+        uint32 spellId)
+    {
+        out.Initialize(SMSG_COOLDOWN_EVENT, 13);
+
+        // Wow.exe 18414 reader sub_6D511A reconstructs the owner GUID around the
+        // spell ID; resolved terminal sub_77AECB applies its cooldown event.
+        out.WriteGuidMask<4, 7, 1, 5, 6, 0, 2, 3>(ownerGuid);
+        out.FlushBits();
+        out.WriteGuidBytes<5, 7>(ownerGuid);
+        out << spellId;
+        out.WriteGuidBytes<3, 1, 2, 4, 6, 0>(ownerGuid);
+    }
+
     inline void BuildLearnedSpell(WorldPacket& out, uint32 spellId,
         bool suppressMessaging)
     {

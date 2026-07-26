@@ -175,8 +175,8 @@
  *   TOTAL SMSG rows                   925
  *
  * SUBSYSTEM CONFIDENCE: high=365, low=221, medium=182, none=157
- * STATUS TOTALS: ACTIVE=361, DOC=438, DORMANT=721
- *   SMSG: ACTIVE=221, DOC=271, DORMANT=433
+ * STATUS TOTALS: ACTIVE=362, DOC=438, DORMANT=720
+ *   SMSG: ACTIVE=222, DOC=271, DORMANT=432
  *   CMSG: ACTIVE=140, DOC=167, DORMANT=288
  */
 
@@ -936,7 +936,7 @@ typedef uint16_t uint16;
  *   SMSG_SPELL_START                               0x107A  ACTIVE
  *   SMSG_SET_FLAT_SPELL_MODIFIER                   0x10F2  DORMANT 
  *   SMSG_CHANNEL_START                             0x10F9  DORMANT 
- *   SMSG_COOLDOWN_EVENT                            0x1163  DORMANT 
+ *   SMSG_COOLDOWN_EVENT                            0x1163  ACTIVE
  *   SMSG_UNKNOWN_0x117A                            0x117A  DOC     
  *   SMSG_CHANNEL_UPDATE                            0x11D9  DORMANT 
  *   SMSG_PLAY_SPELL_VISUAL_KIT                     0x11E3  DORMANT
