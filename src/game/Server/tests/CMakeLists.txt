@@ -1569,6 +1569,30 @@ foreach(mutation IN ITEMS mask_order byte_order reaction_position creature_sende
     set_tests_properties(mop_ai_reaction_packets_source_mutation_${mutation} PROPERTIES WILL_FAIL TRUE)
 endforeach()
 
+add_executable(mop_power_update_packets_test mop_power_update_packets_test.cpp)
+target_include_directories(mop_power_update_packets_test PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}/..
+    ${CMAKE_SOURCE_DIR}/src/shared
+    $<TARGET_PROPERTY:game,INTERFACE_INCLUDE_DIRECTORIES>)
+set_target_properties(mop_power_update_packets_test PROPERTIES CXX_STANDARD 17 CXX_STANDARD_REQUIRED ON)
+target_compile_definitions(mop_power_update_packets_test PRIVATE
+    $<TARGET_PROPERTY:game,INTERFACE_COMPILE_DEFINITIONS>)
+target_link_libraries(mop_power_update_packets_test PRIVATE shared)
+add_test(NAME mop_power_update_packets COMMAND mop_power_update_packets_test)
+
+add_test(NAME mop_power_update_packets_source
+    COMMAND ${CMAKE_COMMAND} -DSOURCE_ROOT=${CMAKE_SOURCE_DIR}
+        -P ${CMAKE_CURRENT_SOURCE_DIR}/mop_power_update_packets_source_test.cmake)
+
+foreach(mutation IN ITEMS mask_order count_width byte_order primary_sender switch_sender
+        registration allowlist reference)
+    add_test(NAME mop_power_update_packets_source_mutation_${mutation}
+        COMMAND ${CMAKE_COMMAND} -DSOURCE_ROOT=${CMAKE_SOURCE_DIR}
+            -DMUTATION=${mutation}
+            -P ${CMAKE_CURRENT_SOURCE_DIR}/mop_power_update_packets_source_test.cmake)
+    set_tests_properties(mop_power_update_packets_source_mutation_${mutation} PROPERTIES WILL_FAIL TRUE)
+endforeach()
+
 add_executable(mop_sound_packets_test mop_sound_packets_test.cpp)
 target_include_directories(mop_sound_packets_test PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/..

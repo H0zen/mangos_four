@@ -250,6 +250,21 @@ namespace MopCompactPackets
         out.WriteGuidBytes<7, 1, 2, 0, 3>(guid);
     }
 
+    inline void BuildPowerUpdate(WorldPacket& out, ObjectGuid guid,
+        uint8 powerType, uint32 value)
+    {
+        // The 18414 Unit_C reader consumes eight GUID mask bits followed by a
+        // 21-bit record count. Each record is one power selector and value;
+        // GUID byte 6 trails the records rather than preceding them.
+        out.Initialize(SMSG_POWER_UPDATE, 17);
+        out.WriteGuidMask<4, 6, 7, 5, 2, 3, 0, 1>(guid);
+        out.WriteBits(uint32(1), 21);
+        out.WriteGuidBytes<7, 0, 5, 3, 1, 2, 4>(guid);
+        out << powerType;
+        out << value;
+        out.WriteGuidBytes<6>(guid);
+    }
+
     inline void BuildPetActionSound(WorldPacket& out, ObjectGuid guid,
         uint32 action)
     {

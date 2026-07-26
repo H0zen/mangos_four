@@ -2628,11 +2628,8 @@ void Unit::SetPowerType(Powers new_powertype)
         }
 
         // send power type update to client
-        WorldPacket data(SMSG_POWER_UPDATE);
-        data << GetPackGUID();
-        data << uint32(1);              // power count
-        data << uint8(new_powertype);
-        data << uint32(curValue);
+        WorldPacket data;
+        MopCompactPackets::BuildPowerUpdate(data, GetObjectGuid(), uint8(new_powertype), uint32(curValue));
         SendMessageToSet(&data, true);
     }
 }

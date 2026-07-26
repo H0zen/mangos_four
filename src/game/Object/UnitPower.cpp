@@ -149,12 +149,8 @@ void Unit::SetPowerByIndex(uint32 powerIndex, int32 val)
 
     if (IsInWorld())
     {
-        WorldPacket data(SMSG_POWER_UPDATE);
-        data << GetPackGUID();
-        data << uint32(1); // iteration count
-        // for (int i = 0; i < count; ++i)
-        data << uint8(power);
-        data << uint32(val);
+        WorldPacket data;
+        MopCompactPackets::BuildPowerUpdate(data, GetObjectGuid(), uint8(power), uint32(val));
         SendMessageToSet(&data, true);
     }
 

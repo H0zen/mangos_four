@@ -324,6 +324,9 @@ void InitializeOpcodes()
     DefS(SMSG_ATTACKERSTATEUPDATE, "SMSG_ATTACKERSTATEUPDATE");
     DefS(SMSG_CANCEL_COMBAT, "SMSG_CANCEL_COMBAT");
     DefS(SMSG_AI_REACTION, "SMSG_AI_REACTION");
+    // Unit_C reader sub_72B5D8 proves a 21-bit record count, packed unit GUID,
+    // and repeated power-selector/value records on the 18414 route.
+    DefS(SMSG_POWER_UPDATE, "SMSG_POWER_UPDATE");
     // Directly verified 18414 sound readers: packed source GUID, two packed
     // object GUIDs, and the single-ID music form respectively.
     DefS(SMSG_PLAY_SOUND, "SMSG_PLAY_SOUND");
