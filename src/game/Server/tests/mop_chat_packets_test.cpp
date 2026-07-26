@@ -179,6 +179,43 @@ static void test_length_boundaries()
     CHECK(!MopChatPackets::BuildMessage(tagRejected, oversized));
 }
 
+static void test_player_name_notices()
+{
+    WorldPacket notFound;
+    CHECK(MopChatPackets::BuildPlayerNotFound(notFound, "Al"));
+    CHECK(notFound.GetOpcode() == SMSG_CHAT_PLAYER_NOT_FOUND);
+    CHECK(Equal(notFound, { 0x01, 0x00, 'A', 'l' }));
+
+    WorldPacket ambiguous;
+    CHECK(MopChatPackets::BuildPlayerAmbiguous(ambiguous, "Bob"));
+    CHECK(ambiguous.GetOpcode() == SMSG_CHAT_PLAYER_AMBIGUOUS);
+    CHECK(Equal(ambiguous, { 0x01, 0x80, 'B', 'o', 'b' }));
+
+    WorldPacket maximum;
+    CHECK(MopChatPackets::BuildPlayerNotFound(maximum,
+        std::string((size_t(1) << 9) - 1, 'x')));
+    CHECK(maximum.size() == (size_t(1) << 9) + 1);
+    CHECK(maximum.contents()[0] == 0xFF);
+    CHECK(maximum.contents()[1] == 0x80);
+
+    WorldPacket oversized;
+    CHECK(!MopChatPackets::BuildPlayerAmbiguous(oversized,
+        std::string(size_t(1) << 9, 'x')));
+    CHECK(oversized.empty());
+}
+
+static void test_chat_restricted_notice()
+{
+    WorldPacket trial;
+    MopChatPackets::BuildChatRestrictedNotice(trial, 0);
+    CHECK(trial.GetOpcode() == SMSG_CHAT_RESTRICTED);
+    CHECK(Equal(trial, { 0x00 }));
+
+    WorldPacket silenced;
+    MopChatPackets::BuildChatRestrictedNotice(silenced, 3);
+    CHECK(Equal(silenced, { 0x03 }));
+}
+
 static void test_opcode()
 {
     CHECK(uint32(SMSG_MESSAGECHAT) == 0x1A9Au);
@@ -189,6 +226,9 @@ static void test_opcode()
     CHECK(uint32(CMSG_MESSAGECHAT_AFK) < uint32(OPCODE_TABLE_SIZE));
     CHECK(uint32(CMSG_UNREGISTER_ALL_ADDON_PREFIXES) == 0x029Fu);
     CHECK(uint32(CMSG_ADDON_REGISTERED_PREFIXES) == 0x040Eu);
+    CHECK(uint32(SMSG_CHAT_PLAYER_NOT_FOUND) == 0x1082u);
+    CHECK(uint32(SMSG_CHAT_PLAYER_AMBIGUOUS) == 0x061Au);
+    CHECK(uint32(SMSG_CHAT_RESTRICTED) == 0x1A3Bu);
 }
 
 static void test_say_message_request()
@@ -332,6 +372,8 @@ int main(int /*argc*/, char** /*argv*/)
     test_group_message();
     test_guild_message();
     test_length_boundaries();
+    test_player_name_notices();
+    test_chat_restricted_notice();
     test_opcode();
     test_say_message_request();
     test_afk_message_request();

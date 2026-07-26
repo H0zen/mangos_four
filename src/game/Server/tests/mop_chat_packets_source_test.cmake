@@ -168,6 +168,41 @@ elseif(MUTATION STREQUAL "afk_parser_layout")
         "uint8 const length = in.ReadUInt8();"
         "uint8 const length = uint8(in.ReadBits(9)); /* damaged AFK length */"
         chat_header "${chat_header}")
+elseif(MUTATION STREQUAL "notice_length")
+    string(REPLACE
+        "out.WriteBits(name.size(), 9);"
+        "out.WriteBits(name.size(), 8); /* damaged notice length */"
+        chat_header "${chat_header}")
+elseif(MUTATION STREQUAL "not_found_sender")
+    string(REPLACE
+        "MopChatPackets::BuildPlayerNotFound(data, name)"
+        "false /* removed player-not-found builder */"
+        chat_handler "${chat_handler}")
+elseif(MUTATION STREQUAL "ambiguous_sender")
+    string(REPLACE
+        "MopChatPackets::BuildPlayerAmbiguous(data, name)"
+        "false /* removed ambiguous-player builder */"
+        chat_handler "${chat_handler}")
+elseif(MUTATION STREQUAL "restricted_sender")
+    string(REPLACE
+        "MopChatPackets::BuildChatRestrictedNotice(data, uint8(restriction))"
+        "/* removed restricted-chat builder */"
+        chat_handler "${chat_handler}")
+elseif(MUTATION STREQUAL "notice_registration")
+    string(REPLACE
+        "DefS(SMSG_CHAT_PLAYER_NOT_FOUND, \"SMSG_CHAT_PLAYER_NOT_FOUND\");"
+        "/* removed player-not-found registration */"
+        opcode_registry "${opcode_registry}")
+elseif(MUTATION STREQUAL "notice_allowlist")
+    string(REPLACE
+        "case SMSG_CHAT_PLAYER_NOT_FOUND:"
+        "case 0xFFFF: /* removed player-not-found allowlist */"
+        world_session "${world_session}")
+elseif(MUTATION STREQUAL "notice_reference")
+    string(REPLACE
+        "SMSG_CHAT_PLAYER_NOT_FOUND                     0x1082  ACTIVE"
+        "SMSG_CHAT_PLAYER_NOT_FOUND                     0x1082  DORMANT"
+        opcode_reference "${opcode_reference}")
 elseif(MUTATION STREQUAL "legacy_wrong_faction")
     string(APPEND opcode_header "\nWorldPacket legacy(SMSG_CHAT_WRONG_FACTION);\n")
 elseif(MUTATION STREQUAL "legacy_gm_chat")
@@ -228,6 +263,38 @@ require_once("${opcode_registry}"
 require_once("${world_session}"
     "case SMSG_MESSAGECHAT:"
     "generic chat suppression allowlist")
+require_once("${chat_header}"
+    "out.WriteBits(name.size(), 9);"
+    "chat notice 9-bit name length")
+require_once("${chat_handler}"
+    "MopChatPackets::BuildPlayerNotFound(data, name)"
+    "player-not-found sender")
+require_once("${chat_handler}"
+    "MopChatPackets::BuildPlayerAmbiguous(data, name)"
+    "ambiguous-player sender")
+require_once("${chat_handler}"
+    "MopChatPackets::BuildChatRestrictedNotice(data, uint8(restriction))"
+    "restricted-chat sender")
+foreach(name IN ITEMS SMSG_CHAT_PLAYER_NOT_FOUND SMSG_CHAT_PLAYER_AMBIGUOUS SMSG_CHAT_RESTRICTED)
+    require_once("${opcode_registry}"
+        "DefS(${name}, \"${name}\");"
+        "${name} registration")
+    require_once("${world_session}"
+        "case ${name}:"
+        "${name} suppression allowlist")
+endforeach()
+require_once("${opcode_reference}"
+    "SMSG_CHAT_PLAYER_NOT_FOUND                     0x1082  ACTIVE"
+    "player-not-found reference status")
+require_once("${opcode_reference}"
+    "SMSG_CHAT_PLAYER_AMBIGUOUS                     0x061A  ACTIVE"
+    "ambiguous-player reference status")
+require_once("${opcode_reference}"
+    "SMSG_CHAT_RESTRICTED                           0x1A3B  ACTIVE"
+    "restricted-chat reference status")
+forbid("${chat_handler}" "WorldPacket data(SMSG_CHAT_PLAYER_NOT_FOUND" "legacy player-not-found sender")
+forbid("${chat_handler}" "WorldPacket data(SMSG_CHAT_PLAYER_AMBIGUOUS" "legacy ambiguous-player sender")
+forbid("${chat_handler}" "WorldPacket data(SMSG_CHAT_RESTRICTED" "legacy restricted-chat sender")
 require_once("${chat_handler}"
     "MopChatPackets::BuildTextEmote(data,"
     "text-emote response builder call")

@@ -175,8 +175,8 @@
  *   TOTAL SMSG rows                   925
  *
  * SUBSYSTEM CONFIDENCE: high=365, low=221, medium=182, none=157
- * STATUS TOTALS: ACTIVE=374, DOC=438, DORMANT=708
- *   SMSG: ACTIVE=234, DOC=271, DORMANT=420
+ * STATUS TOTALS: ACTIVE=377, DOC=438, DORMANT=705
+ *   SMSG: ACTIVE=237, DOC=271, DORMANT=417
  *   CMSG: ACTIVE=140, DOC=167, DORMANT=288
  */
 
@@ -748,7 +748,7 @@ typedef uint16_t uint16;
  *   SMSG_ARENA_ERROR                               0x04BA  DORMANT  [medium-conf]
  *   SMSG_VOICE_PARENTAL_CONTROLS                   0x04BF  DORMANT  [medium-conf]
  *   SMSG_SPELLDAMAGESHIELD                         0x05F3  ACTIVE
- *   SMSG_CHAT_PLAYER_AMBIGUOUS                     0x061A  DORMANT  [medium-conf]
+ *   SMSG_CHAT_PLAYER_AMBIGUOUS                     0x061A  ACTIVE   [medium-conf]
  *   SMSG_PLAY_TIME_WARNING                         0x062A  DORMANT  [medium-conf]
  *   SMSG_DISMOUNTRESULT                            0x062F  DORMANT  [medium-conf]
  *   SMSG_QUEST_POI_QUERY_RESPONSE                  0x067F  ACTIVE   [medium-conf]
@@ -796,7 +796,7 @@ typedef uint16_t uint16;
  *   SMSG_UNKNOWN_0x1023                            0x1023  DOC     
  *   SMSG_RESURRECT_REQUEST                         0x1062  DORMANT 
  *   SMSG_DEATH_RELEASE_LOC                         0x1063  ACTIVE   [medium-conf]
- *   SMSG_CHAT_PLAYER_NOT_FOUND                     0x1082  DORMANT  [medium-conf]
+ *   SMSG_CHAT_PLAYER_NOT_FOUND                     0x1082  ACTIVE   [medium-conf]
  *   SMSG_UNKNOWN_0x108A                            0x108A  DOC      [medium-conf]
  *   SMSG_ITEM_ENCHANT_TIME_UPDATE                  0x10A2  ACTIVE
  *   SMSG_UNKNOWN_0x10BB                            0x10BB  DOC      [medium-conf]
@@ -840,7 +840,7 @@ typedef uint16_t uint16;
  *   SMSG_UNKNOWN_0x19C2                            0x19C2  DOC      [medium-conf]
  *   SMSG_CONVERT_RUNE                              0x1A1B  DORMANT  [medium-conf]
  *   SMSG_UNKNOWN_0x1A2B                            0x1A2B  DOC      [medium-conf]
- *   SMSG_CHAT_RESTRICTED                           0x1A3B  DORMANT  [medium-conf]
+ *   SMSG_CHAT_RESTRICTED                           0x1A3B  ACTIVE   [medium-conf]
  *   SMSG_TIME_SYNC_REQ                             0x1A8F  ACTIVE
  *   SMSG_LIST_INVENTORY                            0x1AAE  ACTIVE   [medium-conf]
  *   SMSG_GUILD_DECLINE                             0x1AF9  DORMANT  [medium-conf]

@@ -106,6 +106,41 @@ typedef uint32 ChatTagFlags;
 
 namespace MopChatPackets
 {
+    inline bool BuildPlayerNameNotice(WorldPacket& out, uint16 opcode,
+        std::string const& name)
+    {
+        if (name.size() >= (size_t(1) << 9))
+            return false;
+
+        out.Initialize(opcode, name.size() + 2);
+
+        // Wow.exe 18414 reader sub_70E692 combines one aligned byte and one
+        // MSB-first bit into a 9-bit length, then consumes raw bytes without
+        // a wire terminator.
+        out.WriteBits(name.size(), 9);
+        out.FlushBits();
+        out.append(name.data(), name.size());
+        return true;
+    }
+
+    inline bool BuildPlayerNotFound(WorldPacket& out, std::string const& name)
+    {
+        return BuildPlayerNameNotice(out, SMSG_CHAT_PLAYER_NOT_FOUND, name);
+    }
+
+    inline bool BuildPlayerAmbiguous(WorldPacket& out, std::string const& name)
+    {
+        return BuildPlayerNameNotice(out, SMSG_CHAT_PLAYER_AMBIGUOUS, name);
+    }
+
+    inline void BuildChatRestrictedNotice(WorldPacket& out, uint8 restriction)
+    {
+        // Reader sub_6BB6E9 consumes exactly this byte; terminal sub_7AA5B8
+        // maps values 0 through 3 to the four restricted-chat UI errors.
+        out.Initialize(SMSG_CHAT_RESTRICTED, 1);
+        out << restriction;
+    }
+
     /**
      * Reads the message portion of an 18414 CMSG_MESSAGECHAT_SAY request.
      *

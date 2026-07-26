@@ -355,6 +355,9 @@ static bool IsEnterWorldConverted(uint16 opcode)
         case SMSG_PET_LEARNED_SPELL:               // MopSpellPackets::BuildPetLearnedSpell
         case SMSG_PET_REMOVED_SPELL:               // MopSpellPackets::BuildPetRemovedSpell
         case SMSG_MESSAGECHAT:                     // MopChatPackets::BuildMessage
+        case SMSG_CHAT_PLAYER_NOT_FOUND:            // MopChatPackets::BuildPlayerNotFound
+        case SMSG_CHAT_PLAYER_AMBIGUOUS:            // MopChatPackets::BuildPlayerAmbiguous
+        case SMSG_CHAT_RESTRICTED:                  // MopChatPackets::BuildChatRestrictedNotice
         case SMSG_CHANNEL_NOTIFY:                  // MopChannelPackets direct 18414 subtype serializers
         case SMSG_CHANNEL_LIST:                    // MopChannelPackets::BuildList
         case SMSG_TEXT_EMOTE:                      // MopChatPackets::BuildTextEmote
