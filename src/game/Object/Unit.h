@@ -182,6 +182,19 @@ namespace MopCompactPackets
         out.WriteGuidBytes<7, 1, 2, 0, 3>(guid);
     }
 
+    inline void BuildPetActionSound(WorldPacket& out, ObjectGuid guid,
+        uint32 action)
+    {
+        // The 18414 Unit_C reader places the pet action selector between two
+        // packed-GUID byte phases. Selectors 0 and 1 choose the special-spell
+        // and attack vocalizations respectively.
+        out.Initialize(SMSG_PET_ACTION_SOUND, 13);
+        out.WriteGuidMask<2, 7, 6, 0, 5, 1, 3, 4>(guid);
+        out.WriteGuidBytes<7, 4, 6, 1>(guid);
+        out << action;
+        out.WriteGuidBytes<2, 3, 5, 0>(guid);
+    }
+
     inline uint8 SwimSpeedGuidByte(uint64 guid, uint8 index)
     {
         return uint8(guid >> (8 * index));

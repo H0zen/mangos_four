@@ -5568,9 +5568,8 @@ void Unit::SendPetTalk(uint32 pettalk)
         return;
     }
 
-    WorldPacket data(SMSG_PET_ACTION_SOUND, 8 + 4);
-    data << GetObjectGuid();
-    data << uint32(pettalk);
+    WorldPacket data;
+    MopCompactPackets::BuildPetActionSound(data, GetObjectGuid(), pettalk);
     ((Player*)owner)->GetSession()->SendPacket(&data);
 }
 
