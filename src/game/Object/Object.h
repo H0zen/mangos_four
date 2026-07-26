@@ -28,6 +28,7 @@
 
 #include "Common.h"
 #include "ByteBuffer.h"
+#include "Server/Opcodes.h"
 #include "WorldPacket.h"
 #include "UpdateFields.h"
 #include "UpdateData.h"
