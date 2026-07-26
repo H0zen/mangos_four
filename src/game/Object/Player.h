@@ -635,6 +635,13 @@ namespace MopDeathPackets
 {
     static size_t const CEMETERY_LIST_MAX = 16;
 
+    inline void BuildDurabilityDamageDeath(WorldPacket& out)
+    {
+        // Wow.exe 18414 route 0x1E3E reaches sub_CE083A without consuming
+        // payload bytes and raises the retained DURABILITYDAMAGE_DEATH text.
+        out.Initialize(SMSG_DURABILITY_DAMAGE_DEATH, 0);
+    }
+
     inline void BuildDeathReleaseLocation(WorldPacket& out, uint32 mapId,
         float x, float y, float z)
     {

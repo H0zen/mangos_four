@@ -515,6 +515,7 @@ void InitializeOpcodes()
 
     // Wave 35 spirit-healer location state.
     DefS(SMSG_DEATH_RELEASE_LOC, "SMSG_DEATH_RELEASE_LOC");
+    DefS(SMSG_DURABILITY_DAMAGE_DEATH, "SMSG_DURABILITY_DAMAGE_DEATH");
 
     // Binary-proven scheduled cemetery-list refresh.
     DefC(CMSG_REQUEST_CEMETERY_LIST, "CMSG_REQUEST_CEMETERY_LIST", STATUS_LOGGEDIN, PROCESS_THREADUNSAFE, &WorldSession::HandleRequestCemeteryListOpcode);

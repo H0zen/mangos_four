@@ -1,5 +1,7 @@
 file(READ "${SOURCE_ROOT}/src/game/Object/Player.h" player_header)
 file(READ "${SOURCE_ROOT}/src/game/Object/PlayerDeath.cpp" player_death)
+file(READ "${SOURCE_ROOT}/src/game/Object/PlayerMirror.cpp" player_mirror)
+file(READ "${SOURCE_ROOT}/src/game/Object/Unit.cpp" unit_source)
 file(READ "${SOURCE_ROOT}/src/game/Object/ObjectMgr.h" object_mgr_header)
 file(READ "${SOURCE_ROOT}/src/game/Object/ObjectMgrGraveyard.cpp" object_mgr_graveyard)
 file(READ "${SOURCE_ROOT}/src/game/WorldHandlers/MiscHandler.cpp" misc_handler)
@@ -7,6 +9,7 @@ file(READ "${SOURCE_ROOT}/src/game/Server/Opcodes.h" opcode_header)
 file(READ "${SOURCE_ROOT}/src/game/Server/Opcodes.cpp" opcode_registry)
 file(READ "${SOURCE_ROOT}/src/game/Server/WorldSession.h" session_header)
 file(READ "${SOURCE_ROOT}/src/game/Server/WorldSession.cpp" session_source)
+file(READ "${SOURCE_ROOT}/src/game/Server/Opcodes_reference.h" opcode_reference)
 
 if(MUTATION STREQUAL "wire_order")
     string(REPLACE "out << mapId << y << x << z;" "out << mapId << x << y << z;"
@@ -72,6 +75,36 @@ elseif(MUTATION STREQUAL "cemetery_team_filter")
         "data.team != TEAM_BOTH_ALLOWED && data.team != team"
         "data.team != team"
         object_mgr_graveyard "${object_mgr_graveyard}")
+elseif(MUTATION STREQUAL "durability_death_body")
+    string(REPLACE
+        "out.Initialize(SMSG_DURABILITY_DAMAGE_DEATH, 0);"
+        "out.Initialize(SMSG_DURABILITY_DAMAGE_DEATH, 1); out << uint8(0);"
+        player_header "${player_header}")
+elseif(MUTATION STREQUAL "durability_death_mirror_sender")
+    string(REPLACE
+        "MopDeathPackets::BuildDurabilityDamageDeath(data2);"
+        "/* removed fall-death durability sender */"
+        player_mirror "${player_mirror}")
+elseif(MUTATION STREQUAL "durability_death_unit_sender")
+    string(REPLACE
+        "MopDeathPackets::BuildDurabilityDamageDeath(data);"
+        "/* removed combat-death durability sender */"
+        unit_source "${unit_source}")
+elseif(MUTATION STREQUAL "durability_death_registration")
+    string(REPLACE
+        "DefS(SMSG_DURABILITY_DAMAGE_DEATH, \"SMSG_DURABILITY_DAMAGE_DEATH\");"
+        "/* removed durability-death registration */"
+        opcode_registry "${opcode_registry}")
+elseif(MUTATION STREQUAL "durability_death_whitelist")
+    string(REPLACE
+        "case SMSG_DURABILITY_DAMAGE_DEATH:"
+        "/* removed durability-death whitelist */"
+        session_source "${session_source}")
+elseif(MUTATION STREQUAL "durability_death_reference")
+    string(REPLACE
+        "SMSG_DURABILITY_DAMAGE_DEATH                   0x1E3E  ACTIVE"
+        "SMSG_DURABILITY_DAMAGE_DEATH                   0x1E3E  DORMANT"
+        opcode_reference "${opcode_reference}")
 endif()
 
 function(require_once source token context)
@@ -85,6 +118,30 @@ endfunction()
 require_once("${player_header}"
     "out << mapId << y << x << z"
     "death-release 18414 field order")
+
+require_once("${player_header}"
+    "out\\.Initialize\\(SMSG_DURABILITY_DAMAGE_DEATH, 0\\)"
+    "empty durability-death serializer")
+require_once("${player_mirror}"
+    "MopDeathPackets::BuildDurabilityDamageDeath\\(data2\\)"
+    "fall-death durability sender")
+require_once("${unit_source}"
+    "MopDeathPackets::BuildDurabilityDamageDeath\\(data\\)"
+    "combat-death durability sender")
+require_once("${opcode_registry}"
+    "DefS\\(SMSG_DURABILITY_DAMAGE_DEATH,[ \t]*\"SMSG_DURABILITY_DAMAGE_DEATH\"\\)"
+    "durability-death registration")
+require_once("${session_source}"
+    "case[ \t]+SMSG_DURABILITY_DAMAGE_DEATH:"
+    "durability-death suppression whitelist")
+require_once("${opcode_reference}"
+    "SMSG_DURABILITY_DAMAGE_DEATH[ \t]+0x1E3E[ \t]+ACTIVE"
+    "active direct-client durability-death reference")
+foreach(source IN ITEMS player_mirror unit_source)
+    if("${${source}}" MATCHES "WorldPacket[ \t]+[A-Za-z0-9_]+\\(SMSG_DURABILITY_DAMAGE_DEATH")
+        message(FATAL_ERROR "live inline durability-death sender remains in ${source}")
+    endif()
+endforeach()
 
 string(REGEX MATCHALL
     "MopDeathPackets::BuildDeathReleaseLocation\\(data,"

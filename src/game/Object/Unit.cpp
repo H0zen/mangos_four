@@ -1009,7 +1009,8 @@ uint32 Unit::DealDamage(Unit* pVictim, uint32 damage, CleanDamage const* cleanDa
                 DEBUG_LOG("DealDamage: Killed %s, looing 10 percents durability", pVictim->GetGuidStr().c_str());
                 playerVictim->DurabilityLossAll(0.10f, false);
                 // durability lost message
-                WorldPacket data(SMSG_DURABILITY_DAMAGE_DEATH, 0);
+                WorldPacket data;
+                MopDeathPackets::BuildDurabilityDamageDeath(data);
                 playerVictim->GetSession()->SendPacket(&data);
             }
 

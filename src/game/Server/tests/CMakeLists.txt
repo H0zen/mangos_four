@@ -1190,7 +1190,9 @@ add_test(NAME mop_death_packets_source
 foreach(mutation IN ITEMS
         wire_order player_call misc_call registration whitelist opcode_value
         cemetery_wire cemetery_bound cemetery_query cemetery_serializer
-        cemetery_registration cemetery_whitelist cemetery_opcode cemetery_team_filter)
+        cemetery_registration cemetery_whitelist cemetery_opcode cemetery_team_filter
+        durability_death_body durability_death_mirror_sender durability_death_unit_sender
+        durability_death_registration durability_death_whitelist durability_death_reference)
     add_test(NAME mop_death_packets_source_mutation_${mutation}
         COMMAND ${CMAKE_COMMAND} -DSOURCE_ROOT=${CMAKE_SOURCE_DIR}
             -DMUTATION=${mutation}
