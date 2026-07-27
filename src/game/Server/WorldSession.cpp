@@ -383,6 +383,10 @@ static bool IsEnterWorldConverted(uint16 opcode)
         case SMSG_RESYNC_RUNES:                      // MopRunePackets::BuildResync
         case SMSG_ADD_RUNE_POWER:                    // MopRunePackets::BuildAddPower
         case SMSG_CONVERT_RUNE:                      // MopRunePackets::BuildConvert
+        case SMSG_THREAT_UPDATE:                     // MopThreatPackets::BuildUpdate
+        case SMSG_HIGHEST_THREAT_UPDATE:             // MopThreatPackets::BuildHighest
+        case SMSG_THREAT_CLEAR:                      // MopThreatPackets::BuildClear
+        case SMSG_THREAT_REMOVE:                     // MopThreatPackets::BuildRemove
         case SMSG_CANCEL_COMBAT:                   // Empty reader; terminal clears local-player combat state
         case SMSG_CANCEL_AUTO_REPEAT:              // packed unit GUID; Unit_C leaf 0x819546 clears auto-repeat
         case SMSG_AI_REACTION:                     // packed unit GUID plus reaction; Unit_C.cpp leaf 0x80AD80

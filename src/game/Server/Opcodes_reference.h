@@ -175,8 +175,8 @@
  *   TOTAL SMSG rows                   925
  *
  * SUBSYSTEM CONFIDENCE: high=365, low=221, medium=182, none=157
- * STATUS TOTALS: ACTIVE=390, DOC=438, DORMANT=692
- *   SMSG: ACTIVE=250, DOC=271, DORMANT=404
+ * STATUS TOTALS: ACTIVE=394, DOC=438, DORMANT=688
+ *   SMSG: ACTIVE=254, DOC=271, DORMANT=400
  *   CMSG: ACTIVE=140, DOC=167, DORMANT=288
  */
 
@@ -1021,7 +1021,7 @@ typedef uint16_t uint16;
  *   SMSG_MIRROR_IMAGE_COMPONENTED_DATA             0x04D9  DORMANT
  *   SMSG_MOVE_KNOCK_BACK                           0x0562  DORMANT 
  *   SMSG_PLAY_SPELL_VISUAL                         0x061E  DORMANT 
- *   SMSG_THREAT_UPDATE                             0x0632  DORMANT 
+ *   SMSG_THREAT_UPDATE                             0x0632  ACTIVE   [high-conf]
  *   SMSG_AI_REACTION                               0x06AF  ACTIVE
  *   SMSG_SPLINE_MOVE_ROOT                          0x0728  DORMANT 
  *   SMSG_MOVE_SET_SWIM_SPEED                       0x0817  ACTIVE
@@ -1063,7 +1063,7 @@ typedef uint16_t uint16;
  *   SMSG_MOVE_UPDATE_REMOVE_MOVEMENT_FORCE         0x1464  DORMANT
  *   SMSG_HEALTH_UPDATE                             0x148B  DORMANT 
  *   SMSG_SET_VEHICLE_REC_ID                        0x149F  DORMANT 
- *   SMSG_HIGHEST_THREAT_UPDATE                     0x14AE  DORMANT 
+ *   SMSG_HIGHEST_THREAT_UPDATE                     0x14AE  ACTIVE   [high-conf]
  *   SMSG_UNKNOWN_0x1553                            0x1553  DOC     
  *   SMSG_MOVE_UPDATE_RUN_SPEED                     0x158E  DORMANT
  *   SMSG_MOVE_GRAVITY_DISABLE                      0x159F  DORMANT 
@@ -1075,7 +1075,7 @@ typedef uint16_t uint16;
  *   SMSG_SPLINE_MOVE_STOP_SWIM                     0x1798  DORMANT 
  *   SMSG_MOVE_SET_PITCH_RATE                       0x17AB  DORMANT 
  *   SMSG_MOVE_SET_HOVER                            0x1802  DORMANT 
- *   SMSG_THREAT_CLEAR                              0x180B  DORMANT 
+ *   SMSG_THREAT_CLEAR                              0x180B  ACTIVE   [high-conf]
  *   SMSG_MOVE_UPDATE_COLLISION_HEIGHT              0x1812  DORMANT
  *   SMSG_UNKNOWN_0x181B                            0x181B  DOC     
  *   SMSG_SPLINE_MOVE_SET_WATER_WALK                0x1823  ACTIVE
@@ -1085,7 +1085,7 @@ typedef uint16_t uint16;
  *   SMSG_UNKNOWN_0x186F                            0x186F  DOC     
  *   SMSG_SPLINE_MOVE_SET_FEATHER_FALL              0x1893  ACTIVE
  *   SMSG_SPLINE_MOVE_SET_LAND_WALK                 0x18B6  ACTIVE
- *   SMSG_THREAT_REMOVE                             0x1960  DORMANT 
+ *   SMSG_THREAT_REMOVE                             0x1960  ACTIVE   [high-conf]
  *   SMSG_PRE_RESURRECT                             0x19C0  DORMANT 
  *   SMSG_MONSTER_MOVE                              0x1A07  ACTIVE
  *   SMSG_PLAYER_MOVE                               0x1A32  ACTIVE

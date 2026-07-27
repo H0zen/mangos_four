@@ -199,7 +199,9 @@ foreach(mutation IN ITEMS cancel_sender cancel_registration cancel_allowlist can
         mirror_start_order mirror_pause_width mirror_sender mirror_registration
         mirror_allowlist mirror_reference
         rune_count_width rune_record_order rune_convert_order rune_sender
-        rune_registration rune_allowlist rune_reference)
+        rune_registration rune_allowlist rune_reference
+        threat_count_width threat_update_mask threat_highest_mask threat_clear_bytes
+        threat_remove_mask threat_sender threat_registration threat_allowlist threat_reference)
     add_test(NAME mop_compact_packets_source_mutation_${mutation}
         COMMAND ${CMAKE_COMMAND} -DSOURCE_ROOT=${CMAKE_SOURCE_DIR}
             -DMUTATION=${mutation}

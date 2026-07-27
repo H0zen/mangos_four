@@ -16,6 +16,7 @@ file(READ "${SOURCE_ROOT}/src/game/Server/Opcodes.h" opcode_header)
 file(READ "${SOURCE_ROOT}/src/game/Object/UnitCombat.cpp" unit_combat)
 file(READ "${SOURCE_ROOT}/src/game/Object/Unit.cpp" unit)
 file(READ "${SOURCE_ROOT}/src/game/Object/Unit.h" unit_header)
+file(READ "${SOURCE_ROOT}/src/game/Object/UnitThreat.cpp" unit_threat)
 file(READ "${SOURCE_ROOT}/src/game/WorldHandlers/CombatHandler.cpp" combat_handler)
 file(READ "${SOURCE_ROOT}/src/game/Server/WorldSession.cpp" world_session)
 file(READ "${SOURCE_ROOT}/src/game/WorldHandlers/ItemHandler.cpp" item_handler)
@@ -289,6 +290,51 @@ elseif(MUTATION STREQUAL "rune_reference")
     string(REPLACE
         "SMSG_RESYNC_RUNES                              0x15E3  ACTIVE"
         "SMSG_RESYNC_RUNES                              0x15E3  DORMANT"
+        opcode_reference "${opcode_reference}")
+elseif(MUTATION STREQUAL "threat_count_width")
+    string(REPLACE
+        "out.WriteBits(uint32(entries.size()), 21);"
+        "out.WriteBits(uint32(entries.size()), 20);"
+        unit_header "${unit_header}")
+elseif(MUTATION STREQUAL "threat_update_mask")
+    string(REPLACE
+        "out.WriteGuidMask<5, 6, 1, 3, 7, 0, 4>(owner);"
+        "out.WriteGuidMask<6, 5, 1, 3, 7, 0, 4>(owner);"
+        unit_header "${unit_header}")
+elseif(MUTATION STREQUAL "threat_highest_mask")
+    string(REPLACE
+        "out.WriteGuidMask<3, 0>(selected);"
+        "out.WriteGuidMask<0, 3>(selected);"
+        unit_header "${unit_header}")
+elseif(MUTATION STREQUAL "threat_clear_bytes")
+    string(REPLACE
+        "out.WriteGuidBytes<7, 0, 4, 3, 2, 1, 6, 5>(owner);"
+        "out.WriteGuidBytes<0, 7, 4, 3, 2, 1, 6, 5>(owner);"
+        unit_header "${unit_header}")
+elseif(MUTATION STREQUAL "threat_remove_mask")
+    string(REPLACE
+        "out.WriteGuidMask<0, 1, 5>(owner);"
+        "out.WriteGuidMask<1, 0, 5>(owner);"
+        unit_header "${unit_header}")
+elseif(MUTATION STREQUAL "threat_sender")
+    string(REPLACE
+        "MopThreatPackets::BuildUpdate(data, GetObjectGuid(), entries);"
+        "/* removed threat-update builder */"
+        unit_threat "${unit_threat}")
+elseif(MUTATION STREQUAL "threat_registration")
+    string(REPLACE
+        "DefS(SMSG_THREAT_UPDATE, \"SMSG_THREAT_UPDATE\");"
+        "/* removed threat-update registration */"
+        opcode_registry "${opcode_registry}")
+elseif(MUTATION STREQUAL "threat_allowlist")
+    string(REPLACE
+        "case SMSG_THREAT_UPDATE:"
+        "case 0xFFFF: /* removed threat-update allowlist */"
+        world_session "${world_session}")
+elseif(MUTATION STREQUAL "threat_reference")
+    string(REPLACE
+        "SMSG_THREAT_UPDATE                             0x0632  ACTIVE"
+        "SMSG_THREAT_UPDATE                             0x0632  DORMANT"
         opcode_reference "${opcode_reference}")
 endif()
 
@@ -576,6 +622,54 @@ foreach(server_name IN ITEMS SMSG_RESYNC_RUNES SMSG_ADD_RUNE_POWER SMSG_CONVERT_
         message(FATAL_ERROR "${server_name} is missing from the converted-packet gate")
     endif()
     if(NOT opcode_reference MATCHES "${server_name}[ \\t]+0x[0-9A-F]+[ \\t]+ACTIVE")
+        message(FATAL_ERROR "reference inventory does not record active ${server_name}")
+    endif()
+endforeach()
+
+if(NOT unit_header MATCHES "namespace MopThreatPackets")
+    message(FATAL_ERROR "threat serializers are missing from owning unit code")
+endif()
+string(FIND "${unit_header}" "out.WriteBits(uint32(entries.size()), 21);" threat_count_layout)
+if(threat_count_layout EQUAL -1)
+    message(FATAL_ERROR "threat-list count is not the 21-bit 18414 layout")
+endif()
+string(FIND "${unit_header}" "out.WriteGuidMask<5, 6, 1, 3, 7, 0, 4>(owner);" threat_update_layout)
+if(threat_update_layout EQUAL -1)
+    message(FATAL_ERROR "threat-update owner mask does not match reader sub_7344A4")
+endif()
+string(FIND "${unit_header}" "out.WriteGuidMask<3, 0>(selected);" threat_highest_layout)
+if(threat_highest_layout EQUAL -1)
+    message(FATAL_ERROR "highest-threat selected mask does not match reader sub_736527")
+endif()
+string(FIND "${unit_header}" "out.WriteGuidBytes<7, 0, 4, 3, 2, 1, 6, 5>(owner);" threat_clear_layout)
+if(threat_clear_layout EQUAL -1)
+    message(FATAL_ERROR "threat-clear byte order does not match reader sub_6F2392")
+endif()
+string(FIND "${unit_header}" "out.WriteGuidMask<0, 1, 5>(owner);" threat_remove_layout)
+if(threat_remove_layout EQUAL -1)
+    message(FATAL_ERROR "threat-remove owner mask does not match reader sub_6DBFD5")
+endif()
+foreach(builder IN ITEMS BuildUpdate BuildHighest BuildClear BuildRemove)
+    if(NOT unit_threat MATCHES "MopThreatPackets::${builder}")
+        message(FATAL_ERROR "threat sender bypasses ${builder}")
+    endif()
+endforeach()
+foreach(server_name IN ITEMS
+        SMSG_THREAT_UPDATE SMSG_HIGHEST_THREAT_UPDATE SMSG_THREAT_CLEAR SMSG_THREAT_REMOVE)
+    string(FIND "${unit_threat}" "WorldPacket data(${server_name}" legacy_threat_sender)
+    if(NOT legacy_threat_sender EQUAL -1)
+        message(FATAL_ERROR "legacy raw ${server_name} construction remains")
+    endif()
+    string(FIND "${opcode_registry}" "DefS(${server_name}, \"${server_name}\");" threat_registration)
+    if(threat_registration EQUAL -1)
+        message(FATAL_ERROR "${server_name} is missing outbound opcode metadata")
+    endif()
+    string(FIND "${world_session}" "case ${server_name}:" threat_allowlist)
+    if(threat_allowlist EQUAL -1)
+        message(FATAL_ERROR "${server_name} is missing from the converted-packet gate")
+    endif()
+    string(REGEX MATCH "${server_name}[ \t]+0x[0-9A-F]+[ \t]+ACTIVE" threat_reference "${opcode_reference}")
+    if(threat_reference STREQUAL "")
         message(FATAL_ERROR "reference inventory does not record active ${server_name}")
     endif()
 endforeach()

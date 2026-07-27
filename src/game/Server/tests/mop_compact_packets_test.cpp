@@ -497,6 +497,51 @@ static void test_rune_packets()
     CHECK(BytesEqual(converted, { 0x03, 0x04 }));
 }
 
+static void test_threat_packets()
+{
+    ObjectGuid const owner(UINT64_C(0x0807060504030201));
+    ObjectGuid const selected(UINT64_C(0x100F0E0D0C0B0A09));
+    MopThreatPackets::ThreatEntries const entries = {{
+        ObjectGuid(UINT64_C(0x1817161514131211)), 0xA1B2C3D4u
+    }};
+
+    WorldPacket update;
+    MopThreatPackets::BuildUpdate(update, owner, entries);
+    CHECK(update.GetOpcode() == SMSG_THREAT_UPDATE);
+    CHECK(BytesEqual(update, {
+        0xFE, 0x00, 0x00, 0x1F, 0xF8,
+        0x16, 0x19, 0x10, 0x13, 0x12, 0x17, 0x15, 0x14,
+        0xD4, 0xC3, 0xB2, 0xA1,
+        0x03, 0x04, 0x02, 0x05, 0x07, 0x06, 0x00, 0x09,
+    }));
+
+    WorldPacket highest;
+    MopThreatPackets::BuildHighest(highest, owner, selected, entries);
+    CHECK(highest.GetOpcode() == SMSG_HIGHEST_THREAT_UPDATE);
+    CHECK(BytesEqual(highest, {
+        0xFF, 0xF8, 0x00, 0x00, 0x7F, 0xF8,
+        0x04, 0x16, 0xD4, 0xC3, 0xB2, 0xA1,
+        0x14, 0x10, 0x15, 0x17, 0x12, 0x13, 0x19,
+        0x0D, 0x07, 0x0A, 0x03, 0x00, 0x02, 0x0E, 0x0B,
+        0x09, 0x08, 0x0C, 0x11, 0x05, 0x06, 0x0F,
+    }));
+
+    WorldPacket clear;
+    MopThreatPackets::BuildClear(clear, owner);
+    CHECK(clear.GetOpcode() == SMSG_THREAT_CLEAR);
+    CHECK(BytesEqual(clear, {
+        0xFF, 0x09, 0x00, 0x04, 0x05, 0x02, 0x03, 0x06, 0x07,
+    }));
+
+    WorldPacket remove;
+    MopThreatPackets::BuildRemove(remove, owner, selected);
+    CHECK(remove.GetOpcode() == SMSG_THREAT_REMOVE);
+    CHECK(BytesEqual(remove, {
+        0xFF, 0xFF, 0x0D, 0x08, 0x0A, 0x07, 0x04, 0x09, 0x05,
+        0x00, 0x0C, 0x03, 0x0B, 0x06, 0x11, 0x0E, 0x02, 0x0F,
+    }));
+}
+
 static void test_opcode_values_are_framable()
 {
     CHECK(uint32_t(SMSG_ATTACKSWING_ERROR) == 0x11E1u);
@@ -521,6 +566,10 @@ static void test_opcode_values_are_framable()
     CHECK(uint32_t(SMSG_RESYNC_RUNES) == 0x15E3u);
     CHECK(uint32_t(SMSG_ADD_RUNE_POWER) == 0x1860u);
     CHECK(uint32_t(SMSG_CONVERT_RUNE) == 0x1A1Bu);
+    CHECK(uint32_t(SMSG_THREAT_UPDATE) == 0x0632u);
+    CHECK(uint32_t(SMSG_HIGHEST_THREAT_UPDATE) == 0x14AEu);
+    CHECK(uint32_t(SMSG_THREAT_CLEAR) == 0x180Bu);
+    CHECK(uint32_t(SMSG_THREAT_REMOVE) == 0x1960u);
 
     CHECK(uint32_t(SMSG_ATTACKSWING_ERROR) <= 0x1FFFu);
     CHECK(uint32_t(SMSG_MOVE_SET_SWIM_SPEED) <= 0x1FFFu);
@@ -544,6 +593,10 @@ static void test_opcode_values_are_framable()
     CHECK(uint32_t(SMSG_RESYNC_RUNES) <= 0x1FFFu);
     CHECK(uint32_t(SMSG_ADD_RUNE_POWER) <= 0x1FFFu);
     CHECK(uint32_t(SMSG_CONVERT_RUNE) <= 0x1FFFu);
+    CHECK(uint32_t(SMSG_THREAT_UPDATE) <= 0x1FFFu);
+    CHECK(uint32_t(SMSG_HIGHEST_THREAT_UPDATE) <= 0x1FFFu);
+    CHECK(uint32_t(SMSG_THREAT_CLEAR) <= 0x1FFFu);
+    CHECK(uint32_t(SMSG_THREAT_REMOVE) <= 0x1FFFu);
 }
 
 int main(int /*argc*/, char** /*argv*/)
@@ -562,6 +615,7 @@ int main(int /*argc*/, char** /*argv*/)
     test_duel_request_and_winner_packets();
     test_mirror_timer_packets();
     test_rune_packets();
+    test_threat_packets();
     test_opcode_values_are_framable();
 
     if (g_fail)

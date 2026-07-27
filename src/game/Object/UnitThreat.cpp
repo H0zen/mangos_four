@@ -455,14 +455,13 @@ void Unit::SendThreatUpdate()
     if (uint32 count = tlist.size())
     {
         DEBUG_FILTER_LOG(LOG_FILTER_COMBAT, "WORLD: Send SMSG_THREAT_UPDATE Message");
-        WorldPacket data(SMSG_THREAT_UPDATE, 8 + count * 8);
-        data << GetPackGUID();
-        data << uint32(count);
+        MopThreatPackets::ThreatEntries entries;
+        entries.reserve(count);
         for (ThreatList::const_iterator itr = tlist.begin(); itr != tlist.end(); ++itr)
-        {
-            data << (*itr)->getUnitGuid().WriteAsPacked();
-            data << uint32((*itr)->getThreat());
-        }
+            entries.push_back({ (*itr)->getUnitGuid(), uint32((*itr)->getThreat()) });
+
+        WorldPacket data;
+        MopThreatPackets::BuildUpdate(data, GetObjectGuid(), entries);
         SendMessageToSet(&data, false);
     }
 }
@@ -473,15 +472,14 @@ void Unit::SendHighestThreatUpdate(HostileReference* pHostilReference)
     if (uint32 count = tlist.size())
     {
         DEBUG_FILTER_LOG(LOG_FILTER_COMBAT, "WORLD: Send SMSG_HIGHEST_THREAT_UPDATE Message");
-        WorldPacket data(SMSG_HIGHEST_THREAT_UPDATE, 8 + 8 + count * 8);
-        data << GetPackGUID();
-        data << pHostilReference->getUnitGuid().WriteAsPacked();
-        data << uint32(count);
+        MopThreatPackets::ThreatEntries entries;
+        entries.reserve(count);
         for (ThreatList::const_iterator itr = tlist.begin(); itr != tlist.end(); ++itr)
-        {
-            data << (*itr)->getUnitGuid().WriteAsPacked();
-            data << uint32((*itr)->getThreat());
-        }
+            entries.push_back({ (*itr)->getUnitGuid(), uint32((*itr)->getThreat()) });
+
+        WorldPacket data;
+        MopThreatPackets::BuildHighest(data, GetObjectGuid(),
+            pHostilReference->getUnitGuid(), entries);
         SendMessageToSet(&data, false);
     }
 }
@@ -489,16 +487,16 @@ void Unit::SendHighestThreatUpdate(HostileReference* pHostilReference)
 void Unit::SendThreatClear()
 {
     DEBUG_FILTER_LOG(LOG_FILTER_COMBAT, "WORLD: Send SMSG_THREAT_CLEAR Message");
-    WorldPacket data(SMSG_THREAT_CLEAR, 8);
-    data << GetPackGUID();
+    WorldPacket data;
+    MopThreatPackets::BuildClear(data, GetObjectGuid());
     SendMessageToSet(&data, false);
 }
 
 void Unit::SendThreatRemove(HostileReference* pHostileReference)
 {
     DEBUG_FILTER_LOG(LOG_FILTER_COMBAT, "WORLD: Send SMSG_THREAT_REMOVE Message");
-    WorldPacket data(SMSG_THREAT_REMOVE, 8 + 8);
-    data << GetPackGUID();
-    data << pHostileReference->getUnitGuid().WriteAsPacked();
+    WorldPacket data;
+    MopThreatPackets::BuildRemove(data, GetObjectGuid(),
+        pHostileReference->getUnitGuid());
     SendMessageToSet(&data, false);
 }
