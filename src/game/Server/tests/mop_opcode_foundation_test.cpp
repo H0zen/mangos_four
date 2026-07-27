@@ -50,6 +50,16 @@ int main(int /*argc*/, char** /*argv*/)
     CheckOpcode(std::uint32_t(SMSG_RANDOM_ROLL), 0x141Au);
     CheckOpcode(std::uint32_t(SMSG_INSPECT_RATED_BG_STATS), 0x041Fu);
 
+    // The far-teleport ack. Its inherited value was 0x00E0, which is
+    // CMSG_CHAR_ENUM in 18414; registering it there displaced char-enum from
+    // the dispatch table and hung every client on "Retrieving character list".
+    // 0x1FAD comes from a live cross-map teleport and holds up in the corpus:
+    // 2,022 occurrences, always CMSG, always zero-length, one per
+    // SMSG_NEW_WORLD.
+    CheckOpcode(std::uint32_t(MSG_MOVE_WORLDPORT_ACK), 0x1FADu);
+    CheckOpcode(std::uint32_t(CMSG_CHAR_ENUM), 0x00E0u);
+    CHECK(std::uint32_t(MSG_MOVE_WORLDPORT_ACK) != std::uint32_t(CMSG_CHAR_ENUM));
+
     if (g_fail)
     {
         std::fprintf(stderr, "%d check(s) failed\n", g_fail);

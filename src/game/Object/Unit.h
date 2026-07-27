@@ -4455,6 +4455,17 @@ class Unit : public WorldObject
 
         bool IsSplineEnabled() const;
 
+        /**
+         * @brief Re-sends the unit's in-flight movement spline to one viewer.
+         *
+         * Used when the unit becomes visible to a player mid-move: the create
+         * block is a stationary snapshot, so without this the unit would stand
+         * still until its next spline launch.
+         *
+         * @param viewer The player who just gained visibility of this unit.
+         */
+        void SendCurrentSplineTo(Player* viewer);
+
         bool IsInWorgenForm(bool inPermanent = false) const;
         bool HasWorgenForm() const;
 

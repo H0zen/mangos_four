@@ -47,6 +47,8 @@
 #include "Opcodes.h"
 #include "WorldSession.h"
 
+#include <cstring>
+
 /**
  * @brief Static integrity metadata for the Phase 1a login closure.
  *
@@ -58,12 +60,34 @@
 OpcodeHandler clientOpcodeTable[OPCODE_TABLE_SIZE];
 OpcodeHandler serverOpcodeTable[OPCODE_TABLE_SIZE];
 
+/// Which table slots a registration has already claimed, so that a second
+/// claim on the same value is caught instead of silently replacing the first.
+static bool clientOpcodeClaimed[OPCODE_TABLE_SIZE];
+static bool serverOpcodeClaimed[OPCODE_TABLE_SIZE];
+
 /**
  * @brief Register a client-received (inbound) opcode with its real handler.
+ *
+ * Two symbols sharing a value is a data error, not a runtime condition: the
+ * second registration replaces the first and the displaced opcode simply stops
+ * being dispatched. That happened with MSG_MOVE_WORLDPORT_ACK, whose inherited
+ * 0x00E0 is CMSG_CHAR_ENUM in 18414 -- registering it hung every client on
+ * "Retrieving character list", and nothing reported why. Fail loudly instead.
  */
 static void DefC(uint16 v, char const* name, SessionStatus s, PacketProcessing p, void (WorldSession::*h)(WorldPacket&))
 {
     MANGOS_ASSERT(v < OPCODE_TABLE_SIZE);
+    if (clientOpcodeClaimed[v])
+    {
+        // Registering the same symbol twice is redundant but harmless; the
+        // generated login closure and the manual block below it can overlap.
+        // Two *different* symbols on one value is the bug this guards against.
+        MANGOS_ASSERT(std::strcmp(name, clientOpcodeTable[v].name) == 0 &&
+            "two client opcodes share one value: the second would silently "
+            "displace the first from the dispatch table");
+        sLog.outDetail("Opcodes: client opcode 0x%04X ('%s') registered twice", v, name);
+    }
+    clientOpcodeClaimed[v] = true;
     clientOpcodeTable[v] = OpcodeHandler{ name, s, p, h };
 }
 
@@ -73,6 +97,14 @@ static void DefC(uint16 v, char const* name, SessionStatus s, PacketProcessing p
 static void DefS(uint16 v, char const* name)
 {
     MANGOS_ASSERT(v < OPCODE_TABLE_SIZE);
+    if (serverOpcodeClaimed[v])
+    {
+        MANGOS_ASSERT(std::strcmp(name, serverOpcodeTable[v].name) == 0 &&
+            "two server opcodes share one value: the second would silently "
+            "displace the first from the name table");
+        sLog.outDetail("Opcodes: server opcode 0x%04X ('%s') registered twice", v, name);
+    }
+    serverOpcodeClaimed[v] = true;
     serverOpcodeTable[v] = OpcodeHandler{ name, STATUS_NEVER, PROCESS_INPLACE, &WorldSession::Handle_ServerSide };
 }
 
@@ -151,6 +183,8 @@ void InitializeOpcodes()
     {
         clientOpcodeTable[i] = OpcodeHandler{ "UNKNOWN", STATUS_UNHANDLED, PROCESS_INPLACE, &WorldSession::Handle_NULL };
         serverOpcodeTable[i] = OpcodeHandler{ "UNKNOWN", STATUS_NEVER, PROCESS_INPLACE, &WorldSession::Handle_ServerSide };
+        clientOpcodeClaimed[i] = false;
+        serverOpcodeClaimed[i] = false;
     }
 #include "opcode_register.inc"     // login closure only (Phase 1a); greeting NOT registered
     AssertLoginClosureIntegrity();
@@ -587,11 +621,17 @@ void InitializeOpcodes()
     // object creation for the rest of the session while movement and combat
     // broadcasts kept flowing. Retail 18414 captures pair SMSG_MOVE_TELEPORT
     // 1:1 with CMSG_MOVE_TELEPORT_ACK, 1,522 of each, so the ack always comes.
-    // MSG_MOVE_WORLDPORT_ACK is deliberately NOT registered: its inherited
-    // value 0x00E0 belongs to CMSG_CHAR_ENUM in 18414. Registering it there
-    // overwrote the char-enum slot and hung every client on "Retrieving
-    // character list". Its real 18414 value is unknown.
     DefC(CMSG_MOVE_TELEPORT_ACK, "CMSG_MOVE_TELEPORT_ACK", STATUS_LOGGEDIN, PROCESS_THREADUNSAFE, &WorldSession::HandleMoveTeleportAckOpcode);
+    // The worldport ack is 0x1FAD in 18414, not the inherited 0x00E0 -- that
+    // value is CMSG_CHAR_ENUM here, and registering it there overwrote the
+    // char-enum slot and hung every client on "Retrieving character list".
+    // 0x1FAD was taken from a live cross-map teleport that hung on the loading
+    // screen, then checked against the corpus before being registered: it
+    // occurs 2,022 times, always CMSG, always zero-length, against 2,022
+    // SMSG_NEW_WORLD -- an exact 1:1 pairing, 1,968 of them four or five
+    // records after the NEW_WORLD. It is claimed by nothing else, so unlike
+    // 0x00E0 this cannot displace an existing handler.
+    DefC(MSG_MOVE_WORLDPORT_ACK, "MSG_MOVE_WORLDPORT_ACK", STATUS_TRANSFER, PROCESS_THREADUNSAFE, &WorldSession::HandleMoveWorldportAckOpcode);
     DefC(MSG_MOVE_HEARTBEAT, "MSG_MOVE_HEARTBEAT", STATUS_LOGGEDIN, PROCESS_THREADUNSAFE, &WorldSession::HandleMovementOpcodes);
     DefC(CMSG_MOVE_START_FORWARD, "CMSG_MOVE_START_FORWARD", STATUS_LOGGEDIN, PROCESS_THREADUNSAFE, &WorldSession::HandleMovementOpcodes);
     DefC(CMSG_MOVE_START_BACKWARD, "CMSG_MOVE_START_BACKWARD", STATUS_LOGGEDIN, PROCESS_THREADUNSAFE, &WorldSession::HandleMovementOpcodes);

@@ -133,6 +133,7 @@ void VisibleNotifier::Notify()
         if ((*vItr) != &player && (*vItr)->isType(TYPEMASK_UNIT))
         {
             player.SendAurasForTarget((Unit*)(*vItr));
+            ((Unit*)(*vItr))->SendCurrentSplineTo(&player);
         }
     }
 }

@@ -58,6 +58,7 @@
 #include "MovementGenerator.h"
 #include "movement/MoveSplineInit.h"
 #include "movement/MoveSpline.h"
+#include "movement/packet_builder.h"
 #include "CreatureLinkingMgr.h"
 #include "GameTime.h"
 #ifdef ENABLE_ELUNA
@@ -6216,6 +6217,18 @@ void Unit::NearTeleportTo(float x, float y, float z, float orientation, bool cas
  * @param generatePath True to generate a path.
  * @param forceDestination True to force the exact destination.
  */
+void Unit::SendCurrentSplineTo(Player* viewer)
+{
+    if (!viewer || !IsSplineEnabled() || movespline->Finalized())
+    {
+        return;
+    }
+
+    WorldPacket data;
+    Movement::PacketBuilder::WriteMonsterMove(*movespline, data, GetObjectGuid());
+    viewer->GetSession()->SendPacket(&data);
+}
+
 void Unit::MonsterMoveWithSpeed(float x, float y, float z, float speed, bool generatePath, bool forceDestination)
 {
     Movement::MoveSplineInit init(*this);

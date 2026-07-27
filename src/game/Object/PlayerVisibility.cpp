@@ -233,6 +233,7 @@ void Player::UpdateVisibilityOf(WorldObject const* viewPoint, WorldObject* targe
             if (target != this && target->isType(TYPEMASK_UNIT))
             {
                 SendAurasForTarget((Unit*)target);
+                ((Unit*)target)->SendCurrentSplineTo(this);
             }
         }
     }
