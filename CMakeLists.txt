@@ -53,6 +53,10 @@ option(PCH                  "Enable precompiled headers"                    ON)
 option(WITH_IO_URING        "Use the io_uring network backend (Linux, needs liburing)" OFF)
 option(DEBUG                "Enable debug build (only on non IDEs)"         OFF)
 option(WITHOUT_GIT          "Disable Git revision detection"                OFF)
+# Off by default: the suites are large and only of interest when working on the
+# code they cover. The name matches MangosTwo, and the realmd submodule already
+# keys off WITH_TESTS, so this single switch covers the core and realmd suites.
+option(WITH_TESTS           "Build the unit tests"                          OFF)
 #==================================================================================
 message("")
 message(

@@ -194,6 +194,7 @@ set(SRC_GRP_UTILITIES
   Utilities/RNGen.h
   Utilities/Timer.h
   Utilities/Util.cpp
+  Utilities/MathDefines.h
   Utilities/Util.h
   Utilities/WorldPacket.h
   Utilities/ByteConverter.h
@@ -206,6 +207,8 @@ set(SRC_GRP_UTILITIES
   Utilities/TypeList.h
   Utilities/UnorderedMapSet.h
   Utilities/Optional.h
+  Utilities/ScheduledExit.cpp
+  Utilities/ScheduledExit.h
 )
 source_group("Utilities" FILES ${SRC_GRP_UTILITIES})
 
