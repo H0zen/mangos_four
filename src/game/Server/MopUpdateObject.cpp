@@ -156,10 +156,23 @@ uint32 MopUpdateObject::TranslateGameObjectDynamic(uint32 legacyDynamic)
 
 bool MopUpdateObject::CanUseSimpleUnitMovement(SimpleUnitEligibility const& eligibility)
 {
-    return !eligibility.isVehicle && !eligibility.isBoarded && !eligibility.hasTransport &&
-        !eligibility.hasSpline && (eligibility.movementFlags & ~SimpleLivingWalkModeFlag) == 0 &&
-        eligibility.movementFlags2 == 0 &&
-        !eligibility.hasOptionalMovement && !eligibility.hasAttackingTarget;
+    // Only reject states the encoder cannot represent. AppendSimpleLivingMovement
+    // emits a state-invariant layout: it declares every optional block absent
+    // (attacking target 0, spline 0, fall data 0, movement flags omitted, extra
+    // movement flags omitted, forces 0) and then writes position plus all nine
+    // speeds unconditionally. So a moving or fighting unit encodes to exactly the
+    // same structure as an idle one - the client is simply told "stationary
+    // snapshot here", and the SMSG_MONSTER_MOVE stream animates it from there.
+    //
+    // Rejecting those states instead made Object::BuildCreateUpdateBlockForPlayer
+    // return without emitting anything, so any creature that was moving or in
+    // combat when it entered view was never created client-side and stayed
+    // invisible while still dealing damage.
+    //
+    // Transport and vehicle states are still rejected: those change what the
+    // position means (transport-relative rather than world), so a stationary
+    // snapshot would place the unit somewhere wrong rather than merely stale.
+    return !eligibility.isVehicle && !eligibility.isBoarded && !eligibility.hasTransport;
 }
 
 bool MopUpdateObject::CanUseStationaryGameObjectMovement(StationaryGameObjectEligibility const& eligibility)
