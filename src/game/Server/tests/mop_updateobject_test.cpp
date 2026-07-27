@@ -1064,6 +1064,135 @@ int main(int /*argc*/, char** /*argv*/)
     CHECK(dyn == 0);                                           // no dynamic fields
     CHECK(p.rpos() == p.size());                               // consumed to the end
 
+    // The login burst appends the projected self fields to this same create
+    // block, so they ride in the create rather than arriving afterwards as a
+    // VALUES block. Retail orders the login packet items-first, self-last.
+    {
+        // Core-only must be byte-identical whether reached through
+        // BuildSelfCreate or the block writer it now delegates to.
+        ByteBuffer bare;
+        MopUpdateObject::AppendSelfCreateBlock(bare, e, nullptr, 0);
+        CHECK(bare.size() + 6 == p.size());
+        CHECK(bare.size() + 6 == p.size() &&
+            std::memcmp(bare.contents(), p.contents() + 6, bare.size()) == 0);
+
+        // Two projected fields either side of a 32-bit mask boundary, both
+        // above the core block's last index (70).
+        const MopUpdateObject::StaticField extra[] =
+        {
+            { 162, 0x00000010u },        // PLAYER_FLAGS, lowest projected field
+            { 1149, 0x0000BEEFu },       // coinage low
+        };
+        ByteBuffer seeded;
+        MopUpdateObject::AppendSelfCreateBlock(seeded, e, extra, 2);
+
+        // Two more fields, and the mask grows to cover index 1149.
+        CHECK(seeded.size() == bare.size() + 2 * 4 + (1149 / 32 + 1 - 3) * 4);
+
+        // Decode the mask from the head of the values block. Everything before
+        // it is identical to the core-only block, so its offset is known.
+        const size_t valuesOffset = bare.size() - 114;
+        seeded.rpos(valuesOffset);
+        uint8 seededBlocks; seeded >> seededBlocks;
+        CHECK(seededBlocks == 1149 / 32 + 1);
+        std::vector<uint32> seededMask(seededBlocks);
+        for (uint8 i = 0; i < seededBlocks; ++i) { seeded >> seededMask[i]; }
+        auto seededBit = [&](int idx)
+        {
+            return (seededMask[idx / 32] >> (idx % 32)) & 1u;
+        };
+        CHECK(seededBit(70));            // last core field still present
+        CHECK(seededBit(162));           // appended
+        CHECK(seededBit(1149));          // appended
+        CHECK(!seededBit(163));          // nothing invented in between
+
+        // Values stay in index order: the 25 core values, then the two extras.
+        for (int i = 0; i < 25; ++i) { uint32 v; seeded >> v; }
+        uint32 v162, v1149;
+        seeded >> v162; seeded >> v1149;
+        CHECK(v162 == 0x00000010u);
+        CHECK(v1149 == 0x0000BEEFu);
+        uint8 seededDyn; seeded >> seededDyn;
+        CHECK(seededDyn == 0);
+        CHECK(seeded.rpos() == seeded.size());
+    }
+
+    // The real login path feeds LEGACY indices spanning every range Map.cpp
+    // seeds, projects them, and hands the result to the create block. The
+    // projection is not monotonic in general - ranges shift by +5, +7 and +8
+    // and the quest log re-strides 5->15 - so the property that matters is
+    // that it stays ascending across each range BOUNDARY for this input.
+    {
+        MopUpdateObject::StaticField legacy[] =
+        {
+            { 157, 0x00000010u },        // PLAYER_FLAGS      -> 162
+            { 166, 27353u },             // quest slot 0 id   -> 171 (whole slot)
+            { 167, 0u },
+            { 168, 0u },
+            { 169, 0u },
+            { 170, 0u },
+            { 916, 12345u },             // visible item 1    -> 921
+            { 960, 0x0000ABCDu },        // inventory slot 0  -> 965
+            { 1142, 0x0000BEEFu },       // coinage low       -> 1149
+            { 1146, 0x00010002u },       // skill line 0      -> 1153
+            { 1619, 0xFFFFFFFFu },       // explored zone 0   -> 1627
+        };
+        const uint32 legacyCount = uint32(sizeof(legacy) / sizeof(legacy[0]));
+
+        std::vector<MopUpdateObject::StaticField> projected;
+        MopUpdateObject::TranslateSelfPlayerFields(legacy, legacyCount, projected);
+
+        // Quest slots expand 5 words to 15, so the count grows.
+        CHECK(projected.size() == legacyCount - 5 + 15);
+        CHECK(projected.front().index == 162);
+        CHECK(projected.front().index > 70);   // clears the core block
+        CHECK(projected.back().index == 1627);
+        for (size_t i = 1; i < projected.size(); ++i)
+        {
+            CHECK(projected[i - 1].index < projected[i].index);
+        }
+
+        // Must not trip the serializer's ascending assert when appended.
+        ByteBuffer real;
+        MopUpdateObject::AppendSelfCreateBlock(real, e, projected.data(),
+            uint32(projected.size()));
+        CHECK(real.size() > 0);
+
+        // Retail orders the login packet item creates first, self create last.
+        // Verify the two blocks decode in that order from one stream.
+        ByteBuffer stream;
+        uint32 itemValues[MopUpdateObject::ItemFieldCount] = { 0 };
+        itemValues[0] = 0x22u;                 // OBJECT_FIELD_GUID low
+        itemValues[4] = 3u;                    // OBJECT_FIELD_TYPE, Item
+        MopUpdateObject::AppendInventoryCreateBlock(stream, 0x22, 1, itemValues,
+            MopUpdateObject::ItemFieldCount);
+        const size_t selfBlockStart = stream.size();
+        MopUpdateObject::AppendSelfCreateBlock(stream, e, projected.data(),
+            uint32(projected.size()));
+
+        stream.rpos(0);
+        uint8 firstType; stream >> firstType;
+        CHECK(firstType == 1);                 // CREATE_OBJECT for the item
+        uint8 firstGuidMask; stream >> firstGuidMask;
+        for (int i = 0; i < 8; ++i)
+        {
+            if (firstGuidMask & (1 << i)) { uint8 b; stream >> b; }
+        }
+        uint8 firstTypeId; stream >> firstTypeId;
+        CHECK(firstTypeId == 1);               // TYPEID_ITEM
+
+        stream.rpos(selfBlockStart);
+        uint8 secondType; stream >> secondType;
+        CHECK(secondType == 2);                // CREATE_OBJECT2 for the player
+        uint8 secondGuidMask; stream >> secondGuidMask;
+        for (int i = 0; i < 8; ++i)
+        {
+            if (secondGuidMask & (1 << i)) { uint8 b; stream >> b; }
+        }
+        uint8 secondTypeId; stream >> secondTypeId;
+        CHECK(secondTypeId == 4);              // TYPEID_PLAYER, last
+    }
+
     if (g_failures == 0) { std::printf("ALL PASS\n"); return 0; }
     std::printf("%d FAILURES\n", g_failures);
     return 1;

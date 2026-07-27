@@ -710,13 +710,10 @@ void MopUpdateObject::BuildDestroyObject(WorldPacket& out, uint64 guid, bool ani
     out.WriteByteSeq(bytes[5]);
 }
 
-void MopUpdateObject::BuildSelfCreate(WorldPacket& out, const SelfPlayer& e)
+void MopUpdateObject::AppendSelfCreateBlock(ByteBuffer& out, const SelfPlayer& e,
+    StaticField const* extraFields, uint32 extraFieldCount)
 {
-    out.Initialize(SMSG_UPDATE_OBJECT);
-
-    // ---- packet header ----
-    out << uint16(e.mapId);
-    out << uint32(1);                    // one update block, no out-of-range section
+    MANGOS_ASSERT(extraFields || extraFieldCount == 0);
 
     SimpleLivingMovement movement{};
     movement.guid = e.guid;
@@ -768,6 +765,37 @@ void MopUpdateObject::BuildSelfCreate(WorldPacket& out, const SelfPlayer& e)
         { 69, e.displayId },                    // UNIT_FIELD_DISPLAY_ID (+0x3D)
         { 70, e.nativeDisplayId },              // UNIT_FIELD_NATIVE_DISPLAY_ID (+0x3E)
     };
-    AppendSimpleLivingCreateBlock(out, 2, e.guid, 4, movement, fields,
-        uint32(sizeof(fields) / sizeof(fields[0])));
+    const uint32 coreCount = uint32(sizeof(fields) / sizeof(fields[0]));
+
+    if (extraFieldCount == 0)
+    {
+        AppendSimpleLivingCreateBlock(out, 2, e.guid, 4, movement, fields, coreCount);
+        return;
+    }
+
+    // The core block ends at UNIT_FIELD_NATIVE_DISPLAY_ID (70) and every
+    // projected self-player field sits above it - the lowest is PLAYER_FLAGS at
+    // 162 - so appending preserves the ascending order the values serializer
+    // requires. Assert it rather than trust it: a caller that passed unsorted
+    // or overlapping fields would otherwise trip the serializer's own assert
+    // with no indication of which side was wrong.
+    MANGOS_ASSERT(extraFields[0].index > fields[coreCount - 1].index);
+
+    std::vector<StaticField> combined;
+    combined.reserve(coreCount + extraFieldCount);
+    combined.insert(combined.end(), fields, fields + coreCount);
+    combined.insert(combined.end(), extraFields, extraFields + extraFieldCount);
+    AppendSimpleLivingCreateBlock(out, 2, e.guid, 4, movement, combined.data(),
+        uint32(combined.size()));
+}
+
+void MopUpdateObject::BuildSelfCreate(WorldPacket& out, const SelfPlayer& e)
+{
+    out.Initialize(SMSG_UPDATE_OBJECT);
+
+    // ---- packet header ----
+    out << uint16(e.mapId);
+    out << uint32(1);                    // one update block, no out-of-range section
+
+    AppendSelfCreateBlock(out, e, nullptr, 0);
 }

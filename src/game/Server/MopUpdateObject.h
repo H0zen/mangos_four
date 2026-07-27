@@ -318,8 +318,18 @@ namespace MopUpdateObject
         uint32 displayId, nativeDisplayId;
     };
 
+    /// Append one CREATE_OBJECT2 block for the self player (living, stationary
+    /// at login) to an existing update stream, so it can share a packet with
+    /// the item creates the way retail's login burst does.
+    ///
+    /// \a extraFields are appended after the fixed core block, which ends at
+    /// index 70. They must already be in 18414 index order and start above 70
+    /// - the output of TranslateSelfPlayerFields satisfies both.
+    void AppendSelfCreateBlock(ByteBuffer& out, const SelfPlayer& e,
+        StaticField const* extraFields, uint32 extraFieldCount);
+
     /// Build a complete SMSG_UPDATE_OBJECT packet holding one CREATE_OBJECT2
-    /// block for the self player (living, stationary at login).
+    /// block for the self player, carrying the core fields only.
     void BuildSelfCreate(WorldPacket& out, const SelfPlayer& e);
 }
 
