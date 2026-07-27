@@ -4457,7 +4457,6 @@ void Player::SendInitialPacketsBeforeAddToMap()
     GetSession()->SendPacket(&data);
 
     SendInitialActionButtons();
-    m_reputationMgr.SendInitialReputations();
 
     if (!IsAlive())
     {
@@ -4465,6 +4464,13 @@ void Player::SendInitialPacketsBeforeAddToMap()
     }
 
     SendInitWorldStates(GetZoneId(), GetAreaId());
+
+    // Reputations follow the world states, not precede them. Retail orders
+    // this block action buttons, corpse reclaim delay, world states, then
+    // factions in all eight logins in the capture corpus; we were the only
+    // pair inverted against that spine once account data and tutorials moved
+    // to the front.
+    m_reputationMgr.SendInitialReputations();
 
     SendEquipmentSetList();
 

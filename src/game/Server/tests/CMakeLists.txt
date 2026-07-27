@@ -142,6 +142,23 @@ add_test(NAME mop_opcode_reference_status_source
         -DSOURCE_ROOT=${CMAKE_SOURCE_DIR}
         -P ${CMAKE_CURRENT_SOURCE_DIR}/mop_opcode_reference_status_source_test.cmake)
 
+add_test(NAME mop_login_packet_order_source
+    COMMAND ${CMAKE_COMMAND}
+        -DSOURCE_ROOT=${CMAKE_SOURCE_DIR}
+        -P ${CMAKE_CURRENT_SOURCE_DIR}/mop_login_packet_order_source_test.cmake)
+
+# Each mutation restores one ordering the retail capture says never varies; the
+# guard has to reject all three or it is not actually holding the order.
+foreach(login_order_mutation account_data_after_verify drop_tutorials factions_before_world_states)
+    add_test(NAME mop_login_packet_order_source_mutation_${login_order_mutation}
+        COMMAND ${CMAKE_COMMAND}
+            -DSOURCE_ROOT=${CMAKE_SOURCE_DIR}
+            -DMUTATION=${login_order_mutation}
+            -P ${CMAKE_CURRENT_SOURCE_DIR}/mop_login_packet_order_source_test.cmake)
+    set_tests_properties(mop_login_packet_order_source_mutation_${login_order_mutation}
+        PROPERTIES WILL_FAIL TRUE)
+endforeach()
+
 add_executable(mop_client_opcode_worklist_test mop_client_opcode_worklist_test.cpp)
 target_include_directories(mop_client_opcode_worklist_test PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/..
