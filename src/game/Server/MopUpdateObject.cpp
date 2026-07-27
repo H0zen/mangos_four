@@ -169,10 +169,24 @@ bool MopUpdateObject::CanUseSimpleUnitMovement(SimpleUnitEligibility const& elig
     // combat when it entered view was never created client-side and stayed
     // invisible while still dealing damage.
     //
-    // Transport and vehicle states are still rejected: those change what the
-    // position means (transport-relative rather than world), so a stationary
-    // snapshot would place the unit somewhere wrong rather than merely stale.
-    return !eligibility.isVehicle && !eligibility.isBoarded && !eligibility.hasTransport;
+    // Boarding and transport are still rejected: those change what the position
+    // means (transport-relative rather than world), so a stationary snapshot
+    // would place the unit somewhere wrong rather than merely stale.
+    //
+    // Being a vehicle is not such a state. IsVehicle() is m_vehicleInfo != NULL,
+    // so it means the unit CAN carry passengers, not that it is riding anything;
+    // its own position is an ordinary world position. The transport-relative
+    // case is the passenger, already covered by isBoarded. Rejecting vehicles
+    // here hid every vehicle-flagged creature in the world -- 1,622 templates
+    // over 6,529 spawns across 48 maps -- including quest givers such as Master
+    // Shang Xi (53566), whose client never learned he existed and so never even
+    // queried his entry.
+    //
+    // AppendSimpleLivingMovement declares the vehicle block absent, so the
+    // create stays well formed and the unit renders as an ordinary creature. The
+    // cost is that it is not yet rideable, which needs a real vehicle create
+    // block; being visible but not rideable beats being invisible.
+    return !eligibility.isBoarded && !eligibility.hasTransport;
 }
 
 bool MopUpdateObject::CanUseStationaryGameObjectMovement(StationaryGameObjectEligibility const& eligibility)

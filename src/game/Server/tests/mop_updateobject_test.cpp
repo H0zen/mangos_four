@@ -645,9 +645,23 @@ int main(int /*argc*/, char** /*argv*/)
     // leaving creatures that were moving or in combat permanently invisible.
     MopUpdateObject::SimpleUnitEligibility eligibility{};
     CHECK(MopUpdateObject::CanUseSimpleUnitMovement(eligibility));
-    eligibility.isVehicle = true; CHECK(!MopUpdateObject::CanUseSimpleUnitMovement(eligibility)); eligibility.isVehicle = false;
     eligibility.isBoarded = true; CHECK(!MopUpdateObject::CanUseSimpleUnitMovement(eligibility)); eligibility.isBoarded = false;
     eligibility.hasTransport = true; CHECK(!MopUpdateObject::CanUseSimpleUnitMovement(eligibility)); eligibility.hasTransport = false;
+
+    // A vehicle carries passengers; it does not ride anything. Its own position
+    // is a world position, so it encodes as a stationary snapshot like any other
+    // unit. Rejecting it emitted no create at all, hiding 6,529 spawns including
+    // quest givers. The passenger is the transport-relative case, and that is
+    // isBoarded above -- which stays rejected even when both are set.
+    eligibility.isVehicle = true;
+    CHECK(MopUpdateObject::CanUseSimpleUnitMovement(eligibility));
+    eligibility.isBoarded = true;
+    CHECK(!MopUpdateObject::CanUseSimpleUnitMovement(eligibility));
+    eligibility.isBoarded = false;
+    eligibility.hasTransport = true;
+    CHECK(!MopUpdateObject::CanUseSimpleUnitMovement(eligibility));
+    eligibility.hasTransport = false;
+    eligibility.isVehicle = false;
 
     // States the encoder represents as a stationary snapshot: the unit is still
     // created, and the SMSG_MONSTER_MOVE stream animates it from there.
