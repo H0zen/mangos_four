@@ -218,6 +218,23 @@ namespace MopNpcTextPackets
         return true;
     }
 
+    // Whether MakeResponse would actually have minted this id for this option.
+    //
+    // Sitting above the base is not proof of authorship: nothing bounds the
+    // synthesised namespace from above, so a real BroadcastText id larger than
+    // the base decodes to some unrelated npc_text row. Answering that with the
+    // row's text would be worse than not answering at all, because a plausible
+    // record produces a wrong string with nothing to trace it by. An option
+    // only owns an id when it carries text and had no real mapping -- a mapped
+    // option travels as its retail id and never as a synthesised one.
+    inline bool OwnsSynthesisedBroadcastTextId(uint32 entry, uint32 textId,
+        uint32 option, GossipTextOption const& candidate)
+    {
+        return candidate.BroadcastTextId == 0 &&
+            (!candidate.Text_0.empty() || !candidate.Text_1.empty()) &&
+            SynthesiseBroadcastTextId(textId, option) == entry;
+    }
+
     inline Response MakeResponse(uint32 textId, GossipText const* gossip)
     {
         Response response;

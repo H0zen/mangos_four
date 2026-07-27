@@ -341,8 +341,59 @@ static void TestUnmappedNpcTextStillGetsAnId()
     CHECK(!absent.found);
 }
 
+// Nothing bounds the synthesised namespace from above, so an id merely being
+// past the base does not make it ours. Answering someone else's id with this
+// row's text would produce a wrong string and nothing to trace it by.
+static void TestOnlyOurOwnSynthesisedIdsAreServed()
+{
+    GossipTextOption option;
+    option.BroadcastTextId = 0;
+    option.Language = 0;
+    option.Probability = 1.0f;
+    for (auto& emote : option.Emotes)
+    {
+        emote._Emote = 0;
+        emote._Delay = 0;
+    }
+    option.Text_0 = "Hey, citizen!";
+
+    uint32 const mine = MopNpcTextPackets::SynthesiseBroadcastTextId(4938, 0);
+    CHECK(MopNpcTextPackets::OwnsSynthesisedBroadcastTextId(mine, 4938, 0,
+        option));
+
+    // An id that decodes to this row but is not the one it would have minted.
+    CHECK(!MopNpcTextPackets::OwnsSynthesisedBroadcastTextId(mine + 1, 4938, 0,
+        option));
+
+    // An option the world database maps for real never travels as a
+    // synthesised id, so it must not answer for one.
+    GossipTextOption mapped = option;
+    mapped.BroadcastTextId = 62792;
+    CHECK(!MopNpcTextPackets::OwnsSynthesisedBroadcastTextId(mine, 4938, 0,
+        mapped));
+
+    // An option with no text was never advertised at all.
+    GossipTextOption silent = option;
+    silent.Text_0.clear();
+    silent.Text_1.clear();
+    CHECK(!MopNpcTextPackets::OwnsSynthesisedBroadcastTextId(mine, 4938, 0,
+        silent));
+
+    // A real retail id above the base decodes to some unrelated row; that row
+    // must not answer for it. 3397 and 62792 sit below the base and are
+    // rejected at decode, so use one contrived above it.
+    uint32 const foreign = MopNpcTextPackets::SynthesisedBroadcastTextBase + 3;
+    uint32 decodedText = 0;
+    uint32 decodedOption = 0;
+    CHECK(MopNpcTextPackets::DecodeSynthesisedBroadcastTextId(foreign,
+        decodedText, decodedOption));
+    CHECK(!MopNpcTextPackets::OwnsSynthesisedBroadcastTextId(foreign, 4938, 0,
+        option));
+}
+
 int main(int /*argc*/, char** /*argv*/)
 {
+    TestOnlyOurOwnSynthesisedIdsAreServed();
     TestSynthesisedBroadcastTextIdsAvoidTheClientRange();
     TestUnmappedNpcTextStillGetsAnId();
     TestAreaTriggerRequest();

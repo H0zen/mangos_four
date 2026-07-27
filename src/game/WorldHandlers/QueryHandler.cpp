@@ -481,13 +481,26 @@ void WorldSession::SendBroadcastTextDb2Reply(uint32 entry)
         gossip = sObjectMgr.GetGossipText(textId);
     }
 
+    // Being above the base is not proof that we minted this id, so only answer
+    // for one this row would actually have produced.
+    if (gossip && !MopNpcTextPackets::OwnsSynthesisedBroadcastTextId(entry,
+        textId, optionIndex, gossip->Options[optionIndex]))
+    {
+        gossip = nullptr;
+    }
+
     if (!gossip)
     {
         // Answer anyway. A silent drop is what kept the window shut, and the
         // client repeats the request rather than proceeding without a reply.
+        //
+        // The entry is sent negated: the client reads a negative entry as
+        // "drop the record with this absolute id". A bare uint32(-1) would
+        // therefore tell it to drop record 1 rather than the one it asked
+        // about.
         ByteBuffer empty;
-        MopHotfixPackets::BuildDbReply(data, uint32(-1), uint32(time(NULL)),
-            DB2_REPLY_BROADCAST_TEXT, empty);
+        MopHotfixPackets::BuildDbReply(data, uint32(-int32(entry)),
+            uint32(time(NULL)), DB2_REPLY_BROADCAST_TEXT, empty);
         SendPacket(&data);
         DEBUG_LOG("WORLD: SMSG_DB_REPLY BroadcastText %u -> no source row", entry);
         return;
