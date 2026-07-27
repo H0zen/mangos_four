@@ -562,6 +562,46 @@ int main(int /*argc*/, char** /*argv*/)
         CHECK(values.rpos() == values.size());
     }
 
+    // PLAYER_FLAGS. Nothing projected it, and two unrelated-looking failures
+    // came out of that single gap: PLAYER_FLAGS_GHOST (0x10) never reached the
+    // client, so death did nothing at all -- no release dialog, therefore no
+    // CMSG_REPOP_REQUEST, therefore nothing for release or .revive to act on --
+    // and PLAYER_FLAGS_RESTING (0x20), one bit away, left GetRestState()
+    // returning nil so MainMenuBar.lua:119 threw on every XP update and login.
+    //
+    // The 18414 index comes from the client's own field descriptors rather
+    // than by extrapolating a neighbouring shift: CGPlayerData's descriptor
+    // table runs at a 12-byte stride from dword_10F52B8, playerFlags writes at
+    // dword_10F52D0 (relative index 2) and questLog at dword_10F533C (relative
+    // index 11). questLog's absolute index is pinned at 171 below, which puts
+    // the block base at 160 and playerFlags at 162.
+    {
+        ByteBuffer values;
+        const MopUpdateObject::StaticField sourceFields[] =
+        {
+            { 157, 0x00000030u },   // GHOST | RESTING
+        };
+        MopUpdateObject::AppendSelfPlayerValuesBlock(values, 0x10, sourceFields,
+            sizeof(sourceFields) / sizeof(sourceFields[0]));
+        values.rpos(3);
+        uint8 blockCount;
+        values >> blockCount;
+        uint32 masks[6];
+        CHECK(blockCount == 6);
+        for (uint32& mask : masks) values >> mask;
+        auto hasBit = [&masks](uint16 index)
+        {
+            return (masks[index / 32] & (uint32(1) << (index % 32))) != 0;
+        };
+        CHECK(hasBit(162));
+        CHECK(!hasBit(157));    // the legacy index must not be sent verbatim
+        CHECK(!hasBit(161));
+        CHECK(!hasBit(163));
+        uint32 value = 0;
+        values >> value;
+        CHECK(value == 0x00000030u);
+    }
+
     // Per-slot re-striding, checked directly at both ends of the block.
     CHECK(MopUpdateObject::TranslateSelfQuestLogIndex(166) == 171);
     CHECK(MopUpdateObject::TranslateSelfQuestLogIndex(170) == 175);
