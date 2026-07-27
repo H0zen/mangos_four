@@ -1171,8 +1171,15 @@ enum AccountDataType
 #define GLOBAL_CACHE_MASK           0x15
 #define PER_CHARACTER_CACHE_MASK    0xEA
 
+// A hotfix type is the DB2's own table hash, taken from the WDB2 header of the
+// extracted file. Confirmed against the two already served: 1344507586 is
+// 0x50238EC2, the table hash of Item.db2, and 2442913102 is 0x919BE54E, that of
+// Item-sparse.db2.
 #define DB2_REPLY_ITEM 1344507586
 #define DB2_REPLY_SPARSE 2442913102
+// 0x021826BB, the table hash of BroadcastText.db2. The live client requests
+// this the moment it is handed a BroadcastText id it cannot resolve locally.
+#define DB2_REPLY_BROADCAST_TEXT 35137211
 
 struct AccountData
 {
@@ -2179,6 +2186,7 @@ class WorldSession
         void HandleRequestHotfix(WorldPacket& recv_data);
         void SendItemDb2Reply(uint32 entry);
         void SendItemSparseDb2Reply(uint32 entry);
+        void SendBroadcastTextDb2Reply(uint32 entry);
 
         void HandleObjectUpdateFailedOpcode(WorldPacket& recv_data);
 

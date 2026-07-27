@@ -247,8 +247,104 @@ static void TestOpcodeValues()
     CHECK(uint32_t(SMSG_QUESTGIVER_STATUS_MULTIPLE) == 0x06CEu);
 }
 
+// Invented BroadcastText ids must never land on a record the client already
+// ships, or it renders its own text for our row and nothing reports an error.
+// Measured on the 18414 client: 936 records spanning 1..77161.
+static void TestSynthesisedBroadcastTextIdsAvoidTheClientRange()
+{
+    CHECK(MopNpcTextPackets::SynthesiseBroadcastTextId(0, 0) >
+        MopNpcTextPackets::ClientHighestShippedBroadcastTextId);
+
+    // npc_text ids run to 16777215 in our world database; the whole span has
+    // to stay clear of the client's range and inside uint32.
+    uint32 const lowest = MopNpcTextPackets::SynthesiseBroadcastTextId(0, 0);
+    uint32 const highest =
+        MopNpcTextPackets::SynthesiseBroadcastTextId(16777215u, 7);
+    CHECK(lowest > 77161u);
+    CHECK(highest > lowest);
+
+    // Distinct rows and options never share an id, and the mapping inverts.
+    uint32 const cases[][2] = {
+        { 0, 0 }, { 0, 7 }, { 1, 0 }, { 4938, 0 }, { 4938, 3 },
+        { 8363, 7 }, { 16777215u, 7 }
+    };
+    for (auto const& c : cases)
+    {
+        uint32 const id =
+            MopNpcTextPackets::SynthesiseBroadcastTextId(c[0], c[1]);
+        uint32 textId = 0xFFFFFFFFu;
+        uint32 option = 0xFFFFFFFFu;
+        CHECK(MopNpcTextPackets::DecodeSynthesisedBroadcastTextId(id, textId,
+            option));
+        CHECK(textId == c[0]);
+        CHECK(option == c[1]);
+    }
+
+    CHECK(MopNpcTextPackets::SynthesiseBroadcastTextId(4938, 0) !=
+        MopNpcTextPackets::SynthesiseBroadcastTextId(4938, 1));
+    CHECK(MopNpcTextPackets::SynthesiseBroadcastTextId(4938, 7) !=
+        MopNpcTextPackets::SynthesiseBroadcastTextId(4939, 0));
+
+    // An id the client shipped is not ours to decode.
+    uint32 textId = 0;
+    uint32 option = 0;
+    CHECK(!MopNpcTextPackets::DecodeSynthesisedBroadcastTextId(62792, textId,
+        option));
+    CHECK(!MopNpcTextPackets::DecodeSynthesisedBroadcastTextId(3397, textId,
+        option));
+}
+
+// npc_text 4938 (Marshal McBride) carries text but no retail mapping. Before
+// this it produced recordSize 0 and the client refused to open the window.
+static void TestUnmappedNpcTextStillGetsAnId()
+{
+    GossipText gossip;
+    for (auto& option : gossip.Options)
+    {
+        option.BroadcastTextId = 0;
+        option.Language = 0;
+        option.Probability = 0.0f;
+        for (auto& emote : option.Emotes)
+        {
+            emote._Emote = 0;
+            emote._Delay = 0;
+        }
+    }
+    gossip.Options[0].Text_0 = "Hey, citizen!";
+    gossip.Options[0].Probability = 1.0f;
+
+    MopNpcTextPackets::Response const response =
+        MopNpcTextPackets::MakeResponse(4938, &gossip);
+    CHECK(response.found);
+    CHECK(response.broadcastTextIds[0] ==
+        MopNpcTextPackets::SynthesiseBroadcastTextId(4938, 0));
+    CHECK(response.probabilities[0] == 1.0f);
+
+    // Options with nothing behind them stay silent, so the client cannot
+    // select a blank alternative.
+    for (size_t index = 1; index < MAX_GOSSIP_TEXT_OPTIONS; ++index)
+    {
+        CHECK(response.broadcastTextIds[index] == 0);
+        CHECK(response.probabilities[index] == 0.0f);
+    }
+
+    // A row the world database does map keeps its retail id: the client may
+    // already hold that record, and it needs no hotfix from us.
+    gossip.Options[0].BroadcastTextId = 62792;
+    MopNpcTextPackets::Response const mapped =
+        MopNpcTextPackets::MakeResponse(4938, &gossip);
+    CHECK(mapped.broadcastTextIds[0] == 62792);
+
+    // No row at all remains absent rather than inventing one.
+    MopNpcTextPackets::Response const absent =
+        MopNpcTextPackets::MakeResponse(4938, nullptr);
+    CHECK(!absent.found);
+}
+
 int main(int /*argc*/, char** /*argv*/)
 {
+    TestSynthesisedBroadcastTextIdsAvoidTheClientRange();
+    TestUnmappedNpcTextStillGetsAnId();
     TestAreaTriggerRequest();
     TestAreaTriggerNoCorpse();
     TestExplorationExperience();

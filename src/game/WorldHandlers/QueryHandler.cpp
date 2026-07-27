@@ -455,6 +455,120 @@ void WorldSession::HandleNpcTextQueryOpcode(WorldPacket& recv_data)
 }
 
 /**
+ * @brief Serves a BroadcastText record the client could not resolve locally.
+ *
+ * The 18414 client ships 936 BroadcastText records. When SMSG_NPC_TEXT_UPDATE
+ * hands it an id outside that set it does not give up -- it asks for the record
+ * with CMSG_REQUEST_HOTFIX, and renders the text once the server answers. That
+ * is how retail delivered the 1,703 ids in our capture corpus that no client
+ * ever contained, and it is why an unanswered request leaves the quest window
+ * shut rather than merely blank.
+ *
+ * The ids we answer here are the ones MakeResponse invents for npc_text rows
+ * the world database has no retail mapping for, so the record is rebuilt from
+ * the npc_text row that produced the id.
+ */
+void WorldSession::SendBroadcastTextDb2Reply(uint32 entry)
+{
+    WorldPacket data(SMSG_DB_REPLY, 128);
+
+    uint32 textId = 0;
+    uint32 optionIndex = 0;
+    GossipText const* gossip = nullptr;
+    if (MopNpcTextPackets::DecodeSynthesisedBroadcastTextId(entry, textId,
+        optionIndex) && optionIndex < MAX_GOSSIP_TEXT_OPTIONS)
+    {
+        gossip = sObjectMgr.GetGossipText(textId);
+    }
+
+    if (!gossip)
+    {
+        // Answer anyway. A silent drop is what kept the window shut, and the
+        // client repeats the request rather than proceeding without a reply.
+        ByteBuffer empty;
+        MopHotfixPackets::BuildDbReply(data, uint32(-1), uint32(time(NULL)),
+            DB2_REPLY_BROADCAST_TEXT, empty);
+        SendPacket(&data);
+        DEBUG_LOG("WORLD: SMSG_DB_REPLY BroadcastText %u -> no source row", entry);
+        return;
+    }
+
+    GossipTextOption const& option = gossip->Options[optionIndex];
+    std::string text0 = option.Text_0;
+    std::string text1 = option.Text_1;
+
+    int loc_idx = GetSessionDbLocaleIndex();
+    if (loc_idx >= 0)
+    {
+        if (NpcTextLocale const* locale = sObjectMgr.GetNpcTextLocale(textId))
+        {
+            if (locale->Text_0.size() > optionIndex &&
+                locale->Text_0[optionIndex].size() > size_t(loc_idx) &&
+                !locale->Text_0[optionIndex][loc_idx].empty())
+            {
+                text0 = locale->Text_0[optionIndex][loc_idx];
+            }
+            if (locale->Text_1.size() > optionIndex &&
+                locale->Text_1[optionIndex].size() > size_t(loc_idx) &&
+                !locale->Text_1[optionIndex][loc_idx].empty())
+            {
+                text1 = locale->Text_1[optionIndex][loc_idx];
+            }
+        }
+    }
+
+    // A row may carry only one of the two genders; the client shows whichever
+    // it needs, so an empty side is sent as the other rather than as nothing.
+    if (text0.empty())
+    {
+        text0 = text1;
+    }
+    if (text1.empty())
+    {
+        text1 = text0;
+    }
+
+    // Field order is BroadcastText.db2's own: ID, LanguageID, Text_lang,
+    // Text1_lang, EmoteID[3], EmoteDelay[3], SoundEntriesID, EmotesID, Flags.
+    ByteBuffer buff;
+    buff << uint32(entry);
+    buff << uint32(option.Language);
+
+    buff << uint16(text0.length());
+    if (text0.length())
+    {
+        buff << text0;
+    }
+
+    buff << uint16(text1.length());
+    if (text1.length())
+    {
+        buff << text1;
+    }
+
+    for (uint32 i = 0; i < 3; ++i)
+    {
+        buff << uint32(option.Emotes[i]._Emote);
+    }
+    for (uint32 i = 0; i < 3; ++i)
+    {
+        buff << uint32(option.Emotes[i]._Delay);
+    }
+
+    buff << uint32(0);                      // SoundEntriesID
+    buff << uint32(0);                      // EmotesID
+    buff << uint32(0);                      // Flags
+
+    MopHotfixPackets::BuildDbReply(data, entry,
+        sObjectMgr.GetHotfixDate(entry, DB2_REPLY_BROADCAST_TEXT),
+        DB2_REPLY_BROADCAST_TEXT, buff);
+    SendPacket(&data);
+
+    DEBUG_LOG("WORLD: Sent SMSG_DB_REPLY BroadcastText %u (npc_text %u option %u, %u bytes)",
+        entry, textId, optionIndex, uint32(buff.size()));
+}
+
+/**
  * @brief Handles an item page text query and sends all linked pages.
  *
  * @param recv_data The incoming page text query packet.
