@@ -564,6 +564,26 @@ static void test_combo_points_packet()
     }));
 }
 
+static void test_pre_resurrect_packet()
+{
+    WorldPacket packet;
+    MopCompactPackets::BuildPreResurrect(
+        packet, ObjectGuid(UINT64_C(0x0807060504030201)));
+    CHECK(packet.GetOpcode() == SMSG_PRE_RESURRECT);
+    CHECK(BytesEqual(packet, {
+        0xFF, 0x07, 0x03, 0x09, 0x00, 0x06, 0x04, 0x02, 0x05,
+    }));
+
+    // A zero byte clears its mask bit and is omitted entirely, so the body
+    // shortens. Guards against writing a fixed nine-byte body.
+    WorldPacket sparse;
+    MopCompactPackets::BuildPreResurrect(
+        sparse, ObjectGuid(UINT64_C(0x0000060000030001)));
+    CHECK(BytesEqual(sparse, {
+        0x34, 0x07, 0x00, 0x02,
+    }));
+}
+
 static void test_opcode_values_are_framable()
 {
     CHECK(uint32_t(SMSG_ATTACKSWING_ERROR) == 0x11E1u);
@@ -593,6 +613,7 @@ static void test_opcode_values_are_framable()
     CHECK(uint32_t(SMSG_THREAT_CLEAR) == 0x180Bu);
     CHECK(uint32_t(SMSG_THREAT_REMOVE) == 0x1960u);
     CHECK(uint32_t(SMSG_DISMOUNT) == 0x0E3Au);
+    CHECK(uint32_t(SMSG_PRE_RESURRECT) == 0x19C0u);
     CHECK(uint32_t(SMSG_UPDATE_COMBO_POINTS) == 0x082Fu);
 
     CHECK(uint32_t(SMSG_ATTACKSWING_ERROR) <= 0x1FFFu);
@@ -622,6 +643,7 @@ static void test_opcode_values_are_framable()
     CHECK(uint32_t(SMSG_THREAT_CLEAR) <= 0x1FFFu);
     CHECK(uint32_t(SMSG_THREAT_REMOVE) <= 0x1FFFu);
     CHECK(uint32_t(SMSG_DISMOUNT) <= 0x1FFFu);
+    CHECK(uint32_t(SMSG_PRE_RESURRECT) <= 0x1FFFu);
     CHECK(uint32_t(SMSG_UPDATE_COMBO_POINTS) <= 0x1FFFu);
 }
 
@@ -643,6 +665,7 @@ int main(int /*argc*/, char** /*argv*/)
     test_rune_packets();
     test_threat_packets();
     test_dismount_packet();
+    test_pre_resurrect_packet();
     test_combo_points_packet();
     test_opcode_values_are_framable();
 

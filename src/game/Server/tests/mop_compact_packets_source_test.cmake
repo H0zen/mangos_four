@@ -2,6 +2,7 @@ file(READ "${SOURCE_ROOT}/src/game/Object/PlayerCombat.cpp" player_combat)
 file(READ "${SOURCE_ROOT}/src/game/Object/PlayerDuel.cpp" player_duel)
 file(READ "${SOURCE_ROOT}/src/game/Object/PlayerMirror.cpp" player_mirror)
 file(READ "${SOURCE_ROOT}/src/game/Object/PlayerCombo.cpp" player_combo)
+file(READ "${SOURCE_ROOT}/src/game/Object/PlayerDeath.cpp" player_death)
 file(READ "${SOURCE_ROOT}/src/game/Object/RuneMgr.cpp" rune_source)
 file(READ "${SOURCE_ROOT}/src/game/Object/RuneMgr.h" rune_header)
 file(READ "${SOURCE_ROOT}/src/game/Object/Player.h" player_header)
@@ -396,6 +397,36 @@ elseif(MUTATION STREQUAL "combo_reference")
     string(REPLACE
         "SMSG_UPDATE_COMBO_POINTS                       0x082F  ACTIVE"
         "SMSG_UPDATE_COMBO_POINTS                       0x082F  DORMANT"
+        opcode_reference "${opcode_reference}")
+elseif(MUTATION STREQUAL "pre_resurrect_mask")
+    string(REPLACE
+        "out.WriteGuidMask<1, 7, 5, 2, 6, 0, 3, 4>(guid);"
+        "out.WriteGuidMask<7, 1, 5, 2, 6, 0, 3, 4>(guid);"
+        unit_header "${unit_header}")
+elseif(MUTATION STREQUAL "pre_resurrect_bytes")
+    string(REPLACE
+        "out.WriteGuidBytes<5, 1, 7, 0, 6, 4, 2, 3>(guid);"
+        "out.WriteGuidBytes<1, 5, 7, 0, 6, 4, 2, 3>(guid);"
+        unit_header "${unit_header}")
+elseif(MUTATION STREQUAL "pre_resurrect_sender")
+    string(REPLACE
+        "MopCompactPackets::BuildPreResurrect(data, GetObjectGuid());"
+        "/* removed pre-resurrect builder */"
+        player_death "${player_death}")
+elseif(MUTATION STREQUAL "pre_resurrect_registration")
+    string(REPLACE
+        "DefS(SMSG_PRE_RESURRECT, \"SMSG_PRE_RESURRECT\");"
+        "/* removed pre-resurrect registration */"
+        opcode_registry "${opcode_registry}")
+elseif(MUTATION STREQUAL "pre_resurrect_allowlist")
+    string(REPLACE
+        "case SMSG_PRE_RESURRECT:"
+        "case 0xFFFF: /* removed pre-resurrect allowlist */"
+        world_session "${world_session}")
+elseif(MUTATION STREQUAL "pre_resurrect_reference")
+    string(REPLACE
+        "SMSG_PRE_RESURRECT                             0x19C0  ACTIVE"
+        "SMSG_PRE_RESURRECT                             0x19C0  DORMANT"
         opcode_reference "${opcode_reference}")
 endif()
 
@@ -799,4 +830,32 @@ endif()
 string(REGEX MATCH "SMSG_UPDATE_COMBO_POINTS[ \t]+0x082F[ \t]+ACTIVE" combo_reference "${opcode_reference}")
 if(combo_reference STREQUAL "")
     message(FATAL_ERROR "reference inventory does not record active 0x082F combo points")
+endif()
+string(FIND "${unit_header}" "out.WriteGuidMask<1, 7, 5, 2, 6, 0, 3, 4>(guid);" pre_resurrect_mask)
+if(pre_resurrect_mask EQUAL -1)
+    message(FATAL_ERROR "pre-resurrect GUID mask does not match readers sub_6E7875/sub_6D6EF4")
+endif()
+string(FIND "${unit_header}" "out.WriteGuidBytes<5, 1, 7, 0, 6, 4, 2, 3>(guid);" pre_resurrect_bytes)
+if(pre_resurrect_bytes EQUAL -1)
+    message(FATAL_ERROR "pre-resurrect GUID byte order does not match readers sub_6E7875/sub_6D6EF4")
+endif()
+string(FIND "${player_death}" "MopCompactPackets::BuildPreResurrect(data, GetObjectGuid());" pre_resurrect_sender)
+if(pre_resurrect_sender EQUAL -1)
+    message(FATAL_ERROR "pre-resurrect sender bypasses the 18414 serializer")
+endif()
+string(FIND "${player_death}" "WorldPacket data(SMSG_PRE_RESURRECT" legacy_pre_resurrect_sender)
+if(NOT legacy_pre_resurrect_sender EQUAL -1)
+    message(FATAL_ERROR "legacy raw pre-resurrect packet construction remains")
+endif()
+string(FIND "${opcode_registry}" "DefS(SMSG_PRE_RESURRECT, \"SMSG_PRE_RESURRECT\");" pre_resurrect_registration)
+if(pre_resurrect_registration EQUAL -1)
+    message(FATAL_ERROR "SMSG_PRE_RESURRECT is missing outbound opcode metadata")
+endif()
+string(FIND "${world_session}" "case SMSG_PRE_RESURRECT:" pre_resurrect_allowlist)
+if(pre_resurrect_allowlist EQUAL -1)
+    message(FATAL_ERROR "SMSG_PRE_RESURRECT is missing from the converted-packet gate")
+endif()
+string(REGEX MATCH "SMSG_PRE_RESURRECT[ 	]+0x19C0[ 	]+ACTIVE" pre_resurrect_reference "${opcode_reference}")
+if(pre_resurrect_reference STREQUAL "")
+    message(FATAL_ERROR "reference inventory does not record active 0x19C0 pre-resurrect")
 endif()

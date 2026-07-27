@@ -386,6 +386,24 @@ namespace MopCompactPackets
         out.WriteGuidMask<6, 3, 0, 7, 1, 2, 5, 4>(guid);
         out.WriteGuidBytes<3, 6, 7, 5, 1, 4, 2, 0>(guid);
     }
+
+    inline void BuildPreResurrect(WorldPacket& out, ObjectGuid guid)
+    {
+        // Wow.exe 18414 parser sub_709F6B (dispatcher sub_659694 case 696,
+        // the dense selector for 0x19C0) constructs the message and reads one
+        // packed GUID and nothing else. Two independent readers agree on the
+        // order: the constructor's sub_6E7875 and the class's virtual
+        // deserialize slot sub_6D6EF4.
+        //
+        // The consumer is reached only through the per-message Arxan guard
+        // trampoline sub_6D1F55, whose target is assembled at runtime, so the
+        // GUID's role is NOT binary-proved. It is the repopping player's own
+        // GUID here only because that is what the inherited sender already
+        // supplied; this conversion changes the encoding, not the semantics.
+        out.Initialize(SMSG_PRE_RESURRECT, 9);
+        out.WriteGuidMask<1, 7, 5, 2, 6, 0, 3, 4>(guid);
+        out.WriteGuidBytes<5, 1, 7, 0, 6, 4, 2, 3>(guid);
+    }
 }
 
 namespace MopThreatPackets

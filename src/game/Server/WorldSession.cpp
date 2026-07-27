@@ -388,6 +388,7 @@ static bool IsEnterWorldConverted(uint16 opcode)
         case SMSG_THREAT_CLEAR:                      // MopThreatPackets::BuildClear
         case SMSG_THREAT_REMOVE:                     // MopThreatPackets::BuildRemove
         case SMSG_DISMOUNT:                          // MopCompactPackets::BuildDismount
+        case SMSG_PRE_RESURRECT:                     // MopCompactPackets::BuildPreResurrect
         case SMSG_UPDATE_COMBO_POINTS:               // MopComboPointPackets::BuildUpdate
         case SMSG_CANCEL_COMBAT:                   // Empty reader; terminal clears local-player combat state
         case SMSG_CANCEL_AUTO_REPEAT:              // packed unit GUID; Unit_C leaf 0x819546 clears auto-repeat

@@ -175,8 +175,8 @@
  *   TOTAL SMSG rows                   925
  *
  * SUBSYSTEM CONFIDENCE: high=365, low=221, medium=182, none=157
- * STATUS TOTALS: ACTIVE=396, DOC=438, DORMANT=686
- *   SMSG: ACTIVE=256, DOC=271, DORMANT=398
+ * STATUS TOTALS: ACTIVE=397, DOC=438, DORMANT=685
+ *   SMSG: ACTIVE=257, DOC=271, DORMANT=397
  *   CMSG: ACTIVE=140, DOC=167, DORMANT=288
  */
 
@@ -1086,7 +1086,7 @@ typedef uint16_t uint16;
  *   SMSG_SPLINE_MOVE_SET_FEATHER_FALL              0x1893  ACTIVE
  *   SMSG_SPLINE_MOVE_SET_LAND_WALK                 0x18B6  ACTIVE
  *   SMSG_THREAT_REMOVE                             0x1960  ACTIVE   [high-conf]
- *   SMSG_PRE_RESURRECT                             0x19C0  DORMANT 
+ *   SMSG_PRE_RESURRECT                             0x19C0  ACTIVE   [high-conf]
  *   SMSG_MONSTER_MOVE                              0x1A07  ACTIVE
  *   SMSG_PLAYER_MOVE                               0x1A32  ACTIVE
  *   SMSG_PET_DISMISS_SOUND                         0x1ABB  DORMANT 
