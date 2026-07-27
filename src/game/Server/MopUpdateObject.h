@@ -51,6 +51,12 @@ namespace MopUpdateObject
     // is fifty fifteen-word slots. The extra ten words per client slot are
     // MoP objective storage Four does not populate, so this range is the only
     // self projection that re-strides instead of shifting by a constant.
+    // Explored zones and the rested-XP pool are contiguous in both layouts:
+    // Four holds 1619..1818 then 1819, 18414 holds local.exploredZones
+    // 1627..1826 then local.restStateBonusPool 1827. One +8 shift covers both.
+    static constexpr uint16 SelfExploredSourceStart = 1619;
+    static constexpr uint16 SelfExploredSourceEnd = 1819;   // inclusive, rest pool
+    static constexpr uint16 SelfExploredTargetShift = 8;
     static constexpr uint16 SelfQuestLogSourceStart = 166;
     static constexpr uint16 SelfQuestLogTargetStart = 171;
     static constexpr uint16 SelfQuestLogSlotCount = 50;

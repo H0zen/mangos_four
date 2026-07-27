@@ -518,6 +518,50 @@ int main(int /*argc*/, char** /*argv*/)
         CHECK(values.rpos() == values.size());
     }
 
+    // Explored zones and the rested-XP pool shift by eight, not seven.
+    // 18414 holds local.exploredZones at 1627..1826 and
+    // local.restStateBonusPool at 1827; Four holds 1619..1818 and 1819.
+    {
+        const MopUpdateObject::StaticField sourceFields[] =
+        {
+            { 1619, 0xA1A2A3A4u },   // first explored-zone word -> 1627
+            { 1818, 0xB1B2B3B4u },   // last explored-zone word  -> 1826
+            { 1819, 0xC1C2C3C4u },   // rested-XP pool           -> 1827
+        };
+        ByteBuffer values;
+        MopUpdateObject::AppendSelfPlayerValuesBlock(values, 0x10, sourceFields,
+            sizeof(sourceFields) / sizeof(sourceFields[0]));
+        values.rpos(3);
+        uint8 blockCount;
+        values >> blockCount;
+        CHECK(blockCount == 58);
+        uint32 masks[58];
+        for (uint32& mask : masks) values >> mask;
+        auto hasBit = [&masks](uint16 index)
+        {
+            return (masks[index / 32] & (uint32(1) << (index % 32))) != 0;
+        };
+        CHECK(hasBit(1627));
+        CHECK(hasBit(1826));
+        CHECK(hasBit(1827));
+        // a seven-shift, as used by the coinage/XP range, must not be applied
+        CHECK(!hasBit(1626));
+        CHECK(!hasBit(1825));
+        // and the untranslated legacy indices
+        CHECK(!hasBit(1619));
+        CHECK(!hasBit(1819));
+        for (uint32 expectedValue : { 0xA1A2A3A4u, 0xB1B2B3B4u, 0xC1C2C3C4u })
+        {
+            uint32 actualValue;
+            values >> actualValue;
+            CHECK(actualValue == expectedValue);
+        }
+        uint8 dynamicCount;
+        values >> dynamicCount;
+        CHECK(dynamicCount == 0);
+        CHECK(values.rpos() == values.size());
+    }
+
     // Per-slot re-striding, checked directly at both ends of the block.
     CHECK(MopUpdateObject::TranslateSelfQuestLogIndex(166) == 171);
     CHECK(MopUpdateObject::TranslateSelfQuestLogIndex(170) == 175);

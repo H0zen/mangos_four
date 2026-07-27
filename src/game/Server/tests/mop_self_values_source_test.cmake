@@ -75,6 +75,8 @@ require_once("for \\(uint16 i = MopUpdateObject::SelfSkillSourceStart"
     "self skill feed")
 require_once("for \\(uint16 i = MopUpdateObject::SelfBuybackSourceStart"
     "self buyback price/timestamp feed")
+require_once("MopUpdateObject::SelfExploredSourceStart"
+    "self explored-zone and rested-pool feed")
 require_once("MopUpdateObject::SelfQuestLogSlotCount"
     "self quest-log feed")
 require_once("addIfChanged\\(PLAYER_FIELD_COINAGE\\)"
