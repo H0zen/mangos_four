@@ -71,6 +71,16 @@ uint16 MopUpdateObject::TranslateSelfInventoryIndex(uint16 legacyIndex)
     return uint16(legacyIndex + 5);
 }
 
+uint16 MopUpdateObject::TranslateSelfQuestLogIndex(uint16 legacyIndex)
+{
+    MANGOS_ASSERT(legacyIndex >= SelfQuestLogSourceStart &&
+        legacyIndex < SelfQuestLogSourceStart + SelfQuestLogFieldCount);
+    const uint16 offset = uint16(legacyIndex - SelfQuestLogSourceStart);
+    const uint16 slot = uint16(offset / SelfQuestLogSourceStride);
+    const uint16 fieldInSlot = uint16(offset % SelfQuestLogSourceStride);
+    return uint16(SelfQuestLogTargetStart + slot * SelfQuestLogTargetStride + fieldInSlot);
+}
+
 bool MopUpdateObject::TranslateObserverPlayerIndex(uint16 legacyIndex, uint16& targetIndex)
 {
     if (legacyIndex >= ObserverVisibleItemSourceStart &&
@@ -275,6 +285,17 @@ void MopUpdateObject::AppendSelfPlayerValuesBlock(ByteBuffer& out, uint64 guid,
         MANGOS_ASSERT(i == 0 || sourceFields[i - 1].index < sourceFields[i].index);
         const uint16 sourceIndex = sourceFields[i].index;
         const uint32 value = sourceFields[i].value;
+
+        // QuestLogFrame reads each slot at a fifteen-word stride, so Four's
+        // five-word slots have to be re-strided rather than shifted. Zero
+        // values are preserved: a cleared quest id is how the client is told
+        // a slot was abandoned.
+        if (sourceIndex >= SelfQuestLogSourceStart &&
+            sourceIndex < SelfQuestLogSourceStart + SelfQuestLogFieldCount)
+        {
+            fields.push_back({ TranslateSelfQuestLogIndex(sourceIndex), value });
+            continue;
+        }
 
         if (sourceIndex >= ObserverVisibleItemSourceStart &&
             sourceIndex < ObserverVisibleItemSourceStart + ObserverVisibleItemFieldCount)

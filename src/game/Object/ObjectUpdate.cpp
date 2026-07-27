@@ -110,6 +110,15 @@ namespace
         PLAYER_FIELD_BUYBACK_TIMESTAMP_1 + 12 ==
             MopUpdateObject::SelfBuybackSourceStart + MopUpdateObject::SelfBuybackFieldCount,
         "self buyback translation must cover the legacy price and timestamp arrays");
+    static_assert(PLAYER_QUEST_LOG_1_1 == MopUpdateObject::SelfQuestLogSourceStart &&
+        PLAYER_QUEST_LOG_50_5 + 1 ==
+            MopUpdateObject::SelfQuestLogSourceStart + MopUpdateObject::SelfQuestLogFieldCount,
+        "self quest-log translation must cover all fifty legacy five-word slots");
+    static_assert(MAX_QUEST_OFFSET == MopUpdateObject::SelfQuestLogSourceStride,
+        "legacy quest slot stride must match the projection's source stride");
+    static_assert(PLAYER_QUEST_LOG_2_1 - PLAYER_QUEST_LOG_1_1 ==
+        MopUpdateObject::SelfQuestLogSourceStride,
+        "legacy quest slots must remain contiguous at the projected stride");
 
     bool CanBuildMopInventoryObject(Object const& object, Player* target)
     {
@@ -576,7 +585,8 @@ void Object::BuildValuesUpdateBlockForPlayer(UpdateData* data, Player* target) c
             fields.reserve(25 + MopUpdateObject::ObserverVisibleItemFieldCount +
                 MopUpdateObject::SelfInventoryFieldCount +
                 MopUpdateObject::SelfSkillFieldCount +
-                MopUpdateObject::SelfBuybackFieldCount);
+                MopUpdateObject::SelfBuybackFieldCount +
+                MopUpdateObject::SelfQuestLogFieldCount);
             auto addIfChanged = [this, &fields](uint16 sourceIndex)
             {
                 if (m_changedValues[sourceIndex])
@@ -604,6 +614,17 @@ void Object::BuildValuesUpdateBlockForPlayer(UpdateData* data, Player* target) c
             addIfChanged(UNIT_FIELD_COMBATREACH);
             addIfChanged(UNIT_FIELD_DISPLAYID);
             addIfChanged(UNIT_FIELD_NATIVEDISPLAYID);
+
+            // QuestLogFrame renders a slot only once the client holds its
+            // quest id, so an accepted quest never appears until these private
+            // fields are projected. Ordered ahead of the visible-item feed
+            // because the serializer requires ascending legacy indices.
+            for (uint16 i = MopUpdateObject::SelfQuestLogSourceStart;
+                 i < MopUpdateObject::SelfQuestLogSourceStart +
+                     MopUpdateObject::SelfQuestLogFieldCount; ++i)
+            {
+                addIfChanged(i);
+            }
 
             // Local equipment changes use the same public 18414 visible-item
             // projection as updates sent to nearby observers.

@@ -47,6 +47,17 @@ class ByteBuffer;
 
 namespace MopUpdateObject
 {
+    // Four keeps fifty five-word quest slots; 18414's CGPlayerData::questLog
+    // is fifty fifteen-word slots. The extra ten words per client slot are
+    // MoP objective storage Four does not populate, so this range is the only
+    // self projection that re-strides instead of shifting by a constant.
+    static constexpr uint16 SelfQuestLogSourceStart = 166;
+    static constexpr uint16 SelfQuestLogTargetStart = 171;
+    static constexpr uint16 SelfQuestLogSlotCount = 50;
+    static constexpr uint16 SelfQuestLogSourceStride = 5;
+    static constexpr uint16 SelfQuestLogTargetStride = 15;
+    static constexpr uint16 SelfQuestLogFieldCount =
+        SelfQuestLogSlotCount * SelfQuestLogSourceStride;
     static constexpr uint16 SelfInventorySourceStart = 960;
     static constexpr uint16 SelfInventoryFieldCount = 172;
     static constexpr uint16 SelfSkillSourceStart = 1146;
@@ -65,6 +76,11 @@ namespace MopUpdateObject
     static constexpr uint32 SimpleLivingWalkModeFlag = 0x00000100u;
 
     uint16 TranslateSelfInventoryIndex(uint16 legacyIndex);
+
+    /// Map one legacy quest-log field to its 18414 index, preserving the
+    /// field's position within its slot while widening the slot stride from
+    /// five to fifteen.
+    uint16 TranslateSelfQuestLogIndex(uint16 legacyIndex);
 
     /// Translate one field from Four's legacy Player storage to the narrow
     /// public observer projection proved for 18414. Returns false for every

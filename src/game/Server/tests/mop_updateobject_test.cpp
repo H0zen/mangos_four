@@ -450,6 +450,61 @@ int main(int /*argc*/, char** /*argv*/)
         CHECK(values.rpos() == values.size());
     }
 
+    // The quest log is the one self range whose slot stride differs between
+    // Four and 18414. Four stores fifty five-word slots at 166..415; the
+    // client's CGPlayerData::questLog is fifty FIFTEEN-word slots at
+    // 171..920 (750 fields, binary-confirmed). Only the leading five words of
+    // each client slot carry Four's id/state/counts/timer, so the projection
+    // must re-stride per slot rather than copy the range flat. A flat copy
+    // would land legacy slot 1 on 176 instead of 186, inside client slot 0.
+    {
+        const MopUpdateObject::StaticField sourceFields[] =
+        {
+            { 166, 0x000004D2u },        // slot 0 quest id     -> 171
+            { 170, 0x00000E10u },        // slot 0 timer        -> 175
+            { 171, 0x000004D3u },        // slot 1 quest id     -> 186
+            { 415, 0u },                 // slot 49 timer       -> 910
+        };
+        ByteBuffer values;
+        MopUpdateObject::AppendSelfPlayerValuesBlock(values, 0x10, sourceFields,
+            sizeof(sourceFields) / sizeof(sourceFields[0]));
+        values.rpos(3); // VALUES + packed GUID
+        uint8 blockCount;
+        values >> blockCount;
+        CHECK(blockCount == 29);
+        uint32 masks[29];
+        for (uint32& mask : masks) values >> mask;
+        auto hasBit = [&masks](uint16 index)
+        {
+            return (masks[index / 32] & (uint32(1) << (index % 32))) != 0;
+        };
+        for (uint16 index : { uint16(171), uint16(175), uint16(186), uint16(910) })
+            CHECK(hasBit(index));
+        // the flat-copy targets, which must NOT be produced
+        CHECK(!hasBit(176));
+        CHECK(!hasBit(420));
+        // and the untranslated legacy indices
+        CHECK(!hasBit(166));
+        CHECK(!hasBit(415));
+
+        for (uint32 expectedValue : { 0x000004D2u, 0x00000E10u, 0x000004D3u, 0u })
+        {
+            uint32 actualValue;
+            values >> actualValue;
+            CHECK(actualValue == expectedValue);
+        }
+        uint8 dynamicCount;
+        values >> dynamicCount;
+        CHECK(dynamicCount == 0);
+        CHECK(values.rpos() == values.size());
+    }
+
+    // Per-slot re-striding, checked directly at both ends of the block.
+    CHECK(MopUpdateObject::TranslateSelfQuestLogIndex(166) == 171);
+    CHECK(MopUpdateObject::TranslateSelfQuestLogIndex(170) == 175);
+    CHECK(MopUpdateObject::TranslateSelfQuestLogIndex(171) == 186);
+    CHECK(MopUpdateObject::TranslateSelfQuestLogIndex(415) == 910);
+
     CHECK(MopUpdateObject::RepackUnitBytes0(0x04030201u) == 0x03040201u);
     CHECK(MopUpdateObject::TranslateUnitDynamicFlags(0x000000A5u) == 0x0000014Au);
     CHECK(MopUpdateObject::TranslateUnitDynamicFlags(0xFFFF01A5u) == 0x0000014Au);
