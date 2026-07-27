@@ -203,7 +203,8 @@ foreach(mutation IN ITEMS cancel_sender cancel_registration cancel_allowlist can
         threat_count_width threat_update_mask threat_highest_mask threat_clear_bytes
         threat_remove_mask threat_sender threat_registration threat_allowlist threat_reference
         dismount_mask dismount_bytes dismount_sender dismount_registration
-        dismount_allowlist dismount_reference)
+        dismount_allowlist dismount_reference
+        combo_mask combo_bytes combo_sender combo_registration combo_allowlist combo_reference)
     add_test(NAME mop_compact_packets_source_mutation_${mutation}
         COMMAND ${CMAKE_COMMAND} -DSOURCE_ROOT=${CMAKE_SOURCE_DIR}
             -DMUTATION=${mutation}

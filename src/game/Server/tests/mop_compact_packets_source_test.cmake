@@ -1,6 +1,7 @@
 file(READ "${SOURCE_ROOT}/src/game/Object/PlayerCombat.cpp" player_combat)
 file(READ "${SOURCE_ROOT}/src/game/Object/PlayerDuel.cpp" player_duel)
 file(READ "${SOURCE_ROOT}/src/game/Object/PlayerMirror.cpp" player_mirror)
+file(READ "${SOURCE_ROOT}/src/game/Object/PlayerCombo.cpp" player_combo)
 file(READ "${SOURCE_ROOT}/src/game/Object/RuneMgr.cpp" rune_source)
 file(READ "${SOURCE_ROOT}/src/game/Object/RuneMgr.h" rune_header)
 file(READ "${SOURCE_ROOT}/src/game/Object/Player.h" player_header)
@@ -365,6 +366,36 @@ elseif(MUTATION STREQUAL "dismount_reference")
     string(REPLACE
         "SMSG_DISMOUNT                                  0x0E3A  ACTIVE"
         "SMSG_DISMOUNT                                  0x0E3A  DORMANT"
+        opcode_reference "${opcode_reference}")
+elseif(MUTATION STREQUAL "combo_mask")
+    string(REPLACE
+        "out.WriteGuidMask<0, 5, 6, 3, 7, 4, 1, 2>(target);"
+        "out.WriteGuidMask<5, 0, 6, 3, 7, 4, 1, 2>(target);"
+        player_header "${player_header}")
+elseif(MUTATION STREQUAL "combo_bytes")
+    string(REPLACE
+        "out.WriteGuidBytes<5, 6, 4, 7, 3, 0>(target);"
+        "out.WriteGuidBytes<6, 5, 4, 7, 3, 0>(target);"
+        player_header "${player_header}")
+elseif(MUTATION STREQUAL "combo_sender")
+    string(REPLACE
+        "MopComboPointPackets::BuildUpdate(data, combotarget->GetObjectGuid(), uint8(m_comboPoints));"
+        "/* removed combo-point builder */"
+        player_combo "${player_combo}")
+elseif(MUTATION STREQUAL "combo_registration")
+    string(REPLACE
+        "DefS(SMSG_UPDATE_COMBO_POINTS, \"SMSG_UPDATE_COMBO_POINTS\");"
+        "/* removed combo-point registration */"
+        opcode_registry "${opcode_registry}")
+elseif(MUTATION STREQUAL "combo_allowlist")
+    string(REPLACE
+        "case SMSG_UPDATE_COMBO_POINTS:"
+        "case 0xFFFF: /* removed combo-point allowlist */"
+        world_session "${world_session}")
+elseif(MUTATION STREQUAL "combo_reference")
+    string(REPLACE
+        "SMSG_UPDATE_COMBO_POINTS                       0x082F  ACTIVE"
+        "SMSG_UPDATE_COMBO_POINTS                       0x082F  DORMANT"
         opcode_reference "${opcode_reference}")
 endif()
 
@@ -731,4 +762,41 @@ endif()
 string(REGEX MATCH "SMSG_DISMOUNT[ \t]+0x0E3A[ \t]+ACTIVE" dismount_reference "${opcode_reference}")
 if(dismount_reference STREQUAL "")
     message(FATAL_ERROR "reference inventory does not record active 0x0E3A dismount")
+endif()
+
+string(FIND "${player_header}" "out.WriteGuidMask<0, 5, 6, 3, 7, 4, 1, 2>(target);" combo_mask)
+if(combo_mask EQUAL -1)
+    message(FATAL_ERROR "combo-point target mask does not match reader sub_6E2BC4")
+endif()
+string(FIND "${player_header}" "out.WriteGuidBytes<5, 6, 4, 7, 3, 0>(target);" combo_bytes_first)
+if(combo_bytes_first EQUAL -1)
+    message(FATAL_ERROR "combo-point leading target bytes do not match reader sub_6E2BC4")
+endif()
+string(FIND "${player_header}" "out << points;" combo_value)
+if(combo_value EQUAL -1)
+    message(FATAL_ERROR "combo-point value is missing from the 18414 serializer")
+endif()
+string(FIND "${player_header}" "out.WriteGuidBytes<2, 1>(target);" combo_bytes_last)
+if(combo_bytes_last EQUAL -1)
+    message(FATAL_ERROR "combo-point trailing target bytes do not match reader sub_6E2BC4")
+endif()
+string(FIND "${player_combo}" "MopComboPointPackets::BuildUpdate(data, combotarget->GetObjectGuid(), uint8(m_comboPoints));" combo_sender)
+if(combo_sender EQUAL -1)
+    message(FATAL_ERROR "combo-point sender bypasses the 18414 serializer")
+endif()
+string(FIND "${player_combo}" "WorldPacket data(SMSG_UPDATE_COMBO_POINTS" legacy_combo_sender)
+if(NOT legacy_combo_sender EQUAL -1)
+    message(FATAL_ERROR "legacy raw combo-point packet construction remains")
+endif()
+string(FIND "${opcode_registry}" "DefS(SMSG_UPDATE_COMBO_POINTS, \"SMSG_UPDATE_COMBO_POINTS\");" combo_registration)
+if(combo_registration EQUAL -1)
+    message(FATAL_ERROR "SMSG_UPDATE_COMBO_POINTS is missing outbound opcode metadata")
+endif()
+string(FIND "${world_session}" "case SMSG_UPDATE_COMBO_POINTS:" combo_allowlist)
+if(combo_allowlist EQUAL -1)
+    message(FATAL_ERROR "SMSG_UPDATE_COMBO_POINTS is missing from the converted-packet gate")
+endif()
+string(REGEX MATCH "SMSG_UPDATE_COMBO_POINTS[ \t]+0x082F[ \t]+ACTIVE" combo_reference "${opcode_reference}")
+if(combo_reference STREQUAL "")
+    message(FATAL_ERROR "reference inventory does not record active 0x082F combo points")
 endif()

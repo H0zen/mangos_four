@@ -175,8 +175,8 @@
  *   TOTAL SMSG rows                   925
  *
  * SUBSYSTEM CONFIDENCE: high=365, low=221, medium=182, none=157
- * STATUS TOTALS: ACTIVE=395, DOC=438, DORMANT=687
- *   SMSG: ACTIVE=255, DOC=271, DORMANT=399
+ * STATUS TOTALS: ACTIVE=396, DOC=438, DORMANT=686
+ *   SMSG: ACTIVE=256, DOC=271, DORMANT=398
  *   CMSG: ACTIVE=140, DOC=167, DORMANT=288
  */
 
@@ -496,7 +496,7 @@ typedef uint16_t uint16;
  *   SMSG_OVERRIDE_LIGHT                            0x068A  DORMANT  [medium-conf]
  *   SMSG_WEATHER                                   0x06AB  ACTIVE   [medium-conf]
  *   SMSG_UNKNOWN_0x06BA                            0x06BA  DOC      [low-conf]
- *   SMSG_UPDATE_COMBO_POINTS                       0x082F  DORMANT 
+ *   SMSG_UPDATE_COMBO_POINTS                       0x082F  ACTIVE   [high-conf]
  *   SMSG_TALENTS_INVOLUNTARILY_RESET               0x088A  DORMANT  [low-conf]
  *   SMSG_AREA_TRIGGER_NO_CORPSE                    0x089E  ACTIVE   [high-conf]
  *   SMSG_GUILD_BANK_LIST                           0x0B79  DORMANT  [medium-conf]

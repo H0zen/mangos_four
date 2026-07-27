@@ -767,6 +767,22 @@ namespace MopProgressionPackets
     }
 }
 
+namespace MopComboPointPackets
+{
+    inline void BuildUpdate(WorldPacket& out, ObjectGuid target, uint8 points)
+    {
+        out.Initialize(SMSG_UPDATE_COMBO_POINTS, 10);
+
+        // Wow.exe 18414 reader sub_6E2BC4 consumes six target-GUID bytes,
+        // the raw combo-point byte, then the final two target-GUID bytes.
+        // Terminal sub_CCA14B publishes the recovered GUID/value pair.
+        out.WriteGuidMask<0, 5, 6, 3, 7, 4, 1, 2>(target);
+        out.WriteGuidBytes<5, 6, 4, 7, 3, 0>(target);
+        out << points;
+        out.WriteGuidBytes<2, 1>(target);
+    }
+}
+
 namespace MopDuelPackets
 {
     inline void BuildRequested(WorldPacket& out, ObjectGuid arbiter,
