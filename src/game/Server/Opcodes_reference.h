@@ -175,9 +175,9 @@
  *   TOTAL SMSG rows                   925
  *
  * SUBSYSTEM CONFIDENCE: high=365, low=221, medium=182, none=157
- * STATUS TOTALS: ACTIVE=399, DOC=437, DORMANT=684
+ * STATUS TOTALS: ACTIVE=400, DOC=437, DORMANT=683
  *   SMSG: ACTIVE=258, DOC=271, DORMANT=396
- *   CMSG: ACTIVE=141, DOC=166, DORMANT=288
+ *   CMSG: ACTIVE=142, DOC=166, DORMANT=287
  */
 
 // CAVEATS -- read before trusting any single row:
@@ -1321,7 +1321,7 @@ typedef uint16_t uint16;
  *   CMSG_UNKNOWN_0x0069                            0x0069  DOC     
  *   CMSG_LFD_LOCK_INFO_REQUEST                     0x006B  ACTIVE   server-binding=CMSG_LFG_LOCK_INFO_REQUEST
  *   CMSG_UNKNOWN_0x0071                            0x0071  DOC     
- *   CMSG_MOVE_TELEPORT_ACK                         0x0078  DORMANT 
+ *   CMSG_MOVE_TELEPORT_ACK                         0x0078  ACTIVE
  *   CMSG_MOVE_STOP_PITCH                           0x007A  DORMANT 
  *   CMSG_MOUNTSPECIAL_ANIM                         0x0082  DORMANT 
  *   CMSG_SCENE_COMPLETED                           0x0087  DOC     
