@@ -628,6 +628,14 @@ void Object::BuildValuesUpdateBlockForPlayer(UpdateData* data, Player* target) c
             addIfChanged(UNIT_FIELD_COMBATREACH);
             addIfChanged(UNIT_FIELD_DISPLAYID);
             addIfChanged(UNIT_FIELD_NATIVEDISPLAYID);
+            // PLAYER_FLAGS_GHOST lives here. Until this was projected the
+            // client was never told the character had died, so nothing
+            // downstream of death worked: no release dialog, therefore no
+            // CMSG_REPOP_REQUEST at all, and both release and .revive had no
+            // state to act on. Ordered after the native display id and ahead
+            // of the quest log because the serializer requires ascending
+            // legacy indices.
+            addIfChanged(PLAYER_FLAGS);
 
             // QuestLogFrame renders a slot only once the client holds its
             // quest id, so an accepted quest never appears until these private

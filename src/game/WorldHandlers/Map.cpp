@@ -1952,6 +1952,16 @@ void Map::SendInitSelf(Player* player)
         MopUpdateObject::ObserverVisibleItemFieldCount +
         MopUpdateObject::SelfInventoryFieldCount +
         MopUpdateObject::SelfSkillFieldCount);
+    // A character that logged out dead comes back with PLAYER_FLAGS_GHOST
+    // already set, so the flag never changes during the session and the
+    // incremental path has nothing to report. Seeded here or the client
+    // renders a living character over a corpse it will not let go of.
+    // Sorts below the quest log at 166, so it opens the ascending run.
+    if (player->GetUInt32Value(PLAYER_FLAGS) != 0)
+    {
+        selfFields.push_back({ PLAYER_FLAGS, player->GetUInt32Value(PLAYER_FLAGS) });
+    }
+
     // Quests reach the client only through this seed and the incremental
     // values path. Without it a character logs in with its quest log empty
     // and the quest only appears if one of its fields happens to change

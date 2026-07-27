@@ -436,6 +436,22 @@ void MopUpdateObject::AppendSelfPlayerValuesBlock(ByteBuffer& out, uint64 guid,
             case 62: fields.push_back({ 68, value }); break;
             case 63: fields.push_back({ 69, value }); break;
             case 64: fields.push_back({ 70, value }); break;
+            // PLAYER_FLAGS, which carries PLAYER_FLAGS_GHOST. Without it the
+            // client is never told the character died: no release dialog, so
+            // no CMSG_REPOP_REQUEST, so release and .revive have nothing to
+            // act on and the corpse outlives a state the client never entered.
+            // The giveaway is a character sitting at 1 HP that will not
+            // regenerate, because the server is correctly withholding regen
+            // from a corpse while the client renders someone alive.
+            //
+            // 18414 index from the client's own field descriptors:
+            // CGPlayerData's table is a 12-byte stride from dword_10F52B8, and
+            // CGPlayerData::playerFlags writes at dword_10F52D0, so it sits at
+            // relative index 2 -- the same relative position Four gives it.
+            // CGPlayerData::questLog writes at dword_10F533C, relative index
+            // 11, and its absolute 18414 index is already pinned at 171 by the
+            // quest-log projection, which puts the block base at 160.
+            case 157: fields.push_back({ 162, value }); break;
             default:
                 MANGOS_ASSERT(false && "unsupported legacy self-player field");
                 break;
