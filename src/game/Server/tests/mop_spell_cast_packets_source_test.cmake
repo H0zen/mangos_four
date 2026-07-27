@@ -434,6 +434,36 @@ elseif(MUTATION STREQUAL "clear_target_reference")
         "SMSG_CLEAR_TARGET                              0x1061  ACTIVE"
         "SMSG_CLEAR_TARGET                              0x1061  DORMANT"
         opcode_reference "${opcode_reference}")
+elseif(MUTATION STREQUAL "channel_start_mask_order")
+    string(REPLACE
+        "out.WriteGuidMask<7, 5, 4, 1>(casterGuid);"
+        "out.WriteGuidMask<5, 7, 4, 1>(casterGuid);"
+        spell_header "${spell_header}")
+elseif(MUTATION STREQUAL "channel_update_byte_order")
+    string(REPLACE
+        "out.WriteGuidBytes<4, 7, 1, 2, 6, 5>(casterGuid);"
+        "out.WriteGuidBytes<7, 4, 1, 2, 6, 5>(casterGuid);"
+        spell_header "${spell_header}")
+elseif(MUTATION STREQUAL "channel_sender")
+    string(REPLACE
+        "MopSpellPackets::BuildChannelStart("
+        "/* removed channel-start builder */ ("
+        spell_packets "${spell_packets}")
+elseif(MUTATION STREQUAL "channel_registration")
+    string(REPLACE
+        "DefS(SMSG_CHANNEL_START, \"SMSG_CHANNEL_START\");"
+        "/* removed channel-start registration */"
+        opcode_registry "${opcode_registry}")
+elseif(MUTATION STREQUAL "channel_gate")
+    string(REPLACE
+        "case SMSG_CHANNEL_START:"
+        "case SMSG_UNKNOWN_0:"
+        world_session "${world_session}")
+elseif(MUTATION STREQUAL "channel_reference")
+    string(REPLACE
+        "SMSG_CHANNEL_START                             0x10F9  ACTIVE"
+        "SMSG_CHANNEL_START                             0x10F9  DORMANT"
+        opcode_reference "${opcode_reference}")
 endif()
 
 string(FIND "${spell_handler}" "void WorldSession::HandleCastSpellOpcode" cast_start)
@@ -812,6 +842,39 @@ require_once("${opcode_reference}"
     "active direct-client clear-target reference")
 forbid("${spell_effect_tail}" "WorldPacket data(SMSG_CLEAR_TARGET"
     "legacy clear-target body")
+require_once("${spell_header}"
+    "out.WriteGuidMask<7, 5, 4, 1>(casterGuid);"
+    "channel-start leading caster mask")
+require_once("${spell_header}"
+    "out.WriteGuidBytes<6, 7, 3, 1, 0>(casterGuid);"
+    "channel-start leading caster bytes")
+require_once("${spell_header}"
+    "out.WriteGuidMask<0, 3, 4, 1, 5, 2, 6, 7>(casterGuid);"
+    "channel-update caster mask")
+require_once("${spell_header}"
+    "out.WriteGuidBytes<4, 7, 1, 2, 6, 5>(casterGuid);"
+    "channel-update leading caster bytes")
+foreach(builder IN ITEMS BuildChannelStart BuildChannelUpdate)
+    require_once("${spell_packets}"
+        "MopSpellPackets::${builder}("
+        "${builder} owning sender")
+endforeach()
+foreach(opcode IN ITEMS SMSG_CHANNEL_START SMSG_CHANNEL_UPDATE)
+    require_once("${opcode_registry}"
+        "DefS(${opcode}, \"${opcode}\");"
+        "${opcode} registration")
+    require_once("${world_session}"
+        "case ${opcode}:"
+        "${opcode} send admission")
+    forbid("${spell_packets}" "WorldPacket data(${opcode}"
+        "legacy ${opcode} body")
+endforeach()
+require_once("${opcode_reference}"
+    "SMSG_CHANNEL_START                             0x10F9  ACTIVE"
+    "active channel-start reference")
+require_once("${opcode_reference}"
+    "SMSG_CHANNEL_UPDATE                            0x11D9  ACTIVE"
+    "active channel-update reference")
 require_once("${spell_header}"
     "inline void BuildLearnedSpell(WorldPacket& out, uint32 spellId,"
     "18414 learned-spell builder")

@@ -411,6 +411,40 @@ namespace MopSpellPackets
         out.WriteGuidBytes<4, 0, 3, 5, 2, 7, 6, 1>(targetGuid);
     }
 
+    inline void BuildChannelStart(WorldPacket& out, ObjectGuid casterGuid,
+        uint32 spellId, uint32 durationMs)
+    {
+        out.Initialize(SMSG_CHANNEL_START, 18);
+
+        // Wow.exe 18414 reader sub_C6AFEC brackets the caster GUID with
+        // optional target and auxiliary-data bits. The current server path
+        // has neither optional structure, so both presence bits stay clear.
+        out.WriteGuidMask<7, 5, 4, 1>(casterGuid);
+        out.WriteBit(false);
+        out.WriteGuidMask<3, 2, 0, 6>(casterGuid);
+        out.WriteBit(false);
+        out.FlushBits();
+
+        out.WriteGuidBytes<6, 7, 3, 1, 0>(casterGuid);
+        out << durationMs;
+        out.WriteGuidBytes<5, 4, 2>(casterGuid);
+        out << spellId;
+    }
+
+    inline void BuildChannelUpdate(WorldPacket& out, ObjectGuid casterGuid,
+        uint32 durationMs)
+    {
+        out.Initialize(SMSG_CHANNEL_UPDATE, 13);
+
+        // Reader sub_C6915A reconstructs the caster before consuming the
+        // remaining duration; zero duration drives the channel-stop path.
+        out.WriteGuidMask<0, 3, 4, 1, 5, 2, 6, 7>(casterGuid);
+        out.FlushBits();
+        out.WriteGuidBytes<4, 7, 1, 2, 6, 5>(casterGuid);
+        out << durationMs;
+        out.WriteGuidBytes<0, 3>(casterGuid);
+    }
+
     inline void BuildLearnedSpell(WorldPacket& out, uint32 spellId,
         bool suppressMessaging)
     {

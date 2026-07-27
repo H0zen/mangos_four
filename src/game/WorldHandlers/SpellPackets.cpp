@@ -1026,9 +1026,9 @@ void Spell::SendChannelUpdate(uint32 time)
         m_caster->SetUInt32Value(UNIT_CHANNEL_SPELL, 0);
     }
 
-    WorldPacket data(SMSG_CHANNEL_UPDATE, 8 + 4);
-    data << m_caster->GetPackGUID();
-    data << uint32(time);
+    WorldPacket data;
+    MopSpellPackets::BuildChannelUpdate(
+        data, m_caster->GetObjectGuid(), uint32(time));
     m_caster->SendMessageToSet(&data, true);
 }
 
@@ -1071,25 +1071,9 @@ void Spell::SendChannelStart(uint32 duration)
         }
     }
 
-    WorldPacket data(SMSG_CHANNEL_START, (8 + 4 + 4));
-    data << m_caster->GetPackGUID();
-    data << uint32(m_spellInfo->ID);
-    data << uint32(duration);
-    data << uint8(0);       // unk1
-    //if (unk1)
-    //{
-    //    data << uint32(0);
-    //    data << uint32(0);
-    //}
-    data << uint8(0);       // unk2
-    //if (unk2)
-    //{
-    //    data << ObjectGuid().WriteAsPacked();
-    //    data << uint32(0);
-    //    data << uint8(0);   // unk3
-    //    if (unk3 == 2)
-    //        data << ObjectGuid().WriteAsPacked();
-    //}
+    WorldPacket data;
+    MopSpellPackets::BuildChannelStart(
+        data, m_caster->GetObjectGuid(), m_spellInfo->ID, duration);
 
     m_caster->SendMessageToSet(&data, true);
 

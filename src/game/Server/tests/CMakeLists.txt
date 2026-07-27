@@ -1401,7 +1401,9 @@ foreach(mutation IN ITEMS reader registration target_initializer target_mapping 
         item_cooldown_wire_order item_cooldown_sender item_cooldown_registration
         item_cooldown_gate item_cooldown_reference
         clear_target_mask_order clear_target_byte_order clear_target_sender
-        clear_target_registration clear_target_gate clear_target_reference)
+        clear_target_registration clear_target_gate clear_target_reference
+        channel_start_mask_order channel_update_byte_order channel_sender
+        channel_registration channel_gate channel_reference)
     add_test(NAME mop_spell_cast_packets_source_mutation_${mutation}
         COMMAND ${CMAKE_COMMAND} -DSOURCE_ROOT=${CMAKE_SOURCE_DIR}
             -DMUTATION=${mutation}

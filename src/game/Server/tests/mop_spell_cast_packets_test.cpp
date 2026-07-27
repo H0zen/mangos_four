@@ -1148,6 +1148,46 @@ static void test_clear_target_wire_layout()
     });
 }
 
+static void test_spell_channel_wire_layouts()
+{
+    ObjectGuid const denseGuid(UINT64_C(0x0807060504030201));
+
+    WorldPacket start;
+    MopSpellPackets::BuildChannelStart(
+        start, denseGuid, 0x11223344u, 0x55667788u);
+    CHECK(start.GetOpcode() == SMSG_CHANNEL_START);
+    CheckBytes(start, {
+        0xF7, 0x80,
+        0x06, 0x09, 0x05, 0x03, 0x00,
+        0x88, 0x77, 0x66, 0x55,
+        0x07, 0x04, 0x02,
+        0x44, 0x33, 0x22, 0x11,
+    });
+
+    WorldPacket update;
+    MopSpellPackets::BuildChannelUpdate(update, denseGuid, 0x99AABBCCu);
+    CHECK(update.GetOpcode() == SMSG_CHANNEL_UPDATE);
+    CheckBytes(update, {
+        0xFF,
+        0x04, 0x09, 0x03, 0x02, 0x06, 0x07,
+        0xCC, 0xBB, 0xAA, 0x99,
+        0x00, 0x05,
+    });
+
+    WorldPacket sparseStart;
+    MopSpellPackets::BuildChannelStart(
+        sparseStart, ObjectGuid(), 0x01020304u, 0x05060708u);
+    CheckBytes(sparseStart, {
+        0x00, 0x00,
+        0x08, 0x07, 0x06, 0x05,
+        0x04, 0x03, 0x02, 0x01,
+    });
+
+    WorldPacket sparseUpdate;
+    MopSpellPackets::BuildChannelUpdate(sparseUpdate, ObjectGuid(), 0);
+    CheckBytes(sparseUpdate, { 0x00, 0x00, 0x00, 0x00, 0x00 });
+}
+
 int main(int, char**)
 {
     test_dense_and_guid_permutations();
@@ -1168,6 +1208,7 @@ int main(int, char**)
     test_cooldown_event_wire_layout();
     test_item_cooldown_wire_layout();
     test_clear_target_wire_layout();
+    test_spell_channel_wire_layouts();
     test_spellbook_mutation_wire_layouts();
     test_pet_spellbook_mutation_wire_layouts();
 

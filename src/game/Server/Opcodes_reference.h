@@ -175,8 +175,8 @@
  *   TOTAL SMSG rows                   925
  *
  * SUBSYSTEM CONFIDENCE: high=365, low=221, medium=182, none=157
- * STATUS TOTALS: ACTIVE=385, DOC=438, DORMANT=697
- *   SMSG: ACTIVE=245, DOC=271, DORMANT=409
+ * STATUS TOTALS: ACTIVE=387, DOC=438, DORMANT=695
+ *   SMSG: ACTIVE=247, DOC=271, DORMANT=407
  *   CMSG: ACTIVE=140, DOC=167, DORMANT=288
  */
 
@@ -935,10 +935,10 @@ typedef uint16_t uint16;
  *   SMSG_GAMEOBJECT_RESET_STATE                    0x100E  DORMANT 
  *   SMSG_SPELL_START                               0x107A  ACTIVE
  *   SMSG_SET_FLAT_SPELL_MODIFIER                   0x10F2  DORMANT 
- *   SMSG_CHANNEL_START                             0x10F9  DORMANT 
+ *   SMSG_CHANNEL_START                             0x10F9  ACTIVE  [high-conf]
  *   SMSG_COOLDOWN_EVENT                            0x1163  ACTIVE
  *   SMSG_UNKNOWN_0x117A                            0x117A  DOC     
- *   SMSG_CHANNEL_UPDATE                            0x11D9  DORMANT 
+ *   SMSG_CHANNEL_UPDATE                            0x11D9  ACTIVE  [high-conf]
  *   SMSG_PLAY_SPELL_VISUAL_KIT                     0x11E3  DORMANT
  *   SMSG_NOTIFY_MISSILE_TRAJECTORY_COLLISION       0x120A  DORMANT 
  *   SMSG_CAST_FAILED                               0x143A  ACTIVE
