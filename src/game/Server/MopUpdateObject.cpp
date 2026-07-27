@@ -300,11 +300,15 @@ void MopUpdateObject::AppendSelfInventoryValuesBlock(ByteBuffer& out, uint64 gui
     AppendValuesBlock(out, guid, fields.data(), uint32(fields.size()));
 }
 
-void MopUpdateObject::AppendSelfPlayerValuesBlock(ByteBuffer& out, uint64 guid,
-    StaticField const* sourceFields, uint32 fieldCount)
+void MopUpdateObject::TranslateSelfPlayerFields(StaticField const* sourceFields,
+    uint32 fieldCount, std::vector<StaticField>& out)
 {
     MANGOS_ASSERT(sourceFields || fieldCount == 0);
 
+    // Projected into a local and swapped in at the end, so a caller may pass
+    // the storage it is reading from: TranslateSelfPlayerFields(v.data(),
+    // v.size(), v) is well defined. Clearing `out` up front instead would end
+    // the lifetime of those source elements before they were read.
     std::vector<StaticField> fields;
     fields.reserve(fieldCount + 1);
     for (uint32 i = 0; i < fieldCount; ++i)
@@ -472,6 +476,14 @@ void MopUpdateObject::AppendSelfPlayerValuesBlock(ByteBuffer& out, uint64 guid,
         }
     }
 
+    out.swap(fields);
+}
+
+void MopUpdateObject::AppendSelfPlayerValuesBlock(ByteBuffer& out, uint64 guid,
+    StaticField const* sourceFields, uint32 fieldCount)
+{
+    std::vector<StaticField> fields;
+    TranslateSelfPlayerFields(sourceFields, fieldCount, fields);
     AppendValuesBlock(out, guid, fields.data(), uint32(fields.size()));
 }
 

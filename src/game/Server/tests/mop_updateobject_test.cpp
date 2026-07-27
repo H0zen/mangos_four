@@ -81,6 +81,41 @@ int main(int /*argc*/, char** /*argv*/)
     CHECK(MopUpdateObject::TranslateSelfInventoryIndex(960) == 965);
     CHECK(MopUpdateObject::TranslateSelfInventoryIndex(1131) == 1136);
 
+    // TranslateSelfPlayerFields is reached through AppendSelfPlayerValuesBlock
+    // everywhere else in these tests, which always hands it a fresh empty
+    // vector. Exercise the out-parameter contract directly: prior contents are
+    // replaced, not appended to, and the source is allowed to alias the
+    // destination's own storage.
+    {
+        const MopUpdateObject::StaticField source[] =
+        {
+            { 1142, 0x11111111u },       // coinage low  -> 1149
+            { 1144, 0x22222222u },       // XP           -> 1151
+        };
+
+        std::vector<MopUpdateObject::StaticField> projected;
+        projected.push_back({ 9999, 0xDEADBEEFu });   // must not survive
+        MopUpdateObject::TranslateSelfPlayerFields(source, 2, projected);
+        CHECK(projected.size() == 2);
+        CHECK(projected[0].index == 1149 && projected[0].value == 0x11111111u);
+        CHECK(projected[1].index == 1151 && projected[1].value == 0x22222222u);
+
+        // Reuse of the same vector must be idempotent, not cumulative.
+        MopUpdateObject::TranslateSelfPlayerFields(source, 2, projected);
+        CHECK(projected.size() == 2);
+
+        // Self-aliasing: read from the very storage being replaced. The
+        // legacy coinage pair 1142/1143 projects to 1149/1150, so feeding the
+        // result back in would hit the unsupported-field assert; use a range
+        // that is stable under the projection instead.
+        std::vector<MopUpdateObject::StaticField> aliased;
+        aliased.push_back({ 7, 0x33333333u });        // scale -> 7, fixed point
+        MopUpdateObject::TranslateSelfPlayerFields(aliased.data(),
+            uint32(aliased.size()), aliased);
+        CHECK(aliased.size() == 1);
+        CHECK(aliased[0].index == 7 && aliased[0].value == 0x33333333u);
+    }
+
     // Observer-visible Player fields use a deliberately narrow 18414
     // projection. Unit fields are individually admitted; visible-item pairs
     // move by +5. Private Player fields must not acquire a target index.

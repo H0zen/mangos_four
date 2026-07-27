@@ -42,6 +42,8 @@
 #include "Common.h"
 #include "SharedDefines.h"   // MAX_STORED_POWERS
 
+#include <vector>
+
 class WorldPacket;
 class ByteBuffer;
 
@@ -133,6 +135,19 @@ namespace MopUpdateObject
     /// 18414 [965,1137) and append one VALUES block. Zero values are retained.
     void AppendSelfInventoryValuesBlock(ByteBuffer& out, uint64 guid,
         StaticField const* sourceFields, uint32 fieldCount);
+
+    /// Project ordered legacy self-player field indices onto their 18414
+    /// CGPlayerData positions, replacing the contents of \a out. Source
+    /// indices must be strictly ascending; quest-log slots are re-strided
+    /// whole, so a partial slot would clear the remainder client-side.
+    ///
+    /// \a sourceFields may alias \a out's storage: the projection is built
+    /// separately and swapped in once the source has been fully read.
+    ///
+    /// Split out of AppendSelfPlayerValuesBlock so the create path can apply
+    /// the identical projection without going through a VALUES block.
+    void TranslateSelfPlayerFields(StaticField const* sourceFields,
+        uint32 fieldCount, std::vector<StaticField>& out);
 
     /// Translate the binary-proved self-player Unit and visible-item
     /// projections, existing inventory range, coinage/XP fields, and local
