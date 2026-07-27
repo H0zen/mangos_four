@@ -3743,8 +3743,8 @@ void Unit::Unmount(bool from_aura)
     // Called NOT by Taxi system / GM command
     if (from_aura)
     {
-        WorldPacket data(SMSG_DISMOUNT, 8);
-        data << GetPackGUID();
+        WorldPacket data;
+        MopCompactPackets::BuildDismount(data, GetObjectGuid());
         SendMessageToSet(&data, true);
     }
 

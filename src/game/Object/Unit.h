@@ -377,6 +377,15 @@ namespace MopCompactPackets
         out.WriteGuidMask<1, 5, 6, 0, 7, 2, 3, 4>(guid);
         out.WriteGuidBytes<1, 6, 4, 3, 7, 0, 2, 5>(guid);
     }
+
+    inline void BuildDismount(WorldPacket& out, ObjectGuid guid)
+    {
+        // Wow.exe 18414 reader helper sub_6D3AD4 consumes one packed unit
+        // GUID; terminal sub_82E6E0 applies a zero mount state to that unit.
+        out.Initialize(SMSG_DISMOUNT, 9);
+        out.WriteGuidMask<6, 3, 0, 7, 1, 2, 5, 4>(guid);
+        out.WriteGuidBytes<3, 6, 7, 5, 1, 4, 2, 0>(guid);
+    }
 }
 
 namespace MopThreatPackets

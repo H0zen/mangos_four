@@ -542,6 +542,17 @@ static void test_threat_packets()
     }));
 }
 
+static void test_dismount_packet()
+{
+    WorldPacket packet;
+    MopCompactPackets::BuildDismount(
+        packet, ObjectGuid(UINT64_C(0x0807060504030201)));
+    CHECK(packet.GetOpcode() == SMSG_DISMOUNT);
+    CHECK(BytesEqual(packet, {
+        0xFF, 0x05, 0x06, 0x09, 0x07, 0x03, 0x04, 0x02, 0x00,
+    }));
+}
+
 static void test_opcode_values_are_framable()
 {
     CHECK(uint32_t(SMSG_ATTACKSWING_ERROR) == 0x11E1u);
@@ -570,6 +581,7 @@ static void test_opcode_values_are_framable()
     CHECK(uint32_t(SMSG_HIGHEST_THREAT_UPDATE) == 0x14AEu);
     CHECK(uint32_t(SMSG_THREAT_CLEAR) == 0x180Bu);
     CHECK(uint32_t(SMSG_THREAT_REMOVE) == 0x1960u);
+    CHECK(uint32_t(SMSG_DISMOUNT) == 0x0E3Au);
 
     CHECK(uint32_t(SMSG_ATTACKSWING_ERROR) <= 0x1FFFu);
     CHECK(uint32_t(SMSG_MOVE_SET_SWIM_SPEED) <= 0x1FFFu);
@@ -597,6 +609,7 @@ static void test_opcode_values_are_framable()
     CHECK(uint32_t(SMSG_HIGHEST_THREAT_UPDATE) <= 0x1FFFu);
     CHECK(uint32_t(SMSG_THREAT_CLEAR) <= 0x1FFFu);
     CHECK(uint32_t(SMSG_THREAT_REMOVE) <= 0x1FFFu);
+    CHECK(uint32_t(SMSG_DISMOUNT) <= 0x1FFFu);
 }
 
 int main(int /*argc*/, char** /*argv*/)
@@ -616,6 +629,7 @@ int main(int /*argc*/, char** /*argv*/)
     test_mirror_timer_packets();
     test_rune_packets();
     test_threat_packets();
+    test_dismount_packet();
     test_opcode_values_are_framable();
 
     if (g_fail)

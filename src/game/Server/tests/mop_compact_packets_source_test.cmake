@@ -336,6 +336,36 @@ elseif(MUTATION STREQUAL "threat_reference")
         "SMSG_THREAT_UPDATE                             0x0632  ACTIVE"
         "SMSG_THREAT_UPDATE                             0x0632  DORMANT"
         opcode_reference "${opcode_reference}")
+elseif(MUTATION STREQUAL "dismount_mask")
+    string(REPLACE
+        "out.WriteGuidMask<6, 3, 0, 7, 1, 2, 5, 4>(guid);"
+        "out.WriteGuidMask<3, 6, 0, 7, 1, 2, 5, 4>(guid);"
+        unit_header "${unit_header}")
+elseif(MUTATION STREQUAL "dismount_bytes")
+    string(REPLACE
+        "out.WriteGuidBytes<3, 6, 7, 5, 1, 4, 2, 0>(guid);"
+        "out.WriteGuidBytes<6, 3, 7, 5, 1, 4, 2, 0>(guid);"
+        unit_header "${unit_header}")
+elseif(MUTATION STREQUAL "dismount_sender")
+    string(REPLACE
+        "MopCompactPackets::BuildDismount(data, GetObjectGuid());"
+        "/* removed dismount builder */"
+        unit "${unit}")
+elseif(MUTATION STREQUAL "dismount_registration")
+    string(REPLACE
+        "DefS(SMSG_DISMOUNT, \"SMSG_DISMOUNT\");"
+        "/* removed dismount registration */"
+        opcode_registry "${opcode_registry}")
+elseif(MUTATION STREQUAL "dismount_allowlist")
+    string(REPLACE
+        "case SMSG_DISMOUNT:"
+        "case 0xFFFF: /* removed dismount allowlist */"
+        world_session "${world_session}")
+elseif(MUTATION STREQUAL "dismount_reference")
+    string(REPLACE
+        "SMSG_DISMOUNT                                  0x0E3A  ACTIVE"
+        "SMSG_DISMOUNT                                  0x0E3A  DORMANT"
+        opcode_reference "${opcode_reference}")
 endif()
 
 if(player_combat MATCHES "WorldPacket[ \t]+data\\(SMSG_ATTACKSWING_NOTINRANGE")
@@ -673,3 +703,32 @@ foreach(server_name IN ITEMS
         message(FATAL_ERROR "reference inventory does not record active ${server_name}")
     endif()
 endforeach()
+
+string(FIND "${unit_header}" "out.WriteGuidMask<6, 3, 0, 7, 1, 2, 5, 4>(guid);" dismount_mask)
+if(dismount_mask EQUAL -1)
+    message(FATAL_ERROR "dismount GUID mask does not match reader sub_6D3AD4")
+endif()
+string(FIND "${unit_header}" "out.WriteGuidBytes<3, 6, 7, 5, 1, 4, 2, 0>(guid);" dismount_bytes)
+if(dismount_bytes EQUAL -1)
+    message(FATAL_ERROR "dismount GUID byte order does not match reader sub_6D3AD4")
+endif()
+string(FIND "${unit}" "MopCompactPackets::BuildDismount(data, GetObjectGuid());" dismount_sender)
+if(dismount_sender EQUAL -1)
+    message(FATAL_ERROR "dismount sender bypasses the 18414 serializer")
+endif()
+string(FIND "${unit}" "WorldPacket data(SMSG_DISMOUNT" legacy_dismount_sender)
+if(NOT legacy_dismount_sender EQUAL -1)
+    message(FATAL_ERROR "legacy raw dismount packet construction remains")
+endif()
+string(FIND "${opcode_registry}" "DefS(SMSG_DISMOUNT, \"SMSG_DISMOUNT\");" dismount_registration)
+if(dismount_registration EQUAL -1)
+    message(FATAL_ERROR "SMSG_DISMOUNT is missing outbound opcode metadata")
+endif()
+string(FIND "${world_session}" "case SMSG_DISMOUNT:" dismount_allowlist)
+if(dismount_allowlist EQUAL -1)
+    message(FATAL_ERROR "SMSG_DISMOUNT is missing from the converted-packet gate")
+endif()
+string(REGEX MATCH "SMSG_DISMOUNT[ \t]+0x0E3A[ \t]+ACTIVE" dismount_reference "${opcode_reference}")
+if(dismount_reference STREQUAL "")
+    message(FATAL_ERROR "reference inventory does not record active 0x0E3A dismount")
+endif()
