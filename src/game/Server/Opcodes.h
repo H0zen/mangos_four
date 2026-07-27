@@ -264,7 +264,7 @@ enum OpcodesList
     MSG_MOVE_TOGGLE_COLLISION_CHEAT              = 0x0BC8,    // 5.4.1 17538 (no client leaf)
     CMSG_MOVE_SET_FACING                         = 0x1050, // 5.4.8 18414
     CMSG_MOVE_SET_PITCH                          = 0x0261, // not in 5.4.8 (legacy; handler retained)
-    MSG_MOVE_WORLDPORT_ACK                       = 0x00E0,    // WRONG for 18414: 0x00E0 is CMSG_CHAR_ENUM. Value unverified, do not register.
+    MSG_MOVE_WORLDPORT_ACK                       = 0x1FAD,    // 5.4.8 18414 (retail: 2022 zero-length CMSG, one per SMSG_NEW_WORLD)
     SMSG_MONSTER_MOVE                            = 0x1A07,    // 5.4.8 18414 (Wow.exe leaf; name single-source fork)
     SMSG_MOVE_WATER_WALK                         = 0x1F9A,    // 5.4.8 18414 (Wow.exe leaf; name reference-consensus)
     SMSG_MOVE_LAND_WALK                          = 0x086A,    // 5.4.8 18414 (Wow.exe leaf; name reference-consensus)
