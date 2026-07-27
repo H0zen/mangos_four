@@ -175,9 +175,9 @@
  *   TOTAL SMSG rows                   925
  *
  * SUBSYSTEM CONFIDENCE: high=365, low=221, medium=182, none=157
- * STATUS TOTALS: ACTIVE=400, DOC=437, DORMANT=683
+ * STATUS TOTALS: ACTIVE=401, DOC=436, DORMANT=683
  *   SMSG: ACTIVE=258, DOC=271, DORMANT=396
- *   CMSG: ACTIVE=142, DOC=166, DORMANT=287
+ *   CMSG: ACTIVE=143, DOC=165, DORMANT=287
  */
 
 // CAVEATS -- read before trusting any single row:
@@ -1897,7 +1897,7 @@ typedef uint16_t uint16;
  *   CMSG_BATTLEFIELD_STATUS                        0x1F9E  ACTIVE
  *   CMSG_CALENDAR_GET_CALENDAR                     0x1F9F  ACTIVE
  *   CMSG_MAIL_RETURN_TO_SENDER                     0x1FA8  DORMANT 
- *   CMSG_UNKNOWN_0x1FAD                            0x1FAD  DOC     
+ *   CMSG_UNKNOWN_0x1FAD                            0x1FAD  ACTIVE   server-binding=MSG_MOVE_WORLDPORT_ACK     
  *   CMSG_CALENDAR_EVENT_RSVP                       0x1FB8  DORMANT 
  *   CMSG_UNKNOWN_0x1FB9                            0x1FB9  DOC     
  *   CMSG_CORPSE_TRANSPORT_QUERY                    0x1FBE  ACTIVE   server-binding=CMSG_CORPSE_QUERY
