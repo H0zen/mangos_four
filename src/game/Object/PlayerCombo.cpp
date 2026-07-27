@@ -88,9 +88,8 @@ void Player::SendComboPoints()
     Unit* combotarget = sObjectAccessor.GetUnit(*this, m_comboTargetGuid);
     if (combotarget)
     {
-        WorldPacket data(SMSG_UPDATE_COMBO_POINTS, combotarget->GetPackGUID().size() + 1);
-        data << combotarget->GetPackGUID();
-        data << uint8(m_comboPoints);
+        WorldPacket data;
+        MopComboPointPackets::BuildUpdate(data, combotarget->GetObjectGuid(), uint8(m_comboPoints));
         GetSession()->SendPacket(&data);
     }
     /*else

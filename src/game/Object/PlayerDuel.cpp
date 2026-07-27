@@ -102,7 +102,8 @@ void Player::CheckDuelDistance(time_t currTime)
         {
             duel->outOfBound = currTime;
 
-            WorldPacket data(SMSG_DUEL_OUTOFBOUNDS, 0);
+            WorldPacket data;
+            MopDuelPackets::BuildOutOfBounds(data);
             GetSession()->SendPacket(&data);
         }
     }
@@ -112,7 +113,8 @@ void Player::CheckDuelDistance(time_t currTime)
         {
             duel->outOfBound = 0;
 
-            WorldPacket data(SMSG_DUEL_INBOUNDS, 0);
+            WorldPacket data;
+            MopDuelPackets::BuildInBounds(data);
             GetSession()->SendPacket(&data);
         }
         else if (currTime >= (duel->outOfBound + 10))
@@ -153,18 +155,16 @@ void Player::DuelComplete(DuelCompleteType type)
         return;
     }
 
-    WorldPacket data(SMSG_DUEL_COMPLETE, (1));
-    data << (uint8)((type != DUEL_INTERRUPTED) ? 1 : 0);
+    WorldPacket data;
+    MopDuelPackets::BuildComplete(data, type != DUEL_INTERRUPTED);
     GetSession()->SendPacket(&data);
     opponent->GetSession()->SendPacket(&data);
 
     if (type != DUEL_INTERRUPTED)
     {
-        data.Initialize(SMSG_DUEL_WINNER, (1 + 20));          // we guess size
-        data << (uint8)((type == DUEL_WON) ? 0 : 1);          // 0 = just won; 1 = fled
-        data << opponent->GetName();
-        data << GetName();
-        SendMessageToSet(&data, true);
+        if (MopDuelPackets::BuildWinner(data, type != DUEL_WON,
+                opponent->GetName(), realmID, GetName(), realmID))
+            SendMessageToSet(&data, true);
     }
 
     // Used by Eluna
@@ -253,7 +253,7 @@ void Player::DuelComplete(DuelCompleteType type)
 
 void Player::SendDuelCountdown(uint32 counter)
 {
-    WorldPacket data(SMSG_DUEL_COUNTDOWN, 4);
-    data << uint32(counter);                                // seconds
+    WorldPacket data;
+    MopDuelPackets::BuildCountdown(data, counter);
     GetSession()->SendPacket(&data);
 }

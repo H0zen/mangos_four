@@ -1193,15 +1193,17 @@ void WorldSession::HandleChatIgnoredOpcode(WorldPacket& recv_data)
  */
 void WorldSession::SendPlayerNotFoundNotice(const std::string& name)
 {
-    WorldPacket data(SMSG_CHAT_PLAYER_NOT_FOUND, name.size() + 1);
-    data << name;
+    WorldPacket data;
+    if (!MopChatPackets::BuildPlayerNotFound(data, name))
+        return;
     SendPacket(&data);
 }
 
 void WorldSession::SendPlayerAmbiguousNotice(const std::string& name)
 {
-    WorldPacket data(SMSG_CHAT_PLAYER_AMBIGUOUS, name.size() + 1);
-    data << name;
+    WorldPacket data;
+    if (!MopChatPackets::BuildPlayerAmbiguous(data, name))
+        return;
     SendPacket(&data);
 }
 
@@ -1210,7 +1212,7 @@ void WorldSession::SendPlayerAmbiguousNotice(const std::string& name)
  */
 void WorldSession::SendChatRestrictedNotice(ChatRestrictionType restriction)
 {
-    WorldPacket data(SMSG_CHAT_RESTRICTED, 1);
-    data << uint8(restriction);
+    WorldPacket data;
+    MopChatPackets::BuildChatRestrictedNotice(data, uint8(restriction));
     SendPacket(&data);
 }

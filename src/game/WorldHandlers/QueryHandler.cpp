@@ -548,6 +548,42 @@ void WorldSession::HandleCorpseMapPositionQueryOpcode(WorldPacket& recv_data)
     SendPacket(&data);
 }
 
+void WorldSession::HandleQuestNpcQueryOpcode(WorldPacket& recv_data)
+{
+    uint32 questId = 0;
+    if (!MopQueryPackets::ParseQuestNpcQueryRequest(recv_data, questId))
+    {
+        DEBUG_LOG("WORLD: Rejected malformed CMSG_QUEST_NPC_QUERY");
+        return;
+    }
+
+    // The client asks one quest at a time; retail batches several quests into
+    // a single reply, so a one-entry response is the degenerate case of the
+    // same grammar rather than a different shape.
+    MopQueryPackets::QuestNpcResponse entry;
+    entry.questId = questId;
+
+    // Answer with the quest's ENDER creatures. Retail 18414 captures settle
+    // the rule: quest 28508 is a chain hand-off with disjoint sets and the
+    // retail server returned its ender (44452), never its giver (42898).
+    // Every other quest in the corpus has one creature in both roles, so no
+    // other hypothesis survives 28508.
+    QuestRelationsMapBounds const bounds =
+        sObjectMgr.GetQuestEnderCreaturesMapBounds(questId);
+    for (QuestRelationsMap::const_iterator itr = bounds.first; itr != bounds.second; ++itr)
+    {
+        entry.npcIds.push_back(itr->second);
+    }
+
+    WorldPacket data;
+    if (!MopQueryPackets::BuildQuestNpcQueryResponse(data, { entry }))
+    {
+        return;
+    }
+
+    SendPacket(&data);
+}
+
 void WorldSession::HandleQuestPOIQueryOpcode(WorldPacket& recv_data)
 {
     std::vector<uint32> questIds;

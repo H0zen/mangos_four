@@ -518,6 +518,7 @@ enum OpcodesList
     SMSG_COOLDOWN_CHEAT                          = 0x0432,    // 5.4.8 18414 (Wow.exe leaf; name reference-consensus)
     SMSG_SPELL_DELAYED                           = 0x087A,    // 5.4.8 18414 (Wow.exe leaf; name reference-consensus)
     CMSG_QUEST_POI_QUERY                         = 0x10C2, // 5.4.8 18414 (Wow.exe binary)
+    CMSG_QUEST_NPC_QUERY                         = 0x1DAE, // 5.4.8 18414 (live client sends it; name reference-consensus)
     SMSG_QUEST_POI_QUERY_RESPONSE                = 0x067F,    // 5.4.8 18414 (Wow.exe leaf; name reference-consensus)
     SMSG_INVALID_PROMOTION_CODE                  = 0x1A0E,    // 5.4.8 18414 (Wow.exe leaf; name single-source fork)
     MSG_GM_BIND_OTHER                            = 0x11E9,    // (no client leaf)

@@ -75,6 +75,8 @@
 #include "WorldPacket.h"
 #include "Timer.h"
 
+#include <vector>
+
 namespace MopCompactPackets
 {
     inline uint8 AttackGuidByte(uint64 guid, uint8 index)
@@ -179,6 +181,34 @@ namespace MopCompactPackets
         out.Initialize(SMSG_CANCEL_AUTO_REPEAT, 9);
         out.WriteGuidMask<1, 3, 0, 4, 6, 7, 5, 2>(guid);
         out.WriteGuidBytes<7, 6, 2, 5, 0, 4, 1, 3>(guid);
+    }
+
+    inline void BuildPartyKillLog(WorldPacket& out, ObjectGuid killer,
+        ObjectGuid victim)
+    {
+        out.Initialize(SMSG_PARTYKILLLOG, 18);
+
+        // Wow.exe 18414 reader sub_6F2FE4 consumes two packed GUIDs;
+        // terminal sub_841B83 treats them as credited killer then victim.
+        out.WriteGuidMask<7, 2>(victim);
+        out.WriteGuidMask<1>(killer);
+        out.WriteGuidMask<4>(victim);
+        out.WriteGuidMask<2, 5>(killer);
+        out.WriteGuidMask<3, 1, 0>(victim);
+        out.WriteGuidMask<3, 0, 4>(killer);
+        out.WriteGuidMask<6>(victim);
+        out.WriteGuidMask<7>(killer);
+        out.WriteGuidMask<5>(victim);
+        out.WriteGuidMask<6>(killer);
+        out.FlushBits();
+
+        out.WriteGuidBytes<0, 5>(victim);
+        out.WriteGuidBytes<0, 2>(killer);
+        out.WriteGuidBytes<7, 6, 1, 4>(victim);
+        out.WriteGuidBytes<4, 1>(killer);
+        out.WriteGuidBytes<2>(victim);
+        out.WriteGuidBytes<6, 3, 5, 7>(killer);
+        out.WriteGuidBytes<3>(victim);
     }
 
     struct AttackStateUpdateData
@@ -346,6 +376,140 @@ namespace MopCompactPackets
     {
         out.WriteGuidMask<1, 5, 6, 0, 7, 2, 3, 4>(guid);
         out.WriteGuidBytes<1, 6, 4, 3, 7, 0, 2, 5>(guid);
+    }
+
+    inline void BuildDismount(WorldPacket& out, ObjectGuid guid)
+    {
+        // Wow.exe 18414 reader helper sub_6D3AD4 consumes one packed unit
+        // GUID; terminal sub_82E6E0 applies a zero mount state to that unit.
+        out.Initialize(SMSG_DISMOUNT, 9);
+        out.WriteGuidMask<6, 3, 0, 7, 1, 2, 5, 4>(guid);
+        out.WriteGuidBytes<3, 6, 7, 5, 1, 4, 2, 0>(guid);
+    }
+
+    inline void BuildPreResurrect(WorldPacket& out, ObjectGuid guid)
+    {
+        // Wow.exe 18414 parser sub_709F6B (dispatcher sub_659694 case 696,
+        // the dense selector for 0x19C0) constructs the message and reads one
+        // packed GUID and nothing else. Two independent readers agree on the
+        // order: the constructor's sub_6E7875 and the class's virtual
+        // deserialize slot sub_6D6EF4.
+        //
+        // The consumer is reached only through the per-message Arxan guard
+        // trampoline sub_6D1F55, whose target is assembled at runtime, so the
+        // GUID's role is NOT binary-proved. It is the repopping player's own
+        // GUID here only because that is what the inherited sender already
+        // supplied; this conversion changes the encoding, not the semantics.
+        out.Initialize(SMSG_PRE_RESURRECT, 9);
+        out.WriteGuidMask<1, 7, 5, 2, 6, 0, 3, 4>(guid);
+        out.WriteGuidBytes<5, 1, 7, 0, 6, 4, 2, 3>(guid);
+    }
+}
+
+namespace MopThreatPackets
+{
+    struct ThreatEntry
+    {
+        ObjectGuid target;
+        uint32 threat = 0;
+    };
+
+    using ThreatEntries = std::vector<ThreatEntry>;
+
+    inline void BuildUpdate(WorldPacket& out, ObjectGuid owner,
+        ThreatEntries const& entries)
+    {
+        // Wow.exe 18414 reader sub_7344A4 consumes a 21-bit threat count,
+        // per-target packed GUIDs and values, then the threatened unit GUID.
+        MANGOS_ASSERT(entries.size() < (uint32(1) << 21));
+        out.Initialize(SMSG_THREAT_UPDATE, 12 + entries.size() * 13);
+        out.WriteGuidMask<5, 6, 1, 3, 7, 0, 4>(owner);
+        out.WriteBits(uint32(entries.size()), 21);
+        for (ThreatEntry const& entry : entries)
+            out.WriteGuidMask<2, 3, 6, 5, 1, 4, 0, 7>(entry.target);
+        out.WriteGuidMask<2>(owner);
+        out.FlushBits();
+
+        for (ThreatEntry const& entry : entries)
+        {
+            out.WriteGuidBytes<6, 7, 0, 1, 2, 5, 3, 4>(entry.target);
+            out << entry.threat;
+        }
+        out.WriteGuidBytes<1, 4, 2, 3, 5, 6, 0, 7>(owner);
+    }
+
+    inline void BuildHighest(WorldPacket& out, ObjectGuid owner,
+        ObjectGuid selected, ThreatEntries const& entries)
+    {
+        // Wow.exe 18414 reader sub_736527 interleaves the selected target,
+        // threatened unit and the same 21-bit threat-list representation.
+        MANGOS_ASSERT(entries.size() < (uint32(1) << 21));
+        out.Initialize(SMSG_HIGHEST_THREAT_UPDATE, 21 + entries.size() * 13);
+        out.WriteGuidMask<3, 0>(selected);
+        out.WriteGuidMask<3, 6, 1>(owner);
+        out.WriteGuidMask<5, 1, 6>(selected);
+        out.WriteGuidMask<2, 5>(owner);
+        out.WriteGuidMask<7, 4>(selected);
+        out.WriteGuidMask<4>(owner);
+        out.WriteBits(uint32(entries.size()), 21);
+        for (ThreatEntry const& entry : entries)
+            out.WriteGuidMask<6, 1, 0, 2, 7, 4, 3, 5>(entry.target);
+        out.WriteGuidMask<7, 0>(owner);
+        out.WriteGuidMask<2>(selected);
+        out.FlushBits();
+
+        out.WriteGuidBytes<4>(owner);
+        for (ThreatEntry const& entry : entries)
+        {
+            out.WriteGuidBytes<6>(entry.target);
+            out << entry.threat;
+            out.WriteGuidBytes<4, 0, 3, 5, 2, 1, 7>(entry.target);
+        }
+        out.WriteGuidBytes<3>(selected);
+        out.WriteGuidBytes<5>(owner);
+        out.WriteGuidBytes<2>(selected);
+        out.WriteGuidBytes<1, 0, 2>(owner);
+        out.WriteGuidBytes<6, 1>(selected);
+        out.WriteGuidBytes<7>(owner);
+        out.WriteGuidBytes<0, 4, 7>(selected);
+        out.WriteGuidBytes<3, 6>(owner);
+        out.WriteGuidBytes<5>(selected);
+    }
+
+    inline void BuildClear(WorldPacket& out, ObjectGuid owner)
+    {
+        // Reader sub_6F2392 and terminal sub_820714 identify this GUID as the
+        // unit whose client-side threat state is cleared.
+        out.Initialize(SMSG_THREAT_CLEAR, 9);
+        out.WriteGuidMask<6, 7, 4, 5, 2, 1, 0, 3>(owner);
+        out.WriteGuidBytes<7, 0, 4, 3, 2, 1, 6, 5>(owner);
+    }
+
+    inline void BuildRemove(WorldPacket& out, ObjectGuid owner,
+        ObjectGuid removed)
+    {
+        // Reader sub_6DBFD5 gives terminal sub_8206E1 the threatened unit
+        // first and the removed target second.
+        out.Initialize(SMSG_THREAT_REMOVE, 18);
+        out.WriteGuidMask<0, 1, 5>(owner);
+        out.WriteGuidMask<4, 0>(removed);
+        out.WriteGuidMask<4, 6>(owner);
+        out.WriteGuidMask<7, 6, 3>(removed);
+        out.WriteGuidMask<2>(owner);
+        out.WriteGuidMask<1>(removed);
+        out.WriteGuidMask<3, 7>(owner);
+        out.WriteGuidMask<5, 2>(removed);
+        out.FlushBits();
+
+        out.WriteGuidBytes<3, 0, 2>(removed);
+        out.WriteGuidBytes<5, 4, 7, 3, 0>(owner);
+        out.WriteGuidBytes<4>(removed);
+        out.WriteGuidBytes<1>(owner);
+        out.WriteGuidBytes<1>(removed);
+        out.WriteGuidBytes<6>(owner);
+        out.WriteGuidBytes<7, 6>(removed);
+        out.WriteGuidBytes<2>(owner);
+        out.WriteGuidBytes<5>(removed);
     }
 }
 

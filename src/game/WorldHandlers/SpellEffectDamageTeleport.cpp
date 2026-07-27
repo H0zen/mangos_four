@@ -127,10 +127,12 @@ void Spell::EffectInstaKill(SpellEffectEntry const* /*effect*/)
 
     WorldObject* caster = GetCastingObject();               // we need the original casting object
 
-    WorldPacket data(SMSG_SPELLINSTAKILLLOG, (8 + 8 + 4));
-    data << (caster && caster->GetTypeId() != TYPEID_GAMEOBJECT ? m_caster->GetObjectGuid() : ObjectGuid()); // Caster GUID
-    data << unitTarget->GetObjectGuid();                    // Victim GUID
-    data << uint32(m_spellInfo->ID);
+    MopCombatLogPackets::SpellInstakillLog log = {};
+    log.casterGuid = (caster && caster->GetTypeId() != TYPEID_GAMEOBJECT ? m_caster->GetObjectGuid() : ObjectGuid()).GetRawValue();
+    log.victimGuid = unitTarget->GetObjectGuid().GetRawValue();
+    log.spellId = m_spellInfo->ID;
+    WorldPacket data(SMSG_SPELLINSTAKILLLOG, 20);
+    MopCombatLogPackets::BuildSpellInstakillLog(data, log);
     m_caster->SendMessageToSet(&data, true);
 
     m_caster->DealDamage(unitTarget, unitTarget->GetHealth(), NULL, DIRECT_DAMAGE, SPELL_SCHOOL_MASK_NORMAL, m_spellInfo, false);

@@ -161,6 +161,16 @@ void ObjectMgr::LoadCreatureInvolvedRelations()
 {
     LoadQuestRelationsHelper(m_CreatureQuestInvolvedRelations, QA_CREATURE, QR_END);
 
+    // Inverse view for CMSG_QUEST_NPC_QUERY, which asks by quest rather than
+    // by creature. Built from the same rows, so it cannot drift from them and
+    // needs no additional query or table-name coupling.
+    m_QuestEnderCreatures.clear();
+    for (QuestRelationsMap::const_iterator itr = m_CreatureQuestInvolvedRelations.begin();
+         itr != m_CreatureQuestInvolvedRelations.end(); ++itr)
+    {
+        m_QuestEnderCreatures.insert(QuestRelationsMap::value_type(itr->second, itr->first));
+    }
+
     for (QuestRelationsMap::iterator itr = m_CreatureQuestInvolvedRelations.begin(); itr != m_CreatureQuestInvolvedRelations.end(); ++itr)
     {
         CreatureInfo const* cInfo = GetCreatureTemplate(itr->first);

@@ -97,6 +97,18 @@ static void TestAreaTriggerNoCorpse()
     CHECK(packet.empty());
 }
 
+static void TestExplorationExperience()
+{
+    WorldPacket packet;
+    MopAreaTriggerPackets::BuildExplorationExperience(packet,
+        0x11223344u, 0xA1B2C3D4u);
+    CHECK(packet.GetOpcode() == SMSG_EXPLORATION_EXPERIENCE);
+    CheckBytes(packet, {
+        0x44, 0x33, 0x22, 0x11,
+        0xD4, 0xC3, 0xB2, 0xA1,
+    });
+}
+
 static void TestQuestgiverStatusMultipleRequest()
 {
     WorldPacket empty(CMSG_QUESTGIVER_STATUS_MULTIPLE_QUERY, 0);
@@ -228,6 +240,7 @@ static void TestOpcodeValues()
 {
     CHECK(uint32_t(CMSG_AREATRIGGER) == 0x1C44u);
     CHECK(uint32_t(SMSG_AREA_TRIGGER_NO_CORPSE) == 0x089Eu);
+    CHECK(uint32_t(SMSG_EXPLORATION_EXPERIENCE) == 0x189Au);
     CHECK(uint32_t(CMSG_NPC_TEXT_QUERY) == 0x0287u);
     CHECK(uint32_t(SMSG_NPC_TEXT_UPDATE) == 0x140Au);
     CHECK(uint32_t(CMSG_QUESTGIVER_STATUS_MULTIPLE_QUERY) == 0x02F1u);
@@ -238,6 +251,7 @@ int main(int /*argc*/, char** /*argv*/)
 {
     TestAreaTriggerRequest();
     TestAreaTriggerNoCorpse();
+    TestExplorationExperience();
     TestQuestgiverStatusMultipleRequest();
     TestQuestgiverStatusMultipleResponse();
     TestNpcTextRequest();

@@ -352,6 +352,238 @@ static void test_cancel_combat()
     CHECK(uint32_t(packet.GetOpcode()) == 0x0E8Bu);
 }
 
+static void test_party_kill_log()
+{
+    WorldPacket packet;
+    MopCompactPackets::BuildPartyKillLog(
+        packet,
+        ObjectGuid(UINT64_C(0x8877665544332211)),
+        ObjectGuid(UINT64_C(0xFFEEDDCCBBAA9901)));
+    CHECK(packet.GetOpcode() == SMSG_PARTYKILLLOG);
+    CHECK(BytesEqual(packet, {
+        0xFF, 0xFF,
+        0x00, 0xDC, 0x10, 0x32,
+        0xFE, 0xEF, 0x98, 0xCD,
+        0x54, 0x23, 0xAB, 0x76,
+        0x45, 0x67, 0x89, 0xBA,
+    }));
+}
+
+static void test_duel_state_packets()
+{
+    WorldPacket outOfBounds;
+    MopDuelPackets::BuildOutOfBounds(outOfBounds);
+    CHECK(outOfBounds.GetOpcode() == SMSG_DUEL_OUTOFBOUNDS);
+    CHECK(outOfBounds.empty());
+
+    WorldPacket inBounds;
+    MopDuelPackets::BuildInBounds(inBounds);
+    CHECK(inBounds.GetOpcode() == SMSG_DUEL_INBOUNDS);
+    CHECK(inBounds.empty());
+
+    WorldPacket completed;
+    MopDuelPackets::BuildComplete(completed, true);
+    CHECK(completed.GetOpcode() == SMSG_DUEL_COMPLETE);
+    CHECK(BytesEqual(completed, { 0x80 }));
+
+    WorldPacket interrupted;
+    MopDuelPackets::BuildComplete(interrupted, false);
+    CHECK(BytesEqual(interrupted, { 0x00 }));
+
+    WorldPacket countdown;
+    MopDuelPackets::BuildCountdown(countdown, 0x12345678u);
+    CHECK(countdown.GetOpcode() == SMSG_DUEL_COUNTDOWN);
+    CHECK(BytesEqual(countdown, { 0x78, 0x56, 0x34, 0x12 }));
+}
+
+static void test_duel_request_and_winner_packets()
+{
+    WorldPacket requested;
+    MopDuelPackets::BuildRequested(
+        requested,
+        ObjectGuid(UINT64_C(0x0807060504030201)),
+        ObjectGuid(UINT64_C(0x100F0E0D0C0B0A09)));
+    CHECK(requested.GetOpcode() == SMSG_DUEL_REQUESTED);
+    CHECK(BytesEqual(requested, {
+        0xFF, 0xFF,
+        0x07, 0x05, 0x11, 0x0C,
+        0x09, 0x0D, 0x0E, 0x08,
+        0x04, 0x0A, 0x0B, 0x00,
+        0x02, 0x06, 0x03, 0x0F,
+    }));
+
+    WorldPacket winner;
+    CHECK(MopDuelPackets::BuildWinner(
+        winner, false, "Winner", 0x10203040u, "Loser", 0xA1B2C3D4u));
+    CHECK(winner.GetOpcode() == SMSG_DUEL_WINNER);
+    CHECK(BytesEqual(winner, {
+        0x0C, 0x28,
+        0xD4, 0xC3, 0xB2, 0xA1,
+        'W', 'i', 'n', 'n', 'e', 'r',
+        0x40, 0x30, 0x20, 0x10,
+        'L', 'o', 's', 'e', 'r',
+    }));
+
+    WorldPacket retreat;
+    CHECK(MopDuelPackets::BuildWinner(
+        retreat, true, "Winner", 0x10203040u, "Loser", 0xA1B2C3D4u));
+    CHECK(retreat[0] == 0x8C);
+
+    WorldPacket maximum;
+    CHECK(MopDuelPackets::BuildWinner(
+        maximum, false, std::string(63, 'W'), 1, std::string(63, 'L'), 2));
+    WorldPacket tooLong;
+    CHECK(!MopDuelPackets::BuildWinner(
+        tooLong, false, std::string(64, 'W'), 1, "L", 2));
+    CHECK(tooLong.empty());
+}
+
+static void test_mirror_timer_packets()
+{
+    WorldPacket started;
+    MopMirrorTimerPackets::BuildStart(
+        started, 0xDDEEFF00u, 0x11223344u, 0x99AABBCCu,
+        int32_t(-2), 0x55667788u, true);
+    CHECK(started.GetOpcode() == SMSG_START_MIRROR_TIMER);
+    CHECK(BytesEqual(started, {
+        0x44, 0x33, 0x22, 0x11,
+        0x88, 0x77, 0x66, 0x55,
+        0xCC, 0xBB, 0xAA, 0x99,
+        0xFE, 0xFF, 0xFF, 0xFF,
+        0x00, 0xFF, 0xEE, 0xDD,
+        0x80,
+    }));
+
+    WorldPacket running;
+    MopMirrorTimerPackets::BuildStart(
+        running, 1, 1000, 750, -1, 0, false);
+    CHECK(running[20] == 0x00);
+
+    WorldPacket stopped;
+    MopMirrorTimerPackets::BuildStop(stopped, 0x12345678u);
+    CHECK(stopped.GetOpcode() == SMSG_STOP_MIRROR_TIMER);
+    CHECK(BytesEqual(stopped, { 0x78, 0x56, 0x34, 0x12 }));
+}
+
+static void test_rune_packets()
+{
+    std::array<MopRunePackets::RuneState, MAX_RUNES> const runes = {{
+        { RUNE_BLOOD, 0x10 },
+        { RUNE_BLOOD, 0x20 },
+        { RUNE_UNHOLY, 0x30 },
+        { RUNE_UNHOLY, 0x40 },
+        { RUNE_FROST, 0x50 },
+        { RUNE_DEATH, 0x60 },
+    }};
+
+    WorldPacket resync;
+    MopRunePackets::BuildResync(resync, runes);
+    CHECK(resync.GetOpcode() == SMSG_RESYNC_RUNES);
+    CHECK(BytesEqual(resync, {
+        0x00, 0x00, 0x0C,
+        0x10, 0x00, 0x20, 0x00,
+        0x30, 0x01, 0x40, 0x01,
+        0x50, 0x02, 0x60, 0x03,
+    }));
+
+    WorldPacket power;
+    MopRunePackets::BuildAddPower(power, 0x20u);
+    CHECK(power.GetOpcode() == SMSG_ADD_RUNE_POWER);
+    CHECK(BytesEqual(power, { 0x20, 0x00, 0x00, 0x00 }));
+
+    WorldPacket converted;
+    MopRunePackets::BuildConvert(converted, RUNE_DEATH, 4);
+    CHECK(converted.GetOpcode() == SMSG_CONVERT_RUNE);
+    CHECK(BytesEqual(converted, { 0x03, 0x04 }));
+}
+
+static void test_threat_packets()
+{
+    ObjectGuid const owner(UINT64_C(0x0807060504030201));
+    ObjectGuid const selected(UINT64_C(0x100F0E0D0C0B0A09));
+    MopThreatPackets::ThreatEntries const entries = {{
+        ObjectGuid(UINT64_C(0x1817161514131211)), 0xA1B2C3D4u
+    }};
+
+    WorldPacket update;
+    MopThreatPackets::BuildUpdate(update, owner, entries);
+    CHECK(update.GetOpcode() == SMSG_THREAT_UPDATE);
+    CHECK(BytesEqual(update, {
+        0xFE, 0x00, 0x00, 0x1F, 0xF8,
+        0x16, 0x19, 0x10, 0x13, 0x12, 0x17, 0x15, 0x14,
+        0xD4, 0xC3, 0xB2, 0xA1,
+        0x03, 0x04, 0x02, 0x05, 0x07, 0x06, 0x00, 0x09,
+    }));
+
+    WorldPacket highest;
+    MopThreatPackets::BuildHighest(highest, owner, selected, entries);
+    CHECK(highest.GetOpcode() == SMSG_HIGHEST_THREAT_UPDATE);
+    CHECK(BytesEqual(highest, {
+        0xFF, 0xF8, 0x00, 0x00, 0x7F, 0xF8,
+        0x04, 0x16, 0xD4, 0xC3, 0xB2, 0xA1,
+        0x14, 0x10, 0x15, 0x17, 0x12, 0x13, 0x19,
+        0x0D, 0x07, 0x0A, 0x03, 0x00, 0x02, 0x0E, 0x0B,
+        0x09, 0x08, 0x0C, 0x11, 0x05, 0x06, 0x0F,
+    }));
+
+    WorldPacket clear;
+    MopThreatPackets::BuildClear(clear, owner);
+    CHECK(clear.GetOpcode() == SMSG_THREAT_CLEAR);
+    CHECK(BytesEqual(clear, {
+        0xFF, 0x09, 0x00, 0x04, 0x05, 0x02, 0x03, 0x06, 0x07,
+    }));
+
+    WorldPacket remove;
+    MopThreatPackets::BuildRemove(remove, owner, selected);
+    CHECK(remove.GetOpcode() == SMSG_THREAT_REMOVE);
+    CHECK(BytesEqual(remove, {
+        0xFF, 0xFF, 0x0D, 0x08, 0x0A, 0x07, 0x04, 0x09, 0x05,
+        0x00, 0x0C, 0x03, 0x0B, 0x06, 0x11, 0x0E, 0x02, 0x0F,
+    }));
+}
+
+static void test_dismount_packet()
+{
+    WorldPacket packet;
+    MopCompactPackets::BuildDismount(
+        packet, ObjectGuid(UINT64_C(0x0807060504030201)));
+    CHECK(packet.GetOpcode() == SMSG_DISMOUNT);
+    CHECK(BytesEqual(packet, {
+        0xFF, 0x05, 0x06, 0x09, 0x07, 0x03, 0x04, 0x02, 0x00,
+    }));
+}
+
+static void test_combo_points_packet()
+{
+    WorldPacket packet;
+    MopComboPointPackets::BuildUpdate(
+        packet, ObjectGuid(UINT64_C(0x0807060504030201)), 5);
+    CHECK(packet.GetOpcode() == SMSG_UPDATE_COMBO_POINTS);
+    CHECK(BytesEqual(packet, {
+        0xFF, 0x07, 0x06, 0x04, 0x09, 0x05, 0x00, 0x05, 0x02, 0x03,
+    }));
+}
+
+static void test_pre_resurrect_packet()
+{
+    WorldPacket packet;
+    MopCompactPackets::BuildPreResurrect(
+        packet, ObjectGuid(UINT64_C(0x0807060504030201)));
+    CHECK(packet.GetOpcode() == SMSG_PRE_RESURRECT);
+    CHECK(BytesEqual(packet, {
+        0xFF, 0x07, 0x03, 0x09, 0x00, 0x06, 0x04, 0x02, 0x05,
+    }));
+
+    // A zero byte clears its mask bit and is omitted entirely, so the body
+    // shortens. Guards against writing a fixed nine-byte body.
+    WorldPacket sparse;
+    MopCompactPackets::BuildPreResurrect(
+        sparse, ObjectGuid(UINT64_C(0x0000060000030001)));
+    CHECK(BytesEqual(sparse, {
+        0x34, 0x07, 0x00, 0x02,
+    }));
+}
+
 static void test_opcode_values_are_framable()
 {
     CHECK(uint32_t(SMSG_ATTACKSWING_ERROR) == 0x11E1u);
@@ -364,6 +596,25 @@ static void test_opcode_values_are_framable()
     CHECK(uint32_t(SMSG_ATTACKSTOP) == 0x12AFu);
     CHECK(uint32_t(SMSG_ATTACKERSTATEUPDATE) == 0x06AAu);
     CHECK(uint32_t(SMSG_CANCEL_COMBAT) == 0x0E8Bu);
+    CHECK(uint32_t(SMSG_PARTYKILLLOG) == 0x048Au);
+    CHECK(uint32_t(SMSG_DUEL_OUTOFBOUNDS) == 0x001Au);
+    CHECK(uint32_t(SMSG_DUEL_INBOUNDS) == 0x163Au);
+    CHECK(uint32_t(SMSG_DUEL_COMPLETE) == 0x1C0Au);
+    CHECK(uint32_t(SMSG_DUEL_COUNTDOWN) == 0x129Fu);
+    CHECK(uint32_t(SMSG_DUEL_REQUESTED) == 0x0022u);
+    CHECK(uint32_t(SMSG_DUEL_WINNER) == 0x10E1u);
+    CHECK(uint32_t(SMSG_START_MIRROR_TIMER) == 0x0E12u);
+    CHECK(uint32_t(SMSG_STOP_MIRROR_TIMER) == 0x1026u);
+    CHECK(uint32_t(SMSG_RESYNC_RUNES) == 0x15E3u);
+    CHECK(uint32_t(SMSG_ADD_RUNE_POWER) == 0x1860u);
+    CHECK(uint32_t(SMSG_CONVERT_RUNE) == 0x1A1Bu);
+    CHECK(uint32_t(SMSG_THREAT_UPDATE) == 0x0632u);
+    CHECK(uint32_t(SMSG_HIGHEST_THREAT_UPDATE) == 0x14AEu);
+    CHECK(uint32_t(SMSG_THREAT_CLEAR) == 0x180Bu);
+    CHECK(uint32_t(SMSG_THREAT_REMOVE) == 0x1960u);
+    CHECK(uint32_t(SMSG_DISMOUNT) == 0x0E3Au);
+    CHECK(uint32_t(SMSG_PRE_RESURRECT) == 0x19C0u);
+    CHECK(uint32_t(SMSG_UPDATE_COMBO_POINTS) == 0x082Fu);
 
     CHECK(uint32_t(SMSG_ATTACKSWING_ERROR) <= 0x1FFFu);
     CHECK(uint32_t(SMSG_MOVE_SET_SWIM_SPEED) <= 0x1FFFu);
@@ -375,6 +626,25 @@ static void test_opcode_values_are_framable()
     CHECK(uint32_t(SMSG_ATTACKSTOP) <= 0x1FFFu);
     CHECK(uint32_t(SMSG_ATTACKERSTATEUPDATE) <= 0x1FFFu);
     CHECK(uint32_t(SMSG_CANCEL_COMBAT) <= 0x1FFFu);
+    CHECK(uint32_t(SMSG_PARTYKILLLOG) <= 0x1FFFu);
+    CHECK(uint32_t(SMSG_DUEL_OUTOFBOUNDS) <= 0x1FFFu);
+    CHECK(uint32_t(SMSG_DUEL_INBOUNDS) <= 0x1FFFu);
+    CHECK(uint32_t(SMSG_DUEL_COMPLETE) <= 0x1FFFu);
+    CHECK(uint32_t(SMSG_DUEL_COUNTDOWN) <= 0x1FFFu);
+    CHECK(uint32_t(SMSG_DUEL_REQUESTED) <= 0x1FFFu);
+    CHECK(uint32_t(SMSG_DUEL_WINNER) <= 0x1FFFu);
+    CHECK(uint32_t(SMSG_START_MIRROR_TIMER) <= 0x1FFFu);
+    CHECK(uint32_t(SMSG_STOP_MIRROR_TIMER) <= 0x1FFFu);
+    CHECK(uint32_t(SMSG_RESYNC_RUNES) <= 0x1FFFu);
+    CHECK(uint32_t(SMSG_ADD_RUNE_POWER) <= 0x1FFFu);
+    CHECK(uint32_t(SMSG_CONVERT_RUNE) <= 0x1FFFu);
+    CHECK(uint32_t(SMSG_THREAT_UPDATE) <= 0x1FFFu);
+    CHECK(uint32_t(SMSG_HIGHEST_THREAT_UPDATE) <= 0x1FFFu);
+    CHECK(uint32_t(SMSG_THREAT_CLEAR) <= 0x1FFFu);
+    CHECK(uint32_t(SMSG_THREAT_REMOVE) <= 0x1FFFu);
+    CHECK(uint32_t(SMSG_DISMOUNT) <= 0x1FFFu);
+    CHECK(uint32_t(SMSG_PRE_RESURRECT) <= 0x1FFFu);
+    CHECK(uint32_t(SMSG_UPDATE_COMBO_POINTS) <= 0x1FFFu);
 }
 
 int main(int /*argc*/, char** /*argv*/)
@@ -388,6 +658,15 @@ int main(int /*argc*/, char** /*argv*/)
     test_raid_difficulty();
     test_dungeon_difficulty();
     test_cancel_combat();
+    test_party_kill_log();
+    test_duel_state_packets();
+    test_duel_request_and_winner_packets();
+    test_mirror_timer_packets();
+    test_rune_packets();
+    test_threat_packets();
+    test_dismount_packet();
+    test_pre_resurrect_packet();
+    test_combo_points_packet();
     test_opcode_values_are_framable();
 
     if (g_fail)

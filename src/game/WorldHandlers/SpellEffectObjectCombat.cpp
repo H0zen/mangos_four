@@ -360,9 +360,9 @@ void Spell::EffectDuel(SpellEffectEntry const* effect)
     // END
 
     // Send request
-    WorldPacket data(SMSG_DUEL_REQUESTED, 8 + 8);
-    data << pGameObj->GetObjectGuid();
-    data << caster->GetObjectGuid();
+    WorldPacket data;
+    MopDuelPackets::BuildRequested(
+        data, pGameObj->GetObjectGuid(), caster->GetObjectGuid());
     caster->GetSession()->SendPacket(&data);
     target->GetSession()->SendPacket(&data);
 

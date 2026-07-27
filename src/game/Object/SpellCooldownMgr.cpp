@@ -160,9 +160,8 @@ void SpellCooldownMgr::SendCooldownEvent(SpellEntry const* spellInfo, uint32 ite
     AddSpellAndCategoryCooldowns(spellInfo, itemId, spell);
 
     // Send activate cooldown timer (possible 0) at client side
-    WorldPacket data(SMSG_COOLDOWN_EVENT, (4 + 8));
-    data << uint32(spellInfo->ID);
-    data << m_owner->GetObjectGuid();
+    WorldPacket data;
+    MopSpellPackets::BuildCooldownEvent(data, m_owner->GetObjectGuid(), spellInfo->ID);
     m_owner->SendDirectMessage(&data);
 }
 

@@ -328,6 +328,16 @@ namespace MopQueryPackets
         std::vector<uint32>& questIds);
     bool BuildQuestPoiQueryResponse(WorldPacket& out,
         std::vector<QuestPoiResponse> const& response);
+
+    struct QuestNpcResponse
+    {
+        uint32 questId = 0;
+        std::vector<uint32> npcIds;
+    };
+
+    bool ParseQuestNpcQueryRequest(WorldPacket& in, uint32& questId);
+    bool BuildQuestNpcQueryResponse(WorldPacket& out,
+        std::vector<QuestNpcResponse> const& response);
 }
 
 namespace MopStablePackets
@@ -946,6 +956,56 @@ inline bool MopQueryPackets::BuildQuestPoiQueryResponse(WorldPacket& out,
         built << uint32(quest.pois.size());
     }
     built << uint32(response.size());
+
+    out = built;
+    return true;
+}
+
+inline bool MopQueryPackets::ParseQuestNpcQueryRequest(WorldPacket& in,
+    uint32& questId)
+{
+    if (in.size() < 4)
+        return false;
+
+    // The 18414 client always sends a 204-byte body but initialises only the
+    // leading quest id; the remainder is uninitialised client stack memory
+    // (on the 64-bit client, image pointers identical across a whole run).
+    // Read the one defined field and deliberately ignore the rest rather than
+    // validating a length the client does not actually populate.
+    in.rpos(0);
+    in >> questId;
+    in.rpos(in.size());
+    return true;
+}
+
+inline bool MopQueryPackets::BuildQuestNpcQueryResponse(WorldPacket& out,
+    std::vector<QuestNpcResponse> const& response)
+{
+    if (response.size() >= (size_t(1) << 21))
+        return false;
+
+    for (QuestNpcResponse const& quest : response)
+    {
+        if (quest.npcIds.size() >= (size_t(1) << 22))
+            return false;
+    }
+
+    // Grammar from client parser sub_6B8B3B -> sub_6B8A06: a 21-bit quest
+    // count, then one 22-bit NPC count per quest, then a byte-aligned phase
+    // of quest id followed by that quest's NPC ids. Confirmed against real
+    // 18414 retail captures, which decode byte-exact under this reader.
+    WorldPacket built(SMSG_QUEST_NPC_QUERY_RESPONSE, 4);
+    built.WriteBits(uint32(response.size()), 21);
+    for (QuestNpcResponse const& quest : response)
+        built.WriteBits(uint32(quest.npcIds.size()), 22);
+    built.FlushBits();
+
+    for (QuestNpcResponse const& quest : response)
+    {
+        built << quest.questId;
+        for (uint32 npcId : quest.npcIds)
+            built << npcId;
+    }
 
     out = built;
     return true;
@@ -2133,6 +2193,7 @@ class WorldSession
         void HandleUITimeRequestOpcode(WorldPacket& recv_data);
         void HandleReadyForAccountDataTimesOpcode(WorldPacket& recv_data);
         void HandleQuestPOIQueryOpcode(WorldPacket& recv_data);
+        void HandleQuestNpcQueryOpcode(WorldPacket& recv_data);
         void HandleSetCurrencyFlagsOpcode(WorldPacket& recv_data);
 
         // Reforge

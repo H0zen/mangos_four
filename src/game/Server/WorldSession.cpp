@@ -335,18 +335,29 @@ static bool IsEnterWorldConverted(uint16 opcode)
         case SMSG_SPELL_PERIODIC_AURA_LOG:         // MopCombatLogPackets::BuildPeriodicAuraLog
         case SMSG_SPELLDISPELLOG:                  // MopCombatLogPackets::BuildDispelLog
         case SMSG_SPELLINTERRUPTLOG:               // MopCombatLogPackets::BuildSpellInterruptLog
+        case SMSG_SPELLINSTAKILLLOG:               // MopCombatLogPackets::BuildSpellInstakillLog
+        case SMSG_SPELLENERGIZELOG:                // MopCombatLogPackets::BuildSpellEnergizeLog
+        case SMSG_SPELLHEALLOG:                    // MopCombatLogPackets::BuildSpellHealLog
+        case SMSG_SPELLDAMAGESHIELD:               // MopCombatLogPackets::BuildSpellDamageShieldLog
+        case SMSG_SPELLLOGMISS:                    // MopCombatLogPackets::BuildSpellMissLog
         case SMSG_CAST_FAILED:                     // MopSpellPackets::BuildCastFailed
         case SMSG_PET_CAST_FAILED:                 // MopSpellPackets::BuildCastFailed (pet bit order)
         case SMSG_SPELL_START:                     // MopSpellPackets::BuildSpellStart
         case SMSG_SPELL_GO:                        // MopSpellPackets::BuildSpellGo
         case SMSG_SPELL_COOLDOWN:                  // MopSpellPackets::BuildSpellCooldown
         case SMSG_CLEAR_COOLDOWNS:                 // MopSpellPackets::BuildClearCooldowns
+        case SMSG_COOLDOWN_EVENT:                  // MopSpellPackets::BuildCooldownEvent
+        case SMSG_ITEM_COOLDOWN:                   // MopSpellPackets::BuildItemCooldown
+        case SMSG_CLEAR_TARGET:                    // MopSpellPackets::BuildClearTarget
         case SMSG_LEARNED_SPELL:                   // MopSpellPackets::BuildLearnedSpell
         case SMSG_REMOVED_SPELL:                   // MopSpellPackets::BuildRemovedSpell
         case SMSG_SUPERCEDED_SPELL:                // MopSpellPackets::BuildSupersededSpell
         case SMSG_PET_LEARNED_SPELL:               // MopSpellPackets::BuildPetLearnedSpell
         case SMSG_PET_REMOVED_SPELL:               // MopSpellPackets::BuildPetRemovedSpell
         case SMSG_MESSAGECHAT:                     // MopChatPackets::BuildMessage
+        case SMSG_CHAT_PLAYER_NOT_FOUND:            // MopChatPackets::BuildPlayerNotFound
+        case SMSG_CHAT_PLAYER_AMBIGUOUS:            // MopChatPackets::BuildPlayerAmbiguous
+        case SMSG_CHAT_RESTRICTED:                  // MopChatPackets::BuildChatRestrictedNotice
         case SMSG_CHANNEL_NOTIFY:                  // MopChannelPackets direct 18414 subtype serializers
         case SMSG_CHANNEL_LIST:                    // MopChannelPackets::BuildList
         case SMSG_TEXT_EMOTE:                      // MopChatPackets::BuildTextEmote
@@ -358,6 +369,27 @@ static bool IsEnterWorldConverted(uint16 opcode)
         case SMSG_ATTACKSTART:                     // MopCompactPackets::BuildAttackStart
         case SMSG_ATTACKSTOP:                      // MopCompactPackets::BuildAttackStop
         case SMSG_ATTACKERSTATEUPDATE:             // nested UnitCombat_C record; reader sub_858A94
+        case SMSG_PARTYKILLLOG:                    // MopCompactPackets::BuildPartyKillLog
+        case SMSG_DUEL_OUTOFBOUNDS:                // MopDuelPackets::BuildOutOfBounds
+        case SMSG_DUEL_INBOUNDS:                   // MopDuelPackets::BuildInBounds
+        case SMSG_DUEL_COMPLETE:                    // MopDuelPackets::BuildComplete
+        case SMSG_DUEL_COUNTDOWN:                   // MopDuelPackets::BuildCountdown
+        case SMSG_DUEL_REQUESTED:                   // MopDuelPackets::BuildRequested
+        case SMSG_DUEL_WINNER:                      // MopDuelPackets::BuildWinner
+        case SMSG_START_MIRROR_TIMER:                // MopMirrorTimerPackets::BuildStart
+        case SMSG_STOP_MIRROR_TIMER:                 // MopMirrorTimerPackets::BuildStop
+        case SMSG_CHANNEL_START:                     // MopSpellPackets::BuildChannelStart
+        case SMSG_CHANNEL_UPDATE:                    // MopSpellPackets::BuildChannelUpdate
+        case SMSG_RESYNC_RUNES:                      // MopRunePackets::BuildResync
+        case SMSG_ADD_RUNE_POWER:                    // MopRunePackets::BuildAddPower
+        case SMSG_CONVERT_RUNE:                      // MopRunePackets::BuildConvert
+        case SMSG_THREAT_UPDATE:                     // MopThreatPackets::BuildUpdate
+        case SMSG_HIGHEST_THREAT_UPDATE:             // MopThreatPackets::BuildHighest
+        case SMSG_THREAT_CLEAR:                      // MopThreatPackets::BuildClear
+        case SMSG_THREAT_REMOVE:                     // MopThreatPackets::BuildRemove
+        case SMSG_DISMOUNT:                          // MopCompactPackets::BuildDismount
+        case SMSG_PRE_RESURRECT:                     // MopCompactPackets::BuildPreResurrect
+        case SMSG_UPDATE_COMBO_POINTS:               // MopComboPointPackets::BuildUpdate
         case SMSG_CANCEL_COMBAT:                   // Empty reader; terminal clears local-player combat state
         case SMSG_CANCEL_AUTO_REPEAT:              // packed unit GUID; Unit_C leaf 0x819546 clears auto-repeat
         case SMSG_AI_REACTION:                     // packed unit GUID plus reaction; Unit_C.cpp leaf 0x80AD80
@@ -396,6 +428,9 @@ static bool IsEnterWorldConverted(uint16 opcode)
         case SMSG_FISH_ESCAPED:                    // empty; direct terminal leaf displays ERR_FISH_ESCAPED
         case SMSG_FISH_NOT_HOOKED:                 // empty; direct terminal leaf displays ERR_FISH_NOT_HOOKED
         case SMSG_AREA_TRIGGER_NO_CORPSE:           // MopAreaTriggerPackets::BuildNoCorpse
+        case SMSG_EXPLORATION_EXPERIENCE:           // MopAreaTriggerPackets::BuildExplorationExperience
+        case SMSG_LOG_XPGAIN:                       // MopProgressionPackets::BuildExperienceGain
+        case SMSG_LEVELUP_INFO:                     // MopProgressionPackets::BuildLevelUpInfo
         case SMSG_QUESTGIVER_STATUS_MULTIPLE:       // MopQuestStatusPackets::BuildMultipleStatus
         case SMSG_QUESTGIVER_QUEST_LIST:            // MopQuestGiverPackets::BuildQuestList
         case SMSG_QUESTGIVER_QUEST_DETAILS:         // MopQuestGiverPackets::BuildQuestDetails
@@ -410,6 +445,7 @@ static bool IsEnterWorldConverted(uint16 opcode)
         case SMSG_QUESTUPDATE_COMPLETE:             // MopQuestGiverPackets::BuildQuestUpdateComplete
         case SMSG_QUEST_QUERY_RESPONSE:              // MopQuestQueryPackets::BuildResponse / BuildAbsentResponse
         case SMSG_QUEST_POI_QUERY_RESPONSE:          // MopQueryPackets::BuildQuestPoiQueryResponse
+        case SMSG_QUEST_NPC_QUERY_RESPONSE:          // MopQueryPackets::BuildQuestNpcQueryResponse
         case SMSG_NPC_TEXT_UPDATE:                  // MopNpcTextPackets::BuildResponse
         case SMSG_CHAR_CUSTOMIZE:                  // MopCharacterCustomizePackets::BuildResponse
             return true;
@@ -426,6 +462,7 @@ static bool IsEnterWorldConverted(uint16 opcode)
         case SMSG_CORPSE_QUERY_RESPONSE:     // MopQueryPackets::BuildCorpseQueryResponse
         case SMSG_CORPSE_MAP_POSITION_QUERY_RESPONSE: // MopQueryPackets::BuildCorpseMapPositionQueryResponse
         case SMSG_DEATH_RELEASE_LOC:         // MopDeathPackets::BuildDeathReleaseLocation
+        case SMSG_DURABILITY_DAMAGE_DEATH:   // MopDeathPackets::BuildDurabilityDamageDeath
         case SMSG_REQUEST_CEMETERY_LIST_RESPONSE: // MopDeathPackets::BuildCemeteryListResponse
         case SMSG_BATTLE_PET_JOURNAL:        // MopBattlePetPackets::BuildEmptyJournal
         case SMSG_QUEST_CONFIRM_ACCEPT:      // MopQuestPackets::BuildQuestConfirmAccept

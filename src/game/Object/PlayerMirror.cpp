@@ -99,13 +99,9 @@ void Player::SendMirrorTimer(MirrorTimerType Type, uint32 MaxValue, uint32 Curre
         }
         return;
     }
-    WorldPacket data(SMSG_START_MIRROR_TIMER, (21));
-    data << (uint32)Type;
-    data << CurrentValue;
-    data << MaxValue;
-    data << Regen;
-    data << (uint8)0;
-    data << (uint32)0; // Spell ID
+    WorldPacket data;
+    MopMirrorTimerPackets::BuildStart(
+        data, uint32(Type), MaxValue, CurrentValue, Regen, 0, false);
     GetSession()->SendPacket(&data);
 }
 
@@ -117,8 +113,8 @@ void Player::SendMirrorTimer(MirrorTimerType Type, uint32 MaxValue, uint32 Curre
 void Player::StopMirrorTimer(MirrorTimerType Type)
 {
     m_MirrorTimer[Type] = DISABLED_MIRROR_TIMER;
-    WorldPacket data(SMSG_STOP_MIRROR_TIMER, 4);
-    data << (uint32)Type;
+    WorldPacket data;
+    MopMirrorTimerPackets::BuildStop(data, uint32(Type));
     GetSession()->SendPacket(&data);
 }
 
@@ -175,7 +171,8 @@ uint32 Player::EnvironmentalDamage(EnviromentalDamage type, uint32 damage)
             DEBUG_LOG("We fell to death, losing 10 percent durability");
             DurabilityLossAll(0.10f, false);
             // durability lost message
-            WorldPacket data2(SMSG_DURABILITY_DAMAGE_DEATH, 0);
+            WorldPacket data2;
+            MopDeathPackets::BuildDurabilityDamageDeath(data2);
             GetSession()->SendPacket(&data2);
         }
 

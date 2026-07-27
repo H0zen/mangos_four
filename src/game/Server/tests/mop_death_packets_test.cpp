@@ -85,6 +85,14 @@ static void test_opcode_is_framable()
     CHECK(uint32(SMSG_DEATH_RELEASE_LOC) < uint32(OPCODE_TABLE_SIZE));
 }
 
+static void test_durability_damage_death_is_empty()
+{
+    WorldPacket packet;
+    MopDeathPackets::BuildDurabilityDamageDeath(packet);
+    CHECK(packet.GetOpcode() == SMSG_DURABILITY_DAMAGE_DEATH);
+    CHECK(packet.empty());
+}
+
 static void test_empty_cemetery_list_response()
 {
     WorldPacket packet;
@@ -148,6 +156,7 @@ int main(int /*argc*/, char** /*argv*/)
     test_graveyard_location();
     test_clear_location();
     test_opcode_is_framable();
+    test_durability_damage_death_is_empty();
     test_empty_cemetery_list_response();
     test_cemetery_list_response();
     test_cemetery_list_response_is_bounded();

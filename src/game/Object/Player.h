@@ -635,6 +635,13 @@ namespace MopDeathPackets
 {
     static size_t const CEMETERY_LIST_MAX = 16;
 
+    inline void BuildDurabilityDamageDeath(WorldPacket& out)
+    {
+        // Wow.exe 18414 route 0x1E3E reaches sub_CE083A without consuming
+        // payload bytes and raises the retained DURABILITYDAMAGE_DEATH text.
+        out.Initialize(SMSG_DURABILITY_DAMAGE_DEATH, 0);
+    }
+
     inline void BuildDeathReleaseLocation(WorldPacket& out, uint32 mapId,
         float x, float y, float z)
     {
@@ -701,6 +708,187 @@ namespace MopReputationPackets
     }
 }
 
+namespace MopProgressionPackets
+{
+    struct ExperienceGain
+    {
+        ObjectGuid sourceGuid;
+        uint32 totalExperience = 0;
+        uint8 type = 0;
+        bool hasBaseExperience = false;
+        uint32 baseExperience = 0;
+    };
+
+    inline void BuildExperienceGain(WorldPacket& out,
+        ExperienceGain const& info)
+    {
+        out.Initialize(SMSG_LOG_XPGAIN, 19);
+
+        // Wow.exe 18414 reader sub_6F7E25 uses an inverted presence bit for
+        // base XP. The current backend has no group-rate or recruit-a-friend
+        // inputs, so their directly verified neutral bits are emitted here.
+        out.WriteBit(!info.hasBaseExperience);
+        out.WriteGuidMask<1, 2, 7, 4, 3>(info.sourceGuid);
+        out.WriteBit(false); // no recruit-a-friend bonus
+        out.WriteGuidMask<0, 5, 6>(info.sourceGuid);
+        out.WriteBit(true);  // default group rate 1.0; no float follows
+        out.FlushBits();
+
+        out.WriteGuidBytes<4, 2>(info.sourceGuid);
+        out << info.type;
+        out.WriteGuidBytes<7, 1, 3, 6>(info.sourceGuid);
+        out << info.totalExperience;
+        if (info.hasBaseExperience)
+            out << info.baseExperience;
+        out.WriteGuidBytes<0, 5>(info.sourceGuid);
+    }
+
+    struct LevelUpInfo
+    {
+        uint32 talentDelta = 0;
+        uint32 healthDelta = 0;
+        std::array<uint32, MAX_STATS> statDeltas = {{}};
+        uint32 level = 0;
+        std::array<uint32, MAX_STORED_POWERS> powerDeltas = {{}};
+    };
+
+    inline void BuildLevelUpInfo(WorldPacket& out, LevelUpInfo const& info)
+    {
+        out.Initialize(SMSG_LEVELUP_INFO, 13 * sizeof(uint32));
+
+        // Wow.exe 18414 reader sub_6BAC39 consumes thirteen uint32 values.
+        // Terminal sub_7B12E9 maps these slots to PLAYER_LEVEL_UP arguments.
+        out << info.talentDelta << info.healthDelta;
+        for (uint32 delta : info.statDeltas)
+            out << delta;
+        out << info.level;
+        for (uint32 delta : info.powerDeltas)
+            out << delta;
+    }
+}
+
+namespace MopComboPointPackets
+{
+    inline void BuildUpdate(WorldPacket& out, ObjectGuid target, uint8 points)
+    {
+        out.Initialize(SMSG_UPDATE_COMBO_POINTS, 10);
+
+        // Wow.exe 18414 reader sub_6E2BC4 consumes six target-GUID bytes,
+        // the raw combo-point byte, then the final two target-GUID bytes.
+        // Terminal sub_CCA14B publishes the recovered GUID/value pair.
+        out.WriteGuidMask<0, 5, 6, 3, 7, 4, 1, 2>(target);
+        out.WriteGuidBytes<5, 6, 4, 7, 3, 0>(target);
+        out << points;
+        out.WriteGuidBytes<2, 1>(target);
+    }
+}
+
+namespace MopDuelPackets
+{
+    inline void BuildRequested(WorldPacket& out, ObjectGuid arbiter,
+        ObjectGuid initiator)
+    {
+        out.Initialize(SMSG_DUEL_REQUESTED, 18);
+
+        // Reader sub_6CA34C interleaves the duel flag and initiator masks.
+        out.WriteGuidMask<5>(arbiter);
+        out.WriteGuidMask<4, 2, 7>(initiator);
+        out.WriteGuidMask<0>(arbiter);
+        out.WriteGuidMask<5>(initiator);
+        out.WriteGuidMask<4, 6>(arbiter);
+        out.WriteGuidMask<1, 3, 6>(initiator);
+        out.WriteGuidMask<7, 3, 2, 1>(arbiter);
+        out.WriteGuidMask<0>(initiator);
+        out.FlushBits();
+
+        out.WriteGuidBytes<5, 3>(arbiter);
+        out.WriteGuidBytes<7, 4>(initiator);
+        out.WriteGuidBytes<7>(arbiter);
+        out.WriteGuidBytes<3, 6, 0>(initiator);
+        out.WriteGuidBytes<4>(arbiter);
+        out.WriteGuidBytes<2, 1>(initiator);
+        out.WriteGuidBytes<0, 2, 6, 1>(arbiter);
+        out.WriteGuidBytes<5>(initiator);
+    }
+
+    inline void BuildOutOfBounds(WorldPacket& out)
+    {
+        // Wow.exe 18414 routes 0x001A through the fieldless reader sub_6BC12D.
+        out.Initialize(SMSG_DUEL_OUTOFBOUNDS, 0);
+    }
+
+    inline void BuildInBounds(WorldPacket& out)
+    {
+        // Wow.exe 18414 routes 0x163A through the same fieldless reader.
+        out.Initialize(SMSG_DUEL_INBOUNDS, 0);
+    }
+
+    inline void BuildComplete(WorldPacket& out, bool completed)
+    {
+        out.Initialize(SMSG_DUEL_COMPLETE, 1);
+
+        // Reader sub_6D3E7C consumes exactly one MSB-first completion bit.
+        out.WriteBit(completed);
+        out.FlushBits();
+    }
+
+    inline void BuildCountdown(WorldPacket& out, uint32 milliseconds)
+    {
+        out.Initialize(SMSG_DUEL_COUNTDOWN, sizeof(milliseconds));
+
+        // Reader sub_6D9F28 consumes one uint32; terminal sub_9BFFD4
+        // divides it by 1000 before updating the duel countdown UI.
+        out << milliseconds;
+    }
+
+    inline bool BuildWinner(WorldPacket& out, bool retreat,
+        std::string const& winnerName, uint32 winnerRealmAddress,
+        std::string const& loserName, uint32 loserRealmAddress)
+    {
+        if (winnerName.size() > 63 || loserName.size() > 63)
+            return false;
+
+        out.Initialize(SMSG_DUEL_WINNER,
+            2 + 2 * sizeof(uint32) + winnerName.size() + loserName.size());
+
+        // Reader sub_6CFDCC consumes the outcome followed by two six-bit
+        // lengths. Its realm-address fields are crossed around the names;
+        // terminal sub_9C0069 pairs them back as winner then loser.
+        out.WriteBit(retreat);
+        out.WriteBits(uint32(winnerName.size()), 6);
+        out.WriteBits(uint32(loserName.size()), 6);
+        out.FlushBits();
+
+        out << loserRealmAddress;
+        out.append(winnerName.c_str(), winnerName.size());
+        out << winnerRealmAddress;
+        out.append(loserName.c_str(), loserName.size());
+        return true;
+    }
+}
+
+namespace MopMirrorTimerPackets
+{
+    inline void BuildStart(WorldPacket& out, uint32 type, uint32 maxValue,
+        uint32 currentValue, int32 regeneration, uint32 spellId, bool paused)
+    {
+        out.Initialize(SMSG_START_MIRROR_TIMER, 21);
+
+        // Wow.exe 18414 reader sub_6F16F9 consumes five uint32 values in
+        // max/spell/current/regen/type order, then one MSB-first pause bit.
+        out << maxValue << spellId << currentValue << uint32(regeneration) << type;
+        out.WriteBit(paused);
+        out.FlushBits();
+    }
+
+    inline void BuildStop(WorldPacket& out, uint32 type)
+    {
+        // Wow.exe 18414 reader sub_6D9F28 consumes only the timer type.
+        out.Initialize(SMSG_STOP_MIRROR_TIMER, sizeof(type));
+        out << type;
+    }
+}
+
 namespace MopAreaTriggerPackets
 {
     struct Request
@@ -748,6 +936,16 @@ namespace MopAreaTriggerPackets
         // The 18414 reader consumes no fields before displaying
         // ERR_CORPSE_IS_NOT_IN_INSTANCE.
         out.Initialize(SMSG_AREA_TRIGGER_NO_CORPSE, 0);
+    }
+
+    inline void BuildExplorationExperience(WorldPacket& out, uint32 areaId,
+        uint32 experience)
+    {
+        out.Initialize(SMSG_EXPLORATION_EXPERIENCE, 8);
+
+        // Wow.exe 18414 reader sub_6BB9C1 consumes the area-table key first;
+        // terminal sub_7B1384 then displays the second uint32 as awarded XP.
+        out << areaId << experience;
     }
 }
 

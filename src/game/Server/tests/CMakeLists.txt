@@ -102,7 +102,7 @@ add_test(NAME mop_self_values_source
     COMMAND ${CMAKE_COMMAND} -DSOURCE_ROOT=${CMAKE_SOURCE_DIR}
         -P ${CMAKE_CURRENT_SOURCE_DIR}/mop_self_values_source_test.cmake)
 
-foreach(mutation IN ITEMS inventory_only health_feed progression_feed visible_item_feed skill_feed buyback_feed)
+foreach(mutation IN ITEMS inventory_only health_feed progression_feed visible_item_feed skill_feed buyback_feed questlog_feed)
     add_test(NAME mop_self_values_source_mutation_${mutation}
         COMMAND ${CMAKE_COMMAND} -DSOURCE_ROOT=${CMAKE_SOURCE_DIR}
             -DMUTATION=${mutation}
@@ -188,7 +188,25 @@ foreach(mutation IN ITEMS cancel_sender cancel_registration cancel_allowlist can
         auto_repeat_allowlist auto_repeat_opcode auto_repeat_reference
         read_item_alias read_item_sender
         attacker_sender attacker_registration attacker_allowlist attacker_opcode
-        attacker_reference attacker_envelope)
+        attacker_reference attacker_envelope
+        party_kill_mask party_kill_bytes party_kill_sender party_kill_registration
+        party_kill_allowlist party_kill_reference
+        duel_complete_bit duel_countdown_width duel_sender duel_registration
+        duel_allowlist duel_reference
+        duel_request_mask duel_request_bytes duel_winner_bits duel_winner_realm_order
+        duel_request_sender duel_winner_sender duel_pair_registration
+        duel_pair_allowlist duel_pair_reference
+        mirror_start_order mirror_pause_width mirror_sender mirror_registration
+        mirror_allowlist mirror_reference
+        rune_count_width rune_record_order rune_convert_order rune_sender
+        rune_registration rune_allowlist rune_reference
+        threat_count_width threat_update_mask threat_highest_mask threat_clear_bytes
+        threat_remove_mask threat_sender threat_registration threat_allowlist threat_reference
+        dismount_mask dismount_bytes dismount_sender dismount_registration
+        dismount_allowlist dismount_reference
+        pre_resurrect_mask pre_resurrect_bytes pre_resurrect_sender
+        pre_resurrect_registration pre_resurrect_allowlist pre_resurrect_reference
+        combo_mask combo_bytes combo_sender combo_registration combo_allowlist combo_reference)
     add_test(NAME mop_compact_packets_source_mutation_${mutation}
         COMMAND ${CMAKE_COMMAND} -DSOURCE_ROOT=${CMAKE_SOURCE_DIR}
             -DMUTATION=${mutation}
@@ -226,6 +244,17 @@ add_test(NAME mop_combat_log_packets_source
     COMMAND ${CMAKE_COMMAND}
         -DSOURCE_ROOT=${CMAKE_SOURCE_DIR}
         -P ${CMAKE_CURRENT_SOURCE_DIR}/mop_combat_log_packets_source_test.cmake)
+foreach(mutation IN ITEMS instakill_builder instakill_sender instakill_registration instakill_gate instakill_reference
+        energize_builder energize_sender energize_registration energize_gate energize_reference
+        heal_builder heal_sender heal_registration heal_gate heal_reference
+        damage_shield_builder damage_shield_sender damage_shield_registration damage_shield_gate damage_shield_reference
+        spell_miss_builder spell_miss_sender spell_miss_registration spell_miss_gate spell_miss_reference
+        spell_miss_count_width spell_miss_count_bound)
+    add_test(NAME mop_combat_log_packets_source_mutation_${mutation}
+        COMMAND ${CMAKE_COMMAND} -DSOURCE_ROOT=${CMAKE_SOURCE_DIR} -DMUTATION=${mutation}
+            -P ${CMAKE_CURRENT_SOURCE_DIR}/mop_combat_log_packets_source_test.cmake)
+    set_tests_properties(mop_combat_log_packets_source_mutation_${mutation} PROPERTIES WILL_FAIL TRUE)
+endforeach()
 
 add_executable(mop_respec_packets_test mop_respec_packets_test.cpp)
 target_include_directories(mop_respec_packets_test PRIVATE
@@ -479,6 +508,14 @@ set_target_properties(mop_quest_poi_query_test PROPERTIES CXX_STANDARD 17 CXX_ST
 target_link_libraries(mop_quest_poi_query_test PRIVATE game)
 add_test(NAME mop_quest_poi_query COMMAND mop_quest_poi_query_test)
 
+add_executable(mop_quest_npc_query_test mop_quest_npc_query_test.cpp)
+target_include_directories(mop_quest_npc_query_test PRIVATE
+    ${CMAKE_SOURCE_DIR}/src/game/Server
+    ${CMAKE_SOURCE_DIR}/src/game)
+set_target_properties(mop_quest_npc_query_test PROPERTIES CXX_STANDARD 17 CXX_STANDARD_REQUIRED ON)
+target_link_libraries(mop_quest_npc_query_test PRIVATE game)
+add_test(NAME mop_quest_npc_query COMMAND mop_quest_npc_query_test)
+
 add_test(NAME mop_quest_poi_query_source
     COMMAND ${CMAKE_COMMAND}
         -DSOURCE_ROOT=${CMAKE_SOURCE_DIR}
@@ -660,6 +697,8 @@ foreach(mutation IN ITEMS builder registration allowlist emote_builder emote_rea
         addon_count_width addon_length_width addon_softcap addon_unregister_registration addon_batch_registration addon_unregister_handler addon_batch_handler addon_group_filter addon_group_delivery addon_guild_filter addon_whisper_filter
         say_registration say_parser_wiring say_parser_layout say_language_spell say_reference_status
         afk_registration afk_parser_wiring afk_parser_layout
+        notice_length not_found_sender ambiguous_sender restricted_sender
+        notice_registration notice_allowlist notice_reference
         legacy_wrong_faction legacy_gm_chat legacy_member_count)
     add_test(NAME mop_chat_packets_source_mutation_${mutation}
         COMMAND ${CMAKE_COMMAND} -DSOURCE_ROOT=${CMAKE_SOURCE_DIR}
@@ -1034,7 +1073,9 @@ foreach(mutation IN ITEMS area_parser area_leave no_corpse_builder
         sender_admission opcode_values
         npc_parser npc_mapping npc_loader
         npc_client_registration npc_server_registration npc_admission
-        npc_legacy_sender npc_db_content npc_reference_status)
+        npc_legacy_sender npc_db_content npc_reference_status
+        exploration_wire_order exploration_sender exploration_registration
+        exploration_admission exploration_reference)
     add_test(NAME mop_world_quest_interaction_packets_source_mutation_${mutation}
         COMMAND ${CMAKE_COMMAND} -DSOURCE_ROOT=${CMAKE_SOURCE_DIR}
             -DMUTATION=${mutation}
@@ -1179,7 +1220,9 @@ add_test(NAME mop_death_packets_source
 foreach(mutation IN ITEMS
         wire_order player_call misc_call registration whitelist opcode_value
         cemetery_wire cemetery_bound cemetery_query cemetery_serializer
-        cemetery_registration cemetery_whitelist cemetery_opcode cemetery_team_filter)
+        cemetery_registration cemetery_whitelist cemetery_opcode cemetery_team_filter
+        durability_death_body durability_death_mirror_sender durability_death_unit_sender
+        durability_death_registration durability_death_whitelist durability_death_reference)
     add_test(NAME mop_death_packets_source_mutation_${mutation}
         COMMAND ${CMAKE_COMMAND} -DSOURCE_ROOT=${CMAKE_SOURCE_DIR}
             -DMUTATION=${mutation}
@@ -1369,7 +1412,15 @@ foreach(mutation IN ITEMS reader registration target_initializer target_mapping 
         clear_cooldowns_gate clear_cooldowns_reference
         spellbook_wire_order spellbook_sender spellbook_registration spellbook_gate spellbook_reference
         pet_spellbook_builder pet_spellbook_sender pet_spellbook_registration pet_spellbook_gate
-        pet_spellbook_reference)
+        pet_spellbook_reference
+        cooldown_event_mask_order cooldown_event_byte_order cooldown_event_sender
+        cooldown_event_registration cooldown_event_gate cooldown_event_reference
+        item_cooldown_wire_order item_cooldown_sender item_cooldown_registration
+        item_cooldown_gate item_cooldown_reference
+        clear_target_mask_order clear_target_byte_order clear_target_sender
+        clear_target_registration clear_target_gate clear_target_reference
+        channel_start_mask_order channel_update_byte_order channel_sender
+        channel_registration channel_gate channel_reference)
     add_test(NAME mop_spell_cast_packets_source_mutation_${mutation}
         COMMAND ${CMAKE_COMMAND} -DSOURCE_ROOT=${CMAKE_SOURCE_DIR}
             -DMUTATION=${mutation}
@@ -1532,6 +1583,27 @@ foreach(mutation IN ITEMS field_order gameobject_type interact_type guid_mask gu
             -DMUTATION=${mutation}
             -P ${CMAKE_CURRENT_SOURCE_DIR}/mop_quest_progress_packets_source_test.cmake)
     set_tests_properties(mop_quest_progress_packets_source_mutation_${mutation} PROPERTIES WILL_FAIL TRUE)
+endforeach()
+
+add_executable(mop_player_progression_packets_test mop_player_progression_packets_test.cpp)
+target_include_directories(mop_player_progression_packets_test PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}/..
+    ${CMAKE_SOURCE_DIR}/src/shared)
+set_target_properties(mop_player_progression_packets_test PROPERTIES CXX_STANDARD 17 CXX_STANDARD_REQUIRED ON)
+target_link_libraries(mop_player_progression_packets_test PRIVATE game)
+add_test(NAME mop_player_progression_packets COMMAND mop_player_progression_packets_test)
+
+add_test(NAME mop_player_progression_packets_source
+    COMMAND ${CMAKE_COMMAND} -DSOURCE_ROOT=${CMAKE_SOURCE_DIR}
+        -P ${CMAKE_CURRENT_SOURCE_DIR}/mop_player_progression_packets_source_test.cmake)
+
+foreach(mutation IN ITEMS wire_order xp_wire_order sender xp_sender registration admission reference
+        xp_registration xp_admission xp_reference)
+    add_test(NAME mop_player_progression_packets_source_mutation_${mutation}
+        COMMAND ${CMAKE_COMMAND} -DSOURCE_ROOT=${CMAKE_SOURCE_DIR}
+            -DMUTATION=${mutation}
+            -P ${CMAKE_CURRENT_SOURCE_DIR}/mop_player_progression_packets_source_test.cmake)
+    set_tests_properties(mop_player_progression_packets_source_mutation_${mutation} PROPERTIES WILL_FAIL TRUE)
 endforeach()
 
 add_executable(mop_world_state_packets_test mop_world_state_packets_test.cpp)

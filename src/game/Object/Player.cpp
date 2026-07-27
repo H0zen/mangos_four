@@ -2339,16 +2339,15 @@ void Player::SetGMVisible(bool on)
  */
 void Player::SendLogXPGain(uint32 GivenXP, Unit* victim, uint32 RestXP)
 {
-    WorldPacket data(SMSG_LOG_XPGAIN, 21);
-    data << (victim ? victim->GetObjectGuid() : ObjectGuid());// guid
-    data << uint32(GivenXP + RestXP);                       // given experience
-    data << uint8(victim ? 0 : 1);                          // 00-kill_xp type, 01-non_kill_xp type
-    if (victim)
-    {
-        data << uint32(GivenXP);                            // experience without rested bonus
-        data << float(1);                                   // 1 - none 0 - 100% group bonus output
-    }
-    data << uint8(0);                                       // new 2.4.0
+    MopProgressionPackets::ExperienceGain packetInfo;
+    packetInfo.sourceGuid = victim ? victim->GetObjectGuid() : ObjectGuid();
+    packetInfo.totalExperience = GivenXP + RestXP;
+    packetInfo.type = victim ? 0 : 1;
+    packetInfo.hasBaseExperience = victim != nullptr;
+    packetInfo.baseExperience = GivenXP;
+
+    WorldPacket data;
+    MopProgressionPackets::BuildExperienceGain(data, packetInfo);
     GetSession()->SendPacket(&data);
 }
 
@@ -2453,22 +2452,17 @@ void Player::GiveLevel(uint32 level)
     uint32 basehp = 0, basemana = 0;
     sObjectMgr.GetPlayerClassLevelInfo(getClass(), level, basehp, basemana);
 
-    // send levelup info to client
-    WorldPacket data(SMSG_LEVELUP_INFO, (4 + 4 + MAX_STORED_POWERS * 4 + MAX_STATS * 4));
-    data << uint32(level);
-    data << uint32(int32(basehp) - int32(GetCreateHealth()));
-    // for(int i = 0; i < MAX_POWERS; ++i)                  // Powers loop (0-4)
-    data << uint32(int32(basemana)   - int32(GetCreateMana()));
-    data << uint32(0);
-    data << uint32(0);
-    data << uint32(0);
-    data << uint32(0);
-    // end for
-    for (int i = STAT_STRENGTH; i < MAX_STATS; ++i)         // Stats loop (0-4)
-    {
-        data << uint32(int32(info.stats[i]) - GetCreateStat(Stats(i)));
-    }
+    MopProgressionPackets::LevelUpInfo packetInfo;
+    packetInfo.level = level;
+    packetInfo.healthDelta = uint32(int32(basehp) - int32(GetCreateHealth()));
+    packetInfo.powerDeltas[POWER_MANA] =
+        uint32(int32(basemana) - int32(GetCreateMana()));
+    for (int i = STAT_STRENGTH; i < MAX_STATS; ++i)
+        packetInfo.statDeltas[i] =
+            uint32(int32(info.stats[i]) - GetCreateStat(Stats(i)));
 
+    WorldPacket data;
+    MopProgressionPackets::BuildLevelUpInfo(data, packetInfo);
     GetSession()->SendPacket(&data);
 
     SetUInt32Value(PLAYER_NEXT_LEVEL_XP, sObjectMgr.GetXPForLevel(level));
@@ -4118,9 +4112,8 @@ void Player::Customize(ObjectGuid guid, uint8 gender, uint8 skin, uint8 face, ui
  */
 void Player::SendExplorationExperience(uint32 Area, uint32 Experience)
 {
-    WorldPacket data(SMSG_EXPLORATION_EXPERIENCE, 8);
-    data << uint32(Area);
-    data << uint32(Experience);
+    WorldPacket data;
+    MopAreaTriggerPackets::BuildExplorationExperience(data, Area, Experience);
     GetSession()->SendPacket(&data);
 }
 
@@ -4584,9 +4577,8 @@ void Player::ApplyEquipCooldown(Item* pItem)
 
         AddSpellCooldown(spellData.SpellId, pItem->GetEntry(), time(NULL) + 30);
 
-        WorldPacket data(SMSG_ITEM_COOLDOWN, 12);
-        data << pItem->GetObjectGuid();
-        data << uint32(spellData.SpellId);
+        WorldPacket data;
+        MopSpellPackets::BuildItemCooldown(data, pItem->GetObjectGuid(), spellData.SpellId);
         GetSession()->SendPacket(&data);
     }
 }

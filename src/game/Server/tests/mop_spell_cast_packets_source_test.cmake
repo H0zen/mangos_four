@@ -2,6 +2,7 @@ file(READ "${SOURCE_ROOT}/src/game/WorldHandlers/Spell.h" spell_header)
 file(READ "${SOURCE_ROOT}/src/game/WorldHandlers/Spell.cpp" spell_source)
 file(READ "${SOURCE_ROOT}/src/game/WorldHandlers/SpellPackets.cpp" spell_packets)
 file(READ "${SOURCE_ROOT}/src/game/WorldHandlers/SpellHandler.cpp" spell_handler)
+file(READ "${SOURCE_ROOT}/src/game/WorldHandlers/SpellEffectTail.cpp" spell_effect_tail)
 file(READ "${SOURCE_ROOT}/src/game/Server/Opcodes.cpp" opcode_registry)
 file(READ "${SOURCE_ROOT}/src/game/Server/Opcodes.h" opcode_header)
 file(READ "${SOURCE_ROOT}/src/game/Server/WorldSession.cpp" world_session)
@@ -348,6 +349,121 @@ elseif(MUTATION STREQUAL "pet_spellbook_reference")
         "SMSG_PET_LEARNED_SPELL                         0x0282  ACTIVE"
         "SMSG_PET_LEARNED_SPELL                         0x0282  DORMANT"
         opcode_reference "${opcode_reference}")
+elseif(MUTATION STREQUAL "cooldown_event_mask_order")
+    string(REPLACE
+        "out.WriteGuidMask<4, 7, 1, 5, 6, 0, 2, 3>(ownerGuid);"
+        "out.WriteGuidMask<7, 4, 1, 5, 6, 0, 2, 3>(ownerGuid);"
+        spell_header "${spell_header}")
+elseif(MUTATION STREQUAL "cooldown_event_byte_order")
+    string(REPLACE
+        "out.WriteGuidBytes<5, 7>(ownerGuid);"
+        "out.WriteGuidBytes<7, 5>(ownerGuid);"
+        spell_header "${spell_header}")
+elseif(MUTATION STREQUAL "cooldown_event_sender")
+    string(REPLACE
+        "MopSpellPackets::BuildCooldownEvent(data, m_owner->GetObjectGuid(), spellInfo->ID);"
+        "/* removed cooldown-event sender */"
+        spell_cooldown_mgr_source "${spell_cooldown_mgr_source}")
+elseif(MUTATION STREQUAL "cooldown_event_registration")
+    string(REPLACE
+        "DefS(SMSG_COOLDOWN_EVENT, \"SMSG_COOLDOWN_EVENT\");"
+        "/* removed SMSG_COOLDOWN_EVENT registration */"
+        opcode_registry "${opcode_registry}")
+elseif(MUTATION STREQUAL "cooldown_event_gate")
+    string(REPLACE
+        "case SMSG_COOLDOWN_EVENT:"
+        "case SMSG_UNKNOWN_0:"
+        world_session "${world_session}")
+elseif(MUTATION STREQUAL "cooldown_event_reference")
+    string(REPLACE
+        "SMSG_COOLDOWN_EVENT                            0x1163  ACTIVE"
+        "SMSG_COOLDOWN_EVENT                            0x1163  DORMANT"
+        opcode_reference "${opcode_reference}")
+elseif(MUTATION STREQUAL "item_cooldown_wire_order")
+    string(REPLACE
+        "out << itemGuid << spellId;"
+        "out << spellId << itemGuid;"
+        spell_header "${spell_header}")
+elseif(MUTATION STREQUAL "item_cooldown_sender")
+    string(REPLACE
+        "MopSpellPackets::BuildItemCooldown(data, pItem->GetObjectGuid(), spellData.SpellId);"
+        "/* removed item cooldown sender */"
+        player_source "${player_source}")
+elseif(MUTATION STREQUAL "item_cooldown_registration")
+    string(REPLACE
+        "DefS(SMSG_ITEM_COOLDOWN, \"SMSG_ITEM_COOLDOWN\");"
+        "/* removed SMSG_ITEM_COOLDOWN registration */"
+        opcode_registry "${opcode_registry}")
+elseif(MUTATION STREQUAL "item_cooldown_gate")
+    string(REPLACE
+        "case SMSG_ITEM_COOLDOWN:"
+        "case SMSG_UNKNOWN_0:"
+        world_session "${world_session}")
+elseif(MUTATION STREQUAL "item_cooldown_reference")
+    string(REPLACE
+        "SMSG_ITEM_COOLDOWN                             0x1904  ACTIVE"
+        "SMSG_ITEM_COOLDOWN                             0x1904  DORMANT"
+        opcode_reference "${opcode_reference}")
+elseif(MUTATION STREQUAL "clear_target_mask_order")
+    string(REPLACE
+        "out.WriteGuidMask<6, 2, 0, 4, 7, 1, 3, 5>(targetGuid);"
+        "out.WriteGuidMask<2, 6, 0, 4, 7, 1, 3, 5>(targetGuid);"
+        spell_header "${spell_header}")
+elseif(MUTATION STREQUAL "clear_target_byte_order")
+    string(REPLACE
+        "out.WriteGuidBytes<4, 0, 3, 5, 2, 7, 6, 1>(targetGuid);"
+        "out.WriteGuidBytes<0, 4, 3, 5, 2, 7, 6, 1>(targetGuid);"
+        spell_header "${spell_header}")
+elseif(MUTATION STREQUAL "clear_target_sender")
+    string(REPLACE
+        "MopSpellPackets::BuildClearTarget(data, unitTarget->GetObjectGuid());"
+        "/* removed clear-target sender */"
+        spell_effect_tail "${spell_effect_tail}")
+elseif(MUTATION STREQUAL "clear_target_registration")
+    string(REPLACE
+        "DefS(SMSG_CLEAR_TARGET, \"SMSG_CLEAR_TARGET\");"
+        "/* removed SMSG_CLEAR_TARGET registration */"
+        opcode_registry "${opcode_registry}")
+elseif(MUTATION STREQUAL "clear_target_gate")
+    string(REPLACE
+        "case SMSG_CLEAR_TARGET:"
+        "case SMSG_UNKNOWN_0:"
+        world_session "${world_session}")
+elseif(MUTATION STREQUAL "clear_target_reference")
+    string(REPLACE
+        "SMSG_CLEAR_TARGET                              0x1061  ACTIVE"
+        "SMSG_CLEAR_TARGET                              0x1061  DORMANT"
+        opcode_reference "${opcode_reference}")
+elseif(MUTATION STREQUAL "channel_start_mask_order")
+    string(REPLACE
+        "out.WriteGuidMask<7, 5, 4, 1>(casterGuid);"
+        "out.WriteGuidMask<5, 7, 4, 1>(casterGuid);"
+        spell_header "${spell_header}")
+elseif(MUTATION STREQUAL "channel_update_byte_order")
+    string(REPLACE
+        "out.WriteGuidBytes<4, 7, 1, 2, 6, 5>(casterGuid);"
+        "out.WriteGuidBytes<7, 4, 1, 2, 6, 5>(casterGuid);"
+        spell_header "${spell_header}")
+elseif(MUTATION STREQUAL "channel_sender")
+    string(REPLACE
+        "MopSpellPackets::BuildChannelStart("
+        "/* removed channel-start builder */ ("
+        spell_packets "${spell_packets}")
+elseif(MUTATION STREQUAL "channel_registration")
+    string(REPLACE
+        "DefS(SMSG_CHANNEL_START, \"SMSG_CHANNEL_START\");"
+        "/* removed channel-start registration */"
+        opcode_registry "${opcode_registry}")
+elseif(MUTATION STREQUAL "channel_gate")
+    string(REPLACE
+        "case SMSG_CHANNEL_START:"
+        "case SMSG_UNKNOWN_0:"
+        world_session "${world_session}")
+elseif(MUTATION STREQUAL "channel_reference")
+    string(REPLACE
+        "SMSG_CHANNEL_START                             0x10F9  ACTIVE"
+        "SMSG_CHANNEL_START                             0x10F9  DORMANT"
+        opcode_reference "${opcode_reference}")
 endif()
 
 string(FIND "${spell_handler}" "void WorldSession::HandleCastSpellOpcode" cast_start)
@@ -660,6 +776,105 @@ foreach(source IN ITEMS "${player_source}" "${spell_cooldown_mgr_source}")
     forbid("${source}" "WorldPacket data(SMSG_CLEAR_COOLDOWNS"
         "legacy clear-cooldowns body")
 endforeach()
+require_once("${spell_header}"
+    "inline void BuildCooldownEvent(WorldPacket& out, ObjectGuid ownerGuid,"
+    "18414 cooldown-event builder")
+require_once("${spell_header}"
+    "out.WriteGuidMask<4, 7, 1, 5, 6, 0, 2, 3>(ownerGuid);"
+    "cooldown-event GUID mask order")
+require_once("${spell_header}"
+    "out.WriteGuidBytes<5, 7>(ownerGuid);"
+    "cooldown-event leading GUID bytes")
+require_once("${spell_header}"
+    "out.WriteGuidBytes<3, 1, 2, 4, 6, 0>(ownerGuid);"
+    "cooldown-event trailing GUID bytes")
+require_once("${spell_cooldown_mgr_source}"
+    "MopSpellPackets::BuildCooldownEvent(data, m_owner->GetObjectGuid(), spellInfo->ID);"
+    "cooldown-event sender")
+require_once("${opcode_registry}"
+    "DefS(SMSG_COOLDOWN_EVENT, \"SMSG_COOLDOWN_EVENT\");"
+    "cooldown-event registration")
+require_once("${world_session}"
+    "case SMSG_COOLDOWN_EVENT:"
+    "cooldown-event send admission")
+require_once("${opcode_reference}"
+    "SMSG_COOLDOWN_EVENT                            0x1163  ACTIVE"
+    "active cooldown-event reference")
+forbid("${spell_cooldown_mgr_source}" "WorldPacket data(SMSG_COOLDOWN_EVENT"
+    "legacy cooldown-event body")
+require_once("${spell_header}"
+    "inline void BuildItemCooldown(WorldPacket& out, ObjectGuid itemGuid,"
+    "18414 item-cooldown builder")
+require_once("${spell_header}"
+    "out << itemGuid << spellId;"
+    "item-cooldown wire field order")
+require_once("${player_source}"
+    "MopSpellPackets::BuildItemCooldown(data, pItem->GetObjectGuid(), spellData.SpellId);"
+    "item-cooldown sender")
+require_once("${opcode_registry}"
+    "DefS(SMSG_ITEM_COOLDOWN, \"SMSG_ITEM_COOLDOWN\");"
+    "item-cooldown registration")
+require_once("${world_session}"
+    "case SMSG_ITEM_COOLDOWN:"
+    "item-cooldown send admission")
+require_once("${opcode_reference}"
+    "SMSG_ITEM_COOLDOWN                             0x1904  ACTIVE"
+    "active direct-client item-cooldown reference")
+forbid("${player_source}" "WorldPacket data(SMSG_ITEM_COOLDOWN"
+    "legacy item-cooldown body")
+require_once("${spell_header}"
+    "out.WriteGuidMask<6, 2, 0, 4, 7, 1, 3, 5>(targetGuid);"
+    "clear-target GUID mask order")
+require_once("${spell_header}"
+    "out.WriteGuidBytes<4, 0, 3, 5, 2, 7, 6, 1>(targetGuid);"
+    "clear-target GUID byte order")
+require_once("${spell_effect_tail}"
+    "MopSpellPackets::BuildClearTarget(data, unitTarget->GetObjectGuid());"
+    "clear-target sender")
+require_once("${opcode_registry}"
+    "DefS(SMSG_CLEAR_TARGET, \"SMSG_CLEAR_TARGET\");"
+    "clear-target registration")
+require_once("${world_session}"
+    "case SMSG_CLEAR_TARGET:"
+    "clear-target send admission")
+require_once("${opcode_reference}"
+    "SMSG_CLEAR_TARGET                              0x1061  ACTIVE"
+    "active direct-client clear-target reference")
+forbid("${spell_effect_tail}" "WorldPacket data(SMSG_CLEAR_TARGET"
+    "legacy clear-target body")
+require_once("${spell_header}"
+    "out.WriteGuidMask<7, 5, 4, 1>(casterGuid);"
+    "channel-start leading caster mask")
+require_once("${spell_header}"
+    "out.WriteGuidBytes<6, 7, 3, 1, 0>(casterGuid);"
+    "channel-start leading caster bytes")
+require_once("${spell_header}"
+    "out.WriteGuidMask<0, 3, 4, 1, 5, 2, 6, 7>(casterGuid);"
+    "channel-update caster mask")
+require_once("${spell_header}"
+    "out.WriteGuidBytes<4, 7, 1, 2, 6, 5>(casterGuid);"
+    "channel-update leading caster bytes")
+foreach(builder IN ITEMS BuildChannelStart BuildChannelUpdate)
+    require_once("${spell_packets}"
+        "MopSpellPackets::${builder}("
+        "${builder} owning sender")
+endforeach()
+foreach(opcode IN ITEMS SMSG_CHANNEL_START SMSG_CHANNEL_UPDATE)
+    require_once("${opcode_registry}"
+        "DefS(${opcode}, \"${opcode}\");"
+        "${opcode} registration")
+    require_once("${world_session}"
+        "case ${opcode}:"
+        "${opcode} send admission")
+    forbid("${spell_packets}" "WorldPacket data(${opcode}"
+        "legacy ${opcode} body")
+endforeach()
+require_once("${opcode_reference}"
+    "SMSG_CHANNEL_START                             0x10F9  ACTIVE"
+    "active channel-start reference")
+require_once("${opcode_reference}"
+    "SMSG_CHANNEL_UPDATE                            0x11D9  ACTIVE"
+    "active channel-update reference")
 require_once("${spell_header}"
     "inline void BuildLearnedSpell(WorldPacket& out, uint32 spellId,"
     "18414 learned-spell builder")

@@ -77,6 +77,8 @@ public:
         U32(raw);
     }
 
+    void U8(uint8 value) { Align(); m_bytes.push_back(value); }
+
     void GuidBit(uint64 guid, uint8 index) { Bit(GuidByteValue(guid, index) != 0); }
 
     void GuidByte(uint64 guid, uint8 index)
@@ -90,7 +92,6 @@ public:
 
 private:
     static uint8 GuidByteValue(uint64 guid, uint8 index) { return uint8(guid >> (8 * index)); }
-    void U8(uint8 value) { Align(); m_bytes.push_back(value); }
 
     std::vector<uint8> m_bytes;
     uint8 m_bit = 8;
@@ -106,6 +107,177 @@ static void GuidBytes(RefWriter& writer, uint64 guid, uint8 const* order, size_t
 {
     for (size_t i = 0; i < count; ++i)
         writer.GuidByte(guid, order[i]);
+}
+
+static std::vector<uint8> ExpectedInstakill(MopCombatLogPackets::SpellInstakillLog const& log)
+{
+    static uint8 const casterMaskA[] = { 6 };
+    static uint8 const victimMaskA[] = { 0 };
+    static uint8 const casterMaskB[] = { 7 };
+    static uint8 const victimMaskB[] = { 2 };
+    static uint8 const casterMaskC[] = { 3, 1, 2, 0, 4 };
+    static uint8 const victimMaskC[] = { 4, 7, 1, 6, 5 };
+    static uint8 const casterMaskD[] = { 5 };
+    static uint8 const victimMaskD[] = { 3 };
+    static uint8 const bytesA[][2] = {
+        { 0, 0 }, { 1, 1 }, { 3, 0 }, { 4, 0 }, { 5, 0 }, { 7, 0 },
+        { 0, 1 }, { 6, 0 }, { 2, 1 }, { 4, 1 }, { 1, 0 }
+    };
+    static uint8 const bytesB[][2] = {
+        { 3, 1 }, { 2, 0 }, { 7, 1 }, { 6, 1 }, { 5, 1 }
+    };
+
+    RefWriter writer;
+    GuidBits(writer, log.casterGuid, casterMaskA, 1);
+    GuidBits(writer, log.victimGuid, victimMaskA, 1);
+    GuidBits(writer, log.casterGuid, casterMaskB, 1);
+    GuidBits(writer, log.victimGuid, victimMaskB, 1);
+    GuidBits(writer, log.casterGuid, casterMaskC, 5);
+    GuidBits(writer, log.victimGuid, victimMaskC, 5);
+    GuidBits(writer, log.casterGuid, casterMaskD, 1);
+    GuidBits(writer, log.victimGuid, victimMaskD, 1);
+    writer.Align();
+    for (auto const& byte : bytesA)
+        writer.GuidByte(byte[1] ? log.victimGuid : log.casterGuid, byte[0]);
+    writer.U32(log.spellId);
+    for (auto const& byte : bytesB)
+        writer.GuidByte(byte[1] ? log.victimGuid : log.casterGuid, byte[0]);
+    return writer.Bytes();
+}
+
+static std::vector<uint8> ExpectedEnergize(MopCombatLogPackets::SpellEnergizeLog const& log)
+{
+    static uint8 const mask[][2] = {
+        { 7, 0 }, { 3, 0 }, { 1, 1 }, { 4, 0 }, { 2, 0 }, { 3, 1 }, { 5, 0 },
+        { 7, 1 }, { 0, 1 }, { 2, 1 }, { 4, 1 }, { 6, 1 }, { 6, 0 }, { 1, 0 },
+        { 0, 0 }, { 5, 1 }
+    };
+    static uint8 const bytesA[][2] = {
+        { 0, 0 }, { 5, 1 }, { 6, 0 }, { 6, 1 }, { 2, 0 }, { 0, 1 }, { 1, 0 }
+    };
+    static uint8 const bytesB[][2] = {
+        { 4, 0 }, { 1, 1 }, { 7, 1 }, { 5, 0 }, { 2, 1 }, { 3, 1 },
+        { 7, 0 }, { 4, 1 }, { 3, 0 }
+    };
+
+    RefWriter writer;
+    for (size_t i = 0; i < 7; ++i)
+        writer.GuidBit(mask[i][1] ? log.casterGuid : log.targetGuid, mask[i][0]);
+    writer.Bit(false); // no optional spell-cast-log data
+    for (size_t i = 7; i < 16; ++i)
+        writer.GuidBit(mask[i][1] ? log.casterGuid : log.targetGuid, mask[i][0]);
+    writer.Align();
+    for (auto const& byte : bytesA)
+        writer.GuidByte(byte[1] ? log.casterGuid : log.targetGuid, byte[0]);
+    writer.U32(log.amount);
+    for (auto const& byte : bytesB)
+        writer.GuidByte(byte[1] ? log.casterGuid : log.targetGuid, byte[0]);
+    writer.U32(log.spellId);
+    writer.U32(log.powerType);
+    return writer.Bytes();
+}
+
+static std::vector<uint8> ExpectedHeal(MopCombatLogPackets::SpellHealLog const& log)
+{
+    static uint8 const mask[][2] = {
+        { 0, 1 }, { 2, 0 }, { 6, 0 }, { 2, 1 }, { 3, 0 }, { 0, 0 }, { 5, 0 },
+        { 3, 1 }, { 7, 1 }, { 5, 1 }, { 7, 0 }, { 4, 1 }, { 4, 0 }, { 1, 0 },
+        { 1, 1 }, { 6, 1 }
+    };
+    static uint8 const bytes[][2] = {
+        { 2, 0 }, { 6, 1 }, { 5, 0 }, { 3, 0 }, { 7, 1 }, { 7, 0 },
+        { 6, 0 }, { 1, 0 }, { 2, 1 }, { 4, 1 }, { 3, 1 }, { 0, 1 },
+        { 5, 1 }, { 0, 0 }, { 1, 1 }, { 4, 0 }
+    };
+
+    RefWriter writer;
+    writer.U32(log.spellId);
+    writer.U32(log.absorb);
+    writer.U32(log.heal);
+    writer.U32(log.overheal);
+    for (size_t i = 0; i < 4; ++i)
+        writer.GuidBit(mask[i][1] ? log.targetGuid : log.casterGuid, mask[i][0]);
+    writer.Bit(log.critical);
+    for (size_t i = 4; i < 8; ++i)
+        writer.GuidBit(mask[i][1] ? log.targetGuid : log.casterGuid, mask[i][0]);
+    writer.Bit(false); // no optional spell-cast-log data
+    for (size_t i = 8; i < 12; ++i)
+        writer.GuidBit(mask[i][1] ? log.targetGuid : log.casterGuid, mask[i][0]);
+    writer.Bit(false); // no optional first float
+    writer.Bit(false); // no optional second float
+    for (size_t i = 12; i < 16; ++i)
+        writer.GuidBit(mask[i][1] ? log.targetGuid : log.casterGuid, mask[i][0]);
+    writer.Align();
+    for (auto const& byte : bytes)
+        writer.GuidByte(byte[1] ? log.targetGuid : log.casterGuid, byte[0]);
+    return writer.Bytes();
+}
+
+static std::vector<uint8> ExpectedDamageShield(MopCombatLogPackets::SpellDamageShieldLog const& log)
+{
+    static uint8 const mask[][2] = {
+        { 1, 1 }, { 2, 0 }, { 6, 0 }, { 3, 1 }, { 4, 0 }, { 2, 1 },
+        { 5, 1 }, { 6, 1 }, { 3, 0 }, { 0, 1 }, { 5, 0 }, { 1, 0 },
+        { 0, 0 }, { 7, 1 }, { 4, 1 }, { 7, 0 }
+    };
+
+    RefWriter writer;
+    for (size_t i = 0; i < 2; ++i)
+        writer.GuidBit(mask[i][1] ? log.targetGuid : log.casterGuid, mask[i][0]);
+    writer.Bit(false); // no optional spell-cast-log data
+    for (size_t i = 2; i < 16; ++i)
+        writer.GuidBit(mask[i][1] ? log.targetGuid : log.casterGuid, mask[i][0]);
+    writer.Align();
+    writer.GuidByte(log.targetGuid, 2);
+    writer.GuidByte(log.casterGuid, 6);
+    writer.GuidByte(log.targetGuid, 6);
+    writer.GuidByte(log.targetGuid, 4);
+    writer.GuidByte(log.casterGuid, 3);
+    writer.GuidByte(log.targetGuid, 7);
+    writer.U32(log.resist);
+    writer.GuidByte(log.casterGuid, 4);
+    writer.GuidByte(log.targetGuid, 1);
+    writer.U32(log.damage);
+    writer.GuidByte(log.casterGuid, 7);
+    writer.U32(log.spellId);
+    writer.U32(log.overkill);
+    writer.GuidByte(log.targetGuid, 5);
+    writer.GuidByte(log.casterGuid, 5);
+    writer.GuidByte(log.targetGuid, 0);
+    writer.GuidByte(log.casterGuid, 1);
+    writer.GuidByte(log.casterGuid, 0);
+    writer.GuidByte(log.casterGuid, 2);
+    writer.U32(log.schoolMask);
+    writer.GuidByte(log.targetGuid, 3);
+    return writer.Bytes();
+}
+
+static std::vector<uint8> ExpectedSpellMiss(MopCombatLogPackets::SpellMissLog const& log)
+{
+    static uint8 const casterMask[] = { 5, 1, 4, 0, 7, 3, 2, 6 };
+    static uint8 const targetMask[] = { 0, 1, 6, 2, 5, 3, 4, 7 };
+    static uint8 const targetBytes[] = { 7, 5, 0, 6, 3, 2, 1, 4 };
+    static uint8 const casterBytesA[] = { 6, 4, 2, 0, 1 };
+    static uint8 const casterBytesB[] = { 3, 7, 5 };
+
+    RefWriter writer;
+    GuidBits(writer, log.casterGuid, casterMask, 8);
+    writer.Bits(uint32(log.targetCount), 23);
+    for (size_t i = 0; i < log.targetCount; ++i)
+    {
+        GuidBits(writer, log.targets[i].guid, targetMask, 8);
+        writer.Bit(false); // no optional target position pair
+    }
+    writer.Align();
+    for (size_t i = 0; i < log.targetCount; ++i)
+    {
+        writer.U8(log.targets[i].missReason);
+        GuidBytes(writer, log.targets[i].guid, targetBytes, 8);
+    }
+    GuidBytes(writer, log.casterGuid, casterBytesA, 5);
+    writer.U32(log.spellId);
+    GuidBytes(writer, log.casterGuid, casterBytesB, 3);
+    return writer.Bytes();
 }
 
 static std::vector<uint8> ExpectedExecute(MopCombatLogPackets::SpellExecuteLog const& log)
@@ -376,6 +548,144 @@ static void test_execute_variants()
     CHECK(invalid.size() == 1 && invalid.contents()[0] == 0xAA);
 }
 
+static void test_spell_instakill_log()
+{
+    MopCombatLogPackets::SpellInstakillLog dense = {};
+    dense.casterGuid = 0x0123456789ABCDEFull;
+    dense.victimGuid = 0xF1E2D3C4B5A69788ull;
+    dense.spellId = 0x11223344u;
+
+    WorldPacket densePacket(SMSG_SPELLINSTAKILLLOG, 24);
+    MopCombatLogPackets::BuildSpellInstakillLog(densePacket, dense);
+    CHECK(densePacket.GetOpcode() == SMSG_SPELLINSTAKILLLOG);
+    CHECK(Equal(densePacket, ExpectedInstakill(dense)));
+
+    MopCombatLogPackets::SpellInstakillLog sparse = {};
+    sparse.casterGuid = 0x0002000400060008ull;
+    sparse.victimGuid = 0x0100030005000700ull;
+    sparse.spellId = 5;
+
+    WorldPacket sparsePacket(SMSG_SPELLINSTAKILLLOG, 24);
+    MopCombatLogPackets::BuildSpellInstakillLog(sparsePacket, sparse);
+    CHECK(Equal(sparsePacket, ExpectedInstakill(sparse)));
+}
+
+static void test_spell_energize_log()
+{
+    MopCombatLogPackets::SpellEnergizeLog dense = {};
+    dense.targetGuid = 0x0123456789ABCDEFull;
+    dense.casterGuid = 0xF1E2D3C4B5A69788ull;
+    dense.amount = 0x11223344u;
+    dense.spellId = 0x55667788u;
+    dense.powerType = 3;
+
+    WorldPacket densePacket(SMSG_SPELLENERGIZELOG, 32);
+    MopCombatLogPackets::BuildSpellEnergizeLog(densePacket, dense);
+    CHECK(densePacket.GetOpcode() == SMSG_SPELLENERGIZELOG);
+    CHECK(Equal(densePacket, ExpectedEnergize(dense)));
+
+    MopCombatLogPackets::SpellEnergizeLog sparse = {};
+    sparse.targetGuid = 0x0002000400060008ull;
+    sparse.casterGuid = 0x0100030005000700ull;
+    sparse.amount = 1;
+    sparse.spellId = 2;
+    sparse.powerType = 0;
+
+    WorldPacket sparsePacket(SMSG_SPELLENERGIZELOG, 32);
+    MopCombatLogPackets::BuildSpellEnergizeLog(sparsePacket, sparse);
+    CHECK(Equal(sparsePacket, ExpectedEnergize(sparse)));
+}
+
+static void test_spell_heal_log()
+{
+    MopCombatLogPackets::SpellHealLog dense = {};
+    dense.casterGuid = 0x0123456789ABCDEFull;
+    dense.targetGuid = 0xF1E2D3C4B5A69788ull;
+    dense.spellId = 0x11223344u;
+    dense.heal = 0x55667788u;
+    dense.overheal = 0x01020304u;
+    dense.absorb = 0xA1A2A3A4u;
+    dense.critical = true;
+
+    WorldPacket densePacket(SMSG_SPELLHEALLOG, 40);
+    MopCombatLogPackets::BuildSpellHealLog(densePacket, dense);
+    CHECK(densePacket.GetOpcode() == SMSG_SPELLHEALLOG);
+    CHECK(Equal(densePacket, ExpectedHeal(dense)));
+
+    MopCombatLogPackets::SpellHealLog sparse = {};
+    sparse.casterGuid = 0x0002000400060008ull;
+    sparse.targetGuid = 0x0100030005000700ull;
+    sparse.spellId = 1;
+    sparse.heal = 2;
+
+    WorldPacket sparsePacket(SMSG_SPELLHEALLOG, 40);
+    MopCombatLogPackets::BuildSpellHealLog(sparsePacket, sparse);
+    CHECK(Equal(sparsePacket, ExpectedHeal(sparse)));
+}
+
+static void test_spell_damage_shield_log()
+{
+    MopCombatLogPackets::SpellDamageShieldLog dense = {};
+    dense.casterGuid = 0x0123456789ABCDEFull;
+    dense.targetGuid = 0xF1E2D3C4B5A69788ull;
+    dense.spellId = 0x11223344u;
+    dense.damage = 0x55667788u;
+    dense.overkill = 0x01020304u;
+    dense.schoolMask = 0xA1A2A3A4u;
+    dense.resist = 0x05060708u;
+
+    WorldPacket densePacket(SMSG_SPELLDAMAGESHIELD, 40);
+    MopCombatLogPackets::BuildSpellDamageShieldLog(densePacket, dense);
+    CHECK(densePacket.GetOpcode() == SMSG_SPELLDAMAGESHIELD);
+    CHECK(Equal(densePacket, ExpectedDamageShield(dense)));
+
+    MopCombatLogPackets::SpellDamageShieldLog sparse = {};
+    sparse.casterGuid = 0x0002000400060008ull;
+    sparse.targetGuid = 0x0100030005000700ull;
+    sparse.spellId = 1;
+    sparse.damage = 2;
+    sparse.schoolMask = 4;
+
+    WorldPacket sparsePacket(SMSG_SPELLDAMAGESHIELD, 40);
+    MopCombatLogPackets::BuildSpellDamageShieldLog(sparsePacket, sparse);
+    CHECK(Equal(sparsePacket, ExpectedDamageShield(sparse)));
+}
+
+static void test_spell_miss_log()
+{
+    MopCombatLogPackets::SpellMissTarget targets[] = {
+        { 0xF1E2D3C4B5A69788ull, 2 },
+        { 0x0100030005000700ull, 7 }
+    };
+    MopCombatLogPackets::SpellMissLog dense = {};
+    dense.casterGuid = 0x0123456789ABCDEFull;
+    dense.spellId = 0x11223344u;
+    dense.targets = targets;
+    dense.targetCount = 2;
+
+    WorldPacket densePacket(SMSG_SPELLLOGMISS, 48);
+    CHECK(MopCombatLogPackets::BuildSpellMissLog(densePacket, dense));
+    CHECK(densePacket.GetOpcode() == SMSG_SPELLLOGMISS);
+    CHECK(Equal(densePacket, ExpectedSpellMiss(dense)));
+
+    MopCombatLogPackets::SpellMissLog empty = {};
+    empty.casterGuid = 0x0002000400060008ull;
+    empty.spellId = 1;
+    WorldPacket emptyPacket(SMSG_SPELLLOGMISS, 20);
+    CHECK(MopCombatLogPackets::BuildSpellMissLog(emptyPacket, empty));
+    CHECK(Equal(emptyPacket, ExpectedSpellMiss(empty)));
+
+    WorldPacket invalid(SMSG_SPELLLOGMISS, 1);
+    invalid << uint8(0xAA);
+    dense.targetCount = size_t(1) << 23;
+    CHECK(!MopCombatLogPackets::BuildSpellMissLog(invalid, dense));
+    CHECK(invalid.size() == 1 && invalid.contents()[0] == 0xAA);
+    dense.targetCount = 1;
+    dense.targets = nullptr;
+    CHECK(!MopCombatLogPackets::BuildSpellMissLog(invalid, dense));
+    CHECK(invalid.size() == 1 && invalid.contents()[0] == 0xAA);
+}
+
 static void CheckPeriodic(MopCombatLogPackets::PeriodicAuraLog const& log)
 {
     WorldPacket packet(SMSG_SPELL_PERIODIC_AURA_LOG, 64);
@@ -481,6 +791,11 @@ static void test_spell_interrupt_log()
 
 static void test_successor_opcodes_are_framable()
 {
+    CHECK(uint32(SMSG_SPELLINSTAKILLLOG) == 0x09F8u);
+    CHECK(uint32(SMSG_SPELLENERGIZELOG) == 0x0D79u);
+    CHECK(uint32(SMSG_SPELLHEALLOG) == 0x09FBu);
+    CHECK(uint32(SMSG_SPELLDAMAGESHIELD) == 0x05F3u);
+    CHECK(uint32(SMSG_SPELLLOGMISS) == 0x1570u);
     CHECK(uint32(SMSG_SPELL_EXECUTE_LOG) == 0x00D8u);
     CHECK(uint32(SMSG_SPELL_PERIODIC_AURA_LOG) == 0x0CF2u);
     CHECK(uint32(SMSG_SPELLDISPELLOG) == 0x0DF9u);
@@ -493,6 +808,31 @@ static void test_successor_opcodes_are_framable()
     CHECK(executePacket.size() == 29);
 
     uint8 header[4] = {};
+    MopCombatLogPackets::SpellInstakillLog instakill = {};
+    WorldPacket instakillPacket(SMSG_SPELLINSTAKILLLOG, 6);
+    MopCombatLogPackets::BuildSpellInstakillLog(instakillPacket, instakill);
+    CHECK(MopWire::BuildServerHeader(true, instakillPacket.size(), instakillPacket.GetOpcode(), header));
+
+    MopCombatLogPackets::SpellEnergizeLog energize = {};
+    WorldPacket energizePacket(SMSG_SPELLENERGIZELOG, 15);
+    MopCombatLogPackets::BuildSpellEnergizeLog(energizePacket, energize);
+    CHECK(MopWire::BuildServerHeader(true, energizePacket.size(), energizePacket.GetOpcode(), header));
+
+    MopCombatLogPackets::SpellHealLog heal = {};
+    WorldPacket healPacket(SMSG_SPELLHEALLOG, 19);
+    MopCombatLogPackets::BuildSpellHealLog(healPacket, heal);
+    CHECK(MopWire::BuildServerHeader(true, healPacket.size(), healPacket.GetOpcode(), header));
+
+    MopCombatLogPackets::SpellDamageShieldLog damageShield = {};
+    WorldPacket damageShieldPacket(SMSG_SPELLDAMAGESHIELD, 23);
+    MopCombatLogPackets::BuildSpellDamageShieldLog(damageShieldPacket, damageShield);
+    CHECK(MopWire::BuildServerHeader(true, damageShieldPacket.size(), damageShieldPacket.GetOpcode(), header));
+
+    MopCombatLogPackets::SpellMissLog spellMiss = {};
+    WorldPacket spellMissPacket(SMSG_SPELLLOGMISS, 11);
+    CHECK(MopCombatLogPackets::BuildSpellMissLog(spellMissPacket, spellMiss));
+    CHECK(MopWire::BuildServerHeader(true, spellMissPacket.size(), spellMissPacket.GetOpcode(), header));
+
     CHECK(MopWire::BuildServerHeader(true, executePacket.size(), executePacket.GetOpcode(), header));
     CHECK(header[0] == 0xD8 && header[1] == 0xA0 && header[2] == 0x03 && header[3] == 0x00);
 
@@ -522,6 +862,11 @@ static void test_successor_opcodes_are_framable()
 
 int main(int, char**)
 {
+    test_spell_instakill_log();
+    test_spell_energize_log();
+    test_spell_heal_log();
+    test_spell_damage_shield_log();
+    test_spell_miss_log();
     test_execute_variants();
     test_periodic_variants();
     test_dispel_and_steal_variants();

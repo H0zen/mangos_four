@@ -93,8 +93,8 @@ static const uint32 corpseReclaimDelay[MAX_DEATH_COUNT] = {30, 60, 120};
 */
 void Player::BuildPlayerRepop()
 {
-    WorldPacket data(SMSG_PRE_RESURRECT, GetPackGUID().size());
-    data << GetPackGUID();
+    WorldPacket data;
+    MopCompactPackets::BuildPreResurrect(data, GetObjectGuid());
     GetSession()->SendPacket(&data);
 
     if (getRace() == RACE_NIGHTELF)

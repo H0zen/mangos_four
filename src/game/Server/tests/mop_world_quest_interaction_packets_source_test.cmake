@@ -5,6 +5,8 @@ endif()
 file(READ "${SOURCE_ROOT}/src/game/WorldHandlers/MiscHandler.cpp" misc_handler)
 file(READ "${SOURCE_ROOT}/src/game/WorldHandlers/QuestHandler.cpp" quest_handler)
 file(READ "${SOURCE_ROOT}/src/game/Object/PlayerQuest.cpp" player_quest)
+file(READ "${SOURCE_ROOT}/src/game/Object/Player.h" player_header)
+file(READ "${SOURCE_ROOT}/src/game/Object/Player.cpp" player_source)
 file(READ "${SOURCE_ROOT}/src/game/Object/ObjectMgrText.cpp" object_mgr_text)
 file(READ "${SOURCE_ROOT}/src/game/WorldHandlers/NPCHandler.h" npc_handler)
 file(READ "${SOURCE_ROOT}/src/game/WorldHandlers/QueryHandler.cpp" query_handler)
@@ -95,13 +97,38 @@ if(DEFINED MUTATION)
             gossip_def "${gossip_def}")
     elseif(MUTATION STREQUAL "npc_db_content")
         string(REPLACE
-            "WORLD_DB_CONTENT_NR         \"2\""
-            "WORLD_DB_CONTENT_NR         \"1\""
+            "WORLD_DB_CONTENT_NR         \"31\""
+            "WORLD_DB_CONTENT_NR         \"30\""
             revision_data "${revision_data}")
     elseif(MUTATION STREQUAL "npc_reference_status")
         string(REPLACE
             "CMSG_NPC_TEXT_QUERY                            0x0287  ACTIVE"
             "CMSG_NPC_TEXT_QUERY                            0x0287  DORMANT"
+            opcode_reference "${opcode_reference}")
+    elseif(MUTATION STREQUAL "exploration_wire_order")
+        string(REPLACE
+            "out << areaId << experience;"
+            "out << experience << areaId;"
+            player_header "${player_header}")
+    elseif(MUTATION STREQUAL "exploration_sender")
+        string(REPLACE
+            "MopAreaTriggerPackets::BuildExplorationExperience(data, Area, Experience);"
+            "/* removed exploration-experience sender */"
+            player_source "${player_source}")
+    elseif(MUTATION STREQUAL "exploration_registration")
+        string(REPLACE
+            "DefS(SMSG_EXPLORATION_EXPERIENCE, \"SMSG_EXPLORATION_EXPERIENCE\");"
+            "/* removed exploration-experience registration */"
+            opcode_registry "${opcode_registry}")
+    elseif(MUTATION STREQUAL "exploration_admission")
+        string(REPLACE
+            "case SMSG_EXPLORATION_EXPERIENCE:"
+            "/* removed exploration-experience admission */"
+            world_session "${world_session}")
+    elseif(MUTATION STREQUAL "exploration_reference")
+        string(REPLACE
+            "SMSG_EXPLORATION_EXPERIENCE                    0x189A  ACTIVE"
+            "SMSG_EXPLORATION_EXPERIENCE                    0x189A  DORMANT"
             opcode_reference "${opcode_reference}")
     else()
         message(FATAL_ERROR "unknown MUTATION=${MUTATION}")
@@ -125,6 +152,24 @@ require_once("${misc_handler}"
 require_once("${misc_handler}"
     "MopAreaTriggerPackets::BuildNoCorpse\\(data\\)"
     "no-corpse response builder")
+require_once("${player_header}"
+    "out << areaId << experience"
+    "exploration-experience wire order")
+require_once("${player_source}"
+    "MopAreaTriggerPackets::BuildExplorationExperience\\(data, Area, Experience\\)"
+    "exploration-experience sender")
+require_once("${opcode_registry}"
+    "DefS\\(SMSG_EXPLORATION_EXPERIENCE,[ \t]*\"SMSG_EXPLORATION_EXPERIENCE\"\\)"
+    "exploration-experience registration")
+require_once("${world_session}"
+    "case[ \t]+SMSG_EXPLORATION_EXPERIENCE:"
+    "exploration-experience admission")
+require_once("${opcode_reference}"
+    "SMSG_EXPLORATION_EXPERIENCE[ \t]+0x189A[ \t]+ACTIVE"
+    "active direct-client exploration reference")
+if("${player_source}" MATCHES "WorldPacket[ \t]+[A-Za-z0-9_]+\\(SMSG_EXPLORATION_EXPERIENCE")
+    message(FATAL_ERROR "legacy inline exploration-experience sender remains")
+endif()
 require_once("${quest_handler}"
     "MopQuestStatusPackets::ParseMultipleStatusQuery\\(recvPacket\\)"
     "empty quest status query parser")
@@ -216,10 +261,14 @@ foreach(reference IN ITEMS
     endif()
 endforeach()
 
+# Tracks the tuple the server actually declares in revision_data.h.in. The
+# requirement is that the world database be BroadcastText-aware, which first
+# held at 23.1.2; the declared tuple has since advanced and this pin must move
+# with it or the check silently asserts an obsolete database.
 foreach(requirement IN ITEMS
         "WORLD_DB_VERSION_NR[ \t]+\"23\""
-        "WORLD_DB_STRUCTURE_NR[ \t]+\"1\""
-        "WORLD_DB_CONTENT_NR[ \t]+\"2\"")
+        "WORLD_DB_STRUCTURE_NR[ \t]+\"2\""
+        "WORLD_DB_CONTENT_NR[ \t]+\"31\"")
     require_once("${revision_data}"
         "${requirement}"
         "BroadcastText-aware world database requirement")

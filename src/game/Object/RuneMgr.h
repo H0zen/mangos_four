@@ -27,6 +27,10 @@
 #define MANGOS_H_RUNEMGR
 
 #include "Common.h"
+#include "Opcodes.h"
+#include "WorldPacket.h"
+
+#include <array>
 
 class Player;
 class Aura;
@@ -75,6 +79,44 @@ struct Runes
         }
     }
 };
+
+namespace MopRunePackets
+{
+    struct RuneState
+    {
+        RuneType type = RUNE_BLOOD;
+        uint8 cooldownFraction = 0;
+    };
+
+    inline void BuildResync(WorldPacket& out,
+        std::array<RuneState, MAX_RUNES> const& runes)
+    {
+        out.Initialize(SMSG_RESYNC_RUNES, 3 + 2 * runes.size());
+
+        // Wow.exe 18414 helper sub_69BB74 consumes a 23-bit count. Reader
+        // sub_73299D then reads cooldown fraction before rune type.
+        out.WriteBits(uint32(runes.size()), 23);
+        out.FlushBits();
+        for (RuneState const& rune : runes)
+            out << rune.cooldownFraction << uint8(rune.type);
+    }
+
+    inline void BuildAddPower(WorldPacket& out, uint32 runeMask)
+    {
+        // Reader sub_6D9F28 consumes the one uint32 available-rune mask.
+        out.Initialize(SMSG_ADD_RUNE_POWER, sizeof(runeMask));
+        out << runeMask;
+    }
+
+    inline void BuildConvert(WorldPacket& out, RuneType newType, uint8 index)
+    {
+        out.Initialize(SMSG_CONVERT_RUNE, 2);
+
+        // Reader sub_6B9A69 and apply helper sub_951948 consume type first,
+        // then the rune slot index.
+        out << uint8(newType) << index;
+    }
+}
 
 /**
  * @brief Owns a death knight player's rune state and rune-system behaviour.

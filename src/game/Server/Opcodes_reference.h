@@ -175,9 +175,9 @@
  *   TOTAL SMSG rows                   925
  *
  * SUBSYSTEM CONFIDENCE: high=365, low=221, medium=182, none=157
- * STATUS TOTALS: ACTIVE=361, DOC=438, DORMANT=721
- *   SMSG: ACTIVE=221, DOC=271, DORMANT=433
- *   CMSG: ACTIVE=140, DOC=167, DORMANT=288
+ * STATUS TOTALS: ACTIVE=399, DOC=437, DORMANT=684
+ *   SMSG: ACTIVE=258, DOC=271, DORMANT=396
+ *   CMSG: ACTIVE=141, DOC=166, DORMANT=288
  */
 
 // CAVEATS -- read before trusting any single row:
@@ -389,8 +389,8 @@ typedef uint16_t uint16;
  *   SMSG_UPDATE_LAST_INSTANCE                      0x189B  DORMANT  [medium-conf]
  *   SMSG_EXPECTED_SPAM_RECORDS                     0x18C0  DORMANT  [medium-conf]
  *   SMSG_MESSAGECHAT                               0x1A9A  ACTIVE   [medium-conf]
- *   SMSG_DURABILITY_DAMAGE_DEATH                   0x1E3E  DORMANT  [medium-conf]
- *   SMSG_LOG_XPGAIN                                0x1E9A  DORMANT 
+ *   SMSG_DURABILITY_DAMAGE_DEATH                   0x1E3E  ACTIVE   [Wow.exe binary: empty route to retained DURABILITYDAMAGE_DEATH semantic]
+ *   SMSG_LOG_XPGAIN                                0x1E9A  ACTIVE   [Wow.exe binary: sub_6F7E25 packed reader; sub_CE07DA combat-log semantic]
  *
  *  -- CheckExecutableSignature.cpp (1) --
  *   SMSG_UI_TIME                                   0x0027  ACTIVE   [low-conf]
@@ -442,13 +442,13 @@ typedef uint16_t uint16;
  *   SMSG_UNKNOWN_0x14E0                            0x14E0  DOC      [low-conf]
  *
  *  -- DuelInfo.cpp (7) --
- *   SMSG_DUEL_OUTOFBOUNDS                          0x001A  DORMANT  [low-conf]
- *   SMSG_DUEL_REQUESTED                            0x0022  DORMANT 
+ *   SMSG_DUEL_OUTOFBOUNDS                          0x001A  ACTIVE   [high-conf]
+ *   SMSG_DUEL_REQUESTED                            0x0022  ACTIVE   [high-conf]
  *   SMSG_UNKNOWN_0x083F                            0x083F  DOC     
- *   SMSG_DUEL_WINNER                               0x10E1  DORMANT  [low-conf]
- *   SMSG_DUEL_COUNTDOWN                            0x129F  DORMANT  [low-conf]
- *   SMSG_DUEL_INBOUNDS                             0x163A  DORMANT  [low-conf]
- *   SMSG_DUEL_COMPLETE                             0x1C0A  DORMANT  [low-conf]
+ *   SMSG_DUEL_WINNER                               0x10E1  ACTIVE   [high-conf]
+ *   SMSG_DUEL_COUNTDOWN                            0x129F  ACTIVE   [high-conf]
+ *   SMSG_DUEL_INBOUNDS                             0x163A  ACTIVE   [high-conf]
+ *   SMSG_DUEL_COMPLETE                             0x1C0A  ACTIVE   [high-conf]
  *
  *  -- Effect_C.cpp (1) --
  *   SMSG_ACHIEVEMENT_EARNED                        0x080B  DORMANT  [medium-conf]
@@ -496,23 +496,23 @@ typedef uint16_t uint16;
  *   SMSG_OVERRIDE_LIGHT                            0x068A  DORMANT  [medium-conf]
  *   SMSG_WEATHER                                   0x06AB  ACTIVE   [medium-conf]
  *   SMSG_UNKNOWN_0x06BA                            0x06BA  DOC      [low-conf]
- *   SMSG_UPDATE_COMBO_POINTS                       0x082F  DORMANT 
+ *   SMSG_UPDATE_COMBO_POINTS                       0x082F  ACTIVE   [high-conf]
  *   SMSG_TALENTS_INVOLUNTARILY_RESET               0x088A  DORMANT  [low-conf]
  *   SMSG_AREA_TRIGGER_NO_CORPSE                    0x089E  ACTIVE   [high-conf]
  *   SMSG_GUILD_BANK_LIST                           0x0B79  DORMANT  [medium-conf]
  *   SMSG_MONEY_NOTIFY                              0x0C0F  DORMANT  [medium-conf]
  *   SMSG_ITEM_PUSH_RESULT                          0x0E0A  ACTIVE
  *   SMSG_CORPSE_TRANSPORT_QUERY                    0x0E0B  ACTIVE   server-binding=SMSG_CORPSE_QUERY_RESPONSE
- *   SMSG_START_MIRROR_TIMER                        0x0E12  DORMANT 
+ *   SMSG_START_MIRROR_TIMER                        0x0E12  ACTIVE  [high-conf]
  *   SMSG_UNKNOWN_0x0E2B                            0x0E2B  DOC     
  *   SMSG_UNKNOWN_0x0E2E                            0x0E2E  DOC      [medium-conf]
  *   SMSG_GUILD_INVITE_CANCEL                       0x0FE1  DORMANT  [low-conf]
  *   SMSG_PVP_CREDIT                                0x100A  DORMANT 
  *   SMSG_UNKNOWN_0x101F                            0x101F  DOC      [medium-conf]
- *   SMSG_STOP_MIRROR_TIMER                         0x1026  DORMANT  [medium-conf]
+ *   SMSG_STOP_MIRROR_TIMER                         0x1026  ACTIVE  [high-conf]
  *   SMSG_PLAY_SOUND                                0x102A  ACTIVE
  *   SMSG_GM_PLAYER_INFO                            0x102B  DORMANT  [medium-conf]
- *   SMSG_CLEAR_TARGET                              0x1061  DORMANT 
+ *   SMSG_CLEAR_TARGET                              0x1061  ACTIVE   [Wow.exe binary: sub_6D4AFB packed GUID reader; sub_85876E target-clear terminal]
  *   SMSG_PROPOSE_LEVEL_GRANT                       0x109A  DORMANT 
  *   SMSG_UPDATE_INSTANCE_OWNERSHIP                 0x10E0  DORMANT  [medium-conf]
  *   SMSG_REFER_A_FRIEND_EXPIRED                    0x1143  DORMANT  [medium-conf]
@@ -590,8 +590,8 @@ typedef uint16_t uint16;
  *   SMSG_UNKNOWN_0x1E68                            0x1E68  ACTIVE   [low-conf]  server-binding=SMSG_GUILD_EVENT_DISBANDED
  *
  *  -- IncomingResurrection.cpp (2) --
- *   SMSG_RESYNC_RUNES                              0x15E3  DORMANT  [low-conf]
- *   SMSG_ADD_RUNE_POWER                            0x1860  DORMANT  [low-conf]
+ *   SMSG_RESYNC_RUNES                              0x15E3  ACTIVE   [high-conf]
+ *   SMSG_ADD_RUNE_POWER                            0x1860  ACTIVE   [high-conf]
  *
  *  -- ItemSocketInfo.cpp (1) --
  *   SMSG_SHOW_BANK                                 0x0007  DORMANT  [low-conf]
@@ -736,7 +736,7 @@ typedef uint16_t uint16;
  *   SMSG_QUESTGIVER_QUEST_LIST                     0x02D4  ACTIVE   [high-conf]
  *   SMSG_UNKNOWN_0x02EF                            0x02EF  DOC     
  *   SMSG_QUESTGIVER_QUEST_COMPLETE                 0x0346  ACTIVE
- *   SMSG_QUEST_NPC_QUERY_RESPONSE                  0x036D  DORMANT  [medium-conf]
+ *   SMSG_QUEST_NPC_QUERY_RESPONSE                  0x036D  ACTIVE   [medium-conf]
  *   SMSG_UNKNOWN_0x040F                            0x040F  DOC     
  *   SMSG_UNKNOWN_0x041E                            0x041E  DOC      [medium-conf]
  *   SMSG_REQUEST_CEMETERY_LIST_RESPONSE            0x042A  ACTIVE   [medium-conf]
@@ -747,8 +747,8 @@ typedef uint16_t uint16;
  *   SMSG_UNKNOWN_0x04AA                            0x04AA  DOC      [medium-conf]
  *   SMSG_ARENA_ERROR                               0x04BA  DORMANT  [medium-conf]
  *   SMSG_VOICE_PARENTAL_CONTROLS                   0x04BF  DORMANT  [medium-conf]
- *   SMSG_SPELLDAMAGESHIELD                         0x05F3  DORMANT 
- *   SMSG_CHAT_PLAYER_AMBIGUOUS                     0x061A  DORMANT  [medium-conf]
+ *   SMSG_SPELLDAMAGESHIELD                         0x05F3  ACTIVE
+ *   SMSG_CHAT_PLAYER_AMBIGUOUS                     0x061A  ACTIVE   [medium-conf]
  *   SMSG_PLAY_TIME_WARNING                         0x062A  DORMANT  [medium-conf]
  *   SMSG_DISMOUNTRESULT                            0x062F  DORMANT  [medium-conf]
  *   SMSG_QUEST_POI_QUERY_RESPONSE                  0x067F  ACTIVE   [medium-conf]
@@ -767,8 +767,8 @@ typedef uint16_t uint16;
  *   SMSG_PLAYERBOUND                               0x088E  ACTIVE
  *   SMSG_UNKNOWN_0x089F                            0x089F  ACTIVE   [medium-conf]  server-binding=SMSG_SAVE_GUILD_EMBLEM
  *   SMSG_UNKNOWN_0x08FB                            0x08FB  DOC     
- *   SMSG_SPELLINSTAKILLLOG                         0x09F8  DORMANT 
- *   SMSG_SPELLHEALLOG                              0x09FB  DORMANT 
+ *   SMSG_SPELLINSTAKILLLOG                         0x09F8  ACTIVE
+ *   SMSG_SPELLHEALLOG                              0x09FB  ACTIVE
  *   SMSG_UNKNOWN_0x0A2F                            0x0A2F  DOC      [medium-conf]
  *   SMSG_UNKNOWN_0x0A3B                            0x0A3B  DOC     
  *   SMSG_GUILD_RANKS_UPDATE                        0x0A60  ACTIVE   [medium-conf]
@@ -782,7 +782,7 @@ typedef uint16_t uint16;
  *   SMSG_UNKNOWN_0x0C3B                            0x0C3B  DOC      [medium-conf]
  *   SMSG_UNKNOWN_0x0C8E                            0x0C8E  DOC     
  *   SMSG_UNKNOWN_0x0D51                            0x0D51  DOC      [medium-conf]
- *   SMSG_SPELLENERGIZELOG                          0x0D79  DORMANT  [medium-conf]
+ *   SMSG_SPELLENERGIZELOG                          0x0D79  ACTIVE   [medium-conf]
  *   SMSG_SPELLDISPELLOG                            0x0DF9  ACTIVE
  *   SMSG_MOUNTRESULT                               0x0E0F  DORMANT  [medium-conf]
  *   SMSG_ITEM_EXPIRE_PURCHASE_REFUND               0x0E33  DORMANT
@@ -796,7 +796,7 @@ typedef uint16_t uint16;
  *   SMSG_UNKNOWN_0x1023                            0x1023  DOC     
  *   SMSG_RESURRECT_REQUEST                         0x1062  DORMANT 
  *   SMSG_DEATH_RELEASE_LOC                         0x1063  ACTIVE   [medium-conf]
- *   SMSG_CHAT_PLAYER_NOT_FOUND                     0x1082  DORMANT  [medium-conf]
+ *   SMSG_CHAT_PLAYER_NOT_FOUND                     0x1082  ACTIVE   [medium-conf]
  *   SMSG_UNKNOWN_0x108A                            0x108A  DOC      [medium-conf]
  *   SMSG_ITEM_ENCHANT_TIME_UPDATE                  0x10A2  ACTIVE
  *   SMSG_UNKNOWN_0x10BB                            0x10BB  DOC      [medium-conf]
@@ -819,7 +819,7 @@ typedef uint16_t uint16;
  *   SMSG_VOID_STORAGE_TRANSFER_CHANGES             0x14BA  DORMANT  [medium-conf]
  *   SMSG_REMOVED_SPELL                             0x14C3  ACTIVE   [high-conf]
  *   SMSG_BUY_FAILED                                0x1563  ACTIVE   [medium-conf]
- *   SMSG_SPELLLOGMISS                              0x1570  DORMANT 
+ *   SMSG_SPELLLOGMISS                              0x1570  ACTIVE
  *   SMSG_SHOW_NEURTRAL_PLAYER_FACTION_SELECT_UI    0x15E0  DORMANT  [medium-conf]
  *   SMSG_UNKNOWN_0x161A                            0x161A  DOC      [medium-conf]
  *   SMSG_GMTICKET_SYSTEMSTATUS                     0x163B  ACTIVE   [medium-conf]
@@ -829,18 +829,18 @@ typedef uint16_t uint16;
  *   SMSG_INSPECT_RESULTS                           0x1842  ACTIVE
  *   SMSG_SPELLINTERRUPTLOG                         0x1851  ACTIVE
  *   SMSG_GODMODE                                   0x1862  DORMANT  [medium-conf]
- *   SMSG_EXPLORATION_EXPERIENCE                    0x189A  DORMANT 
+ *   SMSG_EXPLORATION_EXPERIENCE                    0x189A  ACTIVE   [Wow.exe binary: sub_6BB9C1 reads area ID then experience; sub_7B1384 retained semantic]
  *   SMSG_TRAINER_LIST                              0x189F  DORMANT  [medium-conf]
  *   SMSG_REPORT_PVP_AFK_RESULT                     0x18BE  DORMANT  [medium-conf]
  *   SMSG_GROUP_SET_LEADER                          0x18BF  DORMANT  [medium-conf]
  *   SMSG_ITEM_TIME_UPDATE                          0x18C1  ACTIVE
  *   SMSG_PETGODMODE                                0x1940  DORMANT  [medium-conf]
  *   SMSG_SUPERCEDED_SPELL                          0x1943  ACTIVE   [high-conf]
- *   SMSG_LEVELUP_INFO                              0x1961  DORMANT 
+ *   SMSG_LEVELUP_INFO                              0x1961  ACTIVE   [Wow.exe binary: sub_6BAC39 reads 13 uint32 fields; sub_7B12E9 maps them to PLAYER_LEVEL_UP]
  *   SMSG_UNKNOWN_0x19C2                            0x19C2  DOC      [medium-conf]
- *   SMSG_CONVERT_RUNE                              0x1A1B  DORMANT  [medium-conf]
+ *   SMSG_CONVERT_RUNE                              0x1A1B  ACTIVE   [high-conf]
  *   SMSG_UNKNOWN_0x1A2B                            0x1A2B  DOC      [medium-conf]
- *   SMSG_CHAT_RESTRICTED                           0x1A3B  DORMANT  [medium-conf]
+ *   SMSG_CHAT_RESTRICTED                           0x1A3B  ACTIVE   [medium-conf]
  *   SMSG_TIME_SYNC_REQ                             0x1A8F  ACTIVE
  *   SMSG_LIST_INVENTORY                            0x1AAE  ACTIVE   [medium-conf]
  *   SMSG_GUILD_DECLINE                             0x1AF9  DORMANT  [medium-conf]
@@ -935,10 +935,10 @@ typedef uint16_t uint16;
  *   SMSG_GAMEOBJECT_RESET_STATE                    0x100E  DORMANT 
  *   SMSG_SPELL_START                               0x107A  ACTIVE
  *   SMSG_SET_FLAT_SPELL_MODIFIER                   0x10F2  DORMANT 
- *   SMSG_CHANNEL_START                             0x10F9  DORMANT 
- *   SMSG_COOLDOWN_EVENT                            0x1163  DORMANT 
+ *   SMSG_CHANNEL_START                             0x10F9  ACTIVE  [high-conf]
+ *   SMSG_COOLDOWN_EVENT                            0x1163  ACTIVE
  *   SMSG_UNKNOWN_0x117A                            0x117A  DOC     
- *   SMSG_CHANNEL_UPDATE                            0x11D9  DORMANT 
+ *   SMSG_CHANNEL_UPDATE                            0x11D9  ACTIVE  [high-conf]
  *   SMSG_PLAY_SPELL_VISUAL_KIT                     0x11E3  DORMANT
  *   SMSG_NOTIFY_MISSILE_TRAJECTORY_COLLISION       0x120A  DORMANT 
  *   SMSG_CAST_FAILED                               0x143A  ACTIVE
@@ -973,7 +973,7 @@ typedef uint16_t uint16;
  *   SMSG_SET_PLAY_HOVER_ANIM                       0x069F  DORMANT
  *
  *  -- UnitCombatLog_C.cpp (6) --
- *   SMSG_PARTYKILLLOG                              0x048A  DORMANT 
+ *   SMSG_PARTYKILLLOG                              0x048A  ACTIVE   [Wow.exe binary: sub_6F2FE4 reads killer/victim GUIDs; sub_841B83 emits party-kill event]
  *   SMSG_DISPEL_FAILED                             0x085B  DORMANT 
  *   SMSG_SPELL_PERIODIC_AURA_LOG                   0x0CF2  ACTIVE
  *   SMSG_ENCHANTMENTLOG                            0x12A3  DORMANT 
@@ -1021,7 +1021,7 @@ typedef uint16_t uint16;
  *   SMSG_MIRROR_IMAGE_COMPONENTED_DATA             0x04D9  DORMANT
  *   SMSG_MOVE_KNOCK_BACK                           0x0562  DORMANT 
  *   SMSG_PLAY_SPELL_VISUAL                         0x061E  DORMANT 
- *   SMSG_THREAT_UPDATE                             0x0632  DORMANT 
+ *   SMSG_THREAT_UPDATE                             0x0632  ACTIVE   [high-conf]
  *   SMSG_AI_REACTION                               0x06AF  ACTIVE
  *   SMSG_SPLINE_MOVE_ROOT                          0x0728  DORMANT 
  *   SMSG_MOVE_SET_SWIM_SPEED                       0x0817  ACTIVE
@@ -1053,7 +1053,7 @@ typedef uint16_t uint16;
  *   SMSG_MOVE_UNSET_CAN_TURN_WHILE_FALLING         0x0D61  DOC     
  *   SMSG_MOVE_UPDATE_TURN_RATE                     0x0D62  DORMANT
  *   SMSG_SPLINE_MOVE_UNSET_FLYING                  0x0DE2  DORMANT 
- *   SMSG_DISMOUNT                                  0x0E3A  DORMANT 
+ *   SMSG_DISMOUNT                                  0x0E3A  ACTIVE   [high-conf]
  *   SMSG_SPLINE_MOVE_START_SWIM                    0x0F29  DORMANT 
  *   SMSG_UNKNOWN_0x100B                            0x100B  DOC     
  *   SMSG_CLIENT_CONTROL_UPDATE                     0x1043  ACTIVE
@@ -1063,7 +1063,7 @@ typedef uint16_t uint16;
  *   SMSG_MOVE_UPDATE_REMOVE_MOVEMENT_FORCE         0x1464  DORMANT
  *   SMSG_HEALTH_UPDATE                             0x148B  DORMANT 
  *   SMSG_SET_VEHICLE_REC_ID                        0x149F  DORMANT 
- *   SMSG_HIGHEST_THREAT_UPDATE                     0x14AE  DORMANT 
+ *   SMSG_HIGHEST_THREAT_UPDATE                     0x14AE  ACTIVE   [high-conf]
  *   SMSG_UNKNOWN_0x1553                            0x1553  DOC     
  *   SMSG_MOVE_UPDATE_RUN_SPEED                     0x158E  DORMANT
  *   SMSG_MOVE_GRAVITY_DISABLE                      0x159F  DORMANT 
@@ -1075,7 +1075,7 @@ typedef uint16_t uint16;
  *   SMSG_SPLINE_MOVE_STOP_SWIM                     0x1798  DORMANT 
  *   SMSG_MOVE_SET_PITCH_RATE                       0x17AB  DORMANT 
  *   SMSG_MOVE_SET_HOVER                            0x1802  DORMANT 
- *   SMSG_THREAT_CLEAR                              0x180B  DORMANT 
+ *   SMSG_THREAT_CLEAR                              0x180B  ACTIVE   [high-conf]
  *   SMSG_MOVE_UPDATE_COLLISION_HEIGHT              0x1812  DORMANT
  *   SMSG_UNKNOWN_0x181B                            0x181B  DOC     
  *   SMSG_SPLINE_MOVE_SET_WATER_WALK                0x1823  ACTIVE
@@ -1085,8 +1085,8 @@ typedef uint16_t uint16;
  *   SMSG_UNKNOWN_0x186F                            0x186F  DOC     
  *   SMSG_SPLINE_MOVE_SET_FEATHER_FALL              0x1893  ACTIVE
  *   SMSG_SPLINE_MOVE_SET_LAND_WALK                 0x18B6  ACTIVE
- *   SMSG_THREAT_REMOVE                             0x1960  DORMANT 
- *   SMSG_PRE_RESURRECT                             0x19C0  DORMANT 
+ *   SMSG_THREAT_REMOVE                             0x1960  ACTIVE   [high-conf]
+ *   SMSG_PRE_RESURRECT                             0x19C0  ACTIVE   [high-conf]
  *   SMSG_MONSTER_MOVE                              0x1A07  ACTIVE
  *   SMSG_PLAYER_MOVE                               0x1A32  ACTIVE
  *   SMSG_PET_DISMISS_SOUND                         0x1ABB  DORMANT 
@@ -1273,7 +1273,7 @@ typedef uint16_t uint16;
  *   SMSG_UNKNOWN_0x188B                            0x188B  DOC      [unattributed]  handler never installed in this build
  *   SMSG_UNKNOWN_0x18AA                            0x18AA  DOC      [unattributed]  handler never installed in this build
  *   SMSG_UNKNOWN_0x18BB                            0x18BB  DOC      [unattributed]  handler never installed in this build
- *   SMSG_ITEM_COOLDOWN                             0x1904  DORMANT  [unattributed]  dynamic slot 772 installed by 0x78F488
+ *   SMSG_ITEM_COOLDOWN                             0x1904  ACTIVE  [Wow.exe binary: dynamic slot 772 handler sub_77D70B reads uint64 item GUID then uint32 spell ID]
  *   SMSG_UNKNOWN_0x1949                            0x1949  DOC      [unattributed]  special-control (ingress)
  *   SMSG_UNKNOWN_0x1968                            0x1968  DOC      [unattributed]  special-control (ingress)
  *   SMSG_PONG                                      0x1969  ACTIVE   [unattributed]  special-control (ingress)
@@ -1879,7 +1879,7 @@ typedef uint16_t uint16;
  *   CMSG_UNKNOWN_0x1D9B                            0x1D9B  DOC     
  *   CMSG_LFG_PROPOSAL_RESPONSE                     0x1D9D  DORMANT 
  *   CMSG_LF_GUILD_SET_GUILD_POST                   0x1D9F  DOC     
- *   CMSG_QUEST_NPC_QUERY                           0x1DAE  DOC     
+ *   CMSG_QUEST_NPC_QUERY                           0x1DAE  ACTIVE
  *   CMSG_UNKNOWN_0x1DB9                            0x1DB9  DOC     
  *   CMSG_SEND_MAIL                                 0x1DBA  DORMANT 
  *   CMSG_LOAD_SCREEN                               0x1DBD  ACTIVE

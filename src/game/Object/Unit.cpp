@@ -888,9 +888,9 @@ uint32 Unit::DealDamage(Unit* pVictim, uint32 damage, CleanDamage const* cleanDa
         {
             player_tap->ProcDamageAndSpell(pVictim, PROC_FLAG_KILL, PROC_FLAG_KILLED, PROC_EX_NONE, 0);
 
-            WorldPacket data(SMSG_PARTYKILLLOG, (8 + 8));   // send event PARTY_KILL
-            data << player_tap->GetObjectGuid();            // player with killing blow
-            data << pVictim->GetObjectGuid();               // victim
+            WorldPacket data;
+            MopCompactPackets::BuildPartyKillLog(data,
+                player_tap->GetObjectGuid(), pVictim->GetObjectGuid());
 
             if (group_tap)
             {
@@ -1009,7 +1009,8 @@ uint32 Unit::DealDamage(Unit* pVictim, uint32 damage, CleanDamage const* cleanDa
                 DEBUG_LOG("DealDamage: Killed %s, looing 10 percents durability", pVictim->GetGuidStr().c_str());
                 playerVictim->DurabilityLossAll(0.10f, false);
                 // durability lost message
-                WorldPacket data(SMSG_DURABILITY_DAMAGE_DEATH, 0);
+                WorldPacket data;
+                MopDeathPackets::BuildDurabilityDamageDeath(data);
                 playerVictim->GetSession()->SendPacket(&data);
             }
 
@@ -2487,15 +2488,16 @@ void Unit::ProcDamageAndSpell(Unit* pVictim, uint32 procAttacker, uint32 procVic
  */
 void Unit::SendSpellMiss(Unit* target, uint32 spellID, SpellMissInfo missInfo)
 {
-    WorldPacket data(SMSG_SPELLLOGMISS, (4 + 8 + 1 + 4 + 8 + 1));
-    data << uint32(spellID);
-    data << GetObjectGuid();
-    data << uint8(0);                                       // can be 0 or 1, flag
-    data << uint32(1);                                      // target count
-    // for(i = 0; i < target count; ++i)
-    data << target->GetObjectGuid();                        // target GUID
-    data << uint8(missInfo);
-    // end loop
+    MopCombatLogPackets::SpellMissTarget miss = {};
+    miss.guid = target->GetObjectGuid().GetRawValue();
+    miss.missReason = uint8(missInfo);
+    MopCombatLogPackets::SpellMissLog log = {};
+    log.casterGuid = GetObjectGuid().GetRawValue();
+    log.spellId = spellID;
+    log.targets = &miss;
+    log.targetCount = 1;
+    WorldPacket data(SMSG_SPELLLOGMISS, 32);
+    MopCombatLogPackets::BuildSpellMissLog(data, log);
     SendMessageToSet(&data, true);
 }
 
@@ -3521,16 +3523,16 @@ Unit* Unit::SelectMagnetTarget(Unit* victim, Spell* spell, SpellEffectIndex eff)
  */
 void Unit::SendHealSpellLog(Unit* pVictim, uint32 SpellID, uint32 Damage, uint32 OverHeal, bool critical, uint32 absorb)
 {
-    // we guess size
-    WorldPacket data(SMSG_SPELLHEALLOG, (8 + 8 + 4 + 4 + 1));
-    data << pVictim->GetPackGUID();
-    data << GetPackGUID();
-    data << uint32(SpellID);
-    data << uint32(Damage);
-    data << uint32(OverHeal);
-    data << uint32(absorb);
-    data << uint8(critical ? 1 : 0);
-    data << uint8(0);                                       // unused in client?
+    MopCombatLogPackets::SpellHealLog log = {};
+    log.casterGuid = GetObjectGuid().GetRawValue();
+    log.targetGuid = pVictim->GetObjectGuid().GetRawValue();
+    log.spellId = SpellID;
+    log.heal = Damage;
+    log.overheal = OverHeal;
+    log.absorb = absorb;
+    log.critical = critical;
+    WorldPacket data(SMSG_SPELLHEALLOG, 36);
+    MopCombatLogPackets::BuildSpellHealLog(data, log);
     SendMessageToSet(&data, true);
 }
 
@@ -3544,12 +3546,14 @@ void Unit::SendHealSpellLog(Unit* pVictim, uint32 SpellID, uint32 Damage, uint32
  */
 void Unit::SendEnergizeSpellLog(Unit* pVictim, uint32 SpellID, uint32 Damage, Powers powertype)
 {
-    WorldPacket data(SMSG_SPELLENERGIZELOG, (8 + 8 + 4 + 4 + 4 + 1));
-    data << pVictim->GetPackGUID();
-    data << GetPackGUID();
-    data << uint32(SpellID);
-    data << uint32(powertype);
-    data << uint32(Damage);
+    MopCombatLogPackets::SpellEnergizeLog log = {};
+    log.targetGuid = pVictim->GetObjectGuid().GetRawValue();
+    log.casterGuid = GetObjectGuid().GetRawValue();
+    log.amount = Damage;
+    log.spellId = SpellID;
+    log.powerType = powertype;
+    WorldPacket data(SMSG_SPELLENERGIZELOG, 28);
+    MopCombatLogPackets::BuildSpellEnergizeLog(data, log);
     SendMessageToSet(&data, true);
 }
 
@@ -3739,8 +3743,8 @@ void Unit::Unmount(bool from_aura)
     // Called NOT by Taxi system / GM command
     if (from_aura)
     {
-        WorldPacket data(SMSG_DISMOUNT, 8);
-        data << GetPackGUID();
+        WorldPacket data;
+        MopCompactPackets::BuildDismount(data, GetObjectGuid());
         SendMessageToSet(&data, true);
     }
 

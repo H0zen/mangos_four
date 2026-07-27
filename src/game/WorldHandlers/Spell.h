@@ -376,6 +376,75 @@ namespace MopSpellPackets
         out.WriteGuidBytes<2>(ownerGuid);
     }
 
+    inline void BuildCooldownEvent(WorldPacket& out, ObjectGuid ownerGuid,
+        uint32 spellId)
+    {
+        out.Initialize(SMSG_COOLDOWN_EVENT, 13);
+
+        // Wow.exe 18414 reader sub_6D511A reconstructs the owner GUID around the
+        // spell ID; resolved terminal sub_77AECB applies its cooldown event.
+        out.WriteGuidMask<4, 7, 1, 5, 6, 0, 2, 3>(ownerGuid);
+        out.FlushBits();
+        out.WriteGuidBytes<5, 7>(ownerGuid);
+        out << spellId;
+        out.WriteGuidBytes<3, 1, 2, 4, 6, 0>(ownerGuid);
+    }
+
+    inline void BuildItemCooldown(WorldPacket& out, ObjectGuid itemGuid,
+        uint32 spellId)
+    {
+        out.Initialize(SMSG_ITEM_COOLDOWN, 12);
+
+        // Dynamic 18414 handler sub_77D70B reads a raw uint64 item GUID and
+        // then a uint32 spell ID before installing the item's 30-second lock.
+        out << itemGuid << spellId;
+    }
+
+    inline void BuildClearTarget(WorldPacket& out, ObjectGuid targetGuid)
+    {
+        out.Initialize(SMSG_CLEAR_TARGET, 9);
+
+        // Wow.exe 18414 reader sub_6D4AFB reconstructs this packed GUID;
+        // terminal sub_85876E forwards it to the client target-clear routine.
+        out.WriteGuidMask<6, 2, 0, 4, 7, 1, 3, 5>(targetGuid);
+        out.FlushBits();
+        out.WriteGuidBytes<4, 0, 3, 5, 2, 7, 6, 1>(targetGuid);
+    }
+
+    inline void BuildChannelStart(WorldPacket& out, ObjectGuid casterGuid,
+        uint32 spellId, uint32 durationMs)
+    {
+        out.Initialize(SMSG_CHANNEL_START, 18);
+
+        // Wow.exe 18414 reader sub_C6AFEC brackets the caster GUID with
+        // optional target and auxiliary-data bits. The current server path
+        // has neither optional structure, so both presence bits stay clear.
+        out.WriteGuidMask<7, 5, 4, 1>(casterGuid);
+        out.WriteBit(false);
+        out.WriteGuidMask<3, 2, 0, 6>(casterGuid);
+        out.WriteBit(false);
+        out.FlushBits();
+
+        out.WriteGuidBytes<6, 7, 3, 1, 0>(casterGuid);
+        out << durationMs;
+        out.WriteGuidBytes<5, 4, 2>(casterGuid);
+        out << spellId;
+    }
+
+    inline void BuildChannelUpdate(WorldPacket& out, ObjectGuid casterGuid,
+        uint32 durationMs)
+    {
+        out.Initialize(SMSG_CHANNEL_UPDATE, 13);
+
+        // Reader sub_C6915A reconstructs the caster before consuming the
+        // remaining duration; zero duration drives the channel-stop path.
+        out.WriteGuidMask<0, 3, 4, 1, 5, 2, 6, 7>(casterGuid);
+        out.FlushBits();
+        out.WriteGuidBytes<4, 7, 1, 2, 6, 5>(casterGuid);
+        out << durationMs;
+        out.WriteGuidBytes<0, 3>(casterGuid);
+    }
+
     inline void BuildLearnedSpell(WorldPacket& out, uint32 spellId,
         bool suppressMessaging)
     {
@@ -1447,6 +1516,236 @@ namespace MopCombatLogPackets
         uint32 interruptSpellId;
         uint32 interruptedSpellId;
     };
+
+    struct SpellInstakillLog
+    {
+        uint64 casterGuid;
+        uint64 victimGuid;
+        uint32 spellId;
+    };
+
+    struct SpellEnergizeLog
+    {
+        uint64 targetGuid;
+        uint64 casterGuid;
+        uint32 amount;
+        uint32 spellId;
+        uint32 powerType;
+    };
+
+    struct SpellHealLog
+    {
+        uint64 casterGuid;
+        uint64 targetGuid;
+        uint32 spellId;
+        uint32 heal;
+        uint32 overheal;
+        uint32 absorb;
+        bool critical;
+    };
+
+    struct SpellDamageShieldLog
+    {
+        uint64 casterGuid;
+        uint64 targetGuid;
+        uint32 spellId;
+        uint32 damage;
+        uint32 overkill;
+        uint32 schoolMask;
+        uint32 resist;
+    };
+
+    struct SpellMissTarget
+    {
+        uint64 guid;
+        uint8 missReason;
+    };
+
+    struct SpellMissLog
+    {
+        uint64 casterGuid;
+        uint32 spellId;
+        SpellMissTarget const* targets;
+        size_t targetCount;
+    };
+
+    inline void BuildSpellInstakillLog(WorldPacket& out, SpellInstakillLog const& log)
+    {
+        // The 18414 reader interleaves both packed-GUID masks before consuming
+        // their XOR bytes and the spell ID.
+        uint8 const casterMaskA[] = { 6, 7, 3, 1, 2, 0, 4 };
+        uint8 const victimMaskA[] = { 0, 2 };
+        uint8 const victimMaskB[] = { 4, 7, 1, 6, 5 };
+
+        out.WriteBit(GuidByte(log.casterGuid, casterMaskA[0]) != 0);
+        out.WriteBit(GuidByte(log.victimGuid, victimMaskA[0]) != 0);
+        out.WriteBit(GuidByte(log.casterGuid, casterMaskA[1]) != 0);
+        out.WriteBit(GuidByte(log.victimGuid, victimMaskA[1]) != 0);
+        for (size_t i = 2; i < sizeof(casterMaskA); ++i)
+            out.WriteBit(GuidByte(log.casterGuid, casterMaskA[i]) != 0);
+        WriteGuidMask(out, log.victimGuid, victimMaskB);
+        out.WriteBit(GuidByte(log.casterGuid, 5) != 0);
+        out.WriteBit(GuidByte(log.victimGuid, 3) != 0);
+        out.FlushBits();
+
+        out.WriteByteSeq(GuidByte(log.casterGuid, 0));
+        out.WriteByteSeq(GuidByte(log.victimGuid, 1));
+        out.WriteByteSeq(GuidByte(log.casterGuid, 3));
+        out.WriteByteSeq(GuidByte(log.casterGuid, 4));
+        out.WriteByteSeq(GuidByte(log.casterGuid, 5));
+        out.WriteByteSeq(GuidByte(log.casterGuid, 7));
+        out.WriteByteSeq(GuidByte(log.victimGuid, 0));
+        out.WriteByteSeq(GuidByte(log.casterGuid, 6));
+        out.WriteByteSeq(GuidByte(log.victimGuid, 2));
+        out.WriteByteSeq(GuidByte(log.victimGuid, 4));
+        out.WriteByteSeq(GuidByte(log.casterGuid, 1));
+        out << uint32(log.spellId);
+        uint8 const victimBytes[] = { 3, 7, 6, 5 };
+        out.WriteByteSeq(GuidByte(log.victimGuid, victimBytes[0]));
+        out.WriteByteSeq(GuidByte(log.casterGuid, 2));
+        for (size_t i = 1; i < sizeof(victimBytes); ++i)
+            out.WriteByteSeq(GuidByte(log.victimGuid, victimBytes[i]));
+    }
+
+    inline void BuildSpellEnergizeLog(WorldPacket& out, SpellEnergizeLog const& log)
+    {
+        // The optional bit controls a client cast-log extension that the
+        // server's energize event does not populate.
+        uint8 const mask[][2] = {
+            { 7, 0 }, { 3, 0 }, { 1, 1 }, { 4, 0 }, { 2, 0 }, { 3, 1 }, { 5, 0 },
+            { 7, 1 }, { 0, 1 }, { 2, 1 }, { 4, 1 }, { 6, 1 }, { 6, 0 }, { 1, 0 },
+            { 0, 0 }, { 5, 1 }
+        };
+        for (size_t i = 0; i < 7; ++i)
+            out.WriteBit(GuidByte(mask[i][1] ? log.casterGuid : log.targetGuid, mask[i][0]) != 0);
+        out.WriteBit(false);
+        for (size_t i = 7; i < 16; ++i)
+            out.WriteBit(GuidByte(mask[i][1] ? log.casterGuid : log.targetGuid, mask[i][0]) != 0);
+        out.FlushBits();
+
+        uint8 const bytesA[][2] = {
+            { 0, 0 }, { 5, 1 }, { 6, 0 }, { 6, 1 }, { 2, 0 }, { 0, 1 }, { 1, 0 }
+        };
+        for (auto const& byte : bytesA)
+            out.WriteByteSeq(GuidByte(byte[1] ? log.casterGuid : log.targetGuid, byte[0]));
+        out << uint32(log.amount);
+        uint8 const bytesB[][2] = {
+            { 4, 0 }, { 1, 1 }, { 7, 1 }, { 5, 0 }, { 2, 1 }, { 3, 1 },
+            { 7, 0 }, { 4, 1 }, { 3, 0 }
+        };
+        for (auto const& byte : bytesB)
+            out.WriteByteSeq(GuidByte(byte[1] ? log.casterGuid : log.targetGuid, byte[0]));
+        out << uint32(log.spellId);
+        out << uint32(log.powerType);
+    }
+
+    inline void BuildSpellHealLog(WorldPacket& out, SpellHealLog const& log)
+    {
+        // The reader consumes the four fixed scalars before its packed-GUID
+        // bit section. The three false bits omit unsupported cast-log/floats.
+        out << uint32(log.spellId);
+        out << uint32(log.absorb);
+        out << uint32(log.heal);
+        out << uint32(log.overheal);
+
+        uint8 const mask[][2] = {
+            { 0, 1 }, { 2, 0 }, { 6, 0 }, { 2, 1 }, { 3, 0 }, { 0, 0 }, { 5, 0 },
+            { 3, 1 }, { 7, 1 }, { 5, 1 }, { 7, 0 }, { 4, 1 }, { 4, 0 }, { 1, 0 },
+            { 1, 1 }, { 6, 1 }
+        };
+        for (size_t i = 0; i < 4; ++i)
+            out.WriteBit(GuidByte(mask[i][1] ? log.targetGuid : log.casterGuid, mask[i][0]) != 0);
+        out.WriteBit(log.critical);
+        for (size_t i = 4; i < 8; ++i)
+            out.WriteBit(GuidByte(mask[i][1] ? log.targetGuid : log.casterGuid, mask[i][0]) != 0);
+        out.WriteBit(false);
+        for (size_t i = 8; i < 12; ++i)
+            out.WriteBit(GuidByte(mask[i][1] ? log.targetGuid : log.casterGuid, mask[i][0]) != 0);
+        out.WriteBit(false);
+        out.WriteBit(false);
+        for (size_t i = 12; i < 16; ++i)
+            out.WriteBit(GuidByte(mask[i][1] ? log.targetGuid : log.casterGuid, mask[i][0]) != 0);
+        out.FlushBits();
+
+        uint8 const bytes[][2] = {
+            { 2, 0 }, { 6, 1 }, { 5, 0 }, { 3, 0 }, { 7, 1 }, { 7, 0 },
+            { 6, 0 }, { 1, 0 }, { 2, 1 }, { 4, 1 }, { 3, 1 }, { 0, 1 },
+            { 5, 1 }, { 0, 0 }, { 1, 1 }, { 4, 0 }
+        };
+        for (auto const& byte : bytes)
+            out.WriteByteSeq(GuidByte(byte[1] ? log.targetGuid : log.casterGuid, byte[0]));
+    }
+
+    inline void BuildSpellDamageShieldLog(WorldPacket& out, SpellDamageShieldLog const& log)
+    {
+        // The false bit omits the optional client cast-log extension. All
+        // damage-shield scalars below are mandatory in the 18414 reader.
+        uint8 const mask[][2] = {
+            { 1, 1 }, { 2, 0 }, { 6, 0 }, { 3, 1 }, { 4, 0 }, { 2, 1 },
+            { 5, 1 }, { 6, 1 }, { 3, 0 }, { 0, 1 }, { 5, 0 }, { 1, 0 },
+            { 0, 0 }, { 7, 1 }, { 4, 1 }, { 7, 0 }
+        };
+        for (size_t i = 0; i < 2; ++i)
+            out.WriteBit(GuidByte(mask[i][1] ? log.targetGuid : log.casterGuid, mask[i][0]) != 0);
+        out.WriteBit(false);
+        for (size_t i = 2; i < 16; ++i)
+            out.WriteBit(GuidByte(mask[i][1] ? log.targetGuid : log.casterGuid, mask[i][0]) != 0);
+        out.FlushBits();
+
+        out.WriteByteSeq(GuidByte(log.targetGuid, 2));
+        out.WriteByteSeq(GuidByte(log.casterGuid, 6));
+        out.WriteByteSeq(GuidByte(log.targetGuid, 6));
+        out.WriteByteSeq(GuidByte(log.targetGuid, 4));
+        out.WriteByteSeq(GuidByte(log.casterGuid, 3));
+        out.WriteByteSeq(GuidByte(log.targetGuid, 7));
+        out << uint32(log.resist);
+        out.WriteByteSeq(GuidByte(log.casterGuid, 4));
+        out.WriteByteSeq(GuidByte(log.targetGuid, 1));
+        out << uint32(log.damage);
+        out.WriteByteSeq(GuidByte(log.casterGuid, 7));
+        out << uint32(log.spellId);
+        out << uint32(log.overkill);
+        out.WriteByteSeq(GuidByte(log.targetGuid, 5));
+        out.WriteByteSeq(GuidByte(log.casterGuid, 5));
+        out.WriteByteSeq(GuidByte(log.targetGuid, 0));
+        out.WriteByteSeq(GuidByte(log.casterGuid, 1));
+        out.WriteByteSeq(GuidByte(log.casterGuid, 0));
+        out.WriteByteSeq(GuidByte(log.casterGuid, 2));
+        out << uint32(log.schoolMask);
+        out.WriteByteSeq(GuidByte(log.targetGuid, 3));
+    }
+
+    inline bool BuildSpellMissLog(WorldPacket& out, SpellMissLog const& log)
+    {
+        if (log.targetCount >= (size_t(1) << 23) || (log.targetCount && !log.targets))
+            return false;
+
+        uint8 const casterMask[] = { 5, 1, 4, 0, 7, 3, 2, 6 };
+        uint8 const targetMask[] = { 0, 1, 6, 2, 5, 3, 4, 7 };
+        WriteGuidMask(out, log.casterGuid, casterMask);
+        out.WriteBits(uint32(log.targetCount), 23);
+        for (size_t i = 0; i < log.targetCount; ++i)
+        {
+            WriteGuidMask(out, log.targets[i].guid, targetMask);
+            // The client can carry two optional target-position floats; this
+            // server event identifies targets by GUID only.
+            out.WriteBit(false);
+        }
+        out.FlushBits();
+
+        uint8 const targetBytes[] = { 7, 5, 0, 6, 3, 2, 1, 4 };
+        for (size_t i = 0; i < log.targetCount; ++i)
+        {
+            out << uint8(log.targets[i].missReason);
+            WriteGuidBytes(out, log.targets[i].guid, targetBytes);
+        }
+        uint8 const casterBytesA[] = { 6, 4, 2, 0, 1 };
+        uint8 const casterBytesB[] = { 3, 7, 5 };
+        WriteGuidBytes(out, log.casterGuid, casterBytesA);
+        out << uint32(log.spellId);
+        WriteGuidBytes(out, log.casterGuid, casterBytesB);
+        return true;
+    }
 
     inline bool BuildSpellExecuteLog(WorldPacket& out, SpellExecuteLog const& log)
     {
