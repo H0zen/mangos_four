@@ -851,6 +851,28 @@ namespace MopDuelPackets
     }
 }
 
+namespace MopMirrorTimerPackets
+{
+    inline void BuildStart(WorldPacket& out, uint32 type, uint32 maxValue,
+        uint32 currentValue, int32 regeneration, uint32 spellId, bool paused)
+    {
+        out.Initialize(SMSG_START_MIRROR_TIMER, 21);
+
+        // Wow.exe 18414 reader sub_6F16F9 consumes five uint32 values in
+        // max/spell/current/regen/type order, then one MSB-first pause bit.
+        out << maxValue << spellId << currentValue << uint32(regeneration) << type;
+        out.WriteBit(paused);
+        out.FlushBits();
+    }
+
+    inline void BuildStop(WorldPacket& out, uint32 type)
+    {
+        // Wow.exe 18414 reader sub_6D9F28 consumes only the timer type.
+        out.Initialize(SMSG_STOP_MIRROR_TIMER, sizeof(type));
+        out << type;
+    }
+}
+
 namespace MopAreaTriggerPackets
 {
     struct Request

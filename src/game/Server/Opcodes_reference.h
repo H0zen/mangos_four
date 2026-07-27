@@ -175,8 +175,8 @@
  *   TOTAL SMSG rows                   925
  *
  * SUBSYSTEM CONFIDENCE: high=365, low=221, medium=182, none=157
- * STATUS TOTALS: ACTIVE=383, DOC=438, DORMANT=699
- *   SMSG: ACTIVE=243, DOC=271, DORMANT=411
+ * STATUS TOTALS: ACTIVE=385, DOC=438, DORMANT=697
+ *   SMSG: ACTIVE=245, DOC=271, DORMANT=409
  *   CMSG: ACTIVE=140, DOC=167, DORMANT=288
  */
 
@@ -503,13 +503,13 @@ typedef uint16_t uint16;
  *   SMSG_MONEY_NOTIFY                              0x0C0F  DORMANT  [medium-conf]
  *   SMSG_ITEM_PUSH_RESULT                          0x0E0A  ACTIVE
  *   SMSG_CORPSE_TRANSPORT_QUERY                    0x0E0B  ACTIVE   server-binding=SMSG_CORPSE_QUERY_RESPONSE
- *   SMSG_START_MIRROR_TIMER                        0x0E12  DORMANT 
+ *   SMSG_START_MIRROR_TIMER                        0x0E12  ACTIVE  [high-conf]
  *   SMSG_UNKNOWN_0x0E2B                            0x0E2B  DOC     
  *   SMSG_UNKNOWN_0x0E2E                            0x0E2E  DOC      [medium-conf]
  *   SMSG_GUILD_INVITE_CANCEL                       0x0FE1  DORMANT  [low-conf]
  *   SMSG_PVP_CREDIT                                0x100A  DORMANT 
  *   SMSG_UNKNOWN_0x101F                            0x101F  DOC      [medium-conf]
- *   SMSG_STOP_MIRROR_TIMER                         0x1026  DORMANT  [medium-conf]
+ *   SMSG_STOP_MIRROR_TIMER                         0x1026  ACTIVE  [high-conf]
  *   SMSG_PLAY_SOUND                                0x102A  ACTIVE
  *   SMSG_GM_PLAYER_INFO                            0x102B  DORMANT  [medium-conf]
  *   SMSG_CLEAR_TARGET                              0x1061  ACTIVE   [Wow.exe binary: sub_6D4AFB packed GUID reader; sub_85876E target-clear terminal]

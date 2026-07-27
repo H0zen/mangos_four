@@ -376,6 +376,8 @@ static bool IsEnterWorldConverted(uint16 opcode)
         case SMSG_DUEL_COUNTDOWN:                   // MopDuelPackets::BuildCountdown
         case SMSG_DUEL_REQUESTED:                   // MopDuelPackets::BuildRequested
         case SMSG_DUEL_WINNER:                      // MopDuelPackets::BuildWinner
+        case SMSG_START_MIRROR_TIMER:                // MopMirrorTimerPackets::BuildStart
+        case SMSG_STOP_MIRROR_TIMER:                 // MopMirrorTimerPackets::BuildStop
         case SMSG_CANCEL_COMBAT:                   // Empty reader; terminal clears local-player combat state
         case SMSG_CANCEL_AUTO_REPEAT:              // packed unit GUID; Unit_C leaf 0x819546 clears auto-repeat
         case SMSG_AI_REACTION:                     // packed unit GUID plus reaction; Unit_C.cpp leaf 0x80AD80

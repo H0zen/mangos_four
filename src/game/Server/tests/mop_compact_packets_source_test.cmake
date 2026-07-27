@@ -1,5 +1,6 @@
 file(READ "${SOURCE_ROOT}/src/game/Object/PlayerCombat.cpp" player_combat)
 file(READ "${SOURCE_ROOT}/src/game/Object/PlayerDuel.cpp" player_duel)
+file(READ "${SOURCE_ROOT}/src/game/Object/PlayerMirror.cpp" player_mirror)
 file(READ "${SOURCE_ROOT}/src/game/Object/Player.h" player_header)
 file(READ "${SOURCE_ROOT}/src/game/WorldHandlers/SpellEffectObjectCombat.cpp" spell_effect_object_combat)
 file(READ "${SOURCE_ROOT}/src/game/Object/UnitSpeed.cpp" unit_speed)
@@ -221,6 +222,36 @@ elseif(MUTATION STREQUAL "duel_pair_reference")
     string(REPLACE
         "SMSG_DUEL_WINNER                               0x10E1  ACTIVE"
         "SMSG_DUEL_WINNER                               0x10E1  DORMANT"
+        opcode_reference "${opcode_reference}")
+elseif(MUTATION STREQUAL "mirror_start_order")
+    string(REPLACE
+        "out << maxValue << spellId << currentValue << uint32(regeneration) << type;"
+        "out << type << maxValue << currentValue << uint32(regeneration) << spellId;"
+        player_header "${player_header}")
+elseif(MUTATION STREQUAL "mirror_pause_width")
+    string(REPLACE
+        "out.WriteBit(paused);"
+        "out << uint8(paused);"
+        player_header "${player_header}")
+elseif(MUTATION STREQUAL "mirror_sender")
+    string(REPLACE
+        "MopMirrorTimerPackets::BuildStart("
+        "/* removed mirror-timer builder */ ("
+        player_mirror "${player_mirror}")
+elseif(MUTATION STREQUAL "mirror_registration")
+    string(REPLACE
+        "DefS(SMSG_START_MIRROR_TIMER, \"SMSG_START_MIRROR_TIMER\");"
+        "/* removed mirror-timer registration */"
+        opcode_registry "${opcode_registry}")
+elseif(MUTATION STREQUAL "mirror_allowlist")
+    string(REPLACE
+        "case SMSG_START_MIRROR_TIMER:"
+        "case 0xFFFF: /* removed mirror-timer allowlist */"
+        world_session "${world_session}")
+elseif(MUTATION STREQUAL "mirror_reference")
+    string(REPLACE
+        "SMSG_START_MIRROR_TIMER                        0x0E12  ACTIVE"
+        "SMSG_START_MIRROR_TIMER                        0x0E12  DORMANT"
         opcode_reference "${opcode_reference}")
 endif()
 
@@ -452,3 +483,33 @@ endif()
 if(player_duel MATCHES "Initialize\\(SMSG_DUEL_WINNER")
     message(FATAL_ERROR "legacy guessed duel-winner construction remains")
 endif()
+
+if(NOT player_header MATCHES "namespace MopMirrorTimerPackets")
+    message(FATAL_ERROR "mirror-timer serializers are missing from owning player code")
+endif()
+if(NOT player_header MATCHES
+        "out << maxValue << spellId << currentValue << uint32\\(regeneration\\) << type;")
+    message(FATAL_ERROR "start mirror-timer field order does not match reader sub_6F16F9")
+endif()
+if(NOT player_header MATCHES "out.WriteBit\\(paused\\)")
+    message(FATAL_ERROR "start mirror-timer pause flag is not one bit")
+endif()
+foreach(builder IN ITEMS BuildStart BuildStop)
+    if(NOT player_mirror MATCHES "MopMirrorTimerPackets::${builder}")
+        message(FATAL_ERROR "mirror-timer sender bypasses ${builder}")
+    endif()
+endforeach()
+if(player_mirror MATCHES "WorldPacket[ \\t]+data\\(SMSG_(START|STOP)_MIRROR_TIMER")
+    message(FATAL_ERROR "legacy raw mirror-timer packet construction remains")
+endif()
+foreach(server_name IN ITEMS SMSG_START_MIRROR_TIMER SMSG_STOP_MIRROR_TIMER)
+    if(NOT opcode_registry MATCHES "DefS\\(${server_name},[ \\t]*\"${server_name}\"\\)")
+        message(FATAL_ERROR "${server_name} is missing outbound opcode metadata")
+    endif()
+    if(NOT world_session MATCHES "case[ \\t]+${server_name}:")
+        message(FATAL_ERROR "${server_name} is missing from the converted-packet gate")
+    endif()
+    if(NOT opcode_reference MATCHES "${server_name}[ \\t]+0x[0-9A-F]+[ \\t]+ACTIVE")
+        message(FATAL_ERROR "reference inventory does not record active ${server_name}")
+    endif()
+endforeach()

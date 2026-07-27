@@ -438,6 +438,33 @@ static void test_duel_request_and_winner_packets()
     CHECK(tooLong.empty());
 }
 
+static void test_mirror_timer_packets()
+{
+    WorldPacket started;
+    MopMirrorTimerPackets::BuildStart(
+        started, 0xDDEEFF00u, 0x11223344u, 0x99AABBCCu,
+        int32_t(-2), 0x55667788u, true);
+    CHECK(started.GetOpcode() == SMSG_START_MIRROR_TIMER);
+    CHECK(BytesEqual(started, {
+        0x44, 0x33, 0x22, 0x11,
+        0x88, 0x77, 0x66, 0x55,
+        0xCC, 0xBB, 0xAA, 0x99,
+        0xFE, 0xFF, 0xFF, 0xFF,
+        0x00, 0xFF, 0xEE, 0xDD,
+        0x80,
+    }));
+
+    WorldPacket running;
+    MopMirrorTimerPackets::BuildStart(
+        running, 1, 1000, 750, -1, 0, false);
+    CHECK(running[20] == 0x00);
+
+    WorldPacket stopped;
+    MopMirrorTimerPackets::BuildStop(stopped, 0x12345678u);
+    CHECK(stopped.GetOpcode() == SMSG_STOP_MIRROR_TIMER);
+    CHECK(BytesEqual(stopped, { 0x78, 0x56, 0x34, 0x12 }));
+}
+
 static void test_opcode_values_are_framable()
 {
     CHECK(uint32_t(SMSG_ATTACKSWING_ERROR) == 0x11E1u);
@@ -457,6 +484,8 @@ static void test_opcode_values_are_framable()
     CHECK(uint32_t(SMSG_DUEL_COUNTDOWN) == 0x129Fu);
     CHECK(uint32_t(SMSG_DUEL_REQUESTED) == 0x0022u);
     CHECK(uint32_t(SMSG_DUEL_WINNER) == 0x10E1u);
+    CHECK(uint32_t(SMSG_START_MIRROR_TIMER) == 0x0E12u);
+    CHECK(uint32_t(SMSG_STOP_MIRROR_TIMER) == 0x1026u);
 
     CHECK(uint32_t(SMSG_ATTACKSWING_ERROR) <= 0x1FFFu);
     CHECK(uint32_t(SMSG_MOVE_SET_SWIM_SPEED) <= 0x1FFFu);
@@ -475,6 +504,8 @@ static void test_opcode_values_are_framable()
     CHECK(uint32_t(SMSG_DUEL_COUNTDOWN) <= 0x1FFFu);
     CHECK(uint32_t(SMSG_DUEL_REQUESTED) <= 0x1FFFu);
     CHECK(uint32_t(SMSG_DUEL_WINNER) <= 0x1FFFu);
+    CHECK(uint32_t(SMSG_START_MIRROR_TIMER) <= 0x1FFFu);
+    CHECK(uint32_t(SMSG_STOP_MIRROR_TIMER) <= 0x1FFFu);
 }
 
 int main(int /*argc*/, char** /*argv*/)
@@ -491,6 +522,7 @@ int main(int /*argc*/, char** /*argv*/)
     test_party_kill_log();
     test_duel_state_packets();
     test_duel_request_and_winner_packets();
+    test_mirror_timer_packets();
     test_opcode_values_are_framable();
 
     if (g_fail)
