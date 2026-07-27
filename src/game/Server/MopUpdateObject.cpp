@@ -358,6 +358,17 @@ void MopUpdateObject::AppendSelfPlayerValuesBlock(ByteBuffer& out, uint64 guid,
             fields.push_back({ uint16(sourceIndex + 7), value });
             continue;
         }
+        // 18414 CGPlayerData::local.exploredZones is 1627..1826 and
+        // local.restStateBonusPool 1827; Four stores the same two ranges
+        // contiguously at 1619..1818 and 1819. Both shift by eight. Without
+        // this the rested-XP pool never reaches the client at all, and
+        // MainMenuBar.lua compares a nil exhaustion threshold.
+        if (sourceIndex >= SelfExploredSourceStart &&
+            sourceIndex <= SelfExploredSourceEnd)
+        {
+            fields.push_back({ uint16(sourceIndex + SelfExploredTargetShift), value });
+            continue;
+        }
         // IDA 9.4 18414 CGPlayerData metadata places local.skill at
         // 1153..1600 (448 fields). Four stores the same seven parallel
         // 64-word arrays at 1146..1593.

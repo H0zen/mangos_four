@@ -1994,6 +1994,18 @@ void Map::SendInitSelf(Player* player)
             selfFields.push_back({ sourceIndex, value });
         }
     }
+    // Coinage, XP and next-level XP. Without these MainMenuBar.lua compares
+    // a nil exhaustion threshold against a zero max XP on PLAYER_XP_UPDATE and
+    // the XP bar is broken from login. Ordered before the skill block to keep
+    // legacy indices ascending.
+    for (uint16 i = PLAYER_FIELD_COINAGE; i <= PLAYER_NEXT_LEVEL_XP; ++i)
+    {
+        const uint32 value = player->GetUInt32Value(i);
+        if (value != 0)
+        {
+            selfFields.push_back({ i, value });
+        }
+    }
     // The client authorizes selectable chat languages from its local skill
     // block. SMSG_INITIAL_SPELLS alone does not populate that state.
     for (uint16 i = 0; i < MopUpdateObject::SelfSkillFieldCount; ++i)
@@ -2005,6 +2017,18 @@ void Map::SendInitSelf(Player* player)
             selfFields.push_back({ sourceIndex, value });
         }
     }
+    // Explored zones and the rested-XP pool; highest legacy indices in the
+    // seed, so they close the ascending run.
+    for (uint16 i = MopUpdateObject::SelfExploredSourceStart;
+         i <= MopUpdateObject::SelfExploredSourceEnd; ++i)
+    {
+        const uint32 value = player->GetUInt32Value(i);
+        if (value != 0)
+        {
+            selfFields.push_back({ i, value });
+        }
+    }
+
     if (!selfFields.empty())
     {
         MopUpdateObject::AppendSelfPlayerValuesBlock(inventoryData.GetBuffer(), sp.guid,

@@ -110,6 +110,9 @@ namespace
         PLAYER_FIELD_BUYBACK_TIMESTAMP_1 + 12 ==
             MopUpdateObject::SelfBuybackSourceStart + MopUpdateObject::SelfBuybackFieldCount,
         "self buyback translation must cover the legacy price and timestamp arrays");
+    static_assert(PLAYER_EXPLORED_ZONES_1 == MopUpdateObject::SelfExploredSourceStart &&
+        PLAYER_REST_STATE_EXPERIENCE == MopUpdateObject::SelfExploredSourceEnd,
+        "explored-zone and rested-pool projection must stay contiguous and anchored");
     static_assert(PLAYER_QUEST_LOG_1_1 == MopUpdateObject::SelfQuestLogSourceStart &&
         PLAYER_QUEST_LOG_50_5 + 1 ==
             MopUpdateObject::SelfQuestLogSourceStart + MopUpdateObject::SelfQuestLogFieldCount,
@@ -672,6 +675,13 @@ void Object::BuildValuesUpdateBlockForPlayer(UpdateData* data, Player* target) c
             for (uint16 i = MopUpdateObject::SelfSkillSourceStart;
                  i < MopUpdateObject::SelfSkillSourceStart +
                      MopUpdateObject::SelfSkillFieldCount; ++i)
+            {
+                addIfChanged(i);
+            }
+            // Explored zones and the rested-XP pool. Ordered after the skill
+            // block and before buyback to keep legacy indices ascending.
+            for (uint16 i = MopUpdateObject::SelfExploredSourceStart;
+                 i <= MopUpdateObject::SelfExploredSourceEnd; ++i)
             {
                 addIfChanged(i);
             }

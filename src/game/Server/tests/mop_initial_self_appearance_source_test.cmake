@@ -49,6 +49,12 @@ require_once(
     "MopUpdateObject::SelfSkillSourceStart \\+ i"
     "initial self skill snapshot")
 require_once(
+    "MopUpdateObject::SelfExploredSourceStart"
+    "initial self explored-zone and rested-pool snapshot")
+require_once(
+    "PLAYER_FIELD_COINAGE"
+    "initial self coinage/XP snapshot")
+require_once(
     "MopUpdateObject::SelfQuestLogSourceStart"
     "initial self quest-log snapshot")
 require_once(
