@@ -573,6 +573,33 @@ void InitializeOpcodes()
     // Wave 34 corpse location and transport map-position queries.
     DefC(CMSG_CORPSE_QUERY, "CMSG_CORPSE_QUERY", STATUS_LOGGEDIN, PROCESS_THREADUNSAFE, &WorldSession::HandleCorpseQueryOpcode);
     DefS(SMSG_CORPSE_QUERY_RESPONSE, "SMSG_CORPSE_QUERY_RESPONSE");
+
+    // Coming back from death. Every handler below already existed; only the
+    // registrations were missing, so a character could die and become a ghost
+    // -- once PLAYER_FLAGS reached the client -- and then had no way back. The
+    // client asked for its corpse and fell silent, because the reply to that
+    // is a reclaim it could not send.
+    //
+    // Release, then reclaim at the corpse, then the two assisted paths: a
+    // resurrection offered by another player, and a spirit healer.
+    DefC(CMSG_REPOP_REQUEST, "CMSG_REPOP_REQUEST", STATUS_LOGGEDIN, PROCESS_THREADUNSAFE, &WorldSession::HandleRepopRequestOpcode);
+    DefC(CMSG_RECLAIM_CORPSE, "CMSG_RECLAIM_CORPSE", STATUS_LOGGEDIN, PROCESS_THREADUNSAFE, &WorldSession::HandleReclaimCorpseOpcode);
+    DefC(CMSG_RESURRECT_RESPONSE, "CMSG_RESURRECT_RESPONSE", STATUS_LOGGEDIN, PROCESS_THREADUNSAFE, &WorldSession::HandleResurrectResponseOpcode);
+    DefS(SMSG_RESURRECT_REQUEST, "SMSG_RESURRECT_REQUEST");
+    DefC(CMSG_SPIRIT_HEALER_ACTIVATE, "CMSG_SPIRIT_HEALER_ACTIVATE", STATUS_LOGGEDIN, PROCESS_THREADUNSAFE, &WorldSession::HandleSpiritHealerActivateOpcode);
+    DefS(SMSG_SPIRIT_HEALER_CONFIRM, "SMSG_SPIRIT_HEALER_CONFIRM");
+
+    // Two members of this flow are deliberately left dormant.
+    //
+    // CMSG_SELF_RES and CMSG_HEARTH_AND_RESURRECT are both recorded as 0x0360
+    // with binary provenance, so one of those names is wrong. Registering
+    // either would claim a slot that may belong to the other, which is the
+    // mistake that put MSG_MOVE_WORLDPORT_ACK on top of CMSG_CHAR_ENUM and hung
+    // every client on the character list. HandleSelfResOpcode is written and
+    // waiting; it needs the value settled first.
+    //
+    // SMSG_RESURRECT_FAILED (0x1253) carries no client leaf, so its value is
+    // inherited rather than confirmed. Same reason.
     DefC(CMSG_CORPSE_MAP_POSITION_QUERY, "CMSG_CORPSE_MAP_POSITION_QUERY", STATUS_LOGGEDIN, PROCESS_THREADUNSAFE, &WorldSession::HandleCorpseMapPositionQueryOpcode);
     DefS(SMSG_CORPSE_MAP_POSITION_QUERY_RESPONSE, "SMSG_CORPSE_MAP_POSITION_QUERY_RESPONSE");
 
