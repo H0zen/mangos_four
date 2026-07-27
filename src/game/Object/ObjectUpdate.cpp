@@ -619,11 +619,31 @@ void Object::BuildValuesUpdateBlockForPlayer(UpdateData* data, Player* target) c
             // quest id, so an accepted quest never appears until these private
             // fields are projected. Ordered ahead of the visible-item feed
             // because the serializer requires ascending legacy indices.
-            for (uint16 i = MopUpdateObject::SelfQuestLogSourceStart;
-                 i < MopUpdateObject::SelfQuestLogSourceStart +
-                     MopUpdateObject::SelfQuestLogFieldCount; ++i)
+            //
+            // Fed a whole slot at a time. The serializer emits all fifteen
+            // 18414 words of any slot it sees, so supplying only the changed
+            // word would clear the rest of that slot on the client.
+            for (uint16 slot = 0; slot < MopUpdateObject::SelfQuestLogSlotCount; ++slot)
             {
-                addIfChanged(i);
+                const uint16 base = uint16(MopUpdateObject::SelfQuestLogSourceStart +
+                    slot * MopUpdateObject::SelfQuestLogSourceStride);
+                bool slotChanged = false;
+                for (uint16 word = 0; word < MopUpdateObject::SelfQuestLogSourceStride; ++word)
+                {
+                    if (m_changedValues[base + word])
+                    {
+                        slotChanged = true;
+                        break;
+                    }
+                }
+                if (!slotChanged)
+                {
+                    continue;
+                }
+                for (uint16 word = 0; word < MopUpdateObject::SelfQuestLogSourceStride; ++word)
+                {
+                    fields.push_back({ uint16(base + word), m_uint32Values[base + word] });
+                }
             }
 
             // Local equipment changes use the same public 18414 visible-item
