@@ -324,4 +324,9 @@ if(PLAYERBOTS)
     DESTINATION ${CONF_INSTALL_DIR})
 endif()
 
-add_subdirectory(Server/tests)
+# Opt-in via -DWITH_TESTS=ON. These suites are numerous and only of interest
+# when working on the packet code they cover, so they stay out of a default
+# build.
+if(WITH_TESTS)
+    add_subdirectory(Server/tests)
+endif()
