@@ -1454,6 +1454,73 @@ MapDifficultyEntry const* GetMapDifficultyData(uint32 mapId, Difficulty difficul
     return itr != sMapDifficultyMap.end() ? itr->second : NULL;
 }
 
+/**
+ * @brief Builds per-map spawn-mode masks from the MapDifficulty data.
+ *
+ * Translates 5.4.8 client difficulty ids into the core's internal spawn
+ * modes (0..MAX_DIFFICULTY-1), which is the convention used by the DB
+ * spawn data and the runtime (Map::GetSpawnMode): continents (0) -> 0,
+ * 5-man normal/heroic (1/2) -> 0/1, raid 10N/25N/10H/25H (3..6) -> 0..3,
+ * legacy 40-player raids (9) -> 0. LFR (7), challenge mode (8) and
+ * flexible (14) have no DB spawn sets and are ignored. 25-player-only
+ * raids (TBC) instantiate as spawn mode 0 internally and are widened
+ * accordingly. Map 0 has no MapDifficulty rows in 4.x+ clients and is
+ * forced to the regular mask.
+ *
+ * @param spawnMasks Destination: map id -> allowed spawn-mode mask.
+ */
+void BuildMapSpawnModeMasks(std::map<uint32, uint32>& spawnMasks)
+{
+    spawnMasks.clear();
+
+    for (MapDifficultyMap::const_iterator itr = sMapDifficultyMap.begin(); itr != sMapDifficultyMap.end(); ++itr)
+    {
+        MapDifficultyEntry const* mapDiff = itr->second;
+        int32 mode = -1;
+
+        switch (mapDiff->DifficultyID)
+        {
+            case 0:                                         // continents
+                mode = 0;
+                break;
+            case 1:                                         // 5-man normal
+            case 2:                                         // 5-man heroic
+                mode = int32(mapDiff->DifficultyID) - 1;
+                break;
+            case 3:                                         // raid 10 normal
+            case 4:                                         // raid 25 normal
+            case 5:                                         // raid 10 heroic
+            case 6:                                         // raid 25 heroic
+                mode = int32(mapDiff->DifficultyID) - 3;
+                break;
+            case 9:                                         // legacy 40-player raids
+                mode = 0;
+                break;
+            default:                                        // LFR (7) / challenge (8) / flexible (14)
+                break;
+        }
+
+        if (mode >= 0 && mode < MAX_DIFFICULTY)
+        {
+            spawnMasks[mapDiff->MapID] |= (1 << mode);
+        }
+    }
+
+    // 25-player-only raids (TBC: Hyjal, Magtheridon, SSC, The Eye, Black
+    // Temple, Gruul, Sunwell) instantiate as spawn mode 0 internally
+    for (std::map<uint32, uint32>::iterator itr = spawnMasks.begin(); itr != spawnMasks.end(); ++itr)
+    {
+        MapEntry const* mapEntry = sMapStore.LookupEntry(itr->first);
+        if (mapEntry && mapEntry->IsRaid() && itr->second == (1 << 1))
+        {
+            itr->second |= 1;
+        }
+    }
+
+    // Map 0 was removed from dbc as of 4.x.x
+    spawnMasks[0] = 1 << REGULAR_DIFFICULTY;
+}
+
 PvPDifficultyEntry const* GetBattlegroundBracketByLevel(uint32 mapid, uint32 level)
 {
     PvPDifficultyEntry const* maxEntry = NULL;              // used for level > max listed level case
