@@ -158,7 +158,26 @@ struct GossipTextOption
 {
     std::string Text_0;
     std::string Text_1;
-    // Build 18414 resolves NPC text client-side through BroadcastText.db2.
+    // npc_text.BroadcastTextID*, and a sharp edge worth knowing before you
+    // write to it.
+    //
+    // A non-zero value is forwarded to the client untouched. The client then
+    // resolves it against its own BroadcastText.db2 -- 936 records in 18414 --
+    // and asks the server for anything it does not hold. We can only answer
+    // for ids we minted ourselves, so a real BroadcastText id the client also
+    // lacks produces a not-found reply and the dialog never opens.
+    //
+    // Only ids the 18414 client actually ships are therefore safe here. That
+    // is a whitelist of 936 out of the 1,707 distinct ids seen in retail
+    // capture, so most real ids would break the row they were added to.
+    // Exactly one row in our world database is populated today, npc_text 17235
+    // with 62792, and it works only because 62792 is one of the four ids that
+    // happen to be in both sets.
+    //
+    // Leave the column at zero and MakeResponse mints an id the hotfix path
+    // can serve. This matters for imported world databases as much as for
+    // hand edits: a release that populates this column broadly would take out
+    // every row it touched, silently.
     uint32 BroadcastTextId = 0;
     uint32 Language;
     float Probability;
@@ -257,10 +276,15 @@ namespace MopNpcTextPackets
             GossipTextOption const& option = gossip->Options[index];
             uint32 broadcastTextId = option.BroadcastTextId;
 
-            // A real mapping is kept as-is: where the world database knows the
-            // retail id, the client may already hold that record and needs no
-            // hotfix. Otherwise an option that carries text gets an invented
-            // id, which SendBroadcastTextDb2Reply answers.
+            // A real mapping is kept as-is, on the assumption that a world
+            // database naming a retail id names one the client holds. That
+            // assumption is load-bearing and unverified: we cannot serve a
+            // hotfix for an id we did not mint, so a real id the client also
+            // lacks leaves the dialog shut. See the note on
+            // GossipTextOption::BroadcastTextId before populating that column.
+            //
+            // Otherwise an option that carries text gets an invented id, which
+            // SendBroadcastTextDb2Reply answers.
             if (!broadcastTextId &&
                 (!option.Text_0.empty() || !option.Text_1.empty()))
             {
