@@ -506,7 +506,18 @@ bool Object::CanBuildMopCreateUpdate() const
         status.hasTransportTime2 || status.hasTransportTime3 || movement.GetUnknownBit148() ||
         movement.GetUnknownBit149() || movement.GetUnknownBit172() || !movement.GetMovementForceIds().empty() ||
         movement.HasUnknownUInt32();
-    eligibility.hasAttackingTarget = unit->getVictim() != NULL;
+    // Snapshot policy: the projected create block carries only a stationary
+    // position snapshot (no movement flags, no spline data, no attack
+    // target), so a unit that is merely moving or fighting can still be
+    // created from that snapshot -- the already-ported 18414
+    // SMSG_MONSTER_MOVE stream animates it afterwards (and the current
+    // spline is re-sent on visibility gain, see Unit::SendCurrentSplineTo).
+    // Gating on these states made every wandering, patrolling or fighting
+    // creature invisible. Only genuinely unprojectable states (vehicles,
+    // transports, boarding, exotic movement extras) still block the create.
+    eligibility.hasSpline = false;
+    eligibility.movementFlags = 0;
+    eligibility.hasAttackingTarget = false;
     return MopUpdateObject::CanUseSimpleUnitMovement(eligibility);
 }
 
