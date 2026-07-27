@@ -371,7 +371,15 @@ void InitializeOpcodes()
 
     // Live-log worklist batch 1. Client constructors and body writers were
     // verified directly in the IDA 9.4 18414 Wow.exe database.
-    DefC(CMSG_REQUEST_HOTFIX, "CMSG_REQUEST_HOTFIX", STATUS_LOGGEDIN, PROCESS_INPLACE, &WorldSession::HandleRequestHotfix);
+    // Authed rather than logged-in: the client's first hotfix batch arrives
+    // immediately after CMSG_PLAYER_LOGIN, roughly ninety packets before
+    // SMSG_LOGIN_VERIFY_WORLD, so the player is not in the world and often does
+    // not exist yet. STATUS_LOGGEDIN drops it either way -- logged when _player
+    // is null, silently when the player exists but IsInWorld() is false -- which
+    // is why mid-session requests were answered and the whole login batch was
+    // not. Hotfix is session state, not world state, and none of the reply
+    // builders touch _player.
+    DefC(CMSG_REQUEST_HOTFIX, "CMSG_REQUEST_HOTFIX", STATUS_AUTHED, PROCESS_INPLACE, &WorldSession::HandleRequestHotfix);
     DefC(CMSG_JOIN_CHANNEL, "CMSG_JOIN_CHANNEL", STATUS_LOGGEDIN, PROCESS_THREADUNSAFE, &WorldSession::HandleJoinChannelOpcode);
     DefS(SMSG_CHANNEL_NOTIFY, "SMSG_CHANNEL_NOTIFY");
     DefS(SMSG_CHANNEL_LIST, "SMSG_CHANNEL_LIST");
