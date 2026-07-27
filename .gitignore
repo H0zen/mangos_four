@@ -64,6 +64,8 @@ Thumbs.db
 /bin/
 _build
 build
+# out-of-tree build directories (build-release, build-teston, ...)
+build-*/
 /dep/libmpq/autom4te.cache/
 /ACE_wrappers/*
 /ACE*.tar.bz2
