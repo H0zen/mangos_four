@@ -546,6 +546,19 @@ foreach(mutation IN ITEMS request_parser response_builder inbound_registration o
     set_tests_properties(mop_quest_poi_query_source_mutation_${mutation} PROPERTIES WILL_FAIL TRUE)
 endforeach()
 
+add_test(NAME mop_ping_field_order_source
+    COMMAND ${CMAKE_COMMAND}
+        -DSOURCE_ROOT=${CMAKE_SOURCE_DIR}
+        -P ${CMAKE_CURRENT_SOURCE_DIR}/mop_ping_field_order_source_test.cmake)
+foreach(mutation IN ITEMS swapped_read echoed_latency)
+    add_test(NAME mop_ping_field_order_source_mutation_${mutation}
+        COMMAND ${CMAKE_COMMAND}
+            -DSOURCE_ROOT=${CMAKE_SOURCE_DIR}
+            -DMUTATION=${mutation}
+            -P ${CMAKE_CURRENT_SOURCE_DIR}/mop_ping_field_order_source_test.cmake)
+    set_tests_properties(mop_ping_field_order_source_mutation_${mutation} PROPERTIES WILL_FAIL TRUE)
+endforeach()
+
 add_executable(mop_name_query_test mop_name_query_test.cpp)
 target_include_directories(mop_name_query_test PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/..
