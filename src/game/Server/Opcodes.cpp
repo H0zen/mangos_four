@@ -580,6 +580,15 @@ void InitializeOpcodes()
     DefS(SMSG_PLAYED_TIME, "SMSG_PLAYED_TIME");
 
     // Wave 10 core 5.4.8 player movement and server relay.
+    // Teleport acknowledgements. Both handlers already existed but were never
+    // registered, so the acks from the client reached nothing and the teleport
+    // semaphore was never cleared. Player::Update skips the visibility observer
+    // sweep while IsBeingTeleported(), so one same-map teleport stopped all
+    // object creation for the rest of the session while movement and combat
+    // broadcasts kept flowing. Retail 18414 captures pair SMSG_MOVE_TELEPORT
+    // 1:1 with CMSG_MOVE_TELEPORT_ACK, 1,522 of each, so the ack always comes.
+    DefC(CMSG_MOVE_TELEPORT_ACK, "CMSG_MOVE_TELEPORT_ACK", STATUS_LOGGEDIN, PROCESS_THREADUNSAFE, &WorldSession::HandleMoveTeleportAckOpcode);
+    DefC(MSG_MOVE_WORLDPORT_ACK, "MSG_MOVE_WORLDPORT_ACK", STATUS_TRANSFER, PROCESS_THREADUNSAFE, &WorldSession::HandleMoveWorldportAckOpcode);
     DefC(MSG_MOVE_HEARTBEAT, "MSG_MOVE_HEARTBEAT", STATUS_LOGGEDIN, PROCESS_THREADUNSAFE, &WorldSession::HandleMovementOpcodes);
     DefC(CMSG_MOVE_START_FORWARD, "CMSG_MOVE_START_FORWARD", STATUS_LOGGEDIN, PROCESS_THREADUNSAFE, &WorldSession::HandleMovementOpcodes);
     DefC(CMSG_MOVE_START_BACKWARD, "CMSG_MOVE_START_BACKWARD", STATUS_LOGGEDIN, PROCESS_THREADUNSAFE, &WorldSession::HandleMovementOpcodes);

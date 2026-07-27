@@ -81,6 +81,16 @@ elseif(MUTATION STREQUAL "monster_move_integration")
 elseif(MUTATION STREQUAL "monster_move_gate")
     string(REPLACE "case SMSG_MONSTER_MOVE:" "case SMSG_MONSTER_MOVE_REMOVED:"
         world_session_source "${world_session_source}")
+elseif(MUTATION STREQUAL "teleport_ack_registration")
+    string(REPLACE
+        "DefC(CMSG_MOVE_TELEPORT_ACK, \"CMSG_MOVE_TELEPORT_ACK\""
+        "DefC(0xFFFF, \"removed teleport ack\""
+        opcode_registry "${opcode_registry}")
+elseif(MUTATION STREQUAL "worldport_ack_registration")
+    string(REPLACE
+        "DefC(MSG_MOVE_WORLDPORT_ACK, \"MSG_MOVE_WORLDPORT_ACK\""
+        "DefC(0xFFFF, \"removed worldport ack\""
+        opcode_registry "${opcode_registry}")
 endif()
 
 function(strip_cpp_comments output source)
@@ -338,3 +348,18 @@ foreach(required IN ITEMS "recv_data >> movementInfo" "VerifyMovementInfo(moveme
         message(FATAL_ERROR "movement handler integration missing: ${required}")
     endif()
 endforeach()
+
+# Both teleport acknowledgements have had working handlers since before the
+# 18414 work, but neither was registered, so the client acks reached nothing
+# and the teleport semaphore never cleared. Player::Update skips the
+# visibility observer sweep while IsBeingTeleported(), so a single same-map
+# teleport silently stopped all object creation for the rest of the session.
+require_once("${opcode_registry}"
+    "DefC(CMSG_MOVE_TELEPORT_ACK, \"CMSG_MOVE_TELEPORT_ACK\""
+    "CMSG_MOVE_TELEPORT_ACK inbound registration")
+require_once("${opcode_registry}"
+    "DefC(MSG_MOVE_WORLDPORT_ACK, \"MSG_MOVE_WORLDPORT_ACK\""
+    "MSG_MOVE_WORLDPORT_ACK inbound registration")
+require_once("${movement_handler}"
+    "plMover->SetSemaphoreTeleportNear(false)"
+    "near-teleport semaphore release")
