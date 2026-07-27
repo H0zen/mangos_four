@@ -582,12 +582,30 @@ void InitializeOpcodes()
     //
     // Release, then reclaim at the corpse, then the two assisted paths: a
     // resurrection offered by another player, and a spirit healer.
+    // Only the release step is registered. Its handler reads a single byte
+    // and the 18414 client sends exactly one, so it needs no conversion.
     DefC(CMSG_REPOP_REQUEST, "CMSG_REPOP_REQUEST", STATUS_LOGGEDIN, PROCESS_THREADUNSAFE, &WorldSession::HandleRepopRequestOpcode);
-    DefC(CMSG_RECLAIM_CORPSE, "CMSG_RECLAIM_CORPSE", STATUS_LOGGEDIN, PROCESS_THREADUNSAFE, &WorldSession::HandleReclaimCorpseOpcode);
-    DefC(CMSG_RESURRECT_RESPONSE, "CMSG_RESURRECT_RESPONSE", STATUS_LOGGEDIN, PROCESS_THREADUNSAFE, &WorldSession::HandleResurrectResponseOpcode);
     DefS(SMSG_RESURRECT_REQUEST, "SMSG_RESURRECT_REQUEST");
-    DefC(CMSG_SPIRIT_HEALER_ACTIVATE, "CMSG_SPIRIT_HEALER_ACTIVATE", STATUS_LOGGEDIN, PROCESS_THREADUNSAFE, &WorldSession::HandleSpiritHealerActivateOpcode);
     DefS(SMSG_SPIRIT_HEALER_CONFIRM, "SMSG_SPIRIT_HEALER_CONFIRM");
+
+    // The three GUID-bearing members of this flow stay unregistered until
+    // their bodies are decoded, because their handlers predate 18414 and parse
+    // a raw uint64 where the client sends a bit-packed GUID. Retail capture
+    // gives the real sizes, and none of them fit:
+    //
+    //   CMSG_RECLAIM_CORPSE          86 observed, body  1-5 bytes
+    //   CMSG_SPIRIT_HEALER_ACTIVATE   7 observed, body    7 bytes
+    //   CMSG_RESURRECT_RESPONSE     218 observed, body 9-12 bytes
+    //
+    // recv_data >> guid demands eight. Reclaim and spirit-healer therefore
+    // throw ByteBufferException on every real packet, which disconnects the
+    // player where bad-packet kicking is enabled; resurrect-response survives
+    // the read but decodes a packed GUID as a raw one. Registering them turned
+    // a silent drop into a worse failure.
+    //
+    // CMSG_MOVE_TELEPORT_ACK is the converted comparison: 14-16 bytes on the
+    // wire, read with ReadGuidMask/ReadGuidBytes. These three need the same
+    // treatment before they can be exposed.
 
     // Two members of this flow are deliberately left dormant.
     //
