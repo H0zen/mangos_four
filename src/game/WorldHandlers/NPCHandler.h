@@ -174,6 +174,50 @@ struct GossipText
 
 namespace MopNpcTextPackets
 {
+    // The 18414 client resolves a BroadcastText id against its own
+    // BroadcastText.db2 and, when that fails, asks the server for the record
+    // over CMSG_REQUEST_HOTFIX. That second route is how retail delivered text
+    // the client never shipped: the client carries 936 records, while retail
+    // captures reference 1,707 distinct ids, only 4 of which the client has.
+    //
+    // Measured on the live client, the id decides everything. Zero is refused,
+    // an id the client cannot resolve is refused once the hotfix goes
+    // unanswered, and an id it can resolve opens the window. So an unmapped
+    // row needs an id we invent and then serve ourselves.
+    //
+    // Inventing one makes collision the hazard: the client's own records span
+    // 1..77161, and landing on one would silently render its Mists text for a
+    // Classic npc_text row -- wrong text, no error, very hard to trace. The
+    // base clears that range entirely, and the static_assert keeps it cleared
+    // if anyone revisits the scheme.
+    static constexpr uint32 ClientHighestShippedBroadcastTextId = 77161;
+    static constexpr uint32 SynthesisedBroadcastTextBase = 100000;
+    static_assert(SynthesisedBroadcastTextBase >
+        ClientHighestShippedBroadcastTextId,
+        "synthesised BroadcastText ids must not collide with the records the "
+        "client ships, or it renders its own text instead of ours");
+
+    // One id per option, so a row's eight alternatives stay distinguishable,
+    // and the mapping inverts for debugging.
+    inline uint32 SynthesiseBroadcastTextId(uint32 textId, uint32 option)
+    {
+        return SynthesisedBroadcastTextBase +
+            textId * MAX_GOSSIP_TEXT_OPTIONS + option;
+    }
+
+    inline bool DecodeSynthesisedBroadcastTextId(uint32 id, uint32& textId,
+        uint32& option)
+    {
+        if (id < SynthesisedBroadcastTextBase)
+        {
+            return false;
+        }
+        uint32 const packed = id - SynthesisedBroadcastTextBase;
+        textId = packed / MAX_GOSSIP_TEXT_OPTIONS;
+        option = packed % MAX_GOSSIP_TEXT_OPTIONS;
+        return true;
+    }
+
     inline Response MakeResponse(uint32 textId, GossipText const* gossip)
     {
         Response response;
@@ -185,14 +229,26 @@ namespace MopNpcTextPackets
 
         for (size_t index = 0; index < MAX_GOSSIP_TEXT_OPTIONS; ++index)
         {
-            uint32 const broadcastTextId =
-                gossip->Options[index].BroadcastTextId;
+            GossipTextOption const& option = gossip->Options[index];
+            uint32 broadcastTextId = option.BroadcastTextId;
+
+            // A real mapping is kept as-is: where the world database knows the
+            // retail id, the client may already hold that record and needs no
+            // hotfix. Otherwise an option that carries text gets an invented
+            // id, which SendBroadcastTextDb2Reply answers.
+            if (!broadcastTextId &&
+                (!option.Text_0.empty() || !option.Text_1.empty()))
+            {
+                broadcastTextId = SynthesiseBroadcastTextId(textId,
+                    uint32(index));
+            }
+
             response.broadcastTextIds[index] = broadcastTextId;
 
-            // A probability without a resolvable ID lets the client select a
-            // blank record, so unmapped alternatives must not participate.
+            // A probability without an id lets the client select a blank
+            // record, so an option with nothing behind it must not participate.
             response.probabilities[index] = broadcastTextId
-                ? gossip->Options[index].Probability
+                ? option.Probability
                 : 0.0f;
             response.found = response.found || broadcastTextId != 0;
         }
