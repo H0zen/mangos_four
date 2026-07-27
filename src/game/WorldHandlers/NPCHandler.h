@@ -218,6 +218,31 @@ namespace MopNpcTextPackets
         return true;
     }
 
+    // Whether this option can answer for a synthesised id.
+    //
+    // Deliberately asks what the option *could* have advertised, not what it
+    // would advertise now. Once an id has gone out the client keeps it in
+    // npccache.wdb, and a later edit adding a real BroadcastTextId to the same
+    // row must not strand the copies already handed out: refusing them sends a
+    // deletion reply and the dialog stays shut until that cache is cleared by
+    // hand. Populating the recovered retail mappings would otherwise break
+    // every client that had already spoken to those NPCs.
+    //
+    // What is checked is that the row exists and the option carries text. The
+    // id itself proves nothing, since the row and option are decoded from it --
+    // SynthesiseBroadcastTextId(decode(entry)) == entry always holds. So a real
+    // BroadcastText id above the base could in principle decode onto a
+    // text-bearing row and be answered with that row's words. No observed id
+    // comes close: the capture corpus tops out at 77,353 and the client's own
+    // records at 77,161, both far below the base. If real ids ever approach it,
+    // raise the base rather than tightening this, and expect to clear client
+    // caches when you do.
+    inline bool OwnsSynthesisedBroadcastTextId(uint32 /*entry*/,
+        uint32 /*textId*/, uint32 /*option*/, GossipTextOption const& candidate)
+    {
+        return !candidate.Text_0.empty() || !candidate.Text_1.empty();
+    }
+
     inline Response MakeResponse(uint32 textId, GossipText const* gossip)
     {
         Response response;

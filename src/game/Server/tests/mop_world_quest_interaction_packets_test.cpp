@@ -341,8 +341,47 @@ static void TestUnmappedNpcTextStillGetsAnId()
     CHECK(!absent.found);
 }
 
+// Nothing bounds the synthesised namespace from above, so an id merely being
+// past the base does not make it ours. Answering someone else's id with this
+// row's text would produce a wrong string and nothing to trace it by.
+static void TestOnlyOurOwnSynthesisedIdsAreServed()
+{
+    GossipTextOption option;
+    option.BroadcastTextId = 0;
+    option.Language = 0;
+    option.Probability = 1.0f;
+    for (auto& emote : option.Emotes)
+    {
+        emote._Emote = 0;
+        emote._Delay = 0;
+    }
+    option.Text_0 = "Hey, citizen!";
+
+    uint32 const mine = MopNpcTextPackets::SynthesiseBroadcastTextId(4938, 0);
+    CHECK(MopNpcTextPackets::OwnsSynthesisedBroadcastTextId(mine, 4938, 0,
+        option));
+
+    // An option with no text was never advertised at all.
+    GossipTextOption silent = option;
+    silent.Text_0.clear();
+    silent.Text_1.clear();
+    CHECK(!MopNpcTextPackets::OwnsSynthesisedBroadcastTextId(mine, 4938, 0,
+        silent));
+
+    // An id already handed out must keep working after the row gains a real
+    // mapping. The client caches the old id in npccache.wdb, so refusing it
+    // sends a deletion reply and the dialog stays shut until that cache is
+    // cleared by hand -- which is what populating the recovered retail
+    // mappings would otherwise do to every client already past those NPCs.
+    GossipTextOption laterMapped = option;
+    laterMapped.BroadcastTextId = 62792;
+    CHECK(MopNpcTextPackets::OwnsSynthesisedBroadcastTextId(mine, 4938, 0,
+        laterMapped));
+}
+
 int main(int /*argc*/, char** /*argv*/)
 {
+    TestOnlyOurOwnSynthesisedIdsAreServed();
     TestSynthesisedBroadcastTextIdsAvoidTheClientRange();
     TestUnmappedNpcTextStillGetsAnId();
     TestAreaTriggerRequest();
