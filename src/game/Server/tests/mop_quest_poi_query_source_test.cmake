@@ -32,7 +32,7 @@ elseif(MUTATION STREQUAL "allowlist")
         world_session "${world_session}")
 elseif(MUTATION STREQUAL "floor_clamp")
     string(REPLACE
-        "if (floorId > MAX_QUEST_POI_FLOOR_ID)"
+        "if (!IsValidQuestPoiFloorId(floorId))"
         "if (false) /* removed floorId clamp */"
         object_mgr "${object_mgr}")
 endif()
@@ -108,13 +108,13 @@ extract_body(poi_loader "${object_mgr}"
 # loader must reject it before the value can ever reach the wire.
 require_ordered("${poi_loader}" "quest-POI loader floorId clamp"
     "uint32 floorId          = fields[5].GetUInt32();"
-    "if (floorId > MAX_QUEST_POI_FLOOR_ID)"
+    "if (!IsValidQuestPoiFloorId(floorId))"
     "floorId = 0;"
     "QuestPOI POI(poiId, objIndex, mapId, mapAreaId, floorId, unk3, unk4);")
 
-string(FIND "${object_mgr_header}" "#define MAX_QUEST_POI_FLOOR_ID" floor_bound)
+string(FIND "${object_mgr_header}" "inline bool IsValidQuestPoiFloorId" floor_bound)
 if(floor_bound EQUAL -1)
-    message(FATAL_ERROR "MAX_QUEST_POI_FLOOR_ID is not defined")
+    message(FATAL_ERROR "IsValidQuestPoiFloorId is not defined")
 endif()
 
 require_ordered("${handler}" "quest-POI handler"

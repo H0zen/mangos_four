@@ -318,10 +318,22 @@ struct QuestPOIPoint
     QuestPOIPoint(int32 _x, int32 _y) : x(_x), y(_y) {}
 };
 
-// Upper bound accepted for `quest_poi`.`floorId`. This is the declared schema
-// width, not a measured client limit - see LoadQuestPOI() for why anything
-// above it must never reach the wire.
+// Upper bound accepted for `quest_poi`.`floorId`. See LoadQuestPOI() for why
+// anything above it must never reach the wire.
+//
+// This is a chosen heuristic, not a derived limit. The column is int(10)
+// unsigned, so the schema imposes no useful ceiling, and the client's real
+// ceiling is unknown - all that is established is that 252339 crashes it and
+// that every sane row observed is <= 7. 255 sits well above real data and well
+// below the six-figure import garbage. Narrowing it properly would need the
+// client's POI reader disassembled; until then this bound is deliberately
+// loose rather than falsely precise.
 #define MAX_QUEST_POI_FLOOR_ID 255
+
+inline bool IsValidQuestPoiFloorId(uint32 floorId)
+{
+    return floorId <= MAX_QUEST_POI_FLOOR_ID;
+}
 
 struct QuestPOI
 {

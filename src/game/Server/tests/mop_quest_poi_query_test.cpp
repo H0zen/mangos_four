@@ -12,6 +12,7 @@
 #include "WorldSession.h"
 #include "Opcodes.h"
 #include "WorldPacket.h"
+#include "Object/ObjectMgr.h"
 
 #include <cstdint>
 #include <cstdio>
@@ -161,11 +162,41 @@ static void test_opcode_values()
     CHECK(uint32_t(SMSG_QUEST_POI_QUERY_RESPONSE) <= 0x1FFFu);
 }
 
+/**
+ * An out of range `quest_poi`.`floorId` crashes the 5.4.8 client when it reads
+ * SMSG_QUEST_POI_QUERY_RESPONSE on quest accept, so LoadQuestPOI() rejects it.
+ * The loader itself needs a database, but the bound it applies does not.
+ */
+static void test_floor_id_bound()
+{
+    // Real data. The whole imported table sits in this range.
+    CHECK(IsValidQuestPoiFloorId(0));
+    CHECK(IsValidQuestPoiFloorId(7));
+
+    // The bound itself, and the first value past it.
+    CHECK(IsValidQuestPoiFloorId(MAX_QUEST_POI_FLOOR_ID));
+    CHECK(!IsValidQuestPoiFloorId(MAX_QUEST_POI_FLOOR_ID + 1));
+
+    // 808 was an earlier candidate bound, taken from DungeonMap.dbc on the
+    // unverified assumption that floorId indexes that DBC. It does not survive
+    // the current bound, and nothing depends on it either way.
+    CHECK(!IsValidQuestPoiFloorId(808));
+
+    // The value that crashed the client in game on quest 29406, and the top of
+    // the observed garbage band across the 49 affected rows.
+    CHECK(!IsValidQuestPoiFloorId(252339));
+    CHECK(!IsValidQuestPoiFloorId(264091));
+
+    // The column is int(10) unsigned, so this is a reachable value.
+    CHECK(!IsValidQuestPoiFloorId(0xFFFFFFFFu));
+}
+
 int main(int /*argc*/, char** /*argv*/)
 {
     test_request();
     test_response();
     test_opcode_values();
+    test_floor_id_bound();
 
     if (g_fail)
     {
