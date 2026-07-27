@@ -12,8 +12,8 @@ elseif(MUTATION STREQUAL "combined_builder")
         map_source "${map_source}")
 elseif(MUTATION STREQUAL "questlog_feed")
     string(REPLACE
-        "MopUpdateObject::SelfQuestLogSourceStart + i"
-        "MopUpdateObject::SelfInventorySourceStart + i"
+        "MopUpdateObject::SelfQuestLogSlotCount"
+        "MopUpdateObject::SelfInventoryFieldCount"
         map_source "${map_source}")
 elseif(MUTATION STREQUAL "skill_feed")
     string(REPLACE
@@ -65,7 +65,7 @@ endif()
 # AppendSelfPlayerValuesBlock asserts strictly ascending source indices. The
 # quest-log range is 166..415, below visible items at 916, so its loop must be
 # emitted first or the block is built out of order and trips that assert.
-string(FIND "${self_body}" "MopUpdateObject::SelfQuestLogSourceStart + i" questlog_pos)
+string(FIND "${self_body}" "MopUpdateObject::SelfQuestLogSlotCount" questlog_pos)
 string(FIND "${self_body}" "MopUpdateObject::ObserverVisibleItemSourceStart + i" visible_pos)
 if(questlog_pos EQUAL -1 OR visible_pos EQUAL -1)
     message(FATAL_ERROR "initial self snapshot is missing a required seed loop")

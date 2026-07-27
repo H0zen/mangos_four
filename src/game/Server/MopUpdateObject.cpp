@@ -287,13 +287,51 @@ void MopUpdateObject::AppendSelfPlayerValuesBlock(ByteBuffer& out, uint64 guid,
         const uint32 value = sourceFields[i].value;
 
         // QuestLogFrame reads each slot at a fifteen-word stride, so Four's
-        // five-word slots have to be re-strided rather than shifted. Zero
-        // values are preserved: a cleared quest id is how the client is told
-        // a slot was abandoned.
+        // five-word slots have to be re-strided rather than shifted.
+        //
+        // 18414 writes EVERY word of a touched slot. Retail captures show the
+        // mask bit set for all fifteen words, with words 5..14 carried as
+        // explicit zeroes; leaving them unmasked never touches that client-side
+        // storage. Emit the whole slot so the client's view of it is fully
+        // defined. Zero values are significant throughout: a cleared quest id
+        // is how the client is told a slot was abandoned.
+        //
+        // Callers supply whole slots (see the quest-log feeds in
+        // ObjectUpdate.cpp and Map.cpp). Any word the caller omits is emitted
+        // as zero, so a partial slot would clear the rest of it.
         if (sourceIndex >= SelfQuestLogSourceStart &&
             sourceIndex < SelfQuestLogSourceStart + SelfQuestLogFieldCount)
         {
-            fields.push_back({ TranslateSelfQuestLogIndex(sourceIndex), value });
+            const uint16 slot = uint16((sourceIndex - SelfQuestLogSourceStart) /
+                SelfQuestLogSourceStride);
+            uint32 slotWords[SelfQuestLogSourceStride] = { 0 };
+            uint32 next = i;
+            for (; next < fieldCount; ++next)
+            {
+                const uint16 candidate = sourceFields[next].index;
+                if (candidate < SelfQuestLogSourceStart ||
+                    candidate >= SelfQuestLogSourceStart + SelfQuestLogFieldCount)
+                {
+                    break;
+                }
+                if (uint16((candidate - SelfQuestLogSourceStart) /
+                    SelfQuestLogSourceStride) != slot)
+                {
+                    break;
+                }
+                slotWords[(candidate - SelfQuestLogSourceStart) %
+                    SelfQuestLogSourceStride] = sourceFields[next].value;
+            }
+
+            const uint16 targetBase =
+                uint16(SelfQuestLogTargetStart + slot * SelfQuestLogTargetStride);
+            for (uint16 word = 0; word < SelfQuestLogTargetStride; ++word)
+            {
+                fields.push_back({ uint16(targetBase + word),
+                    word < SelfQuestLogSourceStride ? slotWords[word] : 0u });
+            }
+
+            i = next - 1;   // the loop's ++i steps past the consumed slot
             continue;
         }
 

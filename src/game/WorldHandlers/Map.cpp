@@ -1958,14 +1958,21 @@ void Map::SendInitSelf(Player* player)
     // later in the session. Emitted first because
     // AppendSelfPlayerValuesBlock requires ascending legacy indices and
     // this range (166..415) sorts below visible items at 916.
-    for (uint16 i = 0; i < MopUpdateObject::SelfQuestLogFieldCount; ++i)
+    // Seeded a whole slot at a time: the serializer emits all fifteen 18414
+    // words of any slot it sees, so a partial slot would clear the remainder
+    // client-side. A slot is seeded when its quest id is set.
+    for (uint16 slot = 0; slot < MopUpdateObject::SelfQuestLogSlotCount; ++slot)
     {
-        const uint16 sourceIndex =
-            uint16(MopUpdateObject::SelfQuestLogSourceStart + i);
-        const uint32 value = player->GetUInt32Value(sourceIndex);
-        if (value != 0)
+        const uint16 base = uint16(MopUpdateObject::SelfQuestLogSourceStart +
+            slot * MopUpdateObject::SelfQuestLogSourceStride);
+        if (player->GetUInt32Value(base) == 0)
         {
-            selfFields.push_back({ sourceIndex, value });
+            continue;
+        }
+        for (uint16 word = 0; word < MopUpdateObject::SelfQuestLogSourceStride; ++word)
+        {
+            selfFields.push_back({ uint16(base + word),
+                player->GetUInt32Value(base + word) });
         }
     }
     for (uint16 i = 0; i < MopUpdateObject::ObserverVisibleItemFieldCount; ++i)

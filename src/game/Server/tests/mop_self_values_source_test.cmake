@@ -29,8 +29,8 @@ elseif(MUTATION STREQUAL "buyback_feed")
         object_update "${object_update}")
 elseif(MUTATION STREQUAL "questlog_feed")
     string(REPLACE
-        "for (uint16 i = MopUpdateObject::SelfQuestLogSourceStart;"
-        "for (uint16 i = 0; /* removed self quest-log feed */"
+        "for (uint16 slot = 0; slot < MopUpdateObject::SelfQuestLogSlotCount; ++slot)"
+        "for (uint16 slot = 0; false; ++slot) /* removed self quest-log feed */"
         object_update "${object_update}")
 endif()
 
@@ -75,7 +75,7 @@ require_once("for \\(uint16 i = MopUpdateObject::SelfSkillSourceStart"
     "self skill feed")
 require_once("for \\(uint16 i = MopUpdateObject::SelfBuybackSourceStart"
     "self buyback price/timestamp feed")
-require_once("for \\(uint16 i = MopUpdateObject::SelfQuestLogSourceStart"
+require_once("MopUpdateObject::SelfQuestLogSlotCount"
     "self quest-log feed")
 require_once("addIfChanged\\(PLAYER_FIELD_COINAGE\\)"
     "self coinage low-word feed")

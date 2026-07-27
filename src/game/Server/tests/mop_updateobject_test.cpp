@@ -453,17 +453,22 @@ int main(int /*argc*/, char** /*argv*/)
     // The quest log is the one self range whose slot stride differs between
     // Four and 18414. Four stores fifty five-word slots at 166..415; the
     // client's CGPlayerData::questLog is fifty FIFTEEN-word slots at
-    // 171..920 (750 fields, binary-confirmed). Only the leading five words of
-    // each client slot carry Four's id/state/counts/timer, so the projection
-    // must re-stride per slot rather than copy the range flat. A flat copy
-    // would land legacy slot 1 on 176 instead of 186, inside client slot 0.
+    // 171..920. Retail captures show 18414 setting the mask bit for all
+    // fifteen words of a touched slot, carrying words 5..14 as explicit
+    // zeroes, so the serializer expands each five-word slot to fifteen.
     {
         const MopUpdateObject::StaticField sourceFields[] =
         {
-            { 166, 0x000004D2u },        // slot 0 quest id     -> 171
-            { 170, 0x00000E10u },        // slot 0 timer        -> 175
-            { 171, 0x000004D3u },        // slot 1 quest id     -> 186
-            { 415, 0u },                 // slot 49 timer       -> 910
+            { 166, 0x000004D2u },   // slot 0  quest id
+            { 167, 0x00000001u },   // slot 0  state
+            { 168, 0x00010000u },   // slot 0  counts
+            { 169, 0x00000017u },   // slot 0  counts
+            { 170, 0x00000E10u },   // slot 0  timer
+            { 411, 0x000004D3u },   // slot 49 quest id
+            { 412, 0u },
+            { 413, 0u },
+            { 414, 0u },
+            { 415, 0u },
         };
         ByteBuffer values;
         MopUpdateObject::AppendSelfPlayerValuesBlock(values, 0x10, sourceFields,
@@ -478,16 +483,30 @@ int main(int /*argc*/, char** /*argv*/)
         {
             return (masks[index / 32] & (uint32(1) << (index % 32))) != 0;
         };
-        for (uint16 index : { uint16(171), uint16(175), uint16(186), uint16(910) })
-            CHECK(hasBit(index));
-        // the flat-copy targets, which must NOT be produced
-        CHECK(!hasBit(176));
+        // every word of both touched slots, including the ten zero words
+        for (uint16 index = 171; index <= 185; ++index) CHECK(hasBit(index));
+        for (uint16 index = 906; index <= 920; ++index) CHECK(hasBit(index));
+        // untouched neighbouring slots stay absent
+        CHECK(!hasBit(186));
+        CHECK(!hasBit(905));
+        // A flat range copy would land slot 49 at 416..420 instead of
+        // 906..920, so the positive checks above already exclude it; 420 is
+        // asserted absent as the direct flat-copy target of source 415.
+        // (176 is NOT a valid guard any more: it is slot 0 word 5, which the
+        // serializer now legitimately writes as an explicit zero.)
         CHECK(!hasBit(420));
         // and the untranslated legacy indices
         CHECK(!hasBit(166));
         CHECK(!hasBit(415));
 
-        for (uint32 expectedValue : { 0x000004D2u, 0x00000E10u, 0x000004D3u, 0u })
+        const uint32 expected[] =
+        {
+            0x000004D2u, 0x00000001u, 0x00010000u, 0x00000017u, 0x00000E10u,
+            0, 0, 0, 0, 0, 0, 0, 0, 0, 0,      // slot 0  words 5..14
+            0x000004D3u, 0, 0, 0, 0,
+            0, 0, 0, 0, 0, 0, 0, 0, 0, 0,      // slot 49 words 5..14
+        };
+        for (uint32 expectedValue : expected)
         {
             uint32 actualValue;
             values >> actualValue;
