@@ -1948,9 +1948,26 @@ void Map::SendInitSelf(Player* player)
     // first unequip sends a zero the client already assumes and leaves the
     // login-time model displayed until a later nonzero equip update.
     std::vector<MopUpdateObject::StaticField> selfFields;
-    selfFields.reserve(MopUpdateObject::ObserverVisibleItemFieldCount +
+    selfFields.reserve(MopUpdateObject::SelfQuestLogFieldCount +
+        MopUpdateObject::ObserverVisibleItemFieldCount +
         MopUpdateObject::SelfInventoryFieldCount +
         MopUpdateObject::SelfSkillFieldCount);
+    // Quests reach the client only through this seed and the incremental
+    // values path. Without it a character logs in with its quest log empty
+    // and the quest only appears if one of its fields happens to change
+    // later in the session. Emitted first because
+    // AppendSelfPlayerValuesBlock requires ascending legacy indices and
+    // this range (166..415) sorts below visible items at 916.
+    for (uint16 i = 0; i < MopUpdateObject::SelfQuestLogFieldCount; ++i)
+    {
+        const uint16 sourceIndex =
+            uint16(MopUpdateObject::SelfQuestLogSourceStart + i);
+        const uint32 value = player->GetUInt32Value(sourceIndex);
+        if (value != 0)
+        {
+            selfFields.push_back({ sourceIndex, value });
+        }
+    }
     for (uint16 i = 0; i < MopUpdateObject::ObserverVisibleItemFieldCount; ++i)
     {
         const uint16 sourceIndex =
