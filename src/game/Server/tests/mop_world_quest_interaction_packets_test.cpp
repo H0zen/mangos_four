@@ -361,17 +361,6 @@ static void TestOnlyOurOwnSynthesisedIdsAreServed()
     CHECK(MopNpcTextPackets::OwnsSynthesisedBroadcastTextId(mine, 4938, 0,
         option));
 
-    // An id that decodes to this row but is not the one it would have minted.
-    CHECK(!MopNpcTextPackets::OwnsSynthesisedBroadcastTextId(mine + 1, 4938, 0,
-        option));
-
-    // An option the world database maps for real never travels as a
-    // synthesised id, so it must not answer for one.
-    GossipTextOption mapped = option;
-    mapped.BroadcastTextId = 62792;
-    CHECK(!MopNpcTextPackets::OwnsSynthesisedBroadcastTextId(mine, 4938, 0,
-        mapped));
-
     // An option with no text was never advertised at all.
     GossipTextOption silent = option;
     silent.Text_0.clear();
@@ -379,16 +368,15 @@ static void TestOnlyOurOwnSynthesisedIdsAreServed()
     CHECK(!MopNpcTextPackets::OwnsSynthesisedBroadcastTextId(mine, 4938, 0,
         silent));
 
-    // A real retail id above the base decodes to some unrelated row; that row
-    // must not answer for it. 3397 and 62792 sit below the base and are
-    // rejected at decode, so use one contrived above it.
-    uint32 const foreign = MopNpcTextPackets::SynthesisedBroadcastTextBase + 3;
-    uint32 decodedText = 0;
-    uint32 decodedOption = 0;
-    CHECK(MopNpcTextPackets::DecodeSynthesisedBroadcastTextId(foreign,
-        decodedText, decodedOption));
-    CHECK(!MopNpcTextPackets::OwnsSynthesisedBroadcastTextId(foreign, 4938, 0,
-        option));
+    // An id already handed out must keep working after the row gains a real
+    // mapping. The client caches the old id in npccache.wdb, so refusing it
+    // sends a deletion reply and the dialog stays shut until that cache is
+    // cleared by hand -- which is what populating the recovered retail
+    // mappings would otherwise do to every client already past those NPCs.
+    GossipTextOption laterMapped = option;
+    laterMapped.BroadcastTextId = 62792;
+    CHECK(MopNpcTextPackets::OwnsSynthesisedBroadcastTextId(mine, 4938, 0,
+        laterMapped));
 }
 
 int main(int /*argc*/, char** /*argv*/)

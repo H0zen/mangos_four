@@ -497,9 +497,11 @@ void WorldSession::SendBroadcastTextDb2Reply(uint32 entry)
         // The entry is sent negated: the client reads a negative entry as
         // "drop the record with this absolute id". A bare uint32(-1) would
         // therefore tell it to drop record 1 rather than the one it asked
-        // about.
+        // about. Negated in unsigned arithmetic because the entry arrives
+        // straight off the wire, and 0x80000000 converted to int32 is
+        // INT32_MIN, whose negation is undefined.
         ByteBuffer empty;
-        MopHotfixPackets::BuildDbReply(data, uint32(-int32(entry)),
+        MopHotfixPackets::BuildDbReply(data, uint32(0) - entry,
             uint32(time(NULL)), DB2_REPLY_BROADCAST_TEXT, empty);
         SendPacket(&data);
         DEBUG_LOG("WORLD: SMSG_DB_REPLY BroadcastText %u -> no source row", entry);
