@@ -1901,6 +1901,9 @@ void WorldSession::HandleRequestHotfix(WorldPacket& recv_data)
             case DB2_REPLY_BROADCAST_TEXT:
                 SendBroadcastTextDb2Reply(record.entry);
                 break;
+            case DB2_REPLY_BATTLE_PET_EFFECT_PROPERTIES:
+                SendBattlePetEffectPropertiesDb2Reply(record.entry);
+                break;
             default:
                 sLog.outError("CMSG_REQUEST_HOTFIX: Received unknown hotfix type: %u", request.type);
                 recv_data.rfinish();

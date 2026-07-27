@@ -1180,6 +1180,10 @@ enum AccountDataType
 // 0x021826BB, the table hash of BroadcastText.db2. The live client requests
 // this the moment it is handed a BroadcastText id it cannot resolve locally.
 #define DB2_REPLY_BROADCAST_TEXT 35137211
+// 0x63B4C4BA, the table hash of BattlePetEffectProperties.db2. This is the
+// first thing the client asks for after logging in, and every answer is a
+// not-found -- see SendBattlePetEffectPropertiesDb2Reply.
+#define DB2_REPLY_BATTLE_PET_EFFECT_PROPERTIES 1672791226
 
 struct AccountData
 {
@@ -2187,6 +2191,7 @@ class WorldSession
         void SendItemDb2Reply(uint32 entry);
         void SendItemSparseDb2Reply(uint32 entry);
         void SendBroadcastTextDb2Reply(uint32 entry);
+        void SendBattlePetEffectPropertiesDb2Reply(uint32 entry);
 
         void HandleObjectUpdateFailedOpcode(WorldPacket& recv_data);
 

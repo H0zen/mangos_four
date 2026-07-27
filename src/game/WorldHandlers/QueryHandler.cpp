@@ -455,6 +455,40 @@ void WorldSession::HandleNpcTextQueryOpcode(WorldPacket& recv_data)
 }
 
 /**
+ * @brief Answers the battle-pet effect-properties probe the client fires at login.
+ *
+ * This is the first server content of a retail login -- ahead of the account
+ * data times, and roughly ninety packets before SMSG_LOGIN_VERIFY_WORLD. The
+ * client ships 97 records and asks for 86 more, and the two sets do not
+ * intersect at all: together they are exactly the contiguous span 22..204, so
+ * the client is probing every id in the table's range that it does not already
+ * hold.
+ *
+ * Retail answers every one of them with a not-found. Across the capture corpus
+ * all 946 replies of this type carry a zero-length record, and every entry is
+ * returned negated -- 0xFFFFFF75 to 0xFFFFFF22, which is -203 to -30. So there
+ * is no data to recover and nothing to build a record layout for; the gap was
+ * only ever that we said nothing where retail says no.
+ *
+ * Do not generalise this into the hotfix handler. Answering every unknown type
+ * with a not-found would be wrong: the same channel carries real records for
+ * other tables, 222 of them in the corpus, with Creature.db2 replies running
+ * 80 to 103 bytes and CreatureDifficulty.db2 at 44. Emptiness here is a
+ * property of this table's id distribution -- the client happens to probe a
+ * range in which nothing it lacks exists -- not of the mechanism. A table that
+ * does carry data would then return nothing and read as a data problem rather
+ * than a code one.
+ */
+void WorldSession::SendBattlePetEffectPropertiesDb2Reply(uint32 entry)
+{
+    WorldPacket data(SMSG_DB_REPLY, 16);
+    ByteBuffer empty;
+    MopHotfixPackets::BuildDbReply(data, uint32(0) - entry, uint32(time(NULL)),
+        DB2_REPLY_BATTLE_PET_EFFECT_PROPERTIES, empty);
+    SendPacket(&data);
+}
+
+/**
  * @brief Serves a BroadcastText record the client could not resolve locally.
  *
  * The 18414 client ships 936 BroadcastText records. When SMSG_NPC_TEXT_UPDATE
