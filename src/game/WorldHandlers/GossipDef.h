@@ -953,6 +953,27 @@ namespace MopQuestQueryPackets
         uint64 sourceGuid = 0;
     };
 
+    // Objective kinds recovered from real 18414 traffic. The counts are
+    // occurrences over 3,189 responses that decoded with zero residual, and
+    // each kind was identified from the range its objectId falls in:
+    // creatures and items sit in their usual entry ranges, and the type-2
+    // objectIds observed (210890-215762) are gameobject entries.
+    enum ObjectiveType : uint8
+    {
+        OBJECTIVE_CREATURE   = 0,       // n=2011
+        OBJECTIVE_ITEM       = 1,       // n=1233
+        OBJECTIVE_GAMEOBJECT = 2,       // n=98
+        OBJECTIVE_CURRENCY   = 4,       // n=50, always untracked
+        OBJECTIVE_REPUTATION = 6,       // n=50, always untracked
+        OBJECTIVE_MONEY      = 8,       // n=4,  always untracked
+    };
+
+    // An objective's index selects which 16-bit counter lane of the quest log
+    // the client reads. Retail marks objectives that occupy no lane with this
+    // sentinel; every currency, reputation and money objective in the corpus
+    // carries it, and no tracked objective does.
+    static constexpr uint8 ObjectiveIndexUntracked = 255;
+
     struct Objective
     {
         int32 amount = 0;
@@ -996,7 +1017,11 @@ namespace MopQuestQueryPackets
         uint32 rewardHonorAddition = 0;
         uint32 obsoleteArenaPoints = 0;
         uint32 suggestedPlayers = 0;
-        uint32 repObjectiveFaction = 0;
+        // The record repeats its own quest id here. This slot was previously
+        // fed from RepObjectiveFaction; every one of 4,564 retail 18414
+        // responses carries the quest id in it instead, and the client reads
+        // it as QuestInfo field 0 when it raises QUEST_ACCEPTED.
+        uint32 innerQuestId = 0;
         int32 minLevel = 0;
         uint32 rewardReputationMask = 0;
         uint32 pointOpt = 0;
@@ -1213,7 +1238,7 @@ namespace MopQuestQueryPackets
         built << response.obsoleteArenaPoints;
         built << response.rewardChoiceItemIds[5];
         built << response.suggestedPlayers;
-        built << response.repObjectiveFaction;
+        built << response.innerQuestId;
         built << response.requiredSourceItemIds[1];
         built << response.rewardItemIds[1];
         built << response.minLevel;
