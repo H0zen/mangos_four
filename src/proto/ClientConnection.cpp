@@ -434,10 +434,31 @@ namespace proto
 
     bool ClientConnection::HandlePing(WorldPacket& packet)
     {
-        uint32 ping = 0;
+        // 5.4.8 reverses the 3.3.5 field order: latency is on the wire FIRST,
+        // then the sequence. Read from Wow.exe 18414, not assumed:
+        //
+        //   sub_798727  ping sender. The per-stream struct is
+        //               connection+0x4560 + index*0x58. It stamps the send
+        //               time at struct+8 and takes the sequence from
+        //               ++struct+0, storing it in the message at +0x14, with
+        //               the latency sample at +0x18.
+        //   sub_66F4D7  writes opcode 18 (0x12, CMSG_PING), then calls
+        //   sub_66F403  which writes *(this+6) BEFORE *(this+5) - byte
+        //               offsets 0x18 then 0x14, so latency precedes sequence.
+        //
+        // Reading these the 3.3.5 way echoes the latency back as the sequence.
+        // The client compares it against its current sequence at 0x79976C and
+        // logs "Received pong with old sequence" at 0x799770 - "old" rather
+        // than "bad" because a millisecond latency is a small number, so it
+        // reads as an earlier sequence rather than as garbage.
+        //
+        // It also reported the sequence to the gateway as if it were a latency
+        // measurement, which feeds movement timestamp adjustment
+        // (MovementHandler.cpp) as well as the exposed latency figure.
         uint32 latency = 0;
-        packet >> ping;
+        uint32 ping = 0;
         packet >> latency;
+        packet >> ping;
 
         // WorldSocket.cpp:1594-1628's 27-second overspeed-ping window.
         static const std::chrono::seconds MIN_PING_INTERVAL(27);
