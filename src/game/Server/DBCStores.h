@@ -146,6 +146,7 @@ bool Map2ZoneCoordinates(float& x, float& y, uint32 zone);
 
 typedef std::map<uint32/*pair32(map,diff)*/, MapDifficultyEntry const*> MapDifficultyMap;
 MapDifficultyEntry const* GetMapDifficultyData(uint32 mapId, Difficulty difficulty);
+void BuildMapSpawnModeMasks(std::map<uint32, uint32>& spawnMasks);
 
 // natural order for difficulties up-down iteration
 // difficulties for dungeons/battleground ordered in normal way

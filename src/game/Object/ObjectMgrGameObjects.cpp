@@ -73,17 +73,10 @@ void ObjectMgr::LoadGameObjects()
         return;
     }
 
-    // build single time for check spawnmask
+    // build single time for check spawnmask; 5.4.8 MapDifficulty difficulty
+    // ids are translated to internal spawn modes (see BuildMapSpawnModeMasks)
     std::map<uint32, uint32> spawnMasks;
-    for (uint32 i = 0; i < sMapStore.GetNumRows(); ++i)
-        if (sMapStore.LookupEntry(i))
-            for (int k = 0; k < MAX_DIFFICULTY; ++k)
-                if (GetMapDifficultyData(i, Difficulty(k)))
-                {
-                    spawnMasks[i] |= (1 << k);
-                }
-    // Map 0 was removed from dbc as of 4.x.x
-    spawnMasks[0] = 1 << REGULAR_DIFFICULTY;
+    BuildMapSpawnModeMasks(spawnMasks);
 
     // collapse per-row "wrong spawn mask" spam into a per-map summary (DB vs DBC mismatches can hit ~every spawn on a map)
     std::map<uint32, uint32> badSpawnMaskCounts;
