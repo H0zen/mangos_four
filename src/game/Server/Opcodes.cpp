@@ -287,6 +287,48 @@ void InitializeOpcodes()
     // 18414 /say requests carry a uint32 language followed by the bit-packed message body.
     DefC(CMSG_MESSAGECHAT_SAY, "CMSG_MESSAGECHAT_SAY", STATUS_LOGGEDIN, PROCESS_THREADUNSAFE, &WorldSession::HandleMessagechatOpcode);
     DefC(CMSG_MESSAGECHAT_AFK, "CMSG_MESSAGECHAT_AFK", STATUS_LOGGEDIN, PROCESS_THREADUNSAFE, &WorldSession::HandleMessagechatOpcode);
+
+    // The rest of the chat channels. Only say and afk were registered, so
+    // everything else a player types was dropped without a trace -- including
+    // GM commands, which ride the chat opcode, and which is why a typed
+    // .revive appeared to do nothing at all.
+    //
+    // HandleMessagechatOpcode already switches on all thirteen types, and its
+    // reads are 18414 shaped rather than inherited: a uint32 language followed
+    // by ReadString(ReadBits(9)). Retail body sizes agree exactly -- guild,
+    // raid, party and instance all bottom out at six bytes, four for the
+    // language and two for the nine-bit length, the same minimum as say, which
+    // is registered and works.
+    DefC(CMSG_MESSAGECHAT_YELL, "CMSG_MESSAGECHAT_YELL", STATUS_LOGGEDIN, PROCESS_THREADUNSAFE, &WorldSession::HandleMessagechatOpcode);
+    DefC(CMSG_MESSAGECHAT_EMOTE, "CMSG_MESSAGECHAT_EMOTE", STATUS_LOGGEDIN, PROCESS_THREADUNSAFE, &WorldSession::HandleMessagechatOpcode);
+    DefC(CMSG_MESSAGECHAT_DND, "CMSG_MESSAGECHAT_DND", STATUS_LOGGEDIN, PROCESS_THREADUNSAFE, &WorldSession::HandleMessagechatOpcode);
+    DefC(CMSG_MESSAGECHAT_WHISPER, "CMSG_MESSAGECHAT_WHISPER", STATUS_LOGGEDIN, PROCESS_THREADUNSAFE, &WorldSession::HandleMessagechatOpcode);
+    DefC(CMSG_MESSAGECHAT_CHANNEL, "CMSG_MESSAGECHAT_CHANNEL", STATUS_LOGGEDIN, PROCESS_THREADUNSAFE, &WorldSession::HandleMessagechatOpcode);
+    DefC(CMSG_MESSAGECHAT_GUILD, "CMSG_MESSAGECHAT_GUILD", STATUS_LOGGEDIN, PROCESS_THREADUNSAFE, &WorldSession::HandleMessagechatOpcode);
+    DefC(CMSG_MESSAGECHAT_OFFICER, "CMSG_MESSAGECHAT_OFFICER", STATUS_LOGGEDIN, PROCESS_THREADUNSAFE, &WorldSession::HandleMessagechatOpcode);
+    DefC(CMSG_MESSAGECHAT_PARTY, "CMSG_MESSAGECHAT_PARTY", STATUS_LOGGEDIN, PROCESS_THREADUNSAFE, &WorldSession::HandleMessagechatOpcode);
+    DefC(CMSG_MESSAGECHAT_RAID, "CMSG_MESSAGECHAT_RAID", STATUS_LOGGEDIN, PROCESS_THREADUNSAFE, &WorldSession::HandleMessagechatOpcode);
+    DefC(CMSG_MESSAGECHAT_RAID_WARNING, "CMSG_MESSAGECHAT_RAID_WARNING", STATUS_LOGGEDIN, PROCESS_THREADUNSAFE, &WorldSession::HandleMessagechatOpcode);
+    DefC(CMSG_MESSAGECHAT_INSTANCE, "CMSG_MESSAGECHAT_INSTANCE", STATUS_LOGGEDIN, PROCESS_THREADUNSAFE, &WorldSession::HandleMessagechatOpcode);
+
+    // Addon traffic rides its own six opcodes and its own handler, which reads
+    // a nine-bit message length and a five-bit prefix length. Also 18414
+    // shaped, and the observed minimum of six bytes matches.
+    DefC(CMSG_MESSAGECHAT_ADDON_RAID, "CMSG_MESSAGECHAT_ADDON_RAID", STATUS_LOGGEDIN, PROCESS_THREADUNSAFE, &WorldSession::HandleAddonMessagechatOpcode);
+    DefC(CMSG_MESSAGECHAT_ADDON_PARTY, "CMSG_MESSAGECHAT_ADDON_PARTY", STATUS_LOGGEDIN, PROCESS_THREADUNSAFE, &WorldSession::HandleAddonMessagechatOpcode);
+    DefC(CMSG_MESSAGECHAT_ADDON_INSTANCE, "CMSG_MESSAGECHAT_ADDON_INSTANCE", STATUS_LOGGEDIN, PROCESS_THREADUNSAFE, &WorldSession::HandleAddonMessagechatOpcode);
+    DefC(CMSG_MESSAGECHAT_ADDON_GUILD, "CMSG_MESSAGECHAT_ADDON_GUILD", STATUS_LOGGEDIN, PROCESS_THREADUNSAFE, &WorldSession::HandleAddonMessagechatOpcode);
+    DefC(CMSG_MESSAGECHAT_ADDON_OFFICER, "CMSG_MESSAGECHAT_ADDON_OFFICER", STATUS_LOGGEDIN, PROCESS_THREADUNSAFE, &WorldSession::HandleAddonMessagechatOpcode);
+    DefC(CMSG_MESSAGECHAT_ADDON_WHISPER, "CMSG_MESSAGECHAT_ADDON_WHISPER", STATUS_LOGGEDIN, PROCESS_THREADUNSAFE, &WorldSession::HandleAddonMessagechatOpcode);
+
+    // Reporting a message as spam. Its handler already decodes the 18414 guid
+    // with ReadGuidMask/ReadGuidBytes rather than a raw read.
+    DefC(CMSG_CHAT_IGNORED, "CMSG_CHAT_IGNORED", STATUS_LOGGEDIN, PROCESS_THREADUNSAFE, &WorldSession::HandleChatIgnoredOpcode);
+
+    // CMSG_MESSAGECHAT_BATTLEGROUND stays dormant: its value is inherited from
+    // 4.3.4 and unverified for 5.4.8, and at 0x2156 it exceeds the thirteen
+    // bits the 18414 header gives an opcode, so it cannot be what the client
+    // sends. HandleMessagechatOpcode has no case for it either.
     DefC(CMSG_TEXT_EMOTE, "CMSG_TEXT_EMOTE", STATUS_LOGGEDIN, PROCESS_THREADUNSAFE, &WorldSession::HandleTextEmoteOpcode);
     DefC(CMSG_EMOTE, "CMSG_EMOTE", STATUS_LOGGEDIN, PROCESS_THREADUNSAFE, &WorldSession::HandleEmoteOpcode);
     DefS(SMSG_TEXT_EMOTE, "SMSG_TEXT_EMOTE");

@@ -175,9 +175,9 @@
  *   TOTAL SMSG rows                   925
  *
  * SUBSYSTEM CONFIDENCE: high=365, low=221, medium=182, none=157
- * STATUS TOTALS: ACTIVE=404, DOC=436, DORMANT=680
+ * STATUS TOTALS: ACTIVE=422, DOC=436, DORMANT=662
  *   SMSG: ACTIVE=260, DOC=271, DORMANT=394
- *   CMSG: ACTIVE=144, DOC=165, DORMANT=286
+ *   CMSG: ACTIVE=162, DOC=165, DORMANT=268
  */
 
 // CAVEATS -- read before trusting any single row:
@@ -1312,7 +1312,7 @@ typedef uint16_t uint16;
  *   CMSG_UNACCEPT_TRADE                            0x0023  DORMANT 
  *   CMSG_DESTROY_ITEM                              0x0026  ACTIVE
  *   CMSG_NEUTRAL_PLAYER_SELECT_FACTION             0x0027  DOC     
- *   CMSG_MESSAGECHAT_DND                           0x002E  DORMANT 
+ *   CMSG_MESSAGECHAT_DND                           0x002E  ACTIVE
  *   CMSG_VIOLENCE_LEVEL                            0x0040  ACTIVE
  *   CMSG_TIME_SYNC_RESPONSE_FAILED                 0x0058  ACTIVE
  *   CMSG_UNKNOWN_0x0060                            0x0060  DOC     
@@ -1325,13 +1325,13 @@ typedef uint16_t uint16;
  *   CMSG_MOVE_STOP_PITCH                           0x007A  DORMANT 
  *   CMSG_MOUNTSPECIAL_ANIM                         0x0082  DORMANT 
  *   CMSG_SCENE_COMPLETED                           0x0087  DOC     
- *   CMSG_MESSAGECHAT_ADDON_RAID                    0x009A  DORMANT 
+ *   CMSG_MESSAGECHAT_ADDON_RAID                    0x009A  ACTIVE
  *   CMSG_CLEAR_TRADE_ITEM                          0x00A7  DORMANT 
  *   CMSG_CHANNEL_MODERATOR                         0x00AE  DORMANT 
  *   CMSG_CHANNEL_OWNER                             0x00AF  DORMANT 
  *   CMSG_AUTH_SESSION                              0x00B2  ACTIVE  
  *   CMSG_UNKNOWN_0x00B3                            0x00B3  DOC     
- *   CMSG_MESSAGECHAT_CHANNEL                       0x00BB  DORMANT 
+ *   CMSG_MESSAGECHAT_CHANNEL                       0x00BB  ACTIVE
  *   CMSG_MOVE_START_PITCH_UP                       0x00D8  DORMANT 
  *   CMSG_MOVE_FALL_RESET                           0x00D9  DORMANT 
  *   CMSG_FORCE_WALK_SPEED_CHANGE_ACK               0x00DB  DORMANT 
@@ -1382,7 +1382,7 @@ typedef uint16_t uint16;
  *   CMSG_RIDE_VEHICLE_INTERACT                     0x0277  DORMANT 
  *   CMSG_SET_FACTION_ATWAR                         0x027B  DORMANT 
  *   CMSG_NPC_TEXT_QUERY                            0x0287  ACTIVE   [high-conf]
- *   CMSG_MESSAGECHAT_ADDON_PARTY                   0x028E  DORMANT 
+ *   CMSG_MESSAGECHAT_ADDON_PARTY                   0x028E  ACTIVE
  *   CMSG_SUSPEND_TOKEN_RESPONSE                    0x0292  DOC     
  *   CMSG_UNREGISTER_ALL_ADDON_PREFIXES             0x029F  ACTIVE
  *   CMSG_GET_MIRRORIMAGE_DATA                      0x02A3  DORMANT 
@@ -1470,9 +1470,9 @@ typedef uint16_t uint16;
  *   CMSG_LFG_JOIN                                  0x046B  DORMANT 
  *   CMSG_QUERY_GUILD_RECIPES                       0x0478  DORMANT 
  *   CMSG_GUILD_ADD_RANK                            0x047A  DORMANT 
- *   CMSG_CHAT_IGNORED                              0x048A  DORMANT 
+ *   CMSG_CHAT_IGNORED                              0x048A  ACTIVE
  *   CMSG_UNKNOWN_0x049B                            0x049B  DOC     
- *   CMSG_MESSAGECHAT_YELL                          0x04AA  DORMANT 
+ *   CMSG_MESSAGECHAT_YELL                          0x04AA  ACTIVE
  *   CMSG_GUILD_NEWS_UPDATE_STICKY                  0x04D1  DOC     
  *   CMSG_GUILD_LEAVE                               0x04D8  DORMANT 
  *   CMSG_GUILD_BANK_NOTE                           0x04D9  DOC     
@@ -1563,7 +1563,7 @@ typedef uint16_t uint16;
  *   CMSG_CHANNEL_UNBAN                             0x081F  DORMANT 
  *   CMSG_REQUEST_RATED_BG_STATS                    0x0826  ACTIVE
  *   CMSG_MINIMAP_PING                              0x0837  ACTIVE
- *   CMSG_MESSAGECHAT_RAID                          0x083E  DORMANT 
+ *   CMSG_MESSAGECHAT_RAID                          0x083E  ACTIVE
  *   CMSG_LOOT_RELEASE                              0x0840  ACTIVE
  *   CMSG_CREATURE_QUERY                            0x0842  ACTIVE
  *   CMSG_MOVE_HOVER_ACK                            0x0858  DORMANT 
@@ -1578,7 +1578,7 @@ typedef uint16_t uint16;
  *   CMSG_LFG_SET_ROLES                             0x08A2  DORMANT 
  *   CMSG_RANDOM_ROLL                               0x08A3  DOC     
  *   CMSG_REORDER_CHARACTERS                        0x08A7  DORMANT 
- *   CMSG_MESSAGECHAT_ADDON_INSTANCE                0x08AF  DORMANT 
+ *   CMSG_MESSAGECHAT_ADDON_INSTANCE                0x08AF  ACTIVE
  *   CMSG_BATTLEFIELD_MANAGER_EXIT_REQUEST          0x08B3  DORMANT 
  *   CMSG_CHANNEL_BAN                               0x08BF  DORMANT 
  *   CMSG_CANCEL_CHANNELLING                        0x08C0  DORMANT 
@@ -1630,7 +1630,7 @@ typedef uint16_t uint16;
  *   CMSG_UNKNOWN_0x0AB2                            0x0AB2  DOC     
  *   CMSG_UNKNOWN_0x0AB6                            0x0AB6  DOC     
  *   CMSG_UNKNOWN_0x0ABA                            0x0ABA  DOC     
- *   CMSG_MESSAGECHAT_OFFICER                       0x0ABF  DORMANT 
+ *   CMSG_MESSAGECHAT_OFFICER                       0x0ABF  ACTIVE
  *   CMSG_RESURRECT_RESPONSE                        0x0B0C  DORMANT
  *   CMSG_GENERATE_RANDOM_CHARACTER_NAME            0x0B1C  DOC     
  *   CMSG_BATTLE_PAY_ACK_FAILED_RESPONSE            0x0B38  DOC     
@@ -1647,7 +1647,7 @@ typedef uint16_t uint16;
  *   CMSG_GUILD_INFO_TEXT                           0x0C70  DORMANT 
  *   CMSG_UNKNOWN_0x0C79                            0x0C79  DOC     
  *   CMSG_GUILD_SET_RANK                            0x0C7A  DORMANT 
- *   CMSG_MESSAGECHAT_GUILD                         0x0CAE  DORMANT 
+ *   CMSG_MESSAGECHAT_GUILD                         0x0CAE  ACTIVE
  *   CMSG_GUILD_REPLACE_GUILD_MASTER                0x0CD0  DOC     
  *   CMSG_GUILD_SWITCH_RANK                         0x0CD1  DORMANT 
  *   CMSG_GUILD_BANK_LOG_QUERY                      0x0CD3  DORMANT 
@@ -1665,14 +1665,14 @@ typedef uint16_t uint16;
  *   CMSG_LOOT_METHOD                               0x0DE1  DORMANT 
  *   CMSG_CHANNEL_KICK                              0x0E0B  DORMANT 
  *   CMSG_UNKNOWN_0x0E0E                            0x0E0E  DOC     
- *   CMSG_MESSAGECHAT_ADDON_GUILD                   0x0E3B  DORMANT 
+ *   CMSG_MESSAGECHAT_ADDON_GUILD                   0x0E3B  ACTIVE
  *   CMSG_MESSAGECHAT_AFK                           0x0EAB  ACTIVE
- *   CMSG_MESSAGECHAT_ADDON_WHISPER                 0x0EBB  DORMANT 
+ *   CMSG_MESSAGECHAT_ADDON_WHISPER                 0x0EBB  ACTIVE
  *   CMSG_CHAR_CREATE                               0x0F1D  ACTIVE  
  *   CMSG_TUTORIAL_CLEAR                            0x0F23  ACTIVE
  *   CMSG_AUTH_CONTINUED_SESSION                    0x0F49  DORMANT 
  *   CMSG_PAGE_TEXT_QUERY                           0x1022  ACTIVE   [high-conf]
- *   CMSG_MESSAGECHAT_EMOTE                         0x103E  DORMANT 
+ *   CMSG_MESSAGECHAT_EMOTE                         0x103E  ACTIVE
  *   CMSG_ITEM_UPGRADE                              0x1042  DOC     
  *   CMSG_MOVE_SET_FACING                           0x1050  ACTIVE
  *   CMSG_FORCE_MOVE_UNROOT_ACK                     0x1051  DORMANT 
@@ -1686,7 +1686,7 @@ typedef uint16_t uint16;
  *   CMSG_MOVE_START_TURN_RIGHT                     0x107B  ACTIVE
  *   CMSG_SCENE_PLAYBACK_CANCELED                   0x1087  DOC     
  *   CMSG_QUEUED_MESSAGES_END                       0x1093  DOC     
- *   CMSG_MESSAGECHAT_PARTY                         0x109A  DORMANT 
+ *   CMSG_MESSAGECHAT_PARTY                         0x109A  ACTIVE
  *   CMSG_UNKNOWN_0x10A2                            0x10A2  DOC     
  *   CMSG_SET_PET_SLOT                              0x10A7  DORMANT 
  *   CMSG_CHANNEL_INVITE                            0x10AB  DORMANT 
@@ -1717,7 +1717,7 @@ typedef uint16_t uint16;
  *   CMSG_MOVE_START_ASCEND                         0x11FA  DORMANT 
  *   CMSG_REQUEST_CATEGORY_COOLDOWNS                0x1203  ACTIVE   [high-conf]
  *   CMSG_UNKNOWN_0x1207                            0x1207  DOC     
- *   CMSG_MESSAGECHAT_WHISPER                       0x123E  DORMANT 
+ *   CMSG_MESSAGECHAT_WHISPER                       0x123E  ACTIVE
  *   CMSG_BINDER_ACTIVATE                           0x1248  ACTIVE
  *   CMSG_QUEST_CONFIRM_ACCEPT                      0x124B  ACTIVE
  *   CMSG_GET_ITEM_PURCHASE_DATA                    0x1258  DORMANT 
@@ -1802,8 +1802,8 @@ typedef uint16_t uint16;
  *   CMSG_CHALLENGE_MODE_REQUEST_LEADERS            0x15DB  DOC     
  *   CMSG_REQUEST_RESEARCH_HISTORY                  0x15E2  DOC     
  *   CMSG_UNKNOWN_0x160F                            0x160F  DOC     
- *   CMSG_MESSAGECHAT_INSTANCE                      0x162A  DORMANT 
- *   CMSG_MESSAGECHAT_RAID_WARNING                  0x16AB  DORMANT 
+ *   CMSG_MESSAGECHAT_INSTANCE                      0x162A  ACTIVE
+ *   CMSG_MESSAGECHAT_RAID_WARNING                  0x16AB  ACTIVE
  *   CMSG_UNKNOWN_0x1788                            0x1788  DOC     
  *   CMSG_UNKNOWN_0x1789                            0x1789  DOC     
  *   CMSG_GROUP_REQUEST_JOIN_UPDATES                0x178A  ACTIVE
@@ -1818,7 +1818,7 @@ typedef uint16_t uint16;
  *   CMSG_LFG_BOOT_PLAYER_VOTE                      0x17BE  DORMANT 
  *   CMSG_SET_PARTY_ASSIGNMENT                      0x1802  DOC     
  *   CMSG_BATTLEFIELD_MANAGER_ENTRY_INVITE_RESPONSE 0x1806  DORMANT 
- *   CMSG_MESSAGECHAT_ADDON_OFFICER                 0x180B  DORMANT 
+ *   CMSG_MESSAGECHAT_ADDON_OFFICER                 0x180B  ACTIVE
  *   CMSG_WARDEN_DATA                               0x1816  DORMANT 
  *   CMSG_UNLEARN_SPECIALIZATION                    0x1841  DORMANT 
  *   CMSG_FORCE_SWIM_SPEED_CHANGE_ACK               0x1853  ACTIVE
