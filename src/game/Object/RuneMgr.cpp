@@ -199,9 +199,8 @@ void RuneMgr::ConvertRune(uint8 index, RuneType newType)
 {
     SetCurrentRune(index, newType);
 
-    WorldPacket data(SMSG_CONVERT_RUNE, 2);
-    data << uint8(index);
-    data << uint8(newType);
+    WorldPacket data;
+    MopRunePackets::BuildConvert(data, newType, index);
     m_owner->GetSession()->SendPacket(&data);
 }
 
@@ -223,20 +222,21 @@ bool RuneMgr::ActivateRunes(RuneType type, uint32 count)
 
 void RuneMgr::ResyncRunes()
 {
-    WorldPacket data(SMSG_RESYNC_RUNES, 4 + MAX_RUNES * 2);
-    data << uint32(MAX_RUNES);
+    std::array<MopRunePackets::RuneState, MAX_RUNES> runes;
     for (uint32 i = 0; i < MAX_RUNES; ++i)
     {
-        data << uint8(GetCurrentRune(i));                   // rune type
-        data << uint8(GetRuneCooldownFraction(i));
+        runes[i].type = GetCurrentRune(i);
+        runes[i].cooldownFraction = GetRuneCooldownFraction(i);
     }
+    WorldPacket data;
+    MopRunePackets::BuildResync(data, runes);
     m_owner->GetSession()->SendPacket(&data);
 }
 
 void RuneMgr::AddRunePower(uint8 index)
 {
-    WorldPacket data(SMSG_ADD_RUNE_POWER, 4);
-    data << uint32(1 << index);                             // mask (0x00-0x3F probably)
+    WorldPacket data;
+    MopRunePackets::BuildAddPower(data, uint32(1 << index));
     m_owner->GetSession()->SendPacket(&data);
 }
 

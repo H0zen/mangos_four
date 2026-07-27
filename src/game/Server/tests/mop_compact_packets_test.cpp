@@ -465,6 +465,38 @@ static void test_mirror_timer_packets()
     CHECK(BytesEqual(stopped, { 0x78, 0x56, 0x34, 0x12 }));
 }
 
+static void test_rune_packets()
+{
+    std::array<MopRunePackets::RuneState, MAX_RUNES> const runes = {{
+        { RUNE_BLOOD, 0x10 },
+        { RUNE_BLOOD, 0x20 },
+        { RUNE_UNHOLY, 0x30 },
+        { RUNE_UNHOLY, 0x40 },
+        { RUNE_FROST, 0x50 },
+        { RUNE_DEATH, 0x60 },
+    }};
+
+    WorldPacket resync;
+    MopRunePackets::BuildResync(resync, runes);
+    CHECK(resync.GetOpcode() == SMSG_RESYNC_RUNES);
+    CHECK(BytesEqual(resync, {
+        0x00, 0x00, 0x0C,
+        0x10, 0x00, 0x20, 0x00,
+        0x30, 0x01, 0x40, 0x01,
+        0x50, 0x02, 0x60, 0x03,
+    }));
+
+    WorldPacket power;
+    MopRunePackets::BuildAddPower(power, 0x20u);
+    CHECK(power.GetOpcode() == SMSG_ADD_RUNE_POWER);
+    CHECK(BytesEqual(power, { 0x20, 0x00, 0x00, 0x00 }));
+
+    WorldPacket converted;
+    MopRunePackets::BuildConvert(converted, RUNE_DEATH, 4);
+    CHECK(converted.GetOpcode() == SMSG_CONVERT_RUNE);
+    CHECK(BytesEqual(converted, { 0x03, 0x04 }));
+}
+
 static void test_opcode_values_are_framable()
 {
     CHECK(uint32_t(SMSG_ATTACKSWING_ERROR) == 0x11E1u);
@@ -486,6 +518,9 @@ static void test_opcode_values_are_framable()
     CHECK(uint32_t(SMSG_DUEL_WINNER) == 0x10E1u);
     CHECK(uint32_t(SMSG_START_MIRROR_TIMER) == 0x0E12u);
     CHECK(uint32_t(SMSG_STOP_MIRROR_TIMER) == 0x1026u);
+    CHECK(uint32_t(SMSG_RESYNC_RUNES) == 0x15E3u);
+    CHECK(uint32_t(SMSG_ADD_RUNE_POWER) == 0x1860u);
+    CHECK(uint32_t(SMSG_CONVERT_RUNE) == 0x1A1Bu);
 
     CHECK(uint32_t(SMSG_ATTACKSWING_ERROR) <= 0x1FFFu);
     CHECK(uint32_t(SMSG_MOVE_SET_SWIM_SPEED) <= 0x1FFFu);
@@ -506,6 +541,9 @@ static void test_opcode_values_are_framable()
     CHECK(uint32_t(SMSG_DUEL_WINNER) <= 0x1FFFu);
     CHECK(uint32_t(SMSG_START_MIRROR_TIMER) <= 0x1FFFu);
     CHECK(uint32_t(SMSG_STOP_MIRROR_TIMER) <= 0x1FFFu);
+    CHECK(uint32_t(SMSG_RESYNC_RUNES) <= 0x1FFFu);
+    CHECK(uint32_t(SMSG_ADD_RUNE_POWER) <= 0x1FFFu);
+    CHECK(uint32_t(SMSG_CONVERT_RUNE) <= 0x1FFFu);
 }
 
 int main(int /*argc*/, char** /*argv*/)
@@ -523,6 +561,7 @@ int main(int /*argc*/, char** /*argv*/)
     test_duel_state_packets();
     test_duel_request_and_winner_packets();
     test_mirror_timer_packets();
+    test_rune_packets();
     test_opcode_values_are_framable();
 
     if (g_fail)

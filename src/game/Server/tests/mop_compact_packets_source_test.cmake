@@ -1,6 +1,8 @@
 file(READ "${SOURCE_ROOT}/src/game/Object/PlayerCombat.cpp" player_combat)
 file(READ "${SOURCE_ROOT}/src/game/Object/PlayerDuel.cpp" player_duel)
 file(READ "${SOURCE_ROOT}/src/game/Object/PlayerMirror.cpp" player_mirror)
+file(READ "${SOURCE_ROOT}/src/game/Object/RuneMgr.cpp" rune_source)
+file(READ "${SOURCE_ROOT}/src/game/Object/RuneMgr.h" rune_header)
 file(READ "${SOURCE_ROOT}/src/game/Object/Player.h" player_header)
 file(READ "${SOURCE_ROOT}/src/game/WorldHandlers/SpellEffectObjectCombat.cpp" spell_effect_object_combat)
 file(READ "${SOURCE_ROOT}/src/game/Object/UnitSpeed.cpp" unit_speed)
@@ -253,6 +255,41 @@ elseif(MUTATION STREQUAL "mirror_reference")
         "SMSG_START_MIRROR_TIMER                        0x0E12  ACTIVE"
         "SMSG_START_MIRROR_TIMER                        0x0E12  DORMANT"
         opcode_reference "${opcode_reference}")
+elseif(MUTATION STREQUAL "rune_count_width")
+    string(REPLACE
+        "out.WriteBits(uint32(runes.size()), 23);"
+        "out.WriteBits(uint32(runes.size()), 22);"
+        rune_header "${rune_header}")
+elseif(MUTATION STREQUAL "rune_record_order")
+    string(REPLACE
+        "out << rune.cooldownFraction << uint8(rune.type);"
+        "out << uint8(rune.type) << rune.cooldownFraction;"
+        rune_header "${rune_header}")
+elseif(MUTATION STREQUAL "rune_convert_order")
+    string(REPLACE
+        "out << uint8(newType) << index;"
+        "out << index << uint8(newType);"
+        rune_header "${rune_header}")
+elseif(MUTATION STREQUAL "rune_sender")
+    string(REPLACE
+        "MopRunePackets::BuildResync(data, runes);"
+        "/* removed rune-resync builder */"
+        rune_source "${rune_source}")
+elseif(MUTATION STREQUAL "rune_registration")
+    string(REPLACE
+        "DefS(SMSG_RESYNC_RUNES, \"SMSG_RESYNC_RUNES\");"
+        "/* removed rune registration */"
+        opcode_registry "${opcode_registry}")
+elseif(MUTATION STREQUAL "rune_allowlist")
+    string(REPLACE
+        "case SMSG_RESYNC_RUNES:"
+        "case 0xFFFF: /* removed rune allowlist */"
+        world_session "${world_session}")
+elseif(MUTATION STREQUAL "rune_reference")
+    string(REPLACE
+        "SMSG_RESYNC_RUNES                              0x15E3  ACTIVE"
+        "SMSG_RESYNC_RUNES                              0x15E3  DORMANT"
+        opcode_reference "${opcode_reference}")
 endif()
 
 if(player_combat MATCHES "WorldPacket[ \t]+data\\(SMSG_ATTACKSWING_NOTINRANGE")
@@ -503,6 +540,35 @@ if(player_mirror MATCHES "WorldPacket[ \\t]+data\\(SMSG_(START|STOP)_MIRROR_TIME
     message(FATAL_ERROR "legacy raw mirror-timer packet construction remains")
 endif()
 foreach(server_name IN ITEMS SMSG_START_MIRROR_TIMER SMSG_STOP_MIRROR_TIMER)
+    if(NOT opcode_registry MATCHES "DefS\\(${server_name},[ \\t]*\"${server_name}\"\\)")
+        message(FATAL_ERROR "${server_name} is missing outbound opcode metadata")
+    endif()
+    if(NOT world_session MATCHES "case[ \\t]+${server_name}:")
+        message(FATAL_ERROR "${server_name} is missing from the converted-packet gate")
+    endif()
+    if(NOT opcode_reference MATCHES "${server_name}[ \\t]+0x[0-9A-F]+[ \\t]+ACTIVE")
+        message(FATAL_ERROR "reference inventory does not record active ${server_name}")
+    endif()
+endforeach()
+
+if(NOT rune_header MATCHES "out.WriteBits\\(uint32\\(runes.size\\(\\)\\), 23\\)")
+    message(FATAL_ERROR "rune-resync count is not the 23-bit 18414 layout")
+endif()
+if(NOT rune_header MATCHES "out << rune.cooldownFraction << uint8\\(rune.type\\);")
+    message(FATAL_ERROR "rune-resync record order does not match reader sub_73299D")
+endif()
+if(NOT rune_header MATCHES "out << uint8\\(newType\\) << index;")
+    message(FATAL_ERROR "rune-convert order does not match reader sub_6B9A69")
+endif()
+foreach(builder IN ITEMS BuildResync BuildAddPower BuildConvert)
+    if(NOT rune_source MATCHES "MopRunePackets::${builder}")
+        message(FATAL_ERROR "rune sender bypasses ${builder}")
+    endif()
+endforeach()
+if(rune_source MATCHES "WorldPacket[ \\t]+data\\(SMSG_(RESYNC_RUNES|ADD_RUNE_POWER|CONVERT_RUNE)")
+    message(FATAL_ERROR "legacy raw rune packet construction remains")
+endif()
+foreach(server_name IN ITEMS SMSG_RESYNC_RUNES SMSG_ADD_RUNE_POWER SMSG_CONVERT_RUNE)
     if(NOT opcode_registry MATCHES "DefS\\(${server_name},[ \\t]*\"${server_name}\"\\)")
         message(FATAL_ERROR "${server_name} is missing outbound opcode metadata")
     endif()
