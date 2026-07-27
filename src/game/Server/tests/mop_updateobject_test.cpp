@@ -597,22 +597,37 @@ int main(int /*argc*/, char** /*argv*/)
     CHECK(MopUpdateObject::TranslateGameObjectDynamic(0xFFFF0009u) == 0xFFFF0012u);
     CHECK(MopUpdateObject::TranslateGameObjectDynamic(0x123400F3u) == 0x12340006u);
 
+    // Only transport-relative states are rejected. AppendSimpleLivingMovement
+    // emits a state-invariant layout - every optional block is declared absent
+    // and position plus all nine speeds are written unconditionally - so a
+    // moving or fighting unit encodes to the same structure as an idle one.
+    // Rejecting those states made BuildCreateUpdateBlockForPlayer emit nothing,
+    // leaving creatures that were moving or in combat permanently invisible.
     MopUpdateObject::SimpleUnitEligibility eligibility{};
     CHECK(MopUpdateObject::CanUseSimpleUnitMovement(eligibility));
     eligibility.isVehicle = true; CHECK(!MopUpdateObject::CanUseSimpleUnitMovement(eligibility)); eligibility.isVehicle = false;
     eligibility.isBoarded = true; CHECK(!MopUpdateObject::CanUseSimpleUnitMovement(eligibility)); eligibility.isBoarded = false;
     eligibility.hasTransport = true; CHECK(!MopUpdateObject::CanUseSimpleUnitMovement(eligibility)); eligibility.hasTransport = false;
-    eligibility.hasSpline = true; CHECK(!MopUpdateObject::CanUseSimpleUnitMovement(eligibility)); eligibility.hasSpline = false;
+
+    // States the encoder represents as a stationary snapshot: the unit is still
+    // created, and the SMSG_MONSTER_MOVE stream animates it from there.
+    eligibility.hasSpline = true; CHECK(MopUpdateObject::CanUseSimpleUnitMovement(eligibility)); eligibility.hasSpline = false;
     eligibility.movementFlags = MopUpdateObject::SimpleLivingWalkModeFlag;
     CHECK(MopUpdateObject::CanUseSimpleUnitMovement(eligibility));
     eligibility.movementFlags = 1;
-    CHECK(!MopUpdateObject::CanUseSimpleUnitMovement(eligibility));
+    CHECK(MopUpdateObject::CanUseSimpleUnitMovement(eligibility));
     eligibility.movementFlags = MopUpdateObject::SimpleLivingWalkModeFlag | 1;
-    CHECK(!MopUpdateObject::CanUseSimpleUnitMovement(eligibility));
+    CHECK(MopUpdateObject::CanUseSimpleUnitMovement(eligibility));
     eligibility.movementFlags = 0;
-    eligibility.movementFlags2 = 1; CHECK(!MopUpdateObject::CanUseSimpleUnitMovement(eligibility)); eligibility.movementFlags2 = 0;
-    eligibility.hasOptionalMovement = true; CHECK(!MopUpdateObject::CanUseSimpleUnitMovement(eligibility)); eligibility.hasOptionalMovement = false;
-    eligibility.hasAttackingTarget = true; CHECK(!MopUpdateObject::CanUseSimpleUnitMovement(eligibility));
+    eligibility.movementFlags2 = 1; CHECK(MopUpdateObject::CanUseSimpleUnitMovement(eligibility)); eligibility.movementFlags2 = 0;
+    eligibility.hasOptionalMovement = true; CHECK(MopUpdateObject::CanUseSimpleUnitMovement(eligibility)); eligibility.hasOptionalMovement = false;
+    eligibility.hasAttackingTarget = true; CHECK(MopUpdateObject::CanUseSimpleUnitMovement(eligibility)); eligibility.hasAttackingTarget = false;
+
+    // Transport rejection must survive any combination of the snapshot states.
+    eligibility.hasSpline = true;
+    eligibility.hasAttackingTarget = true;
+    eligibility.hasTransport = true;
+    CHECK(!MopUpdateObject::CanUseSimpleUnitMovement(eligibility));
 
     MopUpdateObject::StationaryGameObjectEligibility gameObjectEligibility{};
     gameObjectEligibility.hasTemplate = true;
