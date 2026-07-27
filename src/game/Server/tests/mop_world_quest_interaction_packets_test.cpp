@@ -216,13 +216,34 @@ static void TestNpcTextResponse()
     GossipText gossip = {};
     gossip.Options[0].Probability = 0.75f;
     gossip.Options[0].BroadcastTextId = 50471;
+    gossip.Options[0].Text_0 = "Hey, citizen!";
 
+    // The id we send is minted, not the one the row names. Forwarding the
+    // stored id only works when the client already ships that record, and we
+    // can only serve a hotfix for one we minted ourselves.
     MopNpcTextPackets::Response mapped =
         MopNpcTextPackets::MakeResponse(1234, &gossip);
     CHECK(mapped.textId == 1234);
     CHECK(mapped.found);
     CHECK(mapped.probabilities[0] == 0.75f);
-    CHECK(mapped.broadcastTextIds[0] == 50471);
+    CHECK(mapped.broadcastTextIds[0] ==
+        MopNpcTextPackets::SynthesiseBroadcastTextId(1234, 0));
+    CHECK(mapped.broadcastTextIds[0] != 50471);
+
+    // The one capability this gives up: an option whose text lives only in the
+    // client's own BroadcastText record, with nothing stored locally, can no
+    // longer be pointed at that record -- we would be minting an id whose text
+    // we do not have. Such a row is left silent rather than sent as an empty
+    // record. Our npc_text rows carry their strings, so this is a shape the
+    // world database does not currently produce.
+    GossipText referenceOnly = {};
+    referenceOnly.Options[0].Probability = 1.0f;
+    referenceOnly.Options[0].BroadcastTextId = 50471;
+    MopNpcTextPackets::Response const noLocalText =
+        MopNpcTextPackets::MakeResponse(1234, &referenceOnly);
+    CHECK(!noLocalText.found);
+    CHECK(noLocalText.broadcastTextIds[0] == 0);
+    CHECK(noLocalText.probabilities[0] == 0.0f);
 
     // Unmapped alternatives must not retain a probability: otherwise the
     // client can randomly select BroadcastText ID zero and display no text.
@@ -328,12 +349,27 @@ static void TestUnmappedNpcTextStillGetsAnId()
         CHECK(response.probabilities[index] == 0.0f);
     }
 
-    // A row the world database does map keeps its retail id: the client may
-    // already hold that record, and it needs no hotfix from us.
+    // A populated BroadcastTextID is ignored rather than forwarded. Sending it
+    // would only work when the client already ships that record, and we cannot
+    // serve a hotfix for an id we did not mint -- so trusting the column made
+    // correctness depend on whatever wrote to it, imported world databases
+    // included, with a silently unopened dialog as the failure.
     gossip.Options[0].BroadcastTextId = 62792;
     MopNpcTextPackets::Response const mapped =
         MopNpcTextPackets::MakeResponse(4938, &gossip);
-    CHECK(mapped.broadcastTextIds[0] == 62792);
+    CHECK(mapped.broadcastTextIds[0] ==
+        MopNpcTextPackets::SynthesiseBroadcastTextId(4938, 0));
+    CHECK(mapped.broadcastTextIds[0] != 62792);
+    CHECK(mapped.found);
+
+    // Including an id the client could not resolve, which is the case that
+    // used to produce a dead row.
+    gossip.Options[0].BroadcastTextId = 3397;
+    MopNpcTextPackets::Response const unresolvable =
+        MopNpcTextPackets::MakeResponse(4938, &gossip);
+    CHECK(unresolvable.broadcastTextIds[0] ==
+        MopNpcTextPackets::SynthesiseBroadcastTextId(4938, 0));
+    gossip.Options[0].BroadcastTextId = 0;
 
     // No row at all remains absent rather than inventing one.
     MopNpcTextPackets::Response const absent =

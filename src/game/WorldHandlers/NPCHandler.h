@@ -158,26 +158,21 @@ struct GossipTextOption
 {
     std::string Text_0;
     std::string Text_1;
-    // npc_text.BroadcastTextID*, and a sharp edge worth knowing before you
-    // write to it.
+    // npc_text.BroadcastTextID*, loaded but deliberately not sent.
     //
-    // A non-zero value is forwarded to the client untouched. The client then
-    // resolves it against its own BroadcastText.db2 -- 936 records in 18414 --
-    // and asks the server for anything it does not hold. We can only answer
-    // for ids we minted ourselves, so a real BroadcastText id the client also
-    // lacks produces a not-found reply and the dialog never opens.
+    // MakeResponse mints its own id for every option that carries text, so
+    // whatever this column holds does not reach the client. That is on
+    // purpose. A real id only works if the client already ships that record --
+    // 936 of the 1,707 distinct ids seen in retail capture -- because we can
+    // only serve a hotfix for an id we minted. Forwarding the column made
+    // correctness a property of whatever wrote to it, including imported world
+    // databases we do not control, and the failure was a dialog that silently
+    // never opened.
     //
-    // Only ids the 18414 client actually ships are therefore safe here. That
-    // is a whitelist of 936 out of the 1,707 distinct ids seen in retail
-    // capture, so most real ids would break the row they were added to.
-    // Exactly one row in our world database is populated today, npc_text 17235
-    // with 62792, and it works only because 62792 is one of the four ids that
-    // happen to be in both sets.
-    //
-    // Leave the column at zero and MakeResponse mints an id the hotfix path
-    // can serve. This matters for imported world databases as much as for
-    // hand edits: a release that populates this column broadly would take out
-    // every row it touched, silently.
+    // Kept rather than dropped because the loader contract and the world
+    // schema are shared, and because it still records what retail used. If it
+    // is ever wanted on the wire again, the safe form is checking membership
+    // against a loaded BroadcastText.db2 at runtime, not trusting the value.
     uint32 BroadcastTextId = 0;
     uint32 Language;
     float Probability;
@@ -274,19 +269,25 @@ namespace MopNpcTextPackets
         for (size_t index = 0; index < MAX_GOSSIP_TEXT_OPTIONS; ++index)
         {
             GossipTextOption const& option = gossip->Options[index];
-            uint32 broadcastTextId = option.BroadcastTextId;
 
-            // A real mapping is kept as-is, on the assumption that a world
-            // database naming a retail id names one the client holds. That
-            // assumption is load-bearing and unverified: we cannot serve a
-            // hotfix for an id we did not mint, so a real id the client also
-            // lacks leaves the dialog shut. See the note on
-            // GossipTextOption::BroadcastTextId before populating that column.
+            // Every option that carries text gets an id we invented, and
+            // npc_text.BroadcastTextID is deliberately not consulted.
             //
-            // Otherwise an option that carries text gets an invented id, which
-            // SendBroadcastTextDb2Reply answers.
-            if (!broadcastTextId &&
-                (!option.Text_0.empty() || !option.Text_1.empty()))
+            // Forwarding a real id only works when the client already holds
+            // that record, because we can only serve a hotfix for an id we
+            // minted. The client ships 936 of the 1,707 distinct ids seen in
+            // retail capture, so most real ids would leave the dialog shut --
+            // and silently, with nothing in the log. Trusting the column made
+            // that a property of whatever wrote to it, including imported
+            // world databases we do not control. Ignoring it makes an
+            // unserveable id impossible to express.
+            //
+            // The cost is a hotfix round-trip for the handful of ids the
+            // client could have resolved by itself, and losing that record's
+            // SoundEntriesID and Flags, which npc_text has no column for and
+            // which every other row already goes without.
+            uint32 broadcastTextId = 0;
+            if (!option.Text_0.empty() || !option.Text_1.empty())
             {
                 broadcastTextId = SynthesiseBroadcastTextId(textId,
                     uint32(index));
