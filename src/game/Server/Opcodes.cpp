@@ -587,8 +587,11 @@ void InitializeOpcodes()
     // object creation for the rest of the session while movement and combat
     // broadcasts kept flowing. Retail 18414 captures pair SMSG_MOVE_TELEPORT
     // 1:1 with CMSG_MOVE_TELEPORT_ACK, 1,522 of each, so the ack always comes.
+    // MSG_MOVE_WORLDPORT_ACK is deliberately NOT registered: its inherited
+    // value 0x00E0 belongs to CMSG_CHAR_ENUM in 18414. Registering it there
+    // overwrote the char-enum slot and hung every client on "Retrieving
+    // character list". Its real 18414 value is unknown.
     DefC(CMSG_MOVE_TELEPORT_ACK, "CMSG_MOVE_TELEPORT_ACK", STATUS_LOGGEDIN, PROCESS_THREADUNSAFE, &WorldSession::HandleMoveTeleportAckOpcode);
-    DefC(MSG_MOVE_WORLDPORT_ACK, "MSG_MOVE_WORLDPORT_ACK", STATUS_TRANSFER, PROCESS_THREADUNSAFE, &WorldSession::HandleMoveWorldportAckOpcode);
     DefC(MSG_MOVE_HEARTBEAT, "MSG_MOVE_HEARTBEAT", STATUS_LOGGEDIN, PROCESS_THREADUNSAFE, &WorldSession::HandleMovementOpcodes);
     DefC(CMSG_MOVE_START_FORWARD, "CMSG_MOVE_START_FORWARD", STATUS_LOGGEDIN, PROCESS_THREADUNSAFE, &WorldSession::HandleMovementOpcodes);
     DefC(CMSG_MOVE_START_BACKWARD, "CMSG_MOVE_START_BACKWARD", STATUS_LOGGEDIN, PROCESS_THREADUNSAFE, &WorldSession::HandleMovementOpcodes);
