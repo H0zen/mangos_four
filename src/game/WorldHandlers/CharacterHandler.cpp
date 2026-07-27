@@ -805,6 +805,20 @@ void WorldSession::HandlePlayerLogin(LoginQueryHolder* holder)
 
     /* Validation check completely, assign player to WorldSession::_player for later use */
     SetPlayer(pCurrChar);
+
+    // Account data and tutorials open the sequence, ahead of the world verify.
+    // Retail puts them at positions 0 and 1 of every login in the capture
+    // corpus -- 8 of 8, with the ACCOUNT_DATA_TIMES / LOGIN_VERIFY_WORLD pair
+    // never inverting -- and they belong before m_suppressWorldSends is raised
+    // rather than after it.
+    //
+    // The tutorial send was previously reached only from WorldSessionMgr on
+    // session add and pop, which is the glue screen, so a character entering
+    // the world was never told its tutorial state at all.
+    LoadAccountData(holder->GetResult(PLAYER_LOGIN_QUERY_LOADACCOUNTDATA), PER_CHARACTER_CACHE_MASK);
+    SendAccountDataTimes(PER_CHARACTER_CACHE_MASK);
+    SendTutorialsData();
+
     pCurrChar->SendDungeonDifficulty(false);
 
     // 5.4.8.18414: X, O, Y, MapId, Z (Codex serializer; == my earlier reorder). The declaration is
@@ -849,9 +863,8 @@ void WorldSession::HandlePlayerLogin(LoginQueryHolder* holder)
     m_suppressWorldSends = true;
     // ------------------------------------------------------------ END PHASE 6c (A)
 
-    // load player specific part before send times
-    LoadAccountData(holder->GetResult(PLAYER_LOGIN_QUERY_LOADACCOUNTDATA), PER_CHARACTER_CACHE_MASK);
-    SendAccountDataTimes(PER_CHARACTER_CACHE_MASK);
+    // Account data is loaded and sent above, ahead of SMSG_LOGIN_VERIFY_WORLD,
+    // to match the order retail uses in every captured login.
 
     data.Initialize(SMSG_FEATURE_SYSTEM_STATUS, 19);
     MopInitialPackets::BuildFeatureSystemStatus(data, false, false, false);
