@@ -175,9 +175,9 @@
  *   TOTAL SMSG rows                   925
  *
  * SUBSYSTEM CONFIDENCE: high=365, low=221, medium=182, none=157
- * STATUS TOTALS: ACTIVE=397, DOC=438, DORMANT=685
- *   SMSG: ACTIVE=257, DOC=271, DORMANT=397
- *   CMSG: ACTIVE=140, DOC=167, DORMANT=288
+ * STATUS TOTALS: ACTIVE=399, DOC=437, DORMANT=684
+ *   SMSG: ACTIVE=258, DOC=271, DORMANT=396
+ *   CMSG: ACTIVE=141, DOC=166, DORMANT=288
  */
 
 // CAVEATS -- read before trusting any single row:
@@ -736,7 +736,7 @@ typedef uint16_t uint16;
  *   SMSG_QUESTGIVER_QUEST_LIST                     0x02D4  ACTIVE   [high-conf]
  *   SMSG_UNKNOWN_0x02EF                            0x02EF  DOC     
  *   SMSG_QUESTGIVER_QUEST_COMPLETE                 0x0346  ACTIVE
- *   SMSG_QUEST_NPC_QUERY_RESPONSE                  0x036D  DORMANT  [medium-conf]
+ *   SMSG_QUEST_NPC_QUERY_RESPONSE                  0x036D  ACTIVE   [medium-conf]
  *   SMSG_UNKNOWN_0x040F                            0x040F  DOC     
  *   SMSG_UNKNOWN_0x041E                            0x041E  DOC      [medium-conf]
  *   SMSG_REQUEST_CEMETERY_LIST_RESPONSE            0x042A  ACTIVE   [medium-conf]
@@ -1879,7 +1879,7 @@ typedef uint16_t uint16;
  *   CMSG_UNKNOWN_0x1D9B                            0x1D9B  DOC     
  *   CMSG_LFG_PROPOSAL_RESPONSE                     0x1D9D  DORMANT 
  *   CMSG_LF_GUILD_SET_GUILD_POST                   0x1D9F  DOC     
- *   CMSG_QUEST_NPC_QUERY                           0x1DAE  DOC     
+ *   CMSG_QUEST_NPC_QUERY                           0x1DAE  ACTIVE
  *   CMSG_UNKNOWN_0x1DB9                            0x1DB9  DOC     
  *   CMSG_SEND_MAIL                                 0x1DBA  DORMANT 
  *   CMSG_LOAD_SCREEN                               0x1DBD  ACTIVE

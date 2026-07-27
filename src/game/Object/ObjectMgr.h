@@ -1366,6 +1366,15 @@ class ObjectMgr
             return m_CreatureQuestRelations.equal_range(entry);
         }
 
+        /// Quest-completion relations keyed by quest instead of by creature.
+        /// SMSG_QUEST_NPC_QUERY_RESPONSE answers with the quest's ENDER
+        /// creatures; retail 18414 captures confirm that rule (quest 28508
+        /// returns its ender 44452, never its giver 42898).
+        QuestRelationsMapBounds GetQuestEnderCreaturesMapBounds(uint32 questId) const
+        {
+            return m_QuestEnderCreatures.equal_range(questId);
+        }
+
         QuestRelationsMapBounds GetCreatureQuestInvolvedRelationsMapBounds(uint32 entry) const
         {
             return m_CreatureQuestInvolvedRelations.equal_range(entry);
@@ -1497,6 +1506,7 @@ class ObjectMgr
 
         QuestRelationsMap       m_CreatureQuestRelations;
         QuestRelationsMap       m_CreatureQuestInvolvedRelations;
+        QuestRelationsMap       m_QuestEnderCreatures;
         QuestRelationsMap       m_GOQuestRelations;
         QuestRelationsMap       m_GOQuestInvolvedRelations;
 

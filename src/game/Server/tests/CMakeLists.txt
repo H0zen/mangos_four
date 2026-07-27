@@ -508,6 +508,14 @@ set_target_properties(mop_quest_poi_query_test PROPERTIES CXX_STANDARD 17 CXX_ST
 target_link_libraries(mop_quest_poi_query_test PRIVATE game)
 add_test(NAME mop_quest_poi_query COMMAND mop_quest_poi_query_test)
 
+add_executable(mop_quest_npc_query_test mop_quest_npc_query_test.cpp)
+target_include_directories(mop_quest_npc_query_test PRIVATE
+    ${CMAKE_SOURCE_DIR}/src/game/Server
+    ${CMAKE_SOURCE_DIR}/src/game)
+set_target_properties(mop_quest_npc_query_test PROPERTIES CXX_STANDARD 17 CXX_STANDARD_REQUIRED ON)
+target_link_libraries(mop_quest_npc_query_test PRIVATE game)
+add_test(NAME mop_quest_npc_query COMMAND mop_quest_npc_query_test)
+
 add_test(NAME mop_quest_poi_query_source
     COMMAND ${CMAKE_COMMAND}
         -DSOURCE_ROOT=${CMAKE_SOURCE_DIR}
