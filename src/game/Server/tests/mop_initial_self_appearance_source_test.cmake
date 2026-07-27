@@ -7,8 +7,13 @@ if(MUTATION STREQUAL "visible_item_feed")
         map_source "${map_source}")
 elseif(MUTATION STREQUAL "combined_builder")
     string(REPLACE
-        "MopUpdateObject::AppendSelfPlayerValuesBlock"
+        "MopUpdateObject::TranslateSelfPlayerFields"
         "MopUpdateObject::AppendSelfInventoryValuesBlock"
+        map_source "${map_source}")
+elseif(MUTATION STREQUAL "values_block_seed")
+    string(REPLACE
+        "MopUpdateObject::AppendSelfCreateBlock"
+        "MopUpdateObject::AppendSelfPlayerValuesBlock"
         map_source "${map_source}")
 elseif(MUTATION STREQUAL "questlog_feed")
     string(REPLACE
@@ -58,8 +63,11 @@ require_once(
     "MopUpdateObject::SelfQuestLogSourceStart"
     "initial self quest-log snapshot")
 require_once(
-    "MopUpdateObject::AppendSelfPlayerValuesBlock"
-    "combined initial self VALUES builder")
+    "MopUpdateObject::TranslateSelfPlayerFields"
+    "combined initial self projection")
+require_once(
+    "MopUpdateObject::AppendSelfCreateBlock"
+    "seed carried in the self create block")
 
 string(FIND "${self_body}"
     "MopUpdateObject::AppendSelfInventoryValuesBlock" inventory_only)
@@ -68,7 +76,20 @@ if(NOT inventory_only EQUAL -1)
         "initial self snapshot regressed to the inventory-only VALUES builder")
 endif()
 
-# AppendSelfPlayerValuesBlock asserts strictly ascending source indices. The
+# The seeded fields must ride IN the create block, not arrive after it as a
+# VALUES update. The client fires UI feedback for a value it sees CHANGE but
+# not for one present in the create, so seeding via VALUES is what made login
+# play the money sound, a spurious quest-accept sound and skill-up
+# announcements. Retail carries these in the create; regressing to
+# AppendSelfPlayerValuesBlock here would bring all three back.
+string(FIND "${self_body}"
+    "MopUpdateObject::AppendSelfPlayerValuesBlock" post_create_seed)
+if(NOT post_create_seed EQUAL -1)
+    message(FATAL_ERROR
+        "initial self seed regressed to a post-create VALUES block")
+endif()
+
+# TranslateSelfPlayerFields asserts strictly ascending source indices. The
 # quest-log range is 166..415, below visible items at 916, so its loop must be
 # emitted first or the block is built out of order and trips that assert.
 string(FIND "${self_body}" "MopUpdateObject::SelfQuestLogSlotCount" questlog_pos)

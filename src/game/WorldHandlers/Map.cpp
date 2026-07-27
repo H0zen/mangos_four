@@ -1933,20 +1933,31 @@ void Map::SendInitSelf(Player* player)
     sp.displayId = player->GetDisplayId();
     sp.nativeDisplayId = player->GetNativeDisplayId();
 
-    WorldPacket packet;
-    MopUpdateObject::BuildSelfCreate(packet, sp);
-    player->GetSession()->SendPacket(&packet);
-
-    // Inventory objects must exist client-side before the self player links to
-    // them. Player's existing traversal emits top-level items/bags, while Bag's
+    // One packet, item creates first, the self player's create block last -
+    // measured from the 18414 retail login burst, where 62 of 62 fully
+    // accounted packets order it that way and none put the player first.
+    //
+    // The self create carries its inventory links in the same packet that
+    // creates those items, and retail does this too: its self create block
+    // references items whose own create blocks appear LATER in the same byte
+    // stream. An earlier comment here asserted the opposite - that inventory
+    // objects must exist client-side before the player links to them - and
+    // that is simply not how the client behaves.
+    //
+    // Player's existing traversal emits top-level items/bags, while Bag's
     // override recursively emits its contents.
     UpdateData inventoryData(player->GetMapId());
     player->BuildCreateUpdateBlockForPlayer(&inventoryData, player);
 
-    // BuildSelfCreate carries only the fixed login core, so seed the client's
-    // visible equipment here as well as its inventory links. Otherwise the
-    // first unequip sends a zero the client already assumes and leaves the
-    // login-time model displayed until a later nonzero equip update.
+    // The core create block carries only the fixed login fields, so seed the
+    // client's visible equipment here as well as its inventory links.
+    // Otherwise the first unequip sends a zero the client already assumes and
+    // leaves the login-time model displayed until a later nonzero equip update.
+    //
+    // Everything below rides IN the create rather than arriving afterwards as
+    // a VALUES block. That distinction is audible: a value the client sees
+    // change - rather than one present from the start - fires the matching UI
+    // feedback, which is why coinage used to play the money sound on login.
     std::vector<MopUpdateObject::StaticField> selfFields;
     selfFields.reserve(MopUpdateObject::SelfQuestLogFieldCount +
         MopUpdateObject::ObserverVisibleItemFieldCount +
@@ -2039,19 +2050,24 @@ void Map::SendInitSelf(Player* player)
         }
     }
 
+    // Project the legacy indices to their 18414 positions, then hand them to
+    // the create block. The projection preserves ascending order and its
+    // lowest output (PLAYER_FLAGS -> 162) sits above the core block's last
+    // field (70), which is what AppendSelfCreateBlock requires.
+    std::vector<MopUpdateObject::StaticField> projectedFields;
     if (!selfFields.empty())
     {
-        MopUpdateObject::AppendSelfPlayerValuesBlock(inventoryData.GetBuffer(), sp.guid,
-            selfFields.data(), uint32(selfFields.size()));
-        inventoryData.AddUpdateBlock();
+        MopUpdateObject::TranslateSelfPlayerFields(selfFields.data(),
+            uint32(selfFields.size()), projectedFields);
     }
 
-    if (inventoryData.HasData())
-    {
-        WorldPacket inventoryPacket;
-        inventoryData.BuildPacket(&inventoryPacket);
-        player->GetSession()->SendPacket(&inventoryPacket);
-    }
+    MopUpdateObject::AppendSelfCreateBlock(inventoryData.GetBuffer(), sp,
+        projectedFields.data(), uint32(projectedFields.size()));
+    inventoryData.AddUpdateBlock();
+
+    WorldPacket loginPacket;
+    inventoryData.BuildPacket(&loginPacket);
+    player->GetSession()->SendPacket(&loginPacket);
 }
 
 /**
