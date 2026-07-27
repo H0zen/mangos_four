@@ -86,11 +86,6 @@ elseif(MUTATION STREQUAL "teleport_ack_registration")
         "DefC(CMSG_MOVE_TELEPORT_ACK, \"CMSG_MOVE_TELEPORT_ACK\""
         "DefC(0xFFFF, \"removed teleport ack\""
         opcode_registry "${opcode_registry}")
-elseif(MUTATION STREQUAL "worldport_ack_registration")
-    string(REPLACE
-        "DefC(MSG_MOVE_WORLDPORT_ACK, \"MSG_MOVE_WORLDPORT_ACK\""
-        "DefC(0xFFFF, \"removed worldport ack\""
-        opcode_registry "${opcode_registry}")
 endif()
 
 function(strip_cpp_comments output source)
@@ -357,9 +352,6 @@ endforeach()
 require_once("${opcode_registry}"
     "DefC(CMSG_MOVE_TELEPORT_ACK, \"CMSG_MOVE_TELEPORT_ACK\""
     "CMSG_MOVE_TELEPORT_ACK inbound registration")
-require_once("${opcode_registry}"
-    "DefC(MSG_MOVE_WORLDPORT_ACK, \"MSG_MOVE_WORLDPORT_ACK\""
-    "MSG_MOVE_WORLDPORT_ACK inbound registration")
 require_once("${movement_handler}"
     "plMover->SetSemaphoreTeleportNear(false)"
     "near-teleport semaphore release")
