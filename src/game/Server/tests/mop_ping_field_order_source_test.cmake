@@ -16,7 +16,14 @@ endif()
 
 function(strip_cpp_comments output source)
     set(text "${source}")
-    while(TRUE)
+    # while(1), not while(TRUE): each test runs as a bare `cmake -P` script with
+    # no cmake_minimum_required, so CMP0012 is unset. Under that policy's OLD
+    # behaviour the boolean constant TRUE is treated as a variable name and
+    # evaluates false, so the loop would never run and block comments would
+    # survive - letting a token sequence inside one satisfy the guard. Numeric
+    # constants are unaffected. Not reproducible on CMake 4.x, which dropped the
+    # pre-3.5 policies, but this project supports CMake >= 3.18.
+    while(1)
         string(FIND "${text}" "/*" comment_start)
         if(comment_start EQUAL -1)
             break()
