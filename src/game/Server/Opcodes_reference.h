@@ -175,9 +175,9 @@
  *   TOTAL SMSG rows                   925
  *
  * SUBSYSTEM CONFIDENCE: high=365, low=221, medium=182, none=157
- * STATUS TOTALS: ACTIVE=407, DOC=436, DORMANT=677
+ * STATUS TOTALS: ACTIVE=404, DOC=436, DORMANT=680
  *   SMSG: ACTIVE=260, DOC=271, DORMANT=394
- *   CMSG: ACTIVE=147, DOC=165, DORMANT=283
+ *   CMSG: ACTIVE=144, DOC=165, DORMANT=286
  */
 
 // CAVEATS -- read before trusting any single row:
@@ -1425,7 +1425,7 @@ typedef uint16_t uint16;
  *   CMSG_GROUP_RAID_CONVERT                        0x032C  DORMANT 
  *   CMSG_LFG_GET_STATUS                            0x032D  ACTIVE
  *   CMSG_GM_RESPONSE_RESOLVE                       0x033D  DOC     
- *   CMSG_SPIRIT_HEALER_ACTIVATE                    0x0340  ACTIVE
+ *   CMSG_SPIRIT_HEALER_ACTIVATE                    0x0340  DORMANT
  *   CMSG_BATTLEFIELD_MGR_EXIT_REQUEST              0x0343  DOC     
  *   CMSG_ATTACKSTOP                                0x0345  ACTIVE
  *   CMSG_TRAINER_LIST                              0x034B  DORMANT 
@@ -1451,7 +1451,7 @@ typedef uint16_t uint16;
  *   CMSG_AUCTION_PLACE_BID                         0x03C8  DORMANT 
  *   CMSG_ACTIVATETAXI                              0x03C9  DORMANT 
  *   CMSG_PUSHQUESTTOPARTY                          0x03D2  ACTIVE
- *   CMSG_RECLAIM_CORPSE                            0x03D3  ACTIVE
+ *   CMSG_RECLAIM_CORPSE                            0x03D3  DORMANT
  *   CMSG_SET_TRADE_ITEM                            0x03D5  DORMANT 
  *   CMSG_SWAP_INV_ITEM                             0x03DF  ACTIVE
  *   CMSG_DUEL_RESPONSE                             0x03E2  DOC     
@@ -1631,7 +1631,7 @@ typedef uint16_t uint16;
  *   CMSG_UNKNOWN_0x0AB6                            0x0AB6  DOC     
  *   CMSG_UNKNOWN_0x0ABA                            0x0ABA  DOC     
  *   CMSG_MESSAGECHAT_OFFICER                       0x0ABF  DORMANT 
- *   CMSG_RESURRECT_RESPONSE                        0x0B0C  ACTIVE
+ *   CMSG_RESURRECT_RESPONSE                        0x0B0C  DORMANT
  *   CMSG_GENERATE_RANDOM_CHARACTER_NAME            0x0B1C  DOC     
  *   CMSG_BATTLE_PAY_ACK_FAILED_RESPONSE            0x0B38  DOC     
  *   CMSG_CONTACT_LIST                              0x0BB4  DORMANT 
