@@ -318,6 +318,11 @@ struct QuestPOIPoint
     QuestPOIPoint(int32 _x, int32 _y) : x(_x), y(_y) {}
 };
 
+// Upper bound accepted for `quest_poi`.`floorId`. This is the declared schema
+// width, not a measured client limit - see LoadQuestPOI() for why anything
+// above it must never reach the wire.
+#define MAX_QUEST_POI_FLOOR_ID 255
+
 struct QuestPOI
 {
     uint32 PoiId;

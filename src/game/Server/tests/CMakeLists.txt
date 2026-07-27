@@ -537,7 +537,7 @@ add_test(NAME mop_quest_poi_query_source
     COMMAND ${CMAKE_COMMAND}
         -DSOURCE_ROOT=${CMAKE_SOURCE_DIR}
         -P ${CMAKE_CURRENT_SOURCE_DIR}/mop_quest_poi_query_source_test.cmake)
-foreach(mutation IN ITEMS request_parser response_builder inbound_registration outbound_registration allowlist)
+foreach(mutation IN ITEMS request_parser response_builder inbound_registration outbound_registration allowlist floor_clamp)
     add_test(NAME mop_quest_poi_query_source_mutation_${mutation}
         COMMAND ${CMAKE_COMMAND}
             -DSOURCE_ROOT=${CMAKE_SOURCE_DIR}

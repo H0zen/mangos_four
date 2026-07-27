@@ -1319,6 +1319,8 @@ void ObjectMgr::LoadQuestPOI()
 
     BarGoLink bar(result->GetRowCount());
 
+    uint32 badFloorCount = 0;
+
     do
     {
         Field* fields = result->Fetch();
@@ -1332,6 +1334,27 @@ void ObjectMgr::LoadQuestPOI()
         uint32 floorId          = fields[5].GetUInt32();
         uint32 unk3             = fields[6].GetUInt32();
         uint32 unk4             = fields[7].GetUInt32();
+
+        // An out-of-range floorId crashes the 5.4.8 client the moment it reads
+        // SMSG_QUEST_POI_QUERY_RESPONSE, which is sent on quest accept - so one
+        // bad row takes down every client that accepts that quest. Confirmed in
+        // game: floorId 252339 on quest 29406 crashed, zeroing it did not, and
+        // the same packet's objIndex 32 was carried through untouched both
+        // times, so this field is the sole trigger.
+        //
+        // floorId is a small map-floor ordinal. MAX_QUEST_POI_FLOOR_ID is the
+        // declared schema width rather than a measured client limit; the real
+        // ceiling is unknown, but every sane row observed so far is <= 7, so
+        // this rejects the six-figure import garbage without second-guessing
+        // legitimate data. Zero rather than drop: the marker still renders, on
+        // the default floor, instead of vanishing.
+        if (floorId > MAX_QUEST_POI_FLOOR_ID)
+        {
+            sLog.outErrorDb("Table `quest_poi` has questId %u poiId %u with out of range floorId %u, forced to 0.",
+                            questId, poiId, floorId);
+            floorId = 0;
+            ++badFloorCount;
+        }
 
         QuestPOI POI(poiId, objIndex, mapId, mapAreaId, floorId, unk3, unk4);
 
@@ -1377,6 +1400,11 @@ void ObjectMgr::LoadQuestPOI()
 
     sLog.outString();
     sLog.outString(">> Loaded %u quest POI definitions", count);
+
+    if (badFloorCount)
+    {
+        sLog.outErrorDb(">> %u quest POI definitions had an out of range floorId and were forced to floor 0. Fix them in `quest_poi`; left unpatched they crash the client on quest accept.", badFloorCount);
+    }
 }
 
 

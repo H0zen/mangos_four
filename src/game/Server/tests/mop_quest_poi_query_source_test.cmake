@@ -2,6 +2,8 @@ file(READ "${SOURCE_ROOT}/src/game/Server/WorldSession.h" packet_helpers)
 file(READ "${SOURCE_ROOT}/src/game/WorldHandlers/QueryHandler.cpp" query_handler)
 file(READ "${SOURCE_ROOT}/src/game/Server/Opcodes.cpp" opcode_registry)
 file(READ "${SOURCE_ROOT}/src/game/Server/WorldSession.cpp" world_session)
+file(READ "${SOURCE_ROOT}/src/game/Object/ObjectMgr.cpp" object_mgr)
+file(READ "${SOURCE_ROOT}/src/game/Object/ObjectMgr.h" object_mgr_header)
 
 if(MUTATION STREQUAL "request_parser")
     string(REPLACE
@@ -28,6 +30,11 @@ elseif(MUTATION STREQUAL "allowlist")
         "case SMSG_QUEST_POI_QUERY_RESPONSE:"
         "case 0xFFFF: /* removed quest-POI allowlist */"
         world_session "${world_session}")
+elseif(MUTATION STREQUAL "floor_clamp")
+    string(REPLACE
+        "if (floorId > MAX_QUEST_POI_FLOOR_ID)"
+        "if (false) /* removed floorId clamp */"
+        object_mgr "${object_mgr}")
 endif()
 
 function(strip_cpp_comments output source)
@@ -80,6 +87,8 @@ strip_cpp_comments(packet_helpers "${packet_helpers}")
 strip_cpp_comments(query_handler "${query_handler}")
 strip_cpp_comments(opcode_registry "${opcode_registry}")
 strip_cpp_comments(world_session "${world_session}")
+strip_cpp_comments(object_mgr "${object_mgr}")
+strip_cpp_comments(object_mgr_header "${object_mgr_header}")
 
 extract_body(handler "${query_handler}"
     "void WorldSession::HandleQuestPOIQueryOpcode"
@@ -90,6 +99,23 @@ extract_body(parser "${packet_helpers}"
 extract_body(builder "${packet_helpers}"
     "inline bool MopQueryPackets::BuildQuestPoiQueryResponse"
     "inline uint64 MopStablePackets::ReadStableListRequest")
+
+extract_body(poi_loader "${object_mgr}"
+    "void ObjectMgr::LoadQuestPOI"
+    "void ObjectMgr::GetConditions")
+
+# An out-of-range floorId crashes the 5.4.8 client on quest accept, so the
+# loader must reject it before the value can ever reach the wire.
+require_ordered("${poi_loader}" "quest-POI loader floorId clamp"
+    "uint32 floorId          = fields[5].GetUInt32();"
+    "if (floorId > MAX_QUEST_POI_FLOOR_ID)"
+    "floorId = 0;"
+    "QuestPOI POI(poiId, objIndex, mapId, mapAreaId, floorId, unk3, unk4);")
+
+string(FIND "${object_mgr_header}" "#define MAX_QUEST_POI_FLOOR_ID" floor_bound)
+if(floor_bound EQUAL -1)
+    message(FATAL_ERROR "MAX_QUEST_POI_FLOOR_ID is not defined")
+endif()
 
 require_ordered("${handler}" "quest-POI handler"
     "MopQueryPackets::ParseQuestPoiQueryRequest(recv_data, questIds)"
