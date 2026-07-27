@@ -480,7 +480,7 @@ static void TestQuestQueryResponseFixedOrder()
     response.rewardHonorAddition = 2205;
     response.obsoleteArenaPoints = 2206;
     response.suggestedPlayers = 2207;
-    response.repObjectiveFaction = 2208;
+    response.innerQuestId = 2208;
     response.minLevel = 2209;
     response.rewardReputationMask = 2210;
     response.pointOpt = 2211;
@@ -612,6 +612,92 @@ static void TestQuestQueryResponseStringsAndObjective()
     CHECK(visual == objective.visualEffects[0]);
 }
 
+// Reproduces a real retail 18414 response byte-for-byte in size and layout.
+//
+// Quest 27353 "Blessings of the Elements" was captured from live traffic: a
+// 1121-byte response with three item objectives and strings of 58/98/493/25
+// bytes. The retail packet places its strings at 235, 301, 451 and 980, and
+// repeats the quest id at offset 411. Our builder must land on all of it.
+//
+// Before the objectives block was populated this produced 1056 bytes with
+// every string 65 bytes early, which is what stopped the client auto-watching
+// an accepted quest.
+static void TestQuestQueryResponseMatchesRetail27353()
+{
+    MopQuestQueryPackets::Response response;
+    response.questId = 27353;
+    response.innerQuestId = 27353;
+    response.completedText = std::string(58, 'c');
+    response.objectivesText = std::string(98, 'o');
+    response.details = std::string(493, 'd');
+    response.title = std::string(25, 't');
+
+    uint32_t const objectIds[3] = { 60881, 60873, 60875 };
+    int32_t const amounts[3] = { 1, 1, 5 };
+    for (uint32_t i = 0; i < 3; ++i)
+    {
+        MopQuestQueryPackets::Objective objective;
+        objective.id = 27353 * 16 + i;
+        objective.type = MopQuestQueryPackets::OBJECTIVE_ITEM;
+        objective.index = uint8_t(i);
+        objective.objectId = objectIds[i];
+        objective.amount = amounts[i];
+        response.objectives.push_back(objective);
+    }
+
+    WorldPacket packet;
+    CHECK(MopQuestQueryPackets::BuildResponse(packet, response));
+    CHECK(packet.size() == 1121);
+
+    // 4 + ceil((109 + 30*3)/8) == 4 + 25, then three 18-byte objectives.
+    CHECK(std::memcmp(&packet[29 + 0 * 18], "\x01\x00\x00\x00", 4) == 0);
+    CHECK(packet[29 + 0 * 18 + 12] == 0);       // index
+    CHECK(packet[29 + 0 * 18 + 13] == 1);       // type: item
+    CHECK(packet[29 + 2 * 18 + 12] == 2);
+    CHECK(std::memcmp(&packet[29 + 2 * 18 + 14], "\xcb\xed\x00\x00", 4) == 0);
+
+    // String offsets, straight off the retail capture.
+    CHECK(std::memcmp(&packet[235], std::string(58, 'c').data(), 58) == 0);
+    CHECK(std::memcmp(&packet[301], std::string(98, 'o').data(), 98) == 0);
+    CHECK(std::memcmp(&packet[451], std::string(493, 'd').data(), 493) == 0);
+    CHECK(std::memcmp(&packet[980], std::string(25, 't').data(), 25) == 0);
+
+    // Retail repeats the quest id here. Feeding this slot from
+    // RepObjectiveFaction left it zero, which made the client compute
+    // QUEST_ACCEPTED's arguments from a missing cache entry.
+    uint32_t inner = 0;
+    std::memcpy(&inner, &packet[411], 4);
+    CHECK(inner == 27353);
+}
+
+// A reputation requirement has to survive as its own objective now that the
+// scalar it used to travel in is known to carry the quest id. Retail marks it
+// untracked: type 6, index 255, faction in objectId, standing in amount.
+static void TestQuestQueryResponseReputationObjective()
+{
+    MopQuestQueryPackets::Response response;
+    response.questId = 32374;
+    response.innerQuestId = 32374;
+
+    MopQuestQueryPackets::Objective objective;
+    objective.id = 32374 * 16;
+    objective.type = MopQuestQueryPackets::OBJECTIVE_REPUTATION;
+    objective.index = MopQuestQueryPackets::ObjectiveIndexUntracked;
+    objective.objectId = 1359;
+    objective.amount = 21000;
+    response.objectives.push_back(objective);
+
+    WorldPacket packet;
+    CHECK(MopQuestQueryPackets::BuildResponse(packet, response));
+
+    size_t const base = 4 + 18;                 // 4 + ceil((109 + 30)/8)
+    CHECK(packet[base + 12] == 255);
+    CHECK(packet[base + 13] == 6);
+    uint32_t faction = 0;
+    std::memcpy(&faction, &packet[base + 14], 4);
+    CHECK(faction == 1359);
+}
+
 static void TestOpcodeValues()
 {
     CHECK(uint32_t(CMSG_QUESTGIVER_HELLO) == 0x02DBu);
@@ -636,6 +722,8 @@ int main(int /*argc*/, char** /*argv*/)
     TestQuestQueryAbsentResponse();
     TestQuestQueryResponseFixedOrder();
     TestQuestQueryResponseStringsAndObjective();
+    TestQuestQueryResponseMatchesRetail27353();
+    TestQuestQueryResponseReputationObjective();
     TestOpcodeValues();
 
     if (g_fail != 0)

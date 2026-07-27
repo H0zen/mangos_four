@@ -620,6 +620,11 @@ void PlayerMenu::SendQuestQueryResponse(uint32 questId,
     std::string Title, Details, Objectives, EndText, CompletedText;
     std::string PortraitGiverText, PortraitGiverName;
     std::string PortraitTurnInText, PortraitTurnInName;
+    std::string ObjectiveText[QUEST_OBJECTIVES_COUNT];
+    for (uint32 slot = 0; slot < QUEST_OBJECTIVES_COUNT; ++slot)
+    {
+        ObjectiveText[slot] = pQuest->ObjectiveText[slot];
+    }
     Title = pQuest->GetTitle();
     Details = pQuest->GetDetails();
     Objectives = pQuest->GetObjectives();
@@ -673,6 +678,14 @@ void PlayerMenu::SendQuestQueryResponse(uint32 questId,
             {
                 PortraitTurnInText = ql->PortraitTurnInText[loc_idx];
             }
+            for (uint32 slot = 0; slot < QUEST_OBJECTIVES_COUNT; ++slot)
+            {
+                if (ql->ObjectiveText[slot].size() > (size_t)loc_idx &&
+                    !ql->ObjectiveText[slot][loc_idx].empty())
+                {
+                    ObjectiveText[slot] = ql->ObjectiveText[slot][loc_idx];
+                }
+            }
         }
     }
 
@@ -684,7 +697,7 @@ void PlayerMenu::SendQuestQueryResponse(uint32 questId,
     response.rewardMoneyMaxLevel = pQuest->GetRewMoneyMaxLevel();
     response.rewardHonorAddition = pQuest->GetRewHonorAddition();
     response.suggestedPlayers = pQuest->GetSuggestedPlayers();
-    response.repObjectiveFaction = pQuest->GetRepObjectiveFaction();
+    response.innerQuestId = pQuest->GetQuestId();
     response.minLevel = int32(pQuest->GetMinLevel());
     response.pointOpt = pQuest->GetPointOpt();
     response.questLevel = pQuest->GetQuestLevel();
@@ -709,6 +722,84 @@ void PlayerMenu::SendQuestQueryResponse(uint32 questId,
     response.title = Title;
     response.details = Details;
     response.objectivesText = Objectives;
+
+    // 18414 carries the quest's objectives as a structured block. The client
+    // builds its tracker from these, not from the objectives display string,
+    // so a quest sent without them renders its text correctly but is never
+    // watched. The block was absent entirely until now.
+    //
+    // An objective's index selects which 16-bit counter lane of the quest log
+    // the client reads. SetQuestSlotCounter() writes lane creatureOrGO_idx and
+    // nothing else, so creature and gameobject objectives must keep their
+    // array position or they would display another objective's progress.
+    // Items are free to take any spare lane. Our counter words only span lanes
+    // 0-3, so an item that finds none left is marked untracked rather than
+    // pointing past them at the quest timer.
+    bool laneUsed[QUEST_OBJECTIVES_COUNT] = {};
+    uint32 objectiveSerial = 0;
+
+    for (uint32 slot = 0; slot < QUEST_OBJECTIVES_COUNT; ++slot)
+    {
+        int32 const entry = pQuest->ReqCreatureOrGOId[slot];
+        if (!entry || !pQuest->ReqCreatureOrGOCount[slot])
+        {
+            continue;
+        }
+
+        MopQuestQueryPackets::Objective objective;
+        // Retail sends global QuestObjective record ids, which the world
+        // database has no column for. A quest-scoped sequence preserves the
+        // one property the client can depend on: uniqueness.
+        objective.id = pQuest->GetQuestId() * 16 + objectiveSerial++;
+        objective.type = entry > 0
+            ? uint8(MopQuestQueryPackets::OBJECTIVE_CREATURE)
+            : uint8(MopQuestQueryPackets::OBJECTIVE_GAMEOBJECT);
+        objective.objectId = uint32(entry > 0 ? entry : -entry);
+        objective.amount = int32(pQuest->ReqCreatureOrGOCount[slot]);
+        objective.index = uint8(slot);
+        objective.text = ObjectiveText[slot];
+        laneUsed[slot] = true;
+        response.objectives.push_back(objective);
+    }
+
+    for (uint32 slot = 0; slot < QUEST_ITEM_OBJECTIVES_COUNT; ++slot)
+    {
+        if (!pQuest->ReqItemId[slot] || !pQuest->ReqItemCount[slot])
+        {
+            continue;
+        }
+
+        MopQuestQueryPackets::Objective objective;
+        objective.id = pQuest->GetQuestId() * 16 + objectiveSerial++;
+        objective.type = uint8(MopQuestQueryPackets::OBJECTIVE_ITEM);
+        objective.objectId = pQuest->ReqItemId[slot];
+        objective.amount = int32(pQuest->ReqItemCount[slot]);
+        objective.index = MopQuestQueryPackets::ObjectiveIndexUntracked;
+        for (uint32 lane = 0; lane < QUEST_OBJECTIVES_COUNT; ++lane)
+        {
+            if (!laneUsed[lane])
+            {
+                laneUsed[lane] = true;
+                objective.index = uint8(lane);
+                break;
+            }
+        }
+        response.objectives.push_back(objective);
+    }
+
+    // A reputation requirement is an objective of its own on the wire. It used
+    // to reach the client only as the scalar that actually carries the quest
+    // id, so moving that scalar would otherwise drop the requirement.
+    if (pQuest->GetRepObjectiveFaction() && pQuest->GetRepObjectiveValue())
+    {
+        MopQuestQueryPackets::Objective objective;
+        objective.id = pQuest->GetQuestId() * 16 + objectiveSerial++;
+        objective.type = uint8(MopQuestQueryPackets::OBJECTIVE_REPUTATION);
+        objective.objectId = pQuest->GetRepObjectiveFaction();
+        objective.amount = pQuest->GetRepObjectiveValue();
+        objective.index = MopQuestQueryPackets::ObjectiveIndexUntracked;
+        response.objectives.push_back(objective);
+    }
     response.endText = EndText;
     response.completedText = CompletedText;
     response.portraitGiverText = PortraitGiverText;
