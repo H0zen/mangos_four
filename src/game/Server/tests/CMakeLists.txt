@@ -115,7 +115,7 @@ add_test(NAME mop_initial_self_appearance_source
     COMMAND ${CMAKE_COMMAND} -DSOURCE_ROOT=${CMAKE_SOURCE_DIR}
         -P ${CMAKE_CURRENT_SOURCE_DIR}/mop_initial_self_appearance_source_test.cmake)
 
-foreach(mutation IN ITEMS visible_item_feed combined_builder skill_feed)
+foreach(mutation IN ITEMS visible_item_feed combined_builder skill_feed questlog_feed)
     add_test(NAME mop_initial_self_appearance_source_mutation_${mutation}
         COMMAND ${CMAKE_COMMAND} -DSOURCE_ROOT=${CMAKE_SOURCE_DIR}
             -DMUTATION=${mutation}
