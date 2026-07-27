@@ -218,22 +218,28 @@ void WorldSession::HandleMessagechatOpcode(WorldPacket& recv_data)
                 }
             }
 
-            if (type != CHAT_MSG_AFK && type != CHAT_MSG_DND)
-            {
-                if (!_player->CanSpeak())
-                {
-                    std::string timeStr = secsToTimeString(m_muteTime - time(NULL));
-                    SendNotification(GetMangosString(LANG_WAIT_BEFORE_SPEAKING), timeStr.c_str());
-                    return;
-                }
-
-                GetPlayer()->UpdateSpeakTime();
-            }
         }
     }
     else
     {
         lang = LANG_UNIVERSAL;
+    }
+
+    // Muting applies to anything the player says, emotes included. This check
+    // used to sit inside the language block above, which excludes emotes
+    // because they carry no language -- so a muted player could still emit
+    // arbitrary text to everyone nearby through TextEmote. Away and busy are
+    // status toggles rather than speech and stay exempt, as they were.
+    if (type != CHAT_MSG_AFK && type != CHAT_MSG_DND)
+    {
+        if (!_player->CanSpeak())
+        {
+            std::string timeStr = secsToTimeString(m_muteTime - time(NULL));
+            SendNotification(GetMangosString(LANG_WAIT_BEFORE_SPEAKING), timeStr.c_str());
+            return;
+        }
+
+        GetPlayer()->UpdateSpeakTime();
     }
 
     DEBUG_LOG("CHAT: packet received. type %u lang %u", type, lang);
@@ -634,6 +640,16 @@ void WorldSession::HandleMessagechatOpcode(WorldPacket& recv_data)
             std::string msg;
             msg = recv_data.ReadString(recv_data.ReadBits(9));
 
+            // A dot command typed with this destination selected has to be
+            // executed, not announced. Every other destination does this; the
+            // two that did not would have broadcast the command text to
+            // everyone instead, which is worse than the dropped commands this
+            // registration set out to fix.
+            if (ChatHandler(this).ParseCommands(msg.c_str()))
+            {
+                break;
+            }
+
             if (!processChatmessageFurtherAfterSecurityChecks(msg, lang))
             {
                 return;
@@ -751,6 +767,13 @@ void WorldSession::HandleMessagechatOpcode(WorldPacket& recv_data)
             uint32 msgLength = recv_data.ReadBits(9);
             msg = recv_data.ReadString(msgLength);
             channel = recv_data.ReadString(channelLength);
+
+            // As above: execute a dot command rather than saying it into the
+            // channel for everyone to read.
+            if (ChatHandler(this).ParseCommands(msg.c_str()))
+            {
+                break;
+            }
 
             if (!processChatmessageFurtherAfterSecurityChecks(msg, lang))
             {
@@ -964,6 +987,18 @@ void WorldSession::HandleAddonMessagechatOpcode(WorldPacket& recv_data)
 
             Player* receiver = sObjectMgr.GetPlayer(targetName.c_str());
             if (!receiver)
+            {
+                break;
+            }
+
+            // Addon payloads are still cross-faction chat. The regular whisper
+            // path refuses to carry them between teams when the server has
+            // two-side chat disabled, and routing arbitrary data around that
+            // over a second opcode would make the setting meaningless.
+            if (!sWorld.getConfig(CONFIG_BOOL_ALLOW_TWO_SIDE_INTERACTION_CHAT) &&
+                GetSecurity() == SEC_PLAYER &&
+                receiver->GetSession()->GetSecurity() == SEC_PLAYER &&
+                GetPlayer()->GetTeam() != receiver->GetTeam())
             {
                 break;
             }
