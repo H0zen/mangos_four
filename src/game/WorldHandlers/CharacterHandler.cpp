@@ -853,6 +853,18 @@ void WorldSession::HandlePlayerLogin(LoginQueryHolder* holder)
         lts << packedNow;
         lts << float(0.01666667f);
         SendPacket(&lts, true);
+
+        // SMSG_SET_TIME_ZONE_INFORMATION: names the server's timezone so the
+        // client can populate the two 127-byte buffers its date conversion
+        // resolves against. Without it those stay zero, the conversion writes
+        // nothing, and its caller copies an all-minus-one scratch struct over
+        // the date -- which is what hangs the calendar on open. Etc/UTC is one
+        // of the identifiers compiled into the client; a host timezone name is
+        // not, so this is deliberately a constant rather than anything read
+        // from the machine.
+        WorldPacket tz(SMSG_SET_TIME_ZONE_INFORMATION, 2 + 2 * 7);
+        MopWorldEntryPackets::BuildSetTimeZoneInformation(tz, "Etc/UTC");
+        SendPacket(&tz, true);
     }
     // PHASE 6c: NO control/mover packet is sent -- none is needed. The 18414 client grants player
     // control itself when it processes the SELF create-block: the create/add-to-world path marks the

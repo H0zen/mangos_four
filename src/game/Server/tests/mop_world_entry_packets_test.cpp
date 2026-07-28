@@ -96,6 +96,34 @@ static void test_time_sync()
     CHECK(ExpectBytes(packet, { 0x44, 0x33, 0x22, 0x11 }));
 }
 
+static void test_set_time_zone_information()
+{
+    // Two 7-bit lengths packed MSB-first, so 7 and 7 give 0000111 0000111,
+    // flushed to 0x0E 0x1C, then the string twice. The client copies each into
+    // a 127-byte buffer and resolves it by name, so the bytes must be the
+    // literal identifier and the lengths must precede both strings.
+    WorldPacket packet(SMSG_SET_TIME_ZONE_INFORMATION, 2 + 2 * 7);
+    MopWorldEntryPackets::BuildSetTimeZoneInformation(packet, "Etc/UTC");
+    CHECK(ExpectBytes(packet, {
+        0x0E, 0x1C,
+        0x45, 0x74, 0x63, 0x2F, 0x55, 0x54, 0x43,
+        0x45, 0x74, 0x63, 0x2F, 0x55, 0x54, 0x43
+    }));
+}
+
+static void test_set_time_zone_information_length_is_seven_bits()
+{
+    // A length of 64 must still fit: the field is 7 bits, so anything up to 127
+    // is legal and the client's own copy caps at 127. A 6-bit field would wrap
+    // this to 0 and the client would resolve an empty name.
+    const std::string sixtyFour(64, 'A');
+    WorldPacket packet(SMSG_SET_TIME_ZONE_INFORMATION, 2 + 2 * 64);
+    MopWorldEntryPackets::BuildSetTimeZoneInformation(packet, sixtyFour);
+    CHECK(packet.size() == 2 + 2 * 64);
+    CHECK(packet.contents()[0] == 0x81);   // 1000000 1000000 -> 0x81 0x00
+    CHECK(packet.contents()[1] == 0x00);
+}
+
 static void test_discarded_time_sync_acks_absent()
 {
     uint8_t const body[] = { 0x80 };
@@ -261,6 +289,8 @@ int main(int /*argc*/, char** /*argv*/)
     test_new_world();
     test_login_set_time_speed();
     test_time_sync();
+    test_set_time_zone_information();
+    test_set_time_zone_information_length_is_seven_bits();
     test_discarded_time_sync_acks_absent();
     test_discarded_time_sync_acks_present();
     test_time_sync_response_dropped();
