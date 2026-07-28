@@ -1854,6 +1854,45 @@ void WorldSession::HandleReadyForAccountDataTimesOpcode(WorldPacket& /*recv_data
     DEBUG_LOG("WORLD: Received opcode CMSG_READY_FOR_ACCOUNT_DATA_TIMES");
 
     SendAccountDataTimes(GLOBAL_CACHE_MASK);
+
+    // Retail binds SMSG_SET_TIME_ZONE_INFORMATION to the account-data phase, not to world
+    // entry: across the 18414 corpus it is sent 843 times and every sampled instance sits
+    // immediately after SMSG_ACCOUNT_DATA_TIMES -- at character select that is
+    // ACCOUNT_DATA_TIMES -> SET_TIME_ZONE_INFORMATION -> SMSG_CHAR_ENUM. We already send it
+    // on the login path (see HandlePlayerLogin), which mirrors retail's second occurrence,
+    // but character select had no send at all. Same packet either way; only the trigger was
+    // missing. Retail's payload is the zone name twice ("Europe/ParisEurope/Paris" in the
+    // captures), which is the shape this builder already emits.
+    WorldPacket tz(SMSG_SET_TIME_ZONE_INFORMATION, 2 + 2 * 7);
+    MopWorldEntryPackets::BuildSetTimeZoneInformation(tz, "Etc/UTC");
+    SendPacket(&tz);
+}
+
+/**
+ * @brief Answers the character-select store query with an empty purchase list.
+ *
+ * The shipped UI's C_PurchaseAPI.GetPurchaseList writes an empty 0x18B2 and waits. Retail
+ * always answers: 434 requests and 420 responses across the 18414 corpus, the request always
+ * zero bytes and the response always exactly seven, of which 419 of 420 are entirely zero.
+ * We have no Store backend, so the honest and retail-matching reply is the one a player who
+ * has purchased nothing receives - an empty list - rather than dropping the request, which
+ * leaves the client's request outstanding.
+ *
+ * The seven bytes are sent as observed rather than as decoded fields: the body is uniform
+ * across the corpus, so there is nothing in the capture that would let us tell which of them
+ * is a count, a result, or padding. Sending anything other than the observed constant would
+ * be inventing structure we have not proven.
+ */
+void WorldSession::HandleBattlePayGetPurchaseListOpcode(WorldPacket& /*recvPacket*/)
+{
+    DEBUG_LOG("WORLD: Received opcode CMSG_BATTLE_PAY_GET_PURCHASE_LIST");
+
+    WorldPacket data(SMSG_BATTLE_PAY_GET_PURCHASE_LIST_RESPONSE, 7);
+    for (uint8 i = 0; i < 7; ++i)
+    {
+        data << uint8(0);
+    }
+    SendPacket(&data);
 }
 
 void WorldSession::HandleHearthandResurrect(WorldPacket& /*recv_data*/)

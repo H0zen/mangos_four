@@ -215,10 +215,13 @@ void InitializeOpcodes()
     // non-empty per-character GUID permutation.
     DefS(SMSG_UPDATE_ACCOUNT_DATA, "SMSG_UPDATE_ACCOUNT_DATA");
 
-    // Shipped UI C_PurchaseAPI.GetPurchaseList maps through the retained API
-    // table directly to the empty 0x18B2 writer. The Store response/backend is
-    // not implemented, so this registration is intentionally recognition-only.
-    DefC(CMSG_BATTLE_PAY_GET_PURCHASE_LIST, "CMSG_BATTLE_PAY_GET_PURCHASE_LIST", STATUS_AUTHED, PROCESS_INPLACE, &WorldSession::Handle_NULL);
+    // Shipped UI C_PurchaseAPI.GetPurchaseList maps through the retained API table directly to
+    // the empty 0x18B2 writer. Retail answers it at character select: 434 requests and 420
+    // responses across the 18414 corpus, request always 0 bytes, response always exactly 7.
+    // We have no Store backend, so we answer the same thing retail answers a player who has
+    // bought nothing -- an empty list -- rather than dropping the request on the floor.
+    DefC(CMSG_BATTLE_PAY_GET_PURCHASE_LIST, "CMSG_BATTLE_PAY_GET_PURCHASE_LIST", STATUS_AUTHED, PROCESS_INPLACE, &WorldSession::HandleBattlePayGetPurchaseListOpcode);
+    DefS(SMSG_BATTLE_PAY_GET_PURCHASE_LIST_RESPONSE, "SMSG_BATTLE_PAY_GET_PURCHASE_LIST_RESPONSE");
 
     // Wave 2 server messages whose 5.4.8 bodies are encoded by MopCompactPackets.
     DefS(SMSG_ATTACKSWING_ERROR, "SMSG_ATTACKSWING_ERROR");

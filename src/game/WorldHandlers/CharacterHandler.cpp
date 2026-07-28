@@ -728,12 +728,13 @@ void WorldSession::HandleCharDeleteOpcode(WorldPacket& recv_data)
     data << (uint8)CHAR_DELETE_SUCCESS;
     SendPacket(&data);
 
-    // On a successful delete, push the refreshed character list. The 5.4.8 client does not
-    // re-request it on its own -- reversing the client shows the delete path is dialog -> send
-    // CMSG_CHAR_DELETE -> wait, with no self-refresh -- so it keeps showing the stale list (the
-    // player observed it only updated after a realm round-trip) until the server sends a new
-    // enumeration. See claude/FACTS_mop548_char_delete.md.
-    SendCharacterEnum();
+    // No unsolicited SMSG_CHAR_ENUM here. An earlier revision pushed one, on the finding that
+    // the 5.4.8 client never refreshed the list by itself -- but that observation was made while
+    // this handler was answering with the wrong success code. The client was receiving 71
+    // (CHAR_DELETE_IN_PROGRESS), never saw a terminal result, and so never refreshed; that looked
+    // like "the client does not self-refresh". With the code corrected the client sends its own
+    // CMSG_CHAR_ENUM immediately after the delete -- observed on the wire -- so the push became a
+    // duplicate 1.4 KB enumeration answering a request the client had already made.
 }
 
 /**
