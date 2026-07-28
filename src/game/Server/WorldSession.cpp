@@ -1666,11 +1666,16 @@ void WorldSession::SendAddonsInfo()
     // the 18414 client rejected every addon (all shown disabled / "download an updated version"):
     // it cannot parse a single field of the flat form. Layout: header = banned-addon count (18 bits)
     // + addon count (23 bits); then ONE 3-bit flag group per addon (hasUrl, enabled, serverSendsKey),
-    // byte-aligned via FlushBits; then per-addon byte data; then the banned block. This first pass
-    // omits the server public key (serverSendsKey = 0) to validate the packed framing against the live
-    // client -- the 256-byte key and its scatter permutation are added once the framing is confirmed.
-    // Enable/ban/allow policy will move into a dedicated module (AddonRegistry). tdata (the Blizzard
-    // public key) is kept for that follow-up.
+    // byte-aligned via FlushBits; then per-addon byte data; then the banned block.
+    //
+    // The framing below is confirmed against retail: all 128 SMSG_ADDON_INFO bodies in the 18414
+    // capture corpus are 286 bytes and decode under exactly this grammar with zero residual
+    // (bannedCount 0, addonCount 44, every flag group 0b010, every per-addon record
+    // 01 00 00 00 00 02). Retail clears serverSendsKey and ships no key at all, because a retail
+    // client already holds one in its .pub cache; we send ours so that a fresh install validates
+    // without depending on what the archives happen to carry.
+    //
+    // Enable/ban/allow policy will move into a dedicated module (AddonRegistry).
     WorldPacket data(SMSG_ADDON_INFO);
 
     data.WriteBits(0, 18);                                  // banned-addon count (none yet)
@@ -1685,13 +1690,12 @@ void WorldSession::SendAddonsInfo()
 
     for (AddonsList::const_iterator itr = m_addonsList.begin(); itr != m_addonsList.end(); ++itr)
     {
-        // serverSendsKey bit set -> the 256-byte RSA public key. The client uses this key directly as
-        // the RSA modulus to verify the addon signature; a MISSING key left the modulus 0 and the client
-        // faulted INT_DIVIDE_BY_ZERO inside its bignum modular-reduce (sub_1402E2B20). Sent raw this pass
-        // to confirm the key is what the parser needs -- if the addons validate, the raw byte order is
-        // correct; if they stay disabled (no crash), the order needs the scatter permutation and I'll
-        // derive it from the client parser.
-        data.append(tdata, sizeof(tdata));
+        // serverSendsKey bit set -> the 256-byte RSA public key, emitted in the client's scatter
+        // order rather than modulus order. See MopAddonPackets::kAddonKeyWireOrder: the parser
+        // stores wire byte i at key[kAddonKeyWireOrder[i]], so a raw append left the client with a
+        // key wrong at 254 of 256 positions, failing signature verification and loading every
+        // "## Secure:" Blizzard addon untrusted.
+        MopAddonPackets::AppendAddonPublicKey(data, tdata);
         // 'enabled' bit was set -> { u8 enabled, u32 reserved }; then the state byte (2 = valid/loaded).
         data << uint8(1);
         data << uint32(0);
