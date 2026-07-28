@@ -833,10 +833,14 @@ int main(int /*argc*/, char** /*argv*/)
         CHECK(rotation == movement.rotation);
         CHECK(bytes.rpos() == bytes.size());
 
+        // 0xFF002100 is a real destructible BYTES_1: state 0, type 33, artKit
+        // 0, animProgress 255. Index 18 is the highest slot in the gameobject
+        // descriptor, so it also pins the mask width at one block.
         const MopUpdateObject::StaticField fields[] =
         {
             { 0, 0xAABBCCDDu },
             { 17, 60u },
+            { 18, 0xFF002100u },
         };
         ByteBuffer create;
         MopUpdateObject::AppendStationaryGameObjectCreateBlock(create, 2, 0x10, 5, movement,
@@ -847,6 +851,25 @@ int main(int /*argc*/, char** /*argv*/)
         MopUpdateObject::AppendStaticValuesNoDynamic(expected, fields, sizeof(fields) / sizeof(fields[0]));
         CHECK(create.size() == expected.size());
         CHECK(create.size() == expected.size() && std::memcmp(create.contents(), expected.contents(), expected.size()) == 0);
+
+        // Both buffers above come from the same builder, so assert the tail
+        // against a mask and payload written out by hand instead.
+        ByteBuffer values;
+        MopUpdateObject::AppendStaticValuesNoDynamic(values, fields, sizeof(fields) / sizeof(fields[0]));
+        const uint8 expectedBlockCount = 1;
+        const uint32 expectedMask = (1u << 0) | (1u << 17) | (1u << 18);
+        // block count, one mask, three values, then the trailing terminator
+        CHECK(values.size() == sizeof(uint8) + sizeof(uint32) + 3 * sizeof(uint32) + sizeof(uint8));
+        uint8 blockCount, terminator;
+        uint32 mask, valueZero, valueSeventeen, valueEighteen;
+        values >> blockCount >> mask >> valueZero >> valueSeventeen >> valueEighteen >> terminator;
+        CHECK(terminator == 0);
+        CHECK(blockCount == expectedBlockCount);
+        CHECK(mask == expectedMask);
+        CHECK(valueZero == 0xAABBCCDDu);
+        CHECK(valueSeventeen == 60u);
+        CHECK(valueEighteen == 0xFF002100u);
+        CHECK(values.rpos() == values.size());
     }
 
     // Binary-proved DynamicObject/Corpse movement subset: stationary position
