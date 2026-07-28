@@ -2,7 +2,11 @@ file(READ "${SOURCE_ROOT}/src/game/Server/WorldSession.h" packet_helpers)
 file(READ "${SOURCE_ROOT}/src/game/WorldHandlers/QueryHandler.cpp" query_handler)
 file(READ "${SOURCE_ROOT}/src/game/Server/Opcodes.cpp" opcode_registry)
 
-if(MUTATION STREQUAL "request_parser_call")
+if(MUTATION STREQUAL "quest_item_zero_skip")
+    string(REPLACE "            if (questItem != 0)"
+        "            if (true) /* removed quest-item zero skip */"
+        query_handler "${query_handler}")
+elseif(MUTATION STREQUAL "request_parser_call")
     string(REPLACE
         "        MopQueryPackets::ReadGameObjectQueryRequest(recv_data);"
         "        // MopQueryPackets::ReadGameObjectQueryRequest(recv_data);"
@@ -199,3 +203,13 @@ require_exactly_one("${normalized_registry}" "${inbound_registration}"
     "CMSG_GAMEOBJECT_QUERY registration")
 require_exactly_one("${normalized_registry}" "${outbound_registration}"
     "SMSG_GAMEOBJECT_QUERY_RESPONSE registration")
+
+# A zero quest-item entry makes the client resolve a null item record and write
+# through it. GameObjectInfo::questItems is a fixed six-slot array whose unused
+# slots are zero, and the response's count is simply the vector's length, so
+# pushing every slot claimed six items and crashed any client with a cold cache
+# on the first gameobject it saw.
+string(FIND "${query_handler}" "if (questItem != 0)" zero_skip)
+if(zero_skip EQUAL -1)
+    message(FATAL_ERROR "gameobject quest-item zero skip is missing; a cold-cache client will crash")
+endif()

@@ -358,8 +358,36 @@ void WorldSession::HandleGameObjectQueryOpcode(WorldPacket& recv_data)
         for (size_t i = 0; i < response.data.size(); ++i)
             response.data[i] = info->raw.data[i];
         response.size = info->size;
+        // Real entries only. GameObjectInfo::questItems is a fixed six-slot
+        // array and unused slots are zero, so pushing every element made
+        // questItems.size() always six - and BuildGameObjectQueryResponse
+        // writes that size as the on-wire count. The client loops the count
+        // and resolves each entry; entry 0 has no item record, so it
+        // dereferences null and writes at null + 0x10. That is exactly the
+        // observed fault: ACCESS_VIOLATION writing 0x0000000000000010, within
+        // four seconds of entering the world with a cold WDB cache, on the
+        // first gameobject queried.
+        //
+        // A warm cache never re-queries, which is why this survived: it could
+        // only ever affect clients we do not run. Blast radius is every one of
+        // the 36,122 gameobject templates, for every new player.
+        //
+        // Retail never pads. Across 54,209 SMSG_GAMEOBJECT_QUERY_RESPONSE in
+        // the 18414 corpus the count is 0 in 95.8%, never exceeds 4 - so even
+        // a full template would not fill six - and not one non-empty list
+        // contains a zero.
+        //
+        // The creature path above is already correct for the structural
+        // reason that it copies into a fixed-size destination and so cannot
+        // fabricate a count. Only this one built a vector and reported its
+        // length.
         for (uint32 questItem : info->questItems)
-            response.questItems.push_back(questItem);
+        {
+            if (questItem != 0)
+            {
+                response.questItems.push_back(questItem);
+            }
+        }
 
         DETAIL_LOG("WORLD: CMSG_GAMEOBJECT_QUERY '%s' - Entry: %u.",
                    response.names[0].c_str(), request.entry);
