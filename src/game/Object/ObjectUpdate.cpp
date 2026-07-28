@@ -277,6 +277,14 @@ namespace
         for (uint16 i = 0; i < 4; ++i) add(uint16(12 + i), object.GetUInt32Value(GAMEOBJECT_PARENTROTATION + i));
         add(16, object.GetUInt32Value(GAMEOBJECT_FACTION));
         add(17, object.GetUInt32Value(GAMEOBJECT_LEVEL));
+        // Byte 1 of this field is the GAMEOBJECT_TYPE. Omitting it left every
+        // gameobject looking like type 0 (DOOR) to the client, which routes the
+        // display record's model name into the M2 cache. That cache rejects any
+        // extension other than .m2/.mdl/.mdx and returns null, and the caller
+        // releases the null handle without checking it. WMO-backed types read
+        // their type byte here to take the branch that skips the M2 load
+        // entirely, so this field is what keeps them off that path.
+        add(18, object.GetUInt32Value(GAMEOBJECT_BYTES_1));
     }
 
     void BuildMopObserverPlayerStaticFields(Object const& object,
@@ -455,7 +463,7 @@ void Object::BuildCreateUpdateBlockForPlayer(UpdateData* data, Player* target) c
         movement.o = gameObject->GetOrientation();
         movement.rotation = uint64(gameObject->GetPackedWorldRotation());
 
-        fields.reserve(18);
+        fields.reserve(19);
         BuildMopGameObjectStaticFields(*this, target, fields);
         MopUpdateObject::AppendStationaryGameObjectCreateBlock(data->GetBuffer(), updateType, guid,
             m_objectTypeId, movement, fields.data(), uint32(fields.size()));
@@ -805,7 +813,7 @@ void Object::BuildValuesUpdateBlockForPlayer(UpdateData* data, Player* target) c
     }
     else
     {
-        fields.reserve(18);
+        fields.reserve(19);
         BuildMopGameObjectStaticFields(*this, target, fields);
     }
     MopUpdateObject::AppendValuesBlock(data->GetBuffer(), GetObjectGuid().GetRawValue(),
