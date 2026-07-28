@@ -28,6 +28,11 @@ elseif(MUTATION STREQUAL "registration")
 elseif(MUTATION STREQUAL "allowlist")
     string(REPLACE "case SMSG_POWER_UPDATE:"
         "case REMOVED_SMSG_POWER_UPDATE:" session_source "${session_source}")
+elseif(MUTATION STREQUAL "switch_sender_gate")
+    string(REPLACE
+        "        if (IsInWorld())\n        {\n            WorldPacket data;\n            MopCompactPackets::BuildPowerUpdate(data, GetObjectGuid(), uint8(new_powertype), uint32(curValue));"
+        "        {\n            WorldPacket data;\n            MopCompactPackets::BuildPowerUpdate(data, GetObjectGuid(), uint8(new_powertype), uint32(curValue));"
+        unit_source "${unit_source}")
 elseif(MUTATION STREQUAL "reference")
     string(REPLACE "SMSG_POWER_UPDATE                              0x109F  ACTIVE"
         "SMSG_POWER_UPDATE                              0x109F  DORMANT"
@@ -68,6 +73,14 @@ require_once("${power_source}"
 require_once("${unit_source}"
     "MopCompactPackets::BuildPowerUpdate(data, GetObjectGuid(), uint8(new_powertype), uint32(curValue));"
     "power-type switch sender")
+# Ungated, this fires during Player::LoadFromDB -> InitStatsForLevel ->
+# InitDataForForm, before the client knows the unit exists, and lands as the
+# first SMSG after CMSG_PLAYER_LOGIN - the slot retail gives to
+# SMSG_ACCOUNT_DATA_TIMES. Player::SendMessageToSet delivers the self copy
+# regardless of IsInWorld(), so nothing else holds it back.
+require_once("${unit_source}"
+    "        if (IsInWorld())\n        {\n            WorldPacket data;\n            MopCompactPackets::BuildPowerUpdate(data, GetObjectGuid(), uint8(new_powertype), uint32(curValue));"
+    "power-type switch sender in-world gate")
 require_once("${opcode_registry}"
     "DefS(SMSG_POWER_UPDATE, \"SMSG_POWER_UPDATE\");"
     "power-update registration")

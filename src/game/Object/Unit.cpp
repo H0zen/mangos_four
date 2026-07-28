@@ -2630,10 +2630,37 @@ void Unit::SetPowerType(Powers new_powertype)
             SetPower(new_powertype, curValue);
         }
 
-        // send power type update to client
-        WorldPacket data;
-        MopCompactPackets::BuildPowerUpdate(data, GetObjectGuid(), uint8(new_powertype), uint32(curValue));
-        SendMessageToSet(&data, true);
+        // Gated on IsInWorld() exactly as the sibling emitter in
+        // Unit::SetPowerByIndex is. Without it this fires during login, before
+        // the client knows the unit exists, and lands as the FIRST SMSG after
+        // CMSG_PLAYER_LOGIN - the slot retail fills with
+        // SMSG_ACCOUNT_DATA_TIMES.
+        //
+        // The path is Player::LoadFromDB -> InitStatsForLevel ->
+        // InitDataForForm -> SetPowerType. LoadFromDB restores race, class and
+        // gender into UNIT_FIELD_BYTES_0 but never byte 3, so GetPowerType()
+        // still reads 0 (POWER_MANA) and InitDataForForm's
+        // `GetPowerType() != DisplayPower` guard trips once per login for every
+        // class whose display power is not mana. Player::SendMessageToSet
+        // delivers the self copy whether or not the player is in world, so
+        // nothing else suppressed it.
+        //
+        // Nothing is lost by withholding it: SetPowerType runs before
+        // Map::Add, so byte 3, UNIT_FIELD_POWER1+i and UNIT_FIELD_MAXPOWER1+i
+        // all ship inside the self create block Map::SendInitSelf then builds.
+        //
+        // In-world invocations keep their packet; construction and load-time
+        // invocations rely on that later create snapshot instead. Creature and
+        // pet paths are NOT in world by definition - Creature::UpdateEntry runs
+        // before world addition and pet loading calls this before map->Add -
+        // but they were already covered, because the non-player
+        // SendMessageToSet is itself gated on IsInWorld().
+        if (IsInWorld())
+        {
+            WorldPacket data;
+            MopCompactPackets::BuildPowerUpdate(data, GetObjectGuid(), uint8(new_powertype), uint32(curValue));
+            SendMessageToSet(&data, true);
+        }
     }
 }
 
