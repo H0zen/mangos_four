@@ -97,6 +97,22 @@ if(DEFINED MUTATION)
         string(REPLACE "std::strcmp(name, serverOpcodeTable[v].name) == 0"
                        "std::strcmp(name, serverOpcodeTable[v].name) != 0"
                _mutated_cpp "${_cpp_src}")
+    elseif(MUTATION STREQUAL "unpadded_value")
+        # Same opcode, different spelling. Keying on the literal text bucketed
+        # 0xB2 apart from 0x00B2 and let this straight through.
+        string(REGEX REPLACE "(CMSG_AUTH_SESSION[ \t]*=[ \t]*0x00B2[ \t]*,)"
+               "\\1\n    CMSG_UNPADDED_COLLIDER = 0xB2," _mutated_header "${_header}")
+    elseif(MUTATION STREQUAL "symbolic_alias")
+        # An alias rather than a literal. The scanner cannot evaluate it, so it must
+        # refuse rather than skip the declaration and under-report.
+        string(REGEX REPLACE "(CMSG_AUTH_SESSION[ \t]*=[ \t]*0x00B2[ \t]*,)"
+               "\\1\n    CMSG_SYMBOLIC_COLLIDER = CMSG_AUTH_SESSION," _mutated_header "${_header}")
+    elseif(MUTATION STREQUAL "dual_registration_direction")
+        # A symbol registered in BOTH tables, plus an unregistered SMSG_ on its value.
+        # Recording only the client direction hid the server-side collision.
+        string(REGEX REPLACE "(CMSG_AUTH_SESSION[ \t]*=[ \t]*0x00B2[ \t]*,)"
+               "\\1\n    SMSG_DUAL_COLLIDER = 0x00B2," _mutated_header "${_header}")
+        set(_mutated_inc "${_inc_src}\nDefS(CMSG_AUTH_SESSION, \"CMSG_AUTH_SESSION\");")
     elseif(MUTATION STREQUAL "stale_baseline")
         # Resolve a baselined collision without updating the list. Must move the
         # VALUE: renaming one of two symbols that share a value leaves them still
@@ -153,25 +169,66 @@ endforeach()
 
 string(REGEX MATCHALL "[CS]?MSG_[A-Za-z0-9_]+[ \t]*=[ \t]*0x[0-9A-Fa-f]+" _decls "${_header}")
 
+# Every opcode declaration must be a plain hex literal this scanner can read. An
+# alias such as "CMSG_FOO = CMSG_AUTH_SESSION" is a real way to create a collision
+# and the regex above simply would not see it, so the file would silently be scanned
+# incompletely. Refuse to run rather than under-report.
+string(REGEX MATCHALL "[CS]?MSG_[A-Za-z0-9_]+[ \t]*=[ \t]*[^,\n]+" _assigns "${_header}")
+set(_unparsed "")
+foreach(_a IN LISTS _assigns)
+    if(NOT _a MATCHES "=[ \t]*0x[0-9A-Fa-f]+[ \t]*$")
+        string(STRIP "${_a}" _a)
+        set(_unparsed "${_unparsed}\n  ${_a}")
+    endif()
+endforeach()
+if(NOT _unparsed STREQUAL "")
+    message(FATAL_ERROR
+        "Opcode declarations this scanner cannot evaluate:${_unparsed}\n\n"
+        "Only plain hex literals are supported. An alias or expression would be\n"
+        "skipped silently, so the collision check would be incomplete without saying\n"
+        "so. Either write the literal or teach this gate to resolve the expression.")
+endif()
+
 set(_keys "")
 foreach(_decl IN LISTS _decls)
     string(REGEX MATCH "^([CS]?MSG_[A-Za-z0-9_]+)" _n "${_decl}")
     set(_name "${CMAKE_MATCH_1}")
     string(REGEX MATCH "0x([0-9A-Fa-f]+)$" _v "${_decl}")
-    string(TOUPPER "${CMAKE_MATCH_1}" _value)
 
+    # Canonicalise on the NUMBER, not its spelling: 0xB2 and 0x00B2 are the same
+    # opcode and must land in the same bucket. Keying on the literal text put them
+    # in different ones and let a real collision through.
+    math(EXPR _num "0x${CMAKE_MATCH_1}")
+    math(EXPR _canon "${_num}" OUTPUT_FORMAT HEXADECIMAL)
+    string(REGEX REPLACE "^0[xX]" "" _canon "${_canon}")
+    string(TOUPPER "${_canon}" _canon)
+    string(LENGTH "${_canon}" _clen)
+    while(_clen LESS 4)
+        set(_canon "0${_canon}")
+        string(LENGTH "${_canon}" _clen)
+    endwhile()
+    set(_value "${_canon}")
+
+    # A symbol registered through BOTH DefC and DefS occupies both tables, so it
+    # must be compared in both. An if/elseif recorded only the first and hid every
+    # server-side collision for such a symbol.
+    set(_dirs "")
     list(FIND _defc "${_name}" _ic)
-    list(FIND _defs "${_name}" _is)
     if(NOT _ic EQUAL -1)
-        set(_dirs "CMSG")
-    elseif(NOT _is EQUAL -1)
-        set(_dirs "SMSG")
-    elseif(_name MATCHES "^CMSG_")
-        set(_dirs "CMSG")
-    elseif(_name MATCHES "^SMSG_")
-        set(_dirs "SMSG")
-    else()
-        set(_dirs "CMSG;SMSG")      # unregistered MSG_: could become either
+        list(APPEND _dirs "CMSG")
+    endif()
+    list(FIND _defs "${_name}" _is)
+    if(NOT _is EQUAL -1)
+        list(APPEND _dirs "SMSG")
+    endif()
+    if(_dirs STREQUAL "")
+        if(_name MATCHES "^CMSG_")
+            set(_dirs "CMSG")
+        elseif(_name MATCHES "^SMSG_")
+            set(_dirs "SMSG")
+        else()
+            set(_dirs "CMSG;SMSG")  # unregistered MSG_: could become either
+        endif()
     endif()
 
     foreach(_d IN LISTS _dirs)

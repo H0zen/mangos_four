@@ -423,6 +423,7 @@ add_test(NAME mop_opcode_collision_source
         -P ${CMAKE_CURRENT_SOURCE_DIR}/mop_opcode_collision_source_test.cmake)
 
 foreach(mutation IN ITEMS new_collision msg_hides_collision double_registration
+                          unpadded_value symbolic_alias dual_registration_direction
                           third_collider invert_client_guard invert_server_guard
                           stale_baseline)
     add_test(NAME mop_opcode_collision_source_mutation_${mutation}
