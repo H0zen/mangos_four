@@ -1209,6 +1209,55 @@ struct AddonInfo
 
 typedef std::list<AddonInfo> AddonsList;
 
+namespace MopAddonPackets
+{
+    // SMSG_ADDON_INFO does not carry the addon public key in modulus order. The client's
+    // generated parser (JamAddonInfo, sub_14050D1B0 in the 18414 x64 client) reads the 256
+    // key bytes one at a time and scatters each one to a fixed destination inside the addon
+    // record: wire byte i is stored at key[kAddonKeyWireOrder[i]]. To make the client
+    // reconstruct the modulus, the server must therefore emit key[kAddonKeyWireOrder[i]].
+    //
+    // Sending the modulus in its natural order left the client holding a key that differed
+    // from the real one at 254 of 256 positions, so the RSA check inside sub_140D0CFD0
+    // failed, sub_140D0D480 returned 1 ("corrupt signature") instead of 3, and every
+    // "## Secure:" Blizzard addon loaded UNTRUSTED. An untrusted addon is executed under its
+    // own taint identity, which is why Blizzard_TimeManager, Blizzard_CompactRaidFrames and
+    // the rest tainted their globals at the very first line of each file.
+    //
+    // The table was recovered from the parser and then confirmed against live client output:
+    // the 44 .pub files the client wrote back satisfy pub[kAddonKeyWireOrder[i]] == tdata[i]
+    // for all 256 i, which is exactly the raw-order send being scattered.
+    uint8 const kAddonKeyWireOrder[256] =
+    {
+          5, 176, 148,  43,  28, 135,  64,   8, 160, 145, 226, 119, 181, 192, 240,  72,
+        243, 212, 209, 172,  21, 237,  85,  10,  75, 117, 244,  82,  24,  20,  18,  76,
+         67,  57, 157,  59, 198,  90,  22,   6,  49,  12,  95, 193, 118,  94,  40,  98,
+        255, 169, 214,  83, 128, 219,  73, 247, 132, 202, 218, 154, 112, 131, 177, 111,
+        144,  56,  39, 152,  48,  63,  25, 114,  38,  84,  99, 165, 126,  34,  69, 183,
+        185,  52, 103,  36, 233,   3,  47, 141, 162, 232, 194, 253, 116,  27,  80,  46,
+         89, 107, 189,  14, 225, 167, 140, 250, 188,  17,  29, 137, 133,  74, 178,  62,
+        236,  31, 101,   9, 164, 200, 136, 159, 197, 216, 246, 134,   0,  97, 234, 166,
+        204,  65,  60, 223, 122,   2,   4, 239, 249,  30, 252, 211, 124,  26,  23, 161,
+         92, 138,  37, 227, 120, 153, 115, 151, 254, 173, 175, 108, 130, 251, 170, 158,
+         11, 245, 190, 104, 217,   7,  78, 231, 155, 171,  55,  81, 143, 206,  70, 156,
+         88,  45, 201, 182, 180,  16, 215, 230,  50, 149, 203, 168, 220, 187,  41,  61,
+        238, 208, 224, 106, 205, 222,  42,  68, 127, 210,  77, 129, 213,  15, 102, 146,
+         54,  35,  91,  19, 199,  32, 139, 150, 196, 125,  53, 100, 113, 110,  71, 191,
+         58, 242, 248,  13, 184, 163, 147,  79,  93, 229, 228, 186, 207,   1,  66,  33,
+        121,  96, 123, 179, 235, 241, 109, 142,  44,  86, 195, 174,  87, 105,  51, 221
+    };
+
+    // Append the 256-byte addon public key in the scatter order the client's parser expects.
+    // 'key' must point at 256 bytes of modulus in natural order.
+    inline void AppendAddonPublicKey(ByteBuffer& out, uint8 const* key)
+    {
+        for (uint32 i = 0; i < 256; ++i)
+        {
+            out << uint8(key[kAddonKeyWireOrder[i]]);
+        }
+    }
+}
+
 /**
  * @brief Party operation enumeration
  */
