@@ -1320,6 +1320,7 @@ void ObjectMgr::LoadQuestPOI()
     BarGoLink bar(result->GetRowCount());
 
     uint32 badFloorCount = 0;
+    uint32 harmfulFloorCount = 0;
 
     do
     {
@@ -1342,14 +1343,29 @@ void ObjectMgr::LoadQuestPOI()
         // the same packet's objIndex 32 was carried through untouched both
         // times, so this field is the sole trigger.
         //
-        // floorId is a small map-floor ordinal. MAX_QUEST_POI_FLOOR_ID is a
-        // deliberately loose heuristic rather than a measured client limit -
-        // see its definition. Zero rather than drop: the marker still renders,
-        // on the default floor, instead of vanishing.
+        // floorId is a small map-floor ordinal. MAX_QUEST_POI_FLOOR_ID sits
+        // above the measured retail maximum of 12 with a margin for unsampled
+        // content, and far below the blob-id range that produced the only
+        // out-of-range rows we have seen - see its definition. Zero rather
+        // than drop: the marker still renders, on the default floor, instead
+        // of vanishing.
         if (!IsValidQuestPoiFloorId(floorId))
         {
-            sLog.outErrorDb("Table `quest_poi` has questId %u poiId %u with out of range floorId %u, forced to 0.",
-                            questId, poiId, floorId);
+            if (floorId >= KNOWN_HARMFUL_QUEST_POI_FLOOR_ID)
+            {
+                sLog.outErrorDb("Table `quest_poi` has questId %u poiId %u with floorId %u, forced to 0. "
+                                "Six-digit values are quest POI blob ids in the wrong column and are the "
+                                "range known to crash the client on quest accept.",
+                                questId, poiId, floorId);
+                ++harmfulFloorCount;
+            }
+            else
+            {
+                sLog.outErrorDb("Table `quest_poi` has questId %u poiId %u with floorId %u, forced to 0. "
+                                "That is above the accepted range but is not a value known to be harmful; "
+                                "it is rejected as an implausible floor.",
+                                questId, poiId, floorId);
+            }
             floorId = 0;
             ++badFloorCount;
         }
@@ -1401,7 +1417,11 @@ void ObjectMgr::LoadQuestPOI()
 
     if (badFloorCount)
     {
-        sLog.outErrorDb(">> %u quest POI definitions had an out of range floorId and were forced to floor 0. Fix them in `quest_poi`; left unpatched they crash the client on quest accept.", badFloorCount);
+        sLog.outErrorDb(">> %u quest POI definitions had an out of range floorId and were forced to floor 0, "
+                        "%u of them in the six-digit range known to crash the client on quest accept. "
+                        "Fix those in `quest_poi`. The remainder are rejected as implausible floors; their "
+                        "effect on the client is unknown, so they are reported rather than diagnosed.",
+                        badFloorCount, harmfulFloorCount);
     }
 }
 
