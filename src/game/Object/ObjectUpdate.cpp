@@ -317,6 +317,16 @@ namespace
         addTranslated(UNIT_FIELD_DISPLAYID);
         addTranslated(UNIT_FIELD_NATIVEDISPLAYID);
         addTranslated(UNIT_FIELD_MOUNTDISPLAYID, true);
+        // The packed appearance words. These must be in the CREATE, not left
+        // to the changed-value path: Object::ClearUpdateMask drops the change
+        // flags on entering the world, and PLAYER_BYTES in particular never
+        // changes again afterwards, so an observer that only ever saw the
+        // create would otherwise never learn this player's hair, facial hair
+        // or gender at all. Zero is meaningful for all three (male, sober,
+        // no arena faction), so they are emitted unconditionally.
+        addTranslated(PLAYER_BYTES);
+        addTranslated(PLAYER_BYTES_2);
+        addTranslated(PLAYER_BYTES_3);
         for (uint16 i = 0; i < MopUpdateObject::ObserverVisibleItemFieldCount; ++i)
         {
             addTranslated(uint16(MopUpdateObject::ObserverVisibleItemSourceStart + i), true);
@@ -634,6 +644,16 @@ void Object::BuildValuesUpdateBlockForPlayer(UpdateData* data, Player* target) c
             // of the quest log because the serializer requires ascending
             // legacy indices.
             addIfChanged(PLAYER_FLAGS);
+            // Rest state lives in byte 3 of PLAYER_BYTES_2 and changes when the
+            // player enters or leaves an inn - i.e. always AFTER login, so the
+            // login seed alone would never deliver a single transition and
+            // GetRestState() would go stale the moment it mattered. Drunkenness
+            // (byte 1 of PLAYER_BYTES_3) and barber-shop appearance changes have
+            // the same shape. Ordered between PLAYER_FLAGS at 157 and the quest
+            // log at 166 to keep the legacy indices ascending.
+            addIfChanged(PLAYER_BYTES);
+            addIfChanged(PLAYER_BYTES_2);
+            addIfChanged(PLAYER_BYTES_3);
 
             // QuestLogFrame renders a slot only once the client holds its
             // quest id, so an accepted quest never appears until these private

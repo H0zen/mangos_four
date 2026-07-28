@@ -27,6 +27,14 @@ elseif(MUTATION STREQUAL "buyback_feed")
         "for (uint16 i = MopUpdateObject::SelfBuybackSourceStart;"
         "for (uint16 i = 0; /* removed self buyback feed */"
         object_update "${object_update}")
+elseif(MUTATION STREQUAL "packed_bytes_self_feed")
+    string(REPLACE "            addIfChanged(PLAYER_BYTES_2);"
+        "            /* removed self packed-bytes feed */"
+        object_update "${object_update}")
+elseif(MUTATION STREQUAL "packed_bytes_observer_create")
+    string(REPLACE "        addTranslated(PLAYER_BYTES_2);"
+        "        /* removed observer packed-bytes create */"
+        object_update "${object_update}")
 elseif(MUTATION STREQUAL "questlog_feed")
     string(REPLACE
         "for (uint16 slot = 0; slot < MopUpdateObject::SelfQuestLogSlotCount; ++slot)"
@@ -96,3 +104,27 @@ if(NOT inventory_only EQUAL -1)
     message(FATAL_ERROR
         "self-player branch regressed to the inventory-only VALUES builder")
 endif()
+
+# Both producers must feed the three packed appearance words, not just one.
+#
+# The observer CREATE matters because Object::ClearUpdateMask drops change
+# flags on entering the world and PLAYER_BYTES never changes again, so an
+# observer relying on the changed-value path alone would never learn a
+# player's hair, facial hair or gender.
+#
+# The self INCREMENTAL feed matters because rest state (byte 3 of
+# PLAYER_BYTES_2) changes on entering an inn - always after login - so the
+# login seed alone delivers no transition at all and GetRestState() goes
+# stale exactly when it is needed.
+foreach(token IN ITEMS
+        "addTranslated(PLAYER_BYTES);"
+        "addTranslated(PLAYER_BYTES_2);"
+        "addTranslated(PLAYER_BYTES_3);"
+        "addIfChanged(PLAYER_BYTES);"
+        "addIfChanged(PLAYER_BYTES_2);"
+        "addIfChanged(PLAYER_BYTES_3);")
+    string(FIND "${object_update}" "${token}" position)
+    if(position EQUAL -1)
+        message(FATAL_ERROR "packed appearance word missing from a producer: ${token}")
+    endif()
+endforeach()
