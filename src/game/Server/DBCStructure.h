@@ -1538,6 +1538,14 @@ struct OverrideSpellDataEntry
     //uint32      unk3;                                     // 12 possibly flag
 };
 
+struct NameGenEntry
+{
+    uint32    ID;                                           // 0
+    DBCString Name;                                         // 1  the generated name itself
+    uint32    Race;                                         // 2  ChrRaces id (1..24 in 18414)
+    uint32    Sex;                                          // 3  0 male, 1 female
+};
+
 struct PhaseEntry
 {
     uint32    ID;                                           // 0

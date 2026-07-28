@@ -145,6 +145,10 @@ bool Zone2MapCoordinates(float& x, float& y, uint32 zone);
  */
 bool Map2ZoneCoordinates(float& x, float& y, uint32 zone);
 
+// Random character name for the creation screen's randomise button, or NULL when
+// NameGen.dbc has no entry for that race/sex pair.
+std::string const* GetRandomCharacterName(uint32 race, uint32 sex);
+
 typedef std::map<uint32/*pair32(map,diff)*/, MapDifficultyEntry const*> MapDifficultyMap;
 MapDifficultyEntry const* GetMapDifficultyData(uint32 mapId, Difficulty difficulty);
 void BuildMapSpawnModeMasks(std::map<uint32, uint32>& spawnMasks);
@@ -276,6 +280,7 @@ extern DBCStorage <QuestFactionRewardEntry>      sQuestFactionRewardStore;
 extern DBCStorage <QuestV2Entry>                 sQuestV2Store;
 extern DBCStorage <QuestSortEntry>               sQuestSortStore;
 extern DBCStorage <QuestXPLevel>                 sQuestXPLevelStore;
+extern DBCStorage <NameGenEntry>                 sNameGenStore;
 extern DBCStorage <PhaseEntry>                   sPhaseStore;
 extern DBCStorage <PowerDisplayEntry>            sPowerDisplayStore;
 // extern DBCStorage <PvPDifficultyEntry>           sPvPDifficultyStore; -- use GetBattlegroundSlotByLevel for access

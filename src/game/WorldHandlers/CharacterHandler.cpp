@@ -738,6 +738,55 @@ void WorldSession::HandleCharDeleteOpcode(WorldPacket& recv_data)
 }
 
 /**
+ * @brief Answers the creation screen's randomise-name button.
+ *
+ * CharacterCreate.lua's RequestRandomName() round-trips to the server with the race and sex
+ * currently selected on screen; the button does nothing at all without a reply. NameGen.dbc
+ * supplies the candidates.
+ *
+ * The request body is read as two flat bytes (sex then race) per the 5.4.8 reference
+ * implementation. Neither this opcode nor its response has a single observation in the 18414
+ * corpus, so both the opcode value and this layout are unconfirmed on the wire - the size
+ * check below is what stops a wrong layout becoming a malformed read rather than a clean
+ * rejection.
+ */
+void WorldSession::HandleRandomizeCharNameOpcode(WorldPacket& recvPacket)
+{
+    if (recvPacket.size() < 2)
+    {
+        sLog.outError("HandleRandomizeCharNameOpcode: malformed CMSG_RANDOMIZE_CHAR_NAME (%u bytes)",
+                      uint32(recvPacket.size()));
+        return;
+    }
+
+    uint8 sex, race;
+    recvPacket >> sex;
+    recvPacket >> race;
+
+    std::string const* name = GetRandomCharacterName(race, sex);
+
+    WorldPacket data(SMSG_RANDOMIZE_CHAR_NAME, 1 + (name ? name->size() : 0));
+    if (!name)
+    {
+        // No candidates for that race/sex. Answer with the failure bit rather than an empty
+        // name: the client leaves the edit box alone, which is recoverable, where a blank
+        // name is not.
+        DEBUG_LOG("WORLD: CMSG_RANDOMIZE_CHAR_NAME - no NameGen entry for race %u sex %u", race, sex);
+        data.WriteBit(false);
+        data.FlushBits();
+        SendPacket(&data);
+        return;
+    }
+
+    DEBUG_LOG("WORLD: CMSG_RANDOMIZE_CHAR_NAME race %u sex %u -> '%s'", race, sex, name->c_str());
+    data.WriteBit(true);
+    data.WriteBits(name->size(), 6);
+    data.FlushBits();
+    data.WriteStringData(*name);
+    SendPacket(&data);
+}
+
+/**
  * @brief Starts the asynchronous player login sequence for a selected character.
  *
  * @param recv_data The received opcode packet.

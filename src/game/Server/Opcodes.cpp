@@ -223,6 +223,17 @@ void InitializeOpcodes()
     DefC(CMSG_BATTLE_PAY_GET_PURCHASE_LIST, "CMSG_BATTLE_PAY_GET_PURCHASE_LIST", STATUS_AUTHED, PROCESS_INPLACE, &WorldSession::HandleBattlePayGetPurchaseListOpcode);
     DefS(SMSG_BATTLE_PAY_GET_PURCHASE_LIST_RESPONSE, "SMSG_BATTLE_PAY_GET_PURCHASE_LIST_RESPONSE");
 
+    // The character-creation randomise button. CharacterCreate.lua's RequestRandomName()
+    // round-trips to the server, so without this the button is inert. STATUS_AUTHED because
+    // it is character-select traffic with no player in world.
+    DefC(CMSG_GENERATE_RANDOM_CHARACTER_NAME, "CMSG_GENERATE_RANDOM_CHARACTER_NAME", STATUS_AUTHED, PROCESS_THREADUNSAFE, &WorldSession::HandleRandomizeCharNameOpcode);
+    DefS(SMSG_RANDOMIZE_CHAR_NAME, "SMSG_RANDOMIZE_CHAR_NAME");
+
+    // Login refusals. Every CHAR_LOGIN_* response code existed but had zero send sites,
+    // because the packet that carries them was never registered - so a refused login told
+    // the client nothing at all.
+    DefS(SMSG_CHARACTER_LOGIN_FAILED, "SMSG_CHARACTER_LOGIN_FAILED");
+
     // Wave 2 server messages whose 5.4.8 bodies are encoded by MopCompactPackets.
     DefS(SMSG_ATTACKSWING_ERROR, "SMSG_ATTACKSWING_ERROR");
     DefS(SMSG_MOVE_SET_SWIM_SPEED, "SMSG_MOVE_SET_SWIM_SPEED");
