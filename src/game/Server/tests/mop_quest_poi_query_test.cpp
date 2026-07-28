@@ -172,7 +172,12 @@ static void test_response()
  */
 static void test_point_count_is_repeated_not_floor_id()
 {
-    for (uint32 count : { 1u, 2u, 5u, 12u })
+    // 12 is the largest count in the retail sample, but our own table reaches 2076
+    // (quest 0 poi 0), with 40 POIs above 63. 63 is MAX_QUEST_POI_FLOOR_ID, and reusing
+    // it as a bound here would silently truncate those 40 -- the same invisible failure
+    // this test exists to catch. The 2076 case pins that the 21-bit field, not the floor
+    // bound, is what governs.
+    for (uint32 count : { 1u, 2u, 5u, 12u, 64u, 2076u })
     {
         MopQueryPackets::QuestPoiRecord poi;
         poi.floorId = 0xDEADBEEFu;          // must not appear on the wire

@@ -141,7 +141,10 @@ require_ordered("${builder}" "quest-POI response builder"
     "built << poi.unknown2"
     "built << poi.unknown4"
     "built << poi.mapId"
-    "built << poi.floorId"
+    # The POI's own point count repeated, not floorId. This gate previously required
+    # poi.floorId here and so locked in the defect: floorId is 0 for the overwhelming
+    # majority of rows, the client read "no points" and drew no quest markers at all.
+    "built << uint32(poi.points.size())"
     "built << poi.mapAreaId"
     "built << poi.unknown3"
     "built << poi.unknown1"
