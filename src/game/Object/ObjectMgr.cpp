@@ -24,6 +24,7 @@
  */
 
 #include "ObjectMgr.h"
+#include "DBCStores.h"
 #include "LivingWorldAnchorPolicy.h"
 #include "MotionGenerators/MotionMaster.h"  // WAYPOINT_MOTION_TYPE
 #include "Database/DatabaseEnv.h"
@@ -1512,13 +1513,62 @@ void ObjectMgr::LoadSpellTemplate()
         // insert serverside spell data
         if (sSpellStore.GetNumRows() <= i)
         {
-            sLog.outErrorDb("Loading Spell Template for spell %u, index out of bounds (max = %u)", i, sSpellStore.GetNumRows());
-            continue;
+            // Spell ID exceeds the DBC index table size.  Use SetEntry()
+            // which stores it in an unbounded map that LookupEntry() checks
+            // first, so spell_area and other systems can find it at runtime.
+            sSpellStore.SetEntry(i, const_cast<SpellEntry*>(spellEntry));
         }
         else
         {
             sSpellStore.InsertEntry(const_cast<SpellEntry*>(spellEntry), i);
         }
+    }
+
+    // MoP stores spell effects in a separate DBC (SpellEffect.dbc) looked up
+    // via sSpellEffectMap.  spell_template entries have no corresponding DBC
+    // rows, so their effects are invisible to the runtime.  Query the effect
+    // columns directly and create SpellEffectEntry objects for each spell that
+    // defines an effect.
+    QueryResult* result = WorldDatabase.Query(
+        "SELECT `id`, `effect0`, `effect0_implicit_target_a`, `effect0_implicit_target_b`,"
+        "`effect0_radius_idx`, `effect0_apply_aura_name`, `effect0_misc_value`,"
+        "`effect0_misc_value_b`, `effect0_trigger_spell` FROM `spell_template` WHERE `effect0` != 0");
+
+    if (result)
+    {
+        uint32 effectCount = 0;
+        do
+        {
+            Field* fields = result->Fetch();
+            uint32 spellId = fields[0].GetUInt32();
+
+            // Only register if the spell was successfully loaded above
+            if (!sSpellStore.LookupEntry(spellId))
+            {
+                continue;
+            }
+
+            // Heap-allocate a SpellEffectEntry that lives for the server's lifetime
+            SpellEffectEntry* effect = new SpellEffectEntry();
+            memset(effect, 0, sizeof(SpellEffectEntry));
+            effect->Effect = fields[1].GetUInt32();
+            effect->EffectImplicitTargetA = fields[2].GetUInt32();
+            effect->EffectImplicitTargetB = fields[3].GetUInt32();
+            effect->EffectRadiusIndex = fields[4].GetUInt32();
+            effect->EffectAura = fields[5].GetUInt32();
+            effect->EffectMiscValue = fields[6].GetInt32();
+            effect->EffectMiscValueB = fields[7].GetInt32();
+            effect->EffectTriggerSpell = fields[8].GetUInt32();
+            effect->SpellID = spellId;
+            effect->EffectIndex = 0;
+
+            RegisterCustomSpellEffect(spellId, EFFECT_INDEX_0, effect);
+            ++effectCount;
+        } while (result->NextRow());
+
+        delete result;
+        sLog.outString(">> Registered %u spell_template effect(s) in SpellEffect map", effectCount);
+        sLog.outString();
     }
 }
 

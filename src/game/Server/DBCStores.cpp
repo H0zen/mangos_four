@@ -1139,6 +1139,14 @@ SpellEffectEntry const* GetSpellEffectEntry(uint32 spellId, SpellEffectIndex eff
     return itr->second.effects[effect];
 }
 
+void RegisterCustomSpellEffect(uint32 spellId, SpellEffectIndex index, SpellEffectEntry const* effect)
+{
+    if (index < MAX_SPELL_EFFECTS_MOP)
+    {
+        sSpellEffectMap[spellId].effects[index] = effect;
+    }
+}
+
 /**
  * @brief Computes the talent point cost from a talent position.
  *

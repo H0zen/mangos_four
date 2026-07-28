@@ -84,6 +84,7 @@ uint32 GetTalentSpellCost(TalentSpellPos const* pos);
  */
 TalentSpellPos const* GetTalentSpellPos(uint32 spellId);
 SpellEffectEntry const* GetSpellEffectEntry(uint32 spellId, SpellEffectIndex effect);
+void RegisterCustomSpellEffect(uint32 spellId, SpellEffectIndex index, SpellEffectEntry const* effect);
 
 int32 GetAreaFlagByAreaID(uint32 area_id);                  // -1 if not found
 /**
