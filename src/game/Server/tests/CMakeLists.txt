@@ -413,6 +413,26 @@ foreach(mutation IN ITEMS time_sync_registration time_sync_parse_order)
         PROPERTIES WILL_FAIL TRUE)
 endforeach()
 
+# Two opcode symbols sharing one value in the same direction. DefC/DefS assert at
+# runtime, but only for opcodes actually registered -- a collision between two
+# unregistered names is invisible until someone registers the second, which is how
+# MSG_MOVE_WORLDPORT_ACK on 0x00E0 (CMSG_CHAR_ENUM in 18414) hung every client.
+add_test(NAME mop_opcode_collision_source
+    COMMAND ${CMAKE_COMMAND}
+        -DSOURCE_ROOT=${CMAKE_SOURCE_DIR}
+        -P ${CMAKE_CURRENT_SOURCE_DIR}/mop_opcode_collision_source_test.cmake)
+
+foreach(mutation IN ITEMS new_collision double_registration
+                          remove_client_guard remove_server_guard stale_baseline)
+    add_test(NAME mop_opcode_collision_source_mutation_${mutation}
+        COMMAND ${CMAKE_COMMAND}
+            -DSOURCE_ROOT=${CMAKE_SOURCE_DIR}
+            -DMUTATION=${mutation}
+            -P ${CMAKE_CURRENT_SOURCE_DIR}/mop_opcode_collision_source_test.cmake)
+    set_tests_properties(mop_opcode_collision_source_mutation_${mutation}
+        PROPERTIES WILL_FAIL TRUE)
+endforeach()
+
 add_executable(mop_addon_packets_test mop_addon_packets_test.cpp)
 target_include_directories(mop_addon_packets_test PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/..
