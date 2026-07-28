@@ -735,8 +735,14 @@ int main(int /*argc*/, char** /*argv*/)
     CHECK(!MopUpdateObject::CanUseStationaryGameObjectMovement(gameObjectEligibility));
     gameObjectEligibility.hasRotation = true; gameObjectEligibility.hasTemplate = false;
     CHECK(!MopUpdateObject::CanUseStationaryGameObjectMovement(gameObjectEligibility));
-    gameObjectEligibility.hasTemplate = true; gameObjectEligibility.isDestructibleBuilding = true;
-    CHECK(!MopUpdateObject::CanUseStationaryGameObjectMovement(gameObjectEligibility));
+    gameObjectEligibility.hasTemplate = true;
+    // Being a destructible building is deliberately absent from this struct.
+    // It was a rejection reason, on type alone, and hid 147 spawns - 88 of
+    // them open-world scenery. Movement does not vary with type, so there is
+    // nothing here to assert about it: the eligibility boundary no longer
+    // sees the type at all. Proving a type-33 object is now created needs an
+    // object-level test that builds a real GameObject, which this unit test
+    // has no fixture for.
 
     MopUpdateObject::PositionOnlyEligibility positionOnlyEligibility{};
     positionOnlyEligibility.hasPosition = true;

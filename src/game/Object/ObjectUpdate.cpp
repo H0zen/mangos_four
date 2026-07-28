@@ -472,8 +472,6 @@ bool Object::CanBuildMopCreateUpdate() const
         uint16 const supportedFlags = UPDATEFLAG_HAS_POSITION | UPDATEFLAG_ROTATION;
         MopUpdateObject::StationaryGameObjectEligibility eligibility{};
         eligibility.hasTemplate = gameObject->GetGOInfo() != NULL;
-        eligibility.isDestructibleBuilding = eligibility.hasTemplate &&
-            gameObject->GetGoType() == GAMEOBJECT_TYPE_DESTRUCTIBLE_BUILDING;
         eligibility.isTransport = gameObject->IsTransport();
         eligibility.isBoarded = gameObject->IsBoarded();
         eligibility.hasStationaryPosition = (m_updateFlag & UPDATEFLAG_HAS_POSITION) != 0;
