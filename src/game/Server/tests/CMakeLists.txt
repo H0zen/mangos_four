@@ -1330,7 +1330,7 @@ foreach(mutation IN ITEMS complete_parser request_reward_parser
         PROPERTIES WILL_FAIL TRUE)
 endforeach()
 
-foreach(mutation IN ITEMS hello_parser query_parser accept_parser
+foreach(mutation IN ITEMS details_emote_break offer_reward_emote_break details_emote_zero_skip hello_parser query_parser accept_parser
         quest_cache_query_parser quest_cache_response_builder
         quest_cache_absent_response query_interaction_gate
         list_builder details_builder
