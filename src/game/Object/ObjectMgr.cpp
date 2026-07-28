@@ -1304,8 +1304,8 @@ void ObjectMgr::LoadQuestPOI()
 
     uint32 count = 0;
 
-    //                                                0        1      2         3      4          5        6     7
-    QueryResult* result = WorldDatabase.Query("SELECT `questId`, `poiId`, `objIndex`, `mapId`, `mapAreaId`, `floorId`, `unk3`, `unk4` FROM `quest_poi`");
+    //                                                0           1        2           3        4            5          6       7       8
+    QueryResult* result = WorldDatabase.Query("SELECT `questId`, `poiId`, `objIndex`, `mapId`, `mapAreaId`, `floorId`, `unk3`, `unk4`, `blobId` FROM `quest_poi`");
 
     if (!result)
     {
@@ -1336,6 +1336,7 @@ void ObjectMgr::LoadQuestPOI()
         uint32 floorId          = fields[5].GetUInt32();
         uint32 unk3             = fields[6].GetUInt32();
         uint32 unk4             = fields[7].GetUInt32();
+		uint32 blobId           = fields[8].GetUInt32();
 
         // An out-of-range floorId crashes the 5.4.8 client the moment it reads
         // SMSG_QUEST_POI_QUERY_RESPONSE, which is sent on quest accept - so one

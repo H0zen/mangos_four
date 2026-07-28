@@ -57,9 +57,9 @@
     // The Rel23.01 base schema already owns the eight BroadcastTextID columns;
     // content 2 records the proved 18414 npc_text mapping shipped with the DB.
     #define WORLD_DB_VERSION_NR         "23"
-    #define WORLD_DB_STRUCTURE_NR       "2"
-    #define WORLD_DB_CONTENT_NR         "31"
-    #define WORLD_DB_UPDATE_DESCRIPT    "Fix Startup Errors"
+    #define WORLD_DB_STRUCTURE_NR       "3"
+    #define WORLD_DB_CONTENT_NR         "1"
+    #define WORLD_DB_UPDATE_DESCRIPT    "Add BlobId field to quest_poi"
 
     #define VER_COMPANY_NAME_STR        "MaNGOS Developers"
     #define VER_LEGALCOPYRIGHT_STR      "(c)2005-@rev_year@ MaNGOS"
