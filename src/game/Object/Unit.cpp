@@ -2630,6 +2630,25 @@ void Unit::SetPowerType(Powers new_powertype)
             SetPower(new_powertype, curValue);
         }
 
+        // Report what the field actually holds, not curValue. Those agree for
+        // every type written above, but POWER_MANA is deliberately left alone,
+        // so curValue there is GetCreatePowers(POWER_MANA) - the base pool, not
+        // what the player has. A druid dropping form at 20% mana was being told
+        // it was at full base mana, and the client believed it until the next
+        // update happened to correct it.
+        //
+        // Nothing here validates that this unit's class HAS a slot for
+        // new_powertype, and GetPower() answers 0 for one it does not. Scripts
+        // can reach that: Eluna's SetPowerType checks only the MAX_POWERS
+        // range, not class support. Keep curValue in that case so the wire
+        // value is exactly what it was before this change, rather than
+        // silently becoming zero - the create value is at least a defensible
+        // answer for a power the unit cannot store.
+        const uint32 reportedValue =
+            (GetPowerIndex(new_powertype) == INVALID_POWER_INDEX)
+                ? curValue
+                : GetPower(new_powertype);
+
         // Gated on IsInWorld() exactly as the sibling emitter in
         // Unit::SetPowerByIndex is. Without it this fires during login, before
         // the client knows the unit exists, and lands as the FIRST SMSG after
@@ -2658,7 +2677,7 @@ void Unit::SetPowerType(Powers new_powertype)
         if (IsInWorld())
         {
             WorldPacket data;
-            MopCompactPackets::BuildPowerUpdate(data, GetObjectGuid(), uint8(new_powertype), uint32(curValue));
+            MopCompactPackets::BuildPowerUpdate(data, GetObjectGuid(), uint8(new_powertype), reportedValue);
             SendMessageToSet(&data, true);
         }
     }
