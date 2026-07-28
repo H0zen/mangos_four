@@ -1,9 +1,10 @@
 file(READ "${SOURCE_ROOT}/src/game/WorldHandlers/CalendarHandler.cpp" handler_source)
+set(pristine_source "${handler_source}")
 
 if(MUTATION STREQUAL "restore_subtraction")
     string(REPLACE
-        "record.resetRemaining = int32(resetPeriod);"
-        "record.resetRemaining = resetPeriod > currTime ? int32(resetPeriod - currTime) : 0;"
+        "int32(resetPeriod > maxResetPeriod ? maxResetPeriod : resetPeriod);"
+        "resetPeriod > currTime ? int32(resetPeriod - currTime) : 0;"
         handler_source "${handler_source}")
 elseif(MUTATION STREQUAL "clamp_lockout_away")
     string(REPLACE
@@ -16,6 +17,32 @@ elseif(MUTATION STREQUAL "drop_period_source")
         "GetMaxResetTimeFor(mapDiff)"
         "GetResetTimeFor(mapId, Difficulty(0))"
         handler_source "${handler_source}")
+elseif(MUTATION STREQUAL "drop_overflow_clamp")
+    string(REPLACE
+        "int32(resetPeriod > maxResetPeriod ? maxResetPeriod : resetPeriod);"
+        "int32(resetPeriod);"
+        handler_source "${handler_source}")
+elseif(MUTATION STREQUAL "ignore_period_value")
+    string(REPLACE
+        "uint32 resetPeriod = sMapPersistentStateMgr.GetScheduler().GetMaxResetTimeFor(mapDiff);"
+        "sMapPersistentStateMgr.GetScheduler().GetMaxResetTimeFor(mapDiff);
+        uint32 resetPeriod = 0;"
+        handler_source "${handler_source}")
+endif()
+
+# A mutation whose string(REPLACE) target has drifted out of the source is a
+# silent no-op: the arm then passes for the wrong reason, because WILL_FAIL
+# accepts any non-zero exit and the unmutated source of course still fails
+# nothing. Exit SUCCESSFULLY in that case - under WILL_FAIL a zero exit is
+# reported as a failure, so a dead mutation shows up in ctest instead of
+# hiding. This happened here once already, when the assignment was reworded.
+if(DEFINED MUTATION AND NOT MUTATION STREQUAL "")
+    if(handler_source STREQUAL pristine_source)
+        message("MUTATION '${MUTATION}' did not change the source - its "
+                "replacement target no longer exists. Exiting 0 so WILL_FAIL "
+                "reports this arm as broken.")
+        return()
+    endif()
 endif()
 
 # Two adjacent loops fill two different countdown-looking fields, and only one
@@ -60,10 +87,34 @@ if(period_source EQUAL -1)
         "that yields the retail period class")
 endif()
 
-string(FIND "${reset_arm}" "record.resetRemaining = int32(resetPeriod);" direct_assign)
+# Bind the helper call to the value that is actually sent. Checking the call
+# and the assignment separately would accept a discarded call followed by
+# "uint32 resetPeriod = 0", which is the shape this whole commit removes.
+string(FIND "${reset_arm}"
+    "uint32 resetPeriod = sMapPersistentStateMgr.GetScheduler().GetMaxResetTimeFor(mapDiff);"
+    period_bound)
+if(period_bound EQUAL -1)
+    message(FATAL_ERROR
+        "the value sent must be bound directly to the GetMaxResetTimeFor call, "
+        "not merely accompanied by one")
+endif()
+
+# Rate.InstanceResetTime is validated only against being negative, so a large
+# enough rate overflows the int32 cast and the client ends up dividing by a
+# negative number. The clamp is the only thing standing between an admin's
+# config typo and that.
+string(FIND "${reset_arm}"
+    "int32(resetPeriod > maxResetPeriod ? maxResetPeriod : resetPeriod);" direct_assign)
 if(direct_assign EQUAL -1)
     message(FATAL_ERROR
-        "the global reset period must be sent as-is, not turned into a countdown")
+        "the global reset period must be sent as-is under an overflow clamp, "
+        "not turned into a countdown and not cast unchecked")
+endif()
+
+string(FIND "${reset_arm}" "uint32 const maxResetPeriod = 0x7FFFFFFF;" clamp_bound)
+if(clamp_bound EQUAL -1)
+    message(FATAL_ERROR
+        "the overflow clamp must bound the period at INT32_MAX")
 endif()
 
 # Match the operator forms, not a bare "currTime": the explanatory comment in

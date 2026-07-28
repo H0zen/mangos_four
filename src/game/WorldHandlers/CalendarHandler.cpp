@@ -141,12 +141,19 @@ void WorldSession::HandleCalendarGetCalendar(WorldPacket& /*recv_data*/)
         // being compared against currTime, which a duration can never exceed,
         // so every record went out as zero. The client uses this word as the
         // recurrence period: it steps from the calendar epoch by this value,
-        // and divides by it. Retail carries exactly the value class this
-        // helper produces - 604800, 259200 and 86400 - and never zero.
+        // and divides by it. Retail carries 604800 for the weekly raids and
+        // 259200 for map 509, which is what the IsRaid filter above admits,
+        // and never zero.
         uint32 resetPeriod = sMapPersistentStateMgr.GetScheduler().GetMaxResetTimeFor(mapDiff);
         MopCalendarPackets::CalendarListReset record;
         record.mapId = int32(mapId);
-        record.resetRemaining = int32(resetPeriod);
+        // Rate.InstanceResetTime is only validated against being negative, so
+        // a large enough rate makes the scaled duration exceed INT32_MAX and
+        // the cast wrap negative. The client divides by this word, so a
+        // negative divisor is worse than an implausibly distant reset.
+        uint32 const maxResetPeriod = 0x7FFFFFFF;
+        record.resetRemaining =
+            int32(resetPeriod > maxResetPeriod ? maxResetPeriod : resetPeriod);
         // Retail sends zero here for every raid but one, which carries a
         // seconds-into-the-day reset offset, so zero is a legal value rather
         // than an absent one. We do not model per-map reset hours yet.

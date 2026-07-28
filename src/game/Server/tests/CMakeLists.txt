@@ -154,7 +154,7 @@ add_test(NAME mop_calendar_reset_period_source
     COMMAND ${CMAKE_COMMAND} -DSOURCE_ROOT=${CMAKE_SOURCE_DIR}
         -P ${CMAKE_CURRENT_SOURCE_DIR}/mop_calendar_reset_period_source_test.cmake)
 
-foreach(mutation IN ITEMS restore_subtraction clamp_lockout_away drop_period_source)
+foreach(mutation IN ITEMS restore_subtraction clamp_lockout_away drop_period_source drop_overflow_clamp ignore_period_value)
     add_test(NAME mop_calendar_reset_period_source_mutation_${mutation}
         COMMAND ${CMAKE_COMMAND} -DSOURCE_ROOT=${CMAKE_SOURCE_DIR}
             -DMUTATION=${mutation}
