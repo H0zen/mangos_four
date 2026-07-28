@@ -488,7 +488,7 @@ add_test(NAME mop_gameobject_query_source
     COMMAND ${CMAKE_COMMAND} -DSOURCE_ROOT=${CMAKE_SOURCE_DIR}
         -P ${CMAKE_CURRENT_SOURCE_DIR}/mop_gameobject_query_source_test.cmake)
 
-foreach(mutation IN ITEMS request_parser_call response_builder_call inbound_registration)
+foreach(mutation IN ITEMS quest_item_zero_skip request_parser_call response_builder_call inbound_registration)
     add_test(NAME mop_gameobject_query_source_mutation_${mutation}
         COMMAND ${CMAKE_COMMAND} -DSOURCE_ROOT=${CMAKE_SOURCE_DIR}
             -DMUTATION=${mutation}

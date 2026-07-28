@@ -199,6 +199,67 @@ static void test_populated_hit()
     CHECK(ExpectBytes(packet, expected));
 }
 
+/**
+ * The on-wire questItem count is whatever the caller's vector holds, so a
+ * caller that pads the fixed six-slot template array with zeros makes this
+ * packet claim six items and hand the client six entry ids of 0. The client
+ * resolves each one, gets no item record, and writes through null - the
+ * observed ACCESS_VIOLATION at null + 0x10 on a cold WDB cache.
+ *
+ * Retail never pads: across 54,209 responses in the 18414 corpus the count is
+ * 0 in 95.8%, never exceeds 4, and no non-empty list contains a zero. These
+ * cases pin the two shapes the populated test above does not cover.
+ */
+static void test_quest_item_counts()
+{
+    auto countByteOf = [](MopQueryPackets::GameObjectQueryResponse const& record)
+    {
+        WorldPacket packet(SMSG_GAMEOBJECT_QUERY_RESPONSE, 256);
+        MopQueryPackets::BuildGameObjectQueryResponse(packet, record);
+        // header: 1 bit + flush, entry, blobSize; then the blob. The count
+        // byte sits after type, displayId, seven strings, 32 data words and
+        // the float size.
+        size_t offset = 1 + 4 + 4 + 4 + 4;
+        uint8 const* p = packet.contents();
+        // Bounded, so a future layout change fails this test deterministically
+        // instead of reading past the packet.
+        for (int i = 0; i < 7; ++i)
+        {
+            while (offset < packet.size() && p[offset] != 0) ++offset;
+            CHECK(offset < packet.size());
+            ++offset;
+        }
+        offset += 32 * 4 + 4;
+        CHECK(offset < packet.size());
+        return offset < packet.size() ? p[offset] : uint8(0xFF);
+    };
+
+    MopQueryPackets::GameObjectQueryResponse record;
+    record.hasData = true;
+    record.entry = 203735;                    // Rope Ladder, the object that crashed
+    record.type = 22;
+    record.displayId = 9094;
+    record.names = {{ "Rope Ladder", "", "", "" }};
+    record.iconName = "";
+    record.castBarCaption = "";
+    record.unknownString = "";
+    record.size = 0.5f;
+    record.trailingUnknown = 0;
+
+    // No quest items at all - the overwhelmingly common case, and the one
+    // that crashed. The count must be 0, not the array's six slots.
+    record.questItems.clear();
+    CHECK(countByteOf(record) == 0);
+
+    // A single real item, as 2,278 retail responses carry.
+    record.questItems = { 44830u };
+    CHECK(countByteOf(record) == 1);
+
+    // Four, the largest count observed in retail.
+    record.questItems = { 1u, 2u, 3u, 4u };
+    CHECK(countByteOf(record) == 4);
+}
+
 static void test_opcode_values_are_framable()
 {
     CHECK(uint32_t(CMSG_GAMEOBJECT_QUERY) == 0x1461u);
@@ -213,6 +274,7 @@ int main(int /*argc*/, char** /*argv*/)
     test_missing_template();
     test_minimal_hit();
     test_populated_hit();
+    test_quest_item_counts();
     test_opcode_values_are_framable();
 
     if (g_fail)
