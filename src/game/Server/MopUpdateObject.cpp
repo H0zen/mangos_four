@@ -220,16 +220,14 @@ bool MopUpdateObject::CanUseStationaryGameObjectMovement(StationaryGameObjectEli
     // appeared. Players see it as NPCs standing in mid-air, because creatures
     // resting on these objects render correctly while their platform does not.
     //
-    // The residual cost is bounded but real, and NOT self-correcting. The
-    // gameobject projection stops at target index 17 and never emits
-    // GAMEOBJECT_BYTES_1, whose byte 3 carries destructible animation and
-    // health progress - and the incremental VALUES path reuses the same
-    // projection, so that field never arrives later either. Damaged and
-    // destroyed transitions still propagate through GAMEOBJECT_FLAGS and
-    // GAMEOBJECT_DISPLAYID, which are emitted. The omission predates this
-    // change and applies to every gameobject type equally, so nothing here
-    // makes destructibles a special case; a mask-and-values block simply
-    // clears the bit for a field it does not send, and stays well formed.
+    // Admitting these objects then exposed a second, older omission: the
+    // projection stopped at target index 17 and never emitted
+    // GAMEOBJECT_BYTES_1, so every gameobject read back as type 0. The
+    // client's model resolver excludes the WMO-backed types 11, 14, 15 and 33
+    // and sends everything else to the M2 cache, which rejects a WMO filename,
+    // returns null, and is dereferenced unchecked. That is now fixed by
+    // emitting index 18 in the same projection, which the incremental VALUES
+    // path reuses, so the type arrives on both paths.
     // Rendering with a default sub-state beats not rendering at all.
     return eligibility.hasTemplate && !eligibility.isTransport &&
         !eligibility.isBoarded && eligibility.hasStationaryPosition && eligibility.hasRotation &&
