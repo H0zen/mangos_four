@@ -1973,6 +1973,22 @@ void Map::SendInitSelf(Player* player)
         selfFields.push_back({ PLAYER_FLAGS, player->GetUInt32Value(PLAYER_FLAGS) });
     }
 
+    // The packed appearance words. Byte 3 of PLAYER_BYTES_2 carries rest
+    // state, which GetRestState() reads and MainMenuBar.lua compares; byte 0
+    // of PLAYER_BYTES_3 carries gender, which the client reads from here for
+    // a player rather than from UNIT_FIELD_SEX; PLAYER_BYTES carries skin,
+    // face, hair and hair colour. None of the three was ever projected, so
+    // none had ever reached a client. They sort between PLAYER_FLAGS at 157
+    // and the quest log at 166, so they belong here to keep the run ascending.
+    for (uint16 i = PLAYER_BYTES; i <= PLAYER_BYTES_3; ++i)
+    {
+        const uint32 value = player->GetUInt32Value(i);
+        if (value != 0)
+        {
+            selfFields.push_back({ i, value });
+        }
+    }
+
     // Quests reach the client only through this seed and the incremental
     // values path. Without it a character logs in with its quest log empty
     // and the quest only appears if one of its fields happens to change

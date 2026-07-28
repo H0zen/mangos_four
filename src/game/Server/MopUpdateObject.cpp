@@ -105,6 +105,13 @@ bool MopUpdateObject::TranslateObserverPlayerIndex(uint16 legacyIndex, uint16& t
         case 63: targetIndex = 69; return true; // display ID
         case 64: targetIndex = 70; return true; // native display ID
         case 65: targetIndex = 71; return true; // mount display ID
+        // Packed appearance words, all PUBLIC in the legacy layout and all
+        // previously dropped here. Facial hair and gender are visible to
+        // other players, not just to the owner. See the self projection for
+        // where these indices come from.
+        case 161: targetIndex = 166; return true; // skin/face/hair/hair colour
+        case 162: targetIndex = 167; return true; // facial hair, rest state
+        case 163: targetIndex = 168; return true; // gender, drunk, arena faction
         default: return false;
     }
 }
@@ -503,6 +510,30 @@ void MopUpdateObject::TranslateSelfPlayerFields(StaticField const* sourceFields,
             // 11, and its absolute 18414 index is already pinned at 171 by the
             // quest-log projection, which puts the block base at 160.
             case 157: fields.push_back({ 162, value }); break;
+            // The three packed PLAYER_BYTES words. None was projected at all,
+            // in either path, despite Player.cpp:2933-2935 marking all three
+            // as visual bits - so rest state, facial hair and gender never
+            // reached any client.
+            //
+            // Indices read from the client's own CGPlayerData descriptor
+            // table (12-byte stride from dword_10F52B8, names written by
+            // sub_7A0B33), not interpolated: entry 6 "hairColorID", entry 7
+            // "restState", entry 8 "arenaFaction", against a block base of
+            // 160 pinned independently by entry 2 "playerFlags" at 162 and
+            // entry 11 "questLog" at 171. The client names each packed word
+            // after its byte 3, and all three names match the legacy byte-3
+            // meaning - hair colour, rest state, arena faction - which
+            // corroborates the mapping rather than merely fitting it.
+            //
+            // Byte 3 of 167 is what GetRestState() reads; without it the Lua
+            // returns nil and MainMenuBar.lua fails on the comparison at :119
+            // and the arithmetic at :202. Byte 0 of 168 is gender, which for
+            // a PLAYER the client reads from here rather than from
+            // UNIT_FIELD_SEX - the reason a female character used male voice
+            // and emote sounds while rendering correctly.
+            case 161: fields.push_back({ 166, value }); break;
+            case 162: fields.push_back({ 167, value }); break;
+            case 163: fields.push_back({ 168, value }); break;
             default:
                 MANGOS_ASSERT(false && "unsupported legacy self-player field");
                 break;

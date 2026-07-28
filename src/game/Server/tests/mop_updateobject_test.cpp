@@ -126,6 +126,10 @@ int main(int /*argc*/, char** /*argv*/)
             { 7, 7 }, { 26, 30 }, { 28, 33 }, { 34, 39 },
             { 50, 55 }, { 51, 57 }, { 52, 58 }, { 53, 59 },
             { 54, 60 }, { 63, 69 }, { 64, 70 }, { 65, 71 },
+            // Packed appearance words, previously dropped by both paths.
+            // Indices come from the client's CGPlayerData descriptor names:
+            // entry 6 hairColorID, 7 restState, 8 arenaFaction, base 160.
+            { 161, 166 }, { 162, 167 }, { 163, 168 },
         };
         for (const auto& mapping : sparseMappings)
         {
@@ -1144,6 +1148,24 @@ int main(int /*argc*/, char** /*argv*/)
             { 1619, 0xFFFFFFFFu },       // explored zone 0   -> 1627
         };
         const uint32 legacyCount = uint32(sizeof(legacy) / sizeof(legacy[0]));
+
+        // The same three words must also survive the SELF projection - they
+        // carry rest state (byte 3 of 162) and gender (byte 0 of 163), which
+        // the owner's own client needs for GetRestState() and for voice.
+        {
+            const MopUpdateObject::StaticField bytes[] =
+            {
+                { 161, 0x01020304u },
+                { 162, 0x05060708u },
+                { 163, 0x090A0B0Cu },
+            };
+            std::vector<MopUpdateObject::StaticField> out;
+            MopUpdateObject::TranslateSelfPlayerFields(bytes, 3, out);
+            CHECK(out.size() == 3);
+            CHECK(out[0].index == 166 && out[0].value == 0x01020304u);
+            CHECK(out[1].index == 167 && out[1].value == 0x05060708u);
+            CHECK(out[2].index == 168 && out[2].value == 0x090A0B0Cu);
+        }
 
         std::vector<MopUpdateObject::StaticField> projected;
         MopUpdateObject::TranslateSelfPlayerFields(legacy, legacyCount, projected);
