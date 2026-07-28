@@ -422,8 +422,9 @@ add_test(NAME mop_opcode_collision_source
         -DSOURCE_ROOT=${CMAKE_SOURCE_DIR}
         -P ${CMAKE_CURRENT_SOURCE_DIR}/mop_opcode_collision_source_test.cmake)
 
-foreach(mutation IN ITEMS new_collision double_registration
-                          remove_client_guard remove_server_guard stale_baseline)
+foreach(mutation IN ITEMS new_collision msg_hides_collision double_registration
+                          third_collider invert_client_guard invert_server_guard
+                          stale_baseline)
     add_test(NAME mop_opcode_collision_source_mutation_${mutation}
         COMMAND ${CMAKE_COMMAND}
             -DSOURCE_ROOT=${CMAKE_SOURCE_DIR}
