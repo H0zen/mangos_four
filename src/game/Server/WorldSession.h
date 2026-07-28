@@ -314,7 +314,13 @@ namespace MopQueryPackets
         uint32 unknown1 = 0;
         uint32 unknown3 = 0;
         uint32 unknown4 = 0;
-        uint32 floorId = 0;
+        // No floorId. SMSG_QUEST_POI_QUERY_RESPONSE has no floor field -- the parser
+        // (sub_14043F7A0 in the 18414 x64 client) reads exactly ten scalars per POI and
+        // none of them is a floor. quest_poi.floorId still holds six-digit blob ids on 49
+        // rows, and putting any of them back on the wire lands in the slot the client
+        // treats as an element count, which is what crashed it on quest accept. The member
+        // is deliberately absent so that reintroducing it is a compile error rather than a
+        // silent regression; LoadQuestPOI() keeps the column and its clamp as db hygiene.
         std::vector<QuestPoiPoint> points;
     };
 
@@ -944,12 +950,29 @@ inline bool MopQueryPackets::BuildQuestPoiQueryResponse(WorldPacket& out,
             built << poi.objectiveIndex;
             built << poi.poiId;
             built << poi.unknown2;
-            built << poi.unknown4;
+            // Slot 3, not the home of quest_poi.unk4. Across 3825 retail POIs this field
+            // is 0 or a five-digit id (13903, 13904, 15624, ...); we have no source for
+            // it, so 0 -- which is what unknown1 holds -- is the correct value. unk4 was
+            // being written here and its domain cannot occur in this slot.
+            built << poi.unknown1;
             built << poi.mapId;
-            built << poi.floorId;
+            // The point count again, NOT floorId. Same bit-phase/byte-phase duplication
+            // the quest and POI counts use above. This slot held floorId, which is 0 in
+            // 28,128 of our 29,117 quest_poi rows, so for 96.6% of POIs the client read
+            // "this POI has no points" and drew nothing -- no error, no short read, the
+            // response simply rendered empty and no quest markers appeared on the map.
+            // Measured over 3825 POIs in 400 retail SMSG_QUEST_POI_QUERY_RESPONSE bodies:
+            // this field equals that POI's own point count in 3825 of 3825, across counts
+            // 1,3,5,6,7,8,9,10,11 and 12. floorId is not carried in this packet.
+            built << uint32(poi.points.size());
             built << poi.mapAreaId;
             built << poi.unknown3;
-            built << poi.unknown1;
+            // Slot 8 is where quest_poi.unk4 belongs. Its value domain settles it: our
+            // table holds 1, 7, 3, 5, 0, 2 and retail's slot 8 holds 0, 1, 3, 7, while
+            // retail's slot 3 holds 0 and five-digit ids that unk4 never takes. Every
+            // retail POI sampled in Elwynn (WorldMapArea 30) carries 1 here, which is
+            // also our most common unk4 by a wide margin (23,637 of 29,117 rows).
+            built << poi.unknown4;
             built << poi.playerConditionId;
         }
         built << quest.questId;
