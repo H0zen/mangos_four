@@ -1702,7 +1702,7 @@ add_test(NAME mop_power_update_packets_source
         -P ${CMAKE_CURRENT_SOURCE_DIR}/mop_power_update_packets_source_test.cmake)
 
 foreach(mutation IN ITEMS mask_order count_width byte_order primary_sender switch_sender
-        switch_sender_gate registration allowlist reference)
+        switch_sender_gate reported_value druid_form_exit_guard registration allowlist reference)
     add_test(NAME mop_power_update_packets_source_mutation_${mutation}
         COMMAND ${CMAKE_COMMAND} -DSOURCE_ROOT=${CMAKE_SOURCE_DIR}
             -DMUTATION=${mutation}

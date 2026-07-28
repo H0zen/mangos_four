@@ -464,7 +464,11 @@ void Aura::HandleAuraModShapeshift(bool apply, bool Real)
             target->SetDisplayId(target->GetNativeDisplayId());
         }
 
-        if (target->getClass() == CLASS_DRUID)
+        // Only when it actually changes. Forms that already display mana
+        // (Moonkin, Tree) would otherwise re-announce an unchanged power type
+        // on every exit. The apply path at the top of this function guards the
+        // same way.
+        if (target->getClass() == CLASS_DRUID && target->GetPowerType() != POWER_MANA)
         {
             target->SetPowerType(POWER_MANA);
         }

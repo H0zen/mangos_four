@@ -4,6 +4,7 @@ file(READ "${SOURCE_ROOT}/src/game/Object/Unit.cpp" unit_source)
 file(READ "${SOURCE_ROOT}/src/game/Server/Opcodes.cpp" opcode_registry)
 file(READ "${SOURCE_ROOT}/src/game/Server/Opcodes_reference.h" opcode_reference)
 file(READ "${SOURCE_ROOT}/src/game/Server/WorldSession.cpp" session_source)
+file(READ "${SOURCE_ROOT}/src/game/WorldHandlers/SpellAuraShapeshift.cpp" shapeshift_source)
 
 if(MUTATION STREQUAL "mask_order")
     string(REPLACE "out.WriteGuidMask<4, 6, 7, 5, 2, 3, 0, 1>(guid);"
@@ -20,7 +21,7 @@ elseif(MUTATION STREQUAL "primary_sender")
     string(REPLACE "MopCompactPackets::BuildPowerUpdate(data, GetObjectGuid(), uint8(power), uint32(val));"
         "/* removed primary power-update sender */" power_source "${power_source}")
 elseif(MUTATION STREQUAL "switch_sender")
-    string(REPLACE "MopCompactPackets::BuildPowerUpdate(data, GetObjectGuid(), uint8(new_powertype), uint32(curValue));"
+    string(REPLACE "MopCompactPackets::BuildPowerUpdate(data, GetObjectGuid(), uint8(new_powertype), reportedValue);"
         "/* removed power-type switch sender */" unit_source "${unit_source}")
 elseif(MUTATION STREQUAL "registration")
     string(REPLACE "DefS(SMSG_POWER_UPDATE, \"SMSG_POWER_UPDATE\");"
@@ -30,9 +31,17 @@ elseif(MUTATION STREQUAL "allowlist")
         "case REMOVED_SMSG_POWER_UPDATE:" session_source "${session_source}")
 elseif(MUTATION STREQUAL "switch_sender_gate")
     string(REPLACE
-        "        if (IsInWorld())\n        {\n            WorldPacket data;\n            MopCompactPackets::BuildPowerUpdate(data, GetObjectGuid(), uint8(new_powertype), uint32(curValue));"
-        "        {\n            WorldPacket data;\n            MopCompactPackets::BuildPowerUpdate(data, GetObjectGuid(), uint8(new_powertype), uint32(curValue));"
+        "        if (IsInWorld())\n        {\n            WorldPacket data;\n            MopCompactPackets::BuildPowerUpdate(data, GetObjectGuid(), uint8(new_powertype), reportedValue);"
+        "        {\n            WorldPacket data;\n            MopCompactPackets::BuildPowerUpdate(data, GetObjectGuid(), uint8(new_powertype), reportedValue);"
         unit_source "${unit_source}")
+elseif(MUTATION STREQUAL "reported_value")
+    string(REPLACE "                : GetPower(new_powertype);"
+        "                : curValue;" unit_source "${unit_source}")
+elseif(MUTATION STREQUAL "druid_form_exit_guard")
+    string(REPLACE
+        "if (target->getClass() == CLASS_DRUID && target->GetPowerType() != POWER_MANA)"
+        "if (target->getClass() == CLASS_DRUID)"
+        shapeshift_source "${shapeshift_source}")
 elseif(MUTATION STREQUAL "reference")
     string(REPLACE "SMSG_POWER_UPDATE                              0x109F  ACTIVE"
         "SMSG_POWER_UPDATE                              0x109F  DORMANT"
@@ -71,15 +80,28 @@ require_once("${power_source}"
     "MopCompactPackets::BuildPowerUpdate(data, GetObjectGuid(), uint8(power), uint32(val));"
     "normal power-change sender")
 require_once("${unit_source}"
-    "MopCompactPackets::BuildPowerUpdate(data, GetObjectGuid(), uint8(new_powertype), uint32(curValue));"
+    "MopCompactPackets::BuildPowerUpdate(data, GetObjectGuid(), uint8(new_powertype), reportedValue);"
     "power-type switch sender")
 # Ungated, this fires during Player::LoadFromDB -> InitStatsForLevel ->
 # InitDataForForm, before the client knows the unit exists, and lands as the
 # first SMSG after CMSG_PLAYER_LOGIN - the slot retail gives to
 # SMSG_ACCOUNT_DATA_TIMES. Player::SendMessageToSet delivers the self copy
 # regardless of IsInWorld(), so nothing else holds it back.
+# POWER_MANA is deliberately left untouched by the block above, so curValue
+# there is GetCreatePowers(POWER_MANA) - the base pool, not what the player
+# holds. Reporting the field keeps both branches honest.
 require_once("${unit_source}"
-    "        if (IsInWorld())\n        {\n            WorldPacket data;\n            MopCompactPackets::BuildPowerUpdate(data, GetObjectGuid(), uint8(new_powertype), uint32(curValue));"
+    "            (GetPowerIndex(new_powertype) == INVALID_POWER_INDEX)
+                ? curValue
+                : GetPower(new_powertype);"
+    "power-type switch reports the real field value, with the legacy fallback for a class-unsupported power")
+# Druid forms that already display mana must not re-announce an unchanged
+# power type when they end.
+require_once("${shapeshift_source}"
+    "if (target->getClass() == CLASS_DRUID && target->GetPowerType() != POWER_MANA)"
+    "druid form-exit power-type change guard")
+require_once("${unit_source}"
+    "        if (IsInWorld())\n        {\n            WorldPacket data;\n            MopCompactPackets::BuildPowerUpdate(data, GetObjectGuid(), uint8(new_powertype), reportedValue);"
     "power-type switch sender in-world gate")
 require_once("${opcode_registry}"
     "DefS(SMSG_POWER_UPDATE, \"SMSG_POWER_UPDATE\");"
