@@ -944,7 +944,11 @@ inline bool MopQueryPackets::BuildQuestPoiQueryResponse(WorldPacket& out,
             built << poi.objectiveIndex;
             built << poi.poiId;
             built << poi.unknown2;
-            built << poi.unknown4;
+            // Slot 3, not the home of quest_poi.unk4. Across 3825 retail POIs this field
+            // is 0 or a five-digit id (13903, 13904, 15624, ...); we have no source for
+            // it, so 0 -- which is what unknown1 holds -- is the correct value. unk4 was
+            // being written here and its domain cannot occur in this slot.
+            built << poi.unknown1;
             built << poi.mapId;
             // The point count again, NOT floorId. Same bit-phase/byte-phase duplication
             // the quest and POI counts use above. This slot held floorId, which is 0 in
@@ -957,7 +961,12 @@ inline bool MopQueryPackets::BuildQuestPoiQueryResponse(WorldPacket& out,
             built << uint32(poi.points.size());
             built << poi.mapAreaId;
             built << poi.unknown3;
-            built << poi.unknown1;
+            // Slot 8 is where quest_poi.unk4 belongs. Its value domain settles it: our
+            // table holds 1, 7, 3, 5, 0, 2 and retail's slot 8 holds 0, 1, 3, 7, while
+            // retail's slot 3 holds 0 and five-digit ids that unk4 never takes. Every
+            // retail POI sampled in Elwynn (WorldMapArea 30) carries 1 here, which is
+            // also our most common unk4 by a wide margin (23,637 of 29,117 rows).
+            built << poi.unknown4;
             built << poi.playerConditionId;
         }
         built << quest.questId;
