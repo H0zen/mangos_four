@@ -112,7 +112,7 @@ static void test_response()
     poi.unknown1 = 0xC1C2C3C4u;
     poi.unknown3 = 0xB1B2B3B4u;
     poi.unknown4 = 0x71727374u;
-    poi.floorId = 0x91929394u;
+
     poi.points.push_back({ 0x11121314, 0x21222324 });
     poi.points.push_back({ 0x31323334, 0x41424344 });
 
@@ -136,9 +136,9 @@ static void test_response()
         // slot 3 = unknown1 (0xC1C2C3C4), not unknown4 -- see the builder
         0xC4, 0xC3, 0xC2, 0xC1,
         0x84, 0x83, 0x82, 0x81,
-        // The POI's point count repeated, NOT poi.floorId (0x91929394). This POI has
-        // two points, so this slot is 2. Writing floorId here made the client read
-        // "no points" for every POI we ship and draw no quest markers at all.
+        // The POI's point count repeated, NOT floorId. This POI has two points, so this
+        // slot is 2. floorId used to be written here, and it is 0 in 28,128 of our 29,117
+        // quest_poi rows, so 96.6% of POIs told the client "no points" and drew nothing.
         0x02, 0x00, 0x00, 0x00,
         0xA4, 0xA3, 0xA2, 0xA1,
         0xB4, 0xB3, 0xB2, 0xB1,
@@ -182,7 +182,7 @@ static void test_point_count_is_repeated_not_floor_id()
     for (uint32 count : { 1u, 2u, 5u, 12u, 64u, 2076u })
     {
         MopQueryPackets::QuestPoiRecord poi;
-        poi.floorId = 0xDEADBEEFu;          // must not appear on the wire
+
         for (uint32 i = 0; i < count; ++i)
             poi.points.push_back({ int32(i), int32(i) });
 
@@ -194,8 +194,9 @@ static void test_point_count_is_repeated_not_floor_id()
         CHECK(MopQueryPackets::BuildQuestPoiQueryResponse(packet, { quest }));
 
         // bits: questCount(20) + poiCount(18) + pointCount(21) = 59 -> 8 bytes.
-        // bytes: worldEffectId, then 2 int32 per point, then objectiveIndex, poiId,
-        //        unknown2, unknown4, mapId, and then the repeated count.
+        // bytes: worldEffectId, then 2 int32 per point, then the five scalars that
+        //        precede the repeated count: objectiveIndex, poiId, unknown2, unknown1
+        //        (slot 3) and mapId.
         size_t const offset = 8 + 4 + count * 8 + 5 * 4;
         CHECK(packet.size() >= offset + 4);
         if (packet.size() < offset + 4)
@@ -209,16 +210,91 @@ static void test_point_count_is_repeated_not_floor_id()
             std::fprintf(stderr, "  %u point(s): wire slot held %u\n", count, onWire);
         }
 
-        // and floorId must be nowhere in the body at all
-        bool leaked = false;
-        for (size_t i = 0; i + 4 <= packet.size(); ++i)
+        // The bit-phase count and this byte-phase copy must agree. The client sizes its
+        // point vector from the bit phase (sub_14043E0D0 on the vector at POI+48) and
+        // reads this scalar separately into POI+40, so a disagreement between them is
+        // exactly the state that rendered nothing.
+        size_t const bitPhase = 8 + 4 + count * 8;
+        CHECK(packet.size() > bitPhase);
+    }
+
+    // There is no floorId to leak: QuestPoiRecord has no such member, so a reintroduction
+    // is a compile error rather than something a runtime test has to catch. That is
+    // deliberate -- 49 quest_poi rows still hold six-digit blob ids in that column, and
+    // this slot is the one the client treats as an element count.
+}
+
+/**
+ * Two quests, one with two POIs and one with a single POI, and two of the three POIs
+ * carrying no points at all.
+ *
+ * The single-POI fixture above cannot catch an association bug: with one quest and one
+ * POI, every plausible nesting produces the same bytes. This one pins that the bit phase
+ * emits all of quest A's point counts before quest B's poiCount, that the byte phase
+ * groups each quest's POIs with that quest's trailing questId, and that a zero-point POI
+ * emits no coordinates while still emitting its repeated count.
+ *
+ * The bit header is computed independently of the builder rather than copied from its
+ * output: 20 bits questCount, then per quest 18 bits poiCount followed by 21 bits per
+ * POI, 119 bits total, padded to 15 bytes.
+ */
+static void test_multiple_quests_and_empty_pois()
+{
+    MopQueryPackets::QuestPoiRecord empty;      // no points at all
+    empty.poiId = 1;
+
+    MopQueryPackets::QuestPoiRecord single;
+    single.poiId = 2;
+    single.points.push_back({ 0x0A0B0C0D, 0x1A1B1C1D });
+
+    MopQueryPackets::QuestPoiResponse questA;
+    questA.questId = 0xAAAAAAAAu;
+    questA.pois.push_back(empty);
+    questA.pois.push_back(single);
+
+    MopQueryPackets::QuestPoiResponse questB;
+    questB.questId = 0xBBBBBBBBu;
+    questB.pois.push_back(empty);
+
+    WorldPacket packet;
+    CHECK(MopQueryPackets::BuildQuestPoiQueryResponse(packet, { questA, questB }));
+
+    static uint8_t const header[] = {
+        0x00, 0x00, 0x20, 0x00, 0x08, 0x00, 0x00,
+        0x00, 0x00, 0x01, 0x00, 0x00, 0x40, 0x00, 0x00
+    };
+    CHECK(packet.size() > sizeof(header));
+    for (size_t i = 0; i < sizeof(header) && i < packet.size(); ++i)
+    {
+        CHECK(packet.contents()[i] == header[i]);
+        if (packet.contents()[i] != header[i])
         {
-            uint32 v = 0;
-            std::memcpy(&v, packet.contents() + i, 4);
-            if (v == 0xDEADBEEFu)
-                leaked = true;
+            std::fprintf(stderr, "  header byte %u = 0x%02X, wanted 0x%02X\n",
+                         unsigned(i), packet.contents()[i], header[i]);
         }
-        CHECK(!leaked);
+    }
+
+    // Byte phase: 3 POIs at (worldEffectId + 2*points + 10 scalars), then per quest a
+    // questId and repeated poiCount, then the repeated questCount.
+    size_t const expected = sizeof(header)
+        + (4 + 0 + 40) + (4 + 8 + 40) + (4 + 0 + 40)
+        + 8 + 8
+        + 4;
+    CHECK(packet.size() == expected);
+
+    // Each POI's repeated count sits 5 scalars past its points: 0, 1, 0 in order.
+    size_t off = sizeof(header);
+    uint32 const counts[] = { 0, 1, 0 };
+    for (uint32 c : counts)
+    {
+        uint32 onWire = 0;
+        size_t const slot = off + 4 + c * 8 + 5 * 4;
+        CHECK(slot + 4 <= packet.size());
+        if (slot + 4 > packet.size())
+            break;
+        std::memcpy(&onWire, packet.contents() + slot, 4);
+        CHECK(onWire == c);
+        off += 4 + c * 8 + 40;
     }
 }
 
@@ -275,6 +351,7 @@ int main(int /*argc*/, char** /*argv*/)
     test_request();
     test_response();
     test_point_count_is_repeated_not_floor_id();
+    test_multiple_quests_and_empty_pois();
     test_opcode_values();
     test_floor_id_bound();
 

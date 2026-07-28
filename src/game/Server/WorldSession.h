@@ -314,7 +314,13 @@ namespace MopQueryPackets
         uint32 unknown1 = 0;
         uint32 unknown3 = 0;
         uint32 unknown4 = 0;
-        uint32 floorId = 0;
+        // No floorId. SMSG_QUEST_POI_QUERY_RESPONSE has no floor field -- the parser
+        // (sub_14043F7A0 in the 18414 x64 client) reads exactly ten scalars per POI and
+        // none of them is a floor. quest_poi.floorId still holds six-digit blob ids on 49
+        // rows, and putting any of them back on the wire lands in the slot the client
+        // treats as an element count, which is what crashed it on quest accept. The member
+        // is deliberately absent so that reintroducing it is a compile error rather than a
+        // silent regression; LoadQuestPOI() keeps the column and its clamp as db hygiene.
         std::vector<QuestPoiPoint> points;
     };
 

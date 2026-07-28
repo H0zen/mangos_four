@@ -806,7 +806,10 @@ void WorldSession::HandleQuestPOIQueryOpcode(WorldPacket& recv_data)
                     poi.objectiveIndex = source.ObjectiveIndex;
                     poi.mapId = source.MapId;
                     poi.mapAreaId = source.MapAreaId;
-                    poi.floorId = source.FloorId;
+                    // source.FloorId is deliberately not copied -- see QuestPoiRecord.
+                    // The packet has no floor field, and 49 rows still hold six-digit
+                    // blob ids in that column that crash the client if they reach the
+                    // wire. LoadQuestPOI() keeps the column; the packet must not read it.
                     poi.unknown3 = source.Unk3;
                     poi.unknown4 = source.Unk4;
 
