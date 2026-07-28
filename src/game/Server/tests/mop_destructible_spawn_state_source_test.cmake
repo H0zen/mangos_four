@@ -28,14 +28,24 @@ string(SUBSTRING "${go_source}" ${destructible_start} ${arm_length} destructible
 # whether it spawns GO_STATE_ACTIVE. The transport arm also writes getMSTime()
 # into GAMEOBJECT_LEVEL, which no reader consumes but which the 18414
 # projection sends at wire index 17.
-# No ";" in the pattern: a match containing one would split into two CMake
-# list elements and double the count.
-string(REGEX MATCHALL "[\r\n][ \t]*break" arm_breaks "${destructible_arm}")
-list(LENGTH arm_breaks break_count)
-if(NOT break_count EQUAL 1)
+# Counting breaks is not enough: "if (x) break;" would satisfy a count and
+# still fall through. Require the arm to END in a break that is alone on its
+# line, and forbid any conditional in the arm, so the break cannot be guarded
+# by one. Scalar REGEX MATCH, not MATCHALL, so the ";" cannot split the result
+# into extra list elements.
+string(REGEX MATCH "[\r\n][ \t]*break;[ \t\r\n]*$" terminal_break "${destructible_arm}")
+if(terminal_break STREQUAL "")
     message(FATAL_ERROR
-        "the destructible arm must end in exactly one break so it cannot fall "
-        "into GAMEOBJECT_TYPE_TRANSPORT; found ${break_count}")
+        "the destructible arm must end in an unconditional break on its own "
+        "line so it cannot fall into GAMEOBJECT_TYPE_TRANSPORT")
+endif()
+
+string(REGEX MATCHALL "[^a-zA-Z_]if[ \t]*\\(" arm_conditionals "${destructible_arm}")
+list(LENGTH arm_conditionals conditional_count)
+if(NOT conditional_count EQUAL 0)
+    message(FATAL_ERROR
+        "the destructible arm must stay unconditional; a branch here could "
+        "guard the terminal break and reopen the fall-through")
 endif()
 
 string(FIND "${destructible_arm}" "ForceGameObjectHealth" health)

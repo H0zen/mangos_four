@@ -294,8 +294,8 @@ bool GameObject::Create(uint32 guidlow, uint32 name_id, Map* map, uint32 phaseMa
             ForceGameObjectHealth(GetMaxHealth(), NULL);
             SetUInt32Value(GAMEOBJECT_PARENTROTATION, m_goInfo->destructibleBuilding.destructibleData);
             // Do not fall through. The transport arm below writes a timestamp
-            // into GAMEOBJECT_LEVEL, which nothing reads back but which we do
-            // send at wire index 17, and it reads data word 1 as
+            // into GAMEOBJECT_LEVEL, which no destructible behaviour consumes
+            // but which we do send at wire index 17, and it reads data word 1 as
             // transport.startOpen - the same word a destructible uses for
             // creditProxyCreature. Any destructible with a credit proxy was
             // being spawned into GO_STATE_ACTIVE because of that alias.
