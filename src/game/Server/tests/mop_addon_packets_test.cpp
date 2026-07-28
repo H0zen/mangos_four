@@ -81,6 +81,33 @@ static void TestScatterOrderMatchesTheClient()
 }
 
 /**
+ * Pin all 256 entries, not just the anchors above.
+ *
+ * The other tests are self-consistent: swapping two middle entries preserves the bijection,
+ * the fixed-point count, the head/tail anchors, the identity comparison and the reconstruction
+ * round trip -- and still ships a corrupt modulus, silently, because nothing on the client
+ * logs a bad key. This digest is the only check that constrains the interior of the table.
+ *
+ * FNV-1a/32 over the 256 entries in order. The value comes from the table as recovered from
+ * the client parser and confirmed against the 44 .pub files the client wrote back.
+ */
+static void TestScatterOrderDigest()
+{
+    uint32 hash = 0x811C9DC5u;
+    for (uint32 i = 0; i < 256; ++i)
+    {
+        hash ^= MopAddonPackets::kAddonKeyWireOrder[i];
+        hash *= 0x01000193u;
+    }
+
+    CHECK(hash == 0x11A63A0Fu);
+    if (hash != 0x11A63A0Fu)
+    {
+        std::fprintf(stderr, "  table digest 0x%08X, wanted 0x11A63A0F\n", hash);
+    }
+}
+
+/**
  * Emitting an identity key makes the wire bytes equal the table itself, which pins the
  * direction of the mapping. Sending key[i] instead of key[kAddonKeyWireOrder[i]] -- the
  * bug this replaced -- fails here immediately.
@@ -163,6 +190,7 @@ int main()
 {
     TestScatterOrderIsAPermutation();
     TestScatterOrderMatchesTheClient();
+    TestScatterOrderDigest();
     TestIdentityKeyEmitsTheTable();
     TestClientReconstructsTheModulus();
     TestRawOrderIsWrongAtAlmostEveryPosition();

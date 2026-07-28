@@ -1227,7 +1227,11 @@ namespace MopAddonPackets
     // The table was recovered from the parser and then confirmed against live client output:
     // the 44 .pub files the client wrote back satisfy pub[kAddonKeyWireOrder[i]] == tdata[i]
     // for all 256 i, which is exactly the raw-order send being scattered.
-    uint8 const kAddonKeyWireOrder[256] =
+    // inline constexpr, not plain const: a namespace-scope const has internal linkage, so an
+    // external-linkage inline function odr-using it would name a different object in every
+    // translation unit that includes this header -- ill-formed, no diagnostic required, and it
+    // would also duplicate the table across a lot of object files.
+    inline constexpr uint8 kAddonKeyWireOrder[256] =
     {
           5, 176, 148,  43,  28, 135,  64,   8, 160, 145, 226, 119, 181, 192, 240,  72,
         243, 212, 209, 172,  21, 237,  85,  10,  75, 117, 244,  82,  24,  20,  18,  76,
