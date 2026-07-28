@@ -200,7 +200,6 @@ namespace MopUpdateObject
     struct StationaryGameObjectEligibility
     {
         bool hasTemplate;
-        bool isDestructibleBuilding;
         bool isTransport;
         bool isBoarded;
         bool hasStationaryPosition;

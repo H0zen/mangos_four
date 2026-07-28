@@ -191,7 +191,40 @@ bool MopUpdateObject::CanUseSimpleUnitMovement(SimpleUnitEligibility const& elig
 
 bool MopUpdateObject::CanUseStationaryGameObjectMovement(StationaryGameObjectEligibility const& eligibility)
 {
-    return eligibility.hasTemplate && !eligibility.isDestructibleBuilding && !eligibility.isTransport &&
+    // Reject only what the encoder cannot represent, exactly as the unit gate
+    // does. AppendStationaryGameObjectMovement writes a state-invariant layout:
+    // stationary position plus rotation, every optional block declared absent.
+    // Nothing in it varies with the object's TYPE.
+    //
+    // Being a destructible building was rejected here on type alone, and a
+    // destructible building's movement is identical to any other stationary
+    // gameobject's - it carries UPDATEFLAG_HAS_POSITION | UPDATEFLAG_ROTATION
+    // like the rest. Its damage state lives in the values block, not the
+    // movement block. Rejecting it meant no create block was emitted at all,
+    // so the client was never told the object existed and never even sent
+    // CMSG_GAMEOBJECT_QUERY for it: 147 spawns invisible, 88 of them
+    // open-world scenery - harbour ships on map 0, Gooblin Boats on map 1,
+    // Jade Forest ship cosmetics on 870, Forlorn Spires and a Moonwell on 861.
+    //
+    // Confirmed in game at -7259.48 4101.91 -1.73 on map 0, with a control
+    // that rules out grid loading, phasing, range and the map together: an
+    // ordinary Rope Ladder (203735) thirteen yards away rendered and was
+    // queried, while Alliance Ship 000 (203400) was never queried and never
+    // appeared. Players see it as NPCs standing in mid-air, because creatures
+    // resting on these objects render correctly while their platform does not.
+    //
+    // The residual cost is bounded but real, and NOT self-correcting. The
+    // gameobject projection stops at target index 17 and never emits
+    // GAMEOBJECT_BYTES_1, whose byte 3 carries destructible animation and
+    // health progress - and the incremental VALUES path reuses the same
+    // projection, so that field never arrives later either. Damaged and
+    // destroyed transitions still propagate through GAMEOBJECT_FLAGS and
+    // GAMEOBJECT_DISPLAYID, which are emitted. The omission predates this
+    // change and applies to every gameobject type equally, so nothing here
+    // makes destructibles a special case; a mask-and-values block simply
+    // clears the bit for a field it does not send, and stays well formed.
+    // Rendering with a default sub-state beats not rendering at all.
+    return eligibility.hasTemplate && !eligibility.isTransport &&
         !eligibility.isBoarded && eligibility.hasStationaryPosition && eligibility.hasRotation &&
         !eligibility.hasUnsupportedMovement;
 }
