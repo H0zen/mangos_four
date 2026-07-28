@@ -328,14 +328,27 @@ void WorldSession::HandleMoveTeleportAckOpcode(WorldPacket& recv_data)
     DEBUG_LOG("CMSG_MOVE_TELEPORT_ACK");
 
     ObjectGuid guid;
-    uint32 counter, time;
-    recv_data >> counter >> time;
+    // 18414 writes its own millisecond timestamp first, then echoes the counter
+    // the server put in SMSG_MOVE_TELEPORT. Reading them the other way round is
+    // why the log printed "Counter <ms timestamp>, time 0" on every ack: the
+    // zero is our own counter coming back, and the timestamp is the client's.
+    uint32 clientTime, counter;
+    recv_data >> clientTime >> counter;
 
+    // The mover guid follows as a packed guid. The bit/byte permutation below
+    // is NOT wire-confirmed: every character on this realm has a guid under 256,
+    // so only one mask bit is ever set and only the first slot can be observed.
+    // The captured acks carry mask 0x80 with a single trailing byte equal to the
+    // player's guid, which places the first-read bit at byte 0 -- the order below
+    // put it at byte 5, so the parse yielded 0x0000030000000000 and printed as
+    // "Guid: 0". Byte consumption is permutation-independent (one mask byte, then
+    // popcount(mask) bytes), so the remaining seven slots cannot be recovered
+    // from our own traffic and are left as found rather than invented.
     recv_data.ReadGuidMask<5, 0, 1, 6, 3, 7, 2, 4>(guid);
     recv_data.ReadGuidBytes<4, 2, 7, 6, 5, 1, 3, 0>(guid);
 
     DEBUG_LOG("Guid: %s", guid.GetString().c_str());
-    DEBUG_LOG("Counter %u, time %u", counter, time / IN_MILLISECONDS);
+    DEBUG_LOG("Counter %u, clientTime %u", counter, clientTime / IN_MILLISECONDS);
 
     Unit* mover = _player->GetMover();
     Player* plMover = mover->GetTypeId() == TYPEID_PLAYER ? (Player*)mover : NULL;
@@ -345,10 +358,14 @@ void WorldSession::HandleMoveTeleportAckOpcode(WorldPacket& recv_data)
         return;
     }
 
-    if (guid != plMover->GetObjectGuid())
-    {
-        return;
-    }
+    // No guid equality check. It rejected every valid ack -- the parse above
+    // cannot be trusted until the permutation is recovered, and the guard adds
+    // nothing here: this opcode arrives on the player's own authenticated
+    // session, plMover comes from that session, and IsBeingTeleportedNear()
+    // already establishes that a near teleport is outstanding. Rejecting on a
+    // mis-parsed guid meant SetPosition() below never ran, so the server left
+    // the player at the origin while the client had already moved -- no grid
+    // transition, no visibility rebuild, and an empty destination until relog.
 
     plMover->SetSemaphoreTeleportNear(false);
 
