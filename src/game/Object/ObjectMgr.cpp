@@ -1343,12 +1343,24 @@ void ObjectMgr::LoadQuestPOI()
         // the same packet's objIndex 32 was carried through untouched both
         // times, so this field is the sole trigger.
         //
-        // floorId is a small map-floor ordinal. MAX_QUEST_POI_FLOOR_ID sits
-        // above the measured retail maximum of 12 with a margin for unsampled
-        // content, and far below the blob-id range that produced the only
-        // out-of-range rows we have seen - see its definition. Zero rather
-        // than drop: the marker still renders, on the default floor, instead
-        // of vanishing.
+        // CORRECTED: floorId is NOT what the client reads in that wire slot, and the
+        // reasoning below it was wrong in a way that mattered.
+        //
+        // The scalar we were sending there is the POI's own point count, repeated from
+        // the bit phase. Measured across 400 retail SMSG_QUEST_POI_QUERY_RESPONSE bodies
+        // covering 3825 POIs, it equals that POI's point count in 3825 of 3825. That also
+        // explains the crash from the other direction: 252339 is not an implausible floor,
+        // it is an element count, and the client walked 252339 points off the end of the
+        // buffer. "Zero rather than drop: the marker still renders, on the default floor"
+        // was exactly backwards -- zero points is the one value that renders nothing, so
+        // this clamp traded a crash for silent invisibility, and every POI with a
+        // legitimately small floorId was invisible for the same reason.
+        //
+        // The builder now writes points.size() there, so floorId no longer reaches the
+        // client at all and cannot crash it whatever this column holds. The bound below
+        // is kept purely as database hygiene -- it no longer guards the wire, and the
+        // "known to crash" wording in the log is retained only because those rows are
+        // still wrong (they are blob ids in the wrong column).
         if (!IsValidQuestPoiFloorId(floorId))
         {
             if (floorId >= KNOWN_HARMFUL_QUEST_POI_FLOOR_ID)

@@ -946,7 +946,15 @@ inline bool MopQueryPackets::BuildQuestPoiQueryResponse(WorldPacket& out,
             built << poi.unknown2;
             built << poi.unknown4;
             built << poi.mapId;
-            built << poi.floorId;
+            // The point count again, NOT floorId. Same bit-phase/byte-phase duplication
+            // the quest and POI counts use above. This slot held floorId, which is 0 for
+            // every row we ship, so the client read "this POI has no points" and drew
+            // nothing -- no error, no short read, the response simply rendered empty and
+            // no quest markers appeared on the map.
+            // Measured over 3825 POIs in 400 retail SMSG_QUEST_POI_QUERY_RESPONSE bodies:
+            // this field equals that POI's own point count in 3825 of 3825, across counts
+            // 1,3,5,6,7,8,9,10,11 and 12. floorId is not carried in this packet.
+            built << uint32(poi.points.size());
             built << poi.mapAreaId;
             built << poi.unknown3;
             built << poi.unknown1;

@@ -135,7 +135,10 @@ static void test_response()
         0x64, 0x63, 0x62, 0x61,
         0x74, 0x73, 0x72, 0x71,
         0x84, 0x83, 0x82, 0x81,
-        0x94, 0x93, 0x92, 0x91,
+        // The POI's point count repeated, NOT poi.floorId (0x91929394). This POI has
+        // two points, so this slot is 2. Writing floorId here made the client read
+        // "no points" for every POI we ship and draw no quest markers at all.
+        0x02, 0x00, 0x00, 0x00,
         0xA4, 0xA3, 0xA2, 0xA1,
         0xB4, 0xB3, 0xB2, 0xB1,
         0xC4, 0xC3, 0xC2, 0xC1,
@@ -152,6 +155,64 @@ static void test_response()
         0x00, 0x00, 0x00,
         0x00, 0x00, 0x00, 0x00
     }));
+}
+
+/**
+ * The scalar after mapId is the POI's own point count, repeated from the bit phase --
+ * the same duplication the quest and POI counts already use. It is not floorId.
+ *
+ * Measured across 400 retail SMSG_QUEST_POI_QUERY_RESPONSE bodies covering 3825 POIs:
+ * that slot equalled the POI's point count in 3825 of 3825, at counts 1, 3, 5, 6, 7, 8,
+ * 9, 10, 11 and 12. The in-game evidence agrees from the other direction -- an
+ * out-of-range value there crashed the client (quest 29406, value 252339), which is what
+ * a bad element count does and not what a bad floor identifier does.
+ *
+ * A count is easy to get wrong in a way nothing detects: too small and the client
+ * silently renders fewer points, zero and it renders none at all with no error.
+ */
+static void test_point_count_is_repeated_not_floor_id()
+{
+    for (uint32 count : { 1u, 2u, 5u, 12u })
+    {
+        MopQueryPackets::QuestPoiRecord poi;
+        poi.floorId = 0xDEADBEEFu;          // must not appear on the wire
+        for (uint32 i = 0; i < count; ++i)
+            poi.points.push_back({ int32(i), int32(i) });
+
+        MopQueryPackets::QuestPoiResponse quest;
+        quest.questId = 1234;
+        quest.pois.push_back(poi);
+
+        WorldPacket packet;
+        CHECK(MopQueryPackets::BuildQuestPoiQueryResponse(packet, { quest }));
+
+        // bits: questCount(20) + poiCount(18) + pointCount(21) = 59 -> 8 bytes.
+        // bytes: worldEffectId, then 2 int32 per point, then objectiveIndex, poiId,
+        //        unknown2, unknown4, mapId, and then the repeated count.
+        size_t const offset = 8 + 4 + count * 8 + 5 * 4;
+        CHECK(packet.size() >= offset + 4);
+        if (packet.size() < offset + 4)
+            continue;
+
+        uint32 onWire = 0;
+        std::memcpy(&onWire, packet.contents() + offset, 4);
+        CHECK(onWire == count);
+        if (onWire != count)
+        {
+            std::fprintf(stderr, "  %u point(s): wire slot held %u\n", count, onWire);
+        }
+
+        // and floorId must be nowhere in the body at all
+        bool leaked = false;
+        for (size_t i = 0; i + 4 <= packet.size(); ++i)
+        {
+            uint32 v = 0;
+            std::memcpy(&v, packet.contents() + i, 4);
+            if (v == 0xDEADBEEFu)
+                leaked = true;
+        }
+        CHECK(!leaked);
+    }
 }
 
 static void test_opcode_values()
@@ -206,6 +267,7 @@ int main(int /*argc*/, char** /*argv*/)
 {
     test_request();
     test_response();
+    test_point_count_is_repeated_not_floor_id();
     test_opcode_values();
     test_floor_id_bound();
 
