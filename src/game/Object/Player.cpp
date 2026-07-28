@@ -832,6 +832,17 @@ bool Player::Create(uint32 guidlow, const std::string& name, uint8 race, uint8 c
 
             uint32 item_id = oEntry->ItemID[j];
 
+            // Skip Pandaren starting weapons that should be obtained from
+            // Weapon Rack gameobjects via "The Lesson of the Iron Bough" quest
+            if (getRace() == RACE_PANDAREN_NEUTRAL)
+            {
+                ItemPrototype const* iCheck = ObjectMgr::GetItemPrototype(item_id);
+                if (iCheck && iCheck->Class == ITEM_CLASS_WEAPON)
+                {
+                    continue;
+                }
+            }
+
             // Just skip, reported in ObjectMgr::LoadItemPrototypes
             ItemPrototype const* iProto = ObjectMgr::GetItemPrototype(item_id);
             if (!iProto)
