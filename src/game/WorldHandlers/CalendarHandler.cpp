@@ -136,14 +136,23 @@ void WorldSession::HandleCalendarGetCalendar(WorldPacket& /*recv_data*/)
         if (!sentMaps.insert(mapId).second)
             continue;
 
-        uint32 resetTime = sMapPersistentStateMgr.GetScheduler().GetMaxResetTimeFor(mapDiff);
+        // GetMaxResetTimeFor returns a DURATION - RaidDuration scaled and
+        // floored to whole days - not an absolute reset timestamp. It was
+        // being compared against currTime, which a duration can never exceed,
+        // so every record went out as zero. The client uses this word as the
+        // recurrence period: it steps from the calendar epoch by this value,
+        // and divides by it. Retail carries exactly the value class this
+        // helper produces - 604800, 259200 and 86400 - and never zero.
+        uint32 resetPeriod = sMapPersistentStateMgr.GetScheduler().GetMaxResetTimeFor(mapDiff);
         MopCalendarPackets::CalendarListReset record;
         record.mapId = int32(mapId);
-        record.resetRemaining = resetTime > currTime ?
-            int32(resetTime - currTime) : 0;
-        record.offset = 0; // Direct reader proves the scalar, not a nonzero meaning.
+        record.resetRemaining = int32(resetPeriod);
+        // Retail sends zero here for every raid but one, which carries a
+        // seconds-into-the-day reset offset, so zero is a legal value rather
+        // than an absent one. We do not model per-map reset hours yet.
+        record.offset = 0;
         resetRecords.push_back(record);
-        DEBUG_FILTER_LOG(LOG_FILTER_CALENDAR, "MapId [%u] -> Reset in: %d", mapId, record.resetRemaining);
+        DEBUG_FILTER_LOG(LOG_FILTER_CALENDAR, "MapId [%u] -> Reset period: %d", mapId, record.resetRemaining);
     }
     DEBUG_FILTER_LOG(LOG_FILTER_CALENDAR, "Map sent [%zu]", resetRecords.size());
 
