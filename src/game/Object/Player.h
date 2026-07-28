@@ -1265,6 +1265,37 @@ namespace MopWorldEntryPackets
         out << counter;
     }
 
+    /**
+     * @brief SMSG_SET_TIME_ZONE_INFORMATION - two 7-bit lengths, then two strings.
+     *
+     * The client copies both strings into fixed 127-byte buffers and then
+     * resolves each by NAME against a registry compiled into the binary. Until
+     * this arrives those buffers are zero, the lookup returns null, and the
+     * timezone conversion silently writes nothing - leaving its caller to copy
+     * an all-minus-one scratch struct over an otherwise valid date. That is what
+     * hangs the client's calendar: a date with a negative day, month or year can
+     * never advance, and the comparison it is tested against can never fail.
+     *
+     * The name must be one the client actually knows. Its registry holds IANA
+     * identifiers - Etc/UTC, the US zones, Europe/Paris and others - so a Windows
+     * display name such as "GMT Standard Time" will not resolve, and neither will
+     * anything read from the host's timezone database.
+     *
+     * Both strings are the same value, which is what the reference server sends
+     * and what sidesteps the one thing we cannot pin: the client reads the second
+     * length's string first, so with differing values the pairing would matter.
+     * If this ever needs to send two distinct zones, recover that order first.
+     */
+    inline void BuildSetTimeZoneInformation(WorldPacket& out,
+        std::string const& location)
+    {
+        out.WriteBits(location.length(), 7);
+        out.WriteBits(location.length(), 7);
+        out.FlushBits();
+        out.WriteStringData(location);
+        out.WriteStringData(location);
+    }
+
     struct DiscardedTimeSyncAcksReport
     {
         bool hasValue = false;
