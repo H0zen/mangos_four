@@ -137,6 +137,19 @@ foreach(mutation IN ITEMS drop_bytes1 bytes1_index_drift bytes1_wrong_source sho
         PROPERTIES WILL_FAIL TRUE)
 endforeach()
 
+add_test(NAME mop_destructible_spawn_state_source
+    COMMAND ${CMAKE_COMMAND} -DSOURCE_ROOT=${CMAKE_SOURCE_DIR}
+        -P ${CMAKE_CURRENT_SOURCE_DIR}/mop_destructible_spawn_state_source_test.cmake)
+
+foreach(mutation IN ITEMS restore_fallthrough drop_destructible_data)
+    add_test(NAME mop_destructible_spawn_state_source_mutation_${mutation}
+        COMMAND ${CMAKE_COMMAND} -DSOURCE_ROOT=${CMAKE_SOURCE_DIR}
+            -DMUTATION=${mutation}
+            -P ${CMAKE_CURRENT_SOURCE_DIR}/mop_destructible_spawn_state_source_test.cmake)
+    set_tests_properties(mop_destructible_spawn_state_source_mutation_${mutation}
+        PROPERTIES WILL_FAIL TRUE)
+endforeach()
+
 add_executable(mop_opcode_foundation_test mop_opcode_foundation_test.cpp)
 target_include_directories(mop_opcode_foundation_test PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/..
