@@ -579,8 +579,36 @@ void PlayerMenu::SendQuestGiverQuestDetails(Quest const* pQuest, ObjectGuid guid
         details.rewardFactionValueOverrides[index] =
             uint32(pQuest->RewRepValue[index]);
     }
+    // Real emotes only. DetailsEmote is a fixed four-slot array and unused
+    // slots are zero, so pushing every element made emotes.size() always four
+    // - and that size is written as the packet's 21-bit emote count, so every
+    // quest advertised four emotes and serialised zero-valued records for the
+    // unused ones.
+    //
+    // Same bug class as the gameobject query response, which sent six null
+    // quest items and crashed any client with a cold cache. Found by the review
+    // of that fix. Unlike that one, the client effect here is NOT established -
+    // no crash or misbehaviour has been attributed to it - so this is
+    // correctness by construction rather than a fix for an observed fault.
+    //
+    // Skipping empty slots, NOT stopping at the first one. That distinction is
+    // load-bearing rather than defensive: the world database holds 14 quests
+    // whose DetailsEmote has a gap - {0, emote, ...} - and stopping would drop
+    // every real emote after the hole. An earlier revision of this comment
+    // asserted the data was contiguous. It is not, and it was checkable.
+    //
+    // Emotes are sent as adjacent delay+emote pairs with no transmitted slot
+    // index, so compacting preserves both pairing and relative order. The ten
+    // slots that carry a delay with no emote are not lost pauses: nine belong
+    // to quests with no real Details emote at all, and the tenth trails three
+    // real ones.
     for (size_t index = 0; index < QUEST_EMOTE_COUNT; ++index)
     {
+        if (pQuest->DetailsEmote[index] == 0)
+        {
+            continue;
+        }
+
         MopQuestGiverPackets::QuestEmote emote;
         emote.delay = pQuest->DetailsEmoteDelay[index];
         emote.emote = pQuest->DetailsEmote[index];
@@ -985,11 +1013,18 @@ void PlayerMenu::SendQuestGiverOfferReward(Quest const* pQuest, ObjectGuid npcGU
             pQuest->GetRewOrReqMoney(), int32(0)));
     }
 
+    // Skip empty slots rather than stopping at the first one. Stopping loses
+    // data: 17 quests in the world database have a gap in OfferRewardEmote,
+    // and quest 8275 holds {0, 0, 0, 1} - so breaking at the first zero
+    // discards its only emote. This mirrors the Details loop above, and the
+    // two are now consistent.
+    //
+    // OfferRewardEmote is uint32, so `<= 0` was only ever an equality test.
     for (uint32 i = 0; i < QUEST_EMOTE_COUNT; ++i)
     {
-        if (pQuest->OfferRewardEmote[i] <= 0)
+        if (pQuest->OfferRewardEmote[i] == 0)
         {
-            break;
+            continue;
         }
         MopQuestGiverPackets::QuestEmote emote;
         emote.delay = pQuest->OfferRewardEmoteDelay[i];

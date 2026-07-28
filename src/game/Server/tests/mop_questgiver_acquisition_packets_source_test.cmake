@@ -13,7 +13,31 @@ file(READ "${SOURCE_ROOT}/src/game/Server/Opcodes_reference.h"
 file(READ "${SOURCE_ROOT}/src/game/Server/WorldSession.cpp" world_session)
 
 if(DEFINED MUTATION)
-    if(MUTATION STREQUAL "hello_parser")
+    if(MUTATION STREQUAL "details_emote_break")
+        string(REPLACE "        if (pQuest->DetailsEmote[index] == 0)
+        {
+            continue;
+        }"
+            "        if (pQuest->DetailsEmote[index] == 0)
+        {
+            break;
+        }"
+            gossip_sender "${gossip_sender}")
+    elseif(MUTATION STREQUAL "offer_reward_emote_break")
+        string(REPLACE "        if (pQuest->OfferRewardEmote[i] == 0)
+        {
+            continue;
+        }"
+            "        if (pQuest->OfferRewardEmote[i] == 0)
+        {
+            break;
+        }"
+            gossip_sender "${gossip_sender}")
+    elseif(MUTATION STREQUAL "details_emote_zero_skip")
+        string(REPLACE "        if (pQuest->DetailsEmote[index] == 0)"
+            "        if (false) /* removed details-emote zero skip */"
+            gossip_sender "${gossip_sender}")
+    elseif(MUTATION STREQUAL "hello_parser")
         string(REPLACE "MopQuestGiverPackets::ParseHello(recv_data, rawGuid)"
             "false" quest_handler "${quest_handler}")
     elseif(MUTATION STREQUAL "query_parser")
@@ -253,3 +277,28 @@ string(FIND "${gossip_sender}"
 if(NOT stale_query_response EQUAL -1)
     message(FATAL_ERROR "legacy quest-query response body remains")
 endif()
+
+# DetailsEmote is a fixed four-slot array whose unused slots are zero, and
+# emotes.size() is written as the packet's 21-bit emote count. Pushing every
+# slot made every quest advertise four emotes and serialise zero-valued records
+# for the unused ones - the same shape as the gameobject query response that
+# sent six null quest items and crashed cold-cache clients.
+# Pin the CONTINUE, not just the zero test. Stopping at the first empty slot
+# instead of skipping it silently drops every real emote after a gap, and the
+# world database has 14 such quests in DetailsEmote and 17 in OfferRewardEmote -
+# including quest 8275, whose OfferRewardEmote is {0,0,0,1} and whose only emote
+# a break would discard.
+foreach(token IN ITEMS
+        "if (pQuest->DetailsEmote[index] == 0)
+        {
+            continue;
+        }"
+        "if (pQuest->OfferRewardEmote[i] == 0)
+        {
+            continue;
+        }")
+    string(FIND "${gossip_sender}" "${token}" found)
+    if(found EQUAL -1)
+        message(FATAL_ERROR "quest emote population must SKIP empty slots, not stop at them: ${token}")
+    endif()
+endforeach()
