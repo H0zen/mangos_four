@@ -175,8 +175,8 @@
  *   TOTAL SMSG rows                   925
  *
  * SUBSYSTEM CONFIDENCE: high=365, low=221, medium=182, none=157
- * STATUS TOTALS: ACTIVE=422, DOC=436, DORMANT=662
- *   SMSG: ACTIVE=260, DOC=271, DORMANT=394
+ * STATUS TOTALS: ACTIVE=423, DOC=436, DORMANT=661
+ *   SMSG: ACTIVE=261, DOC=271, DORMANT=393
  *   CMSG: ACTIVE=162, DOC=165, DORMANT=268
  */
 
@@ -253,7 +253,7 @@ typedef uint16_t uint16;
  *
  *  -- AuthChallenge.cpp (6) --
  *   SMSG_BATTLE_PAY_DELIVERY_ENDED                 0x020B  DORMANT  [low-conf]
- *   SMSG_BATTLE_PAY_GET_PURCHASE_LIST_RESPONSE     0x023A  DORMANT  [low-conf]
+ *   SMSG_BATTLE_PAY_GET_PURCHASE_LIST_RESPONSE     0x023A  ACTIVE   [low-conf]
  *   SMSG_UNKNOWN_0x08BF                            0x08BF  DOC     
  *   SMSG_UNKNOWN_0x143E                            0x143E  DOC     
  *   SMSG_BATTLE_PAY_PURCHASE_UPDATE                0x14E2  DOC      [low-conf]
