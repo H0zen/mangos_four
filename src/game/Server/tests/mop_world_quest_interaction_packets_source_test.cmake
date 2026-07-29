@@ -18,6 +18,17 @@ file(READ "${SOURCE_ROOT}/src/game/Server/Opcodes_reference.h" opcode_reference)
 file(READ "${SOURCE_ROOT}/src/game/Server/WorldSession.cpp" world_session)
 file(READ "${SOURCE_ROOT}/src/shared/revision_data.h.in" revision_data)
 
+# Every blob a mutation arm may rewrite. Snapshotted so a dead arm can be detected below.
+set(_gate_blobs
+    misc_handler quest_handler player_quest player_header player_source object_mgr_text
+    npc_handler query_handler gossip_def gossip_header opcode_registry opcode_header
+    opcode_reference world_session revision_data)
+if(DEFINED MUTATION)
+    foreach(_blob IN LISTS _gate_blobs)
+        set(_pre_${_blob} "${${_blob}}")
+    endforeach()
+endif()
+
 if(DEFINED MUTATION)
     if(MUTATION STREQUAL "area_parser")
         string(REPLACE
@@ -96,9 +107,12 @@ if(DEFINED MUTATION)
             "data << \"Greetings $N\""
             gossip_def "${gossip_def}")
     elseif(MUTATION STREQUAL "npc_db_content")
+        # Must track the declared value. When the tuple advanced to 23.3.1 this arm still searched
+        # for "31", matched nothing, and silently became a no-op -- so it passed, and the stale pin
+        # it exists to protect went unnoticed. See the dead-arm guard below.
         string(REPLACE
-            "WORLD_DB_CONTENT_NR         \"31\""
-            "WORLD_DB_CONTENT_NR         \"30\""
+            "WORLD_DB_CONTENT_NR         \"1\""
+            "WORLD_DB_CONTENT_NR         \"0\""
             revision_data "${revision_data}")
     elseif(MUTATION STREQUAL "npc_reference_status")
         string(REPLACE
@@ -132,6 +146,28 @@ if(DEFINED MUTATION)
             opcode_reference "${opcode_reference}")
     else()
         message(FATAL_ERROR "unknown MUTATION=${MUTATION}")
+    endif()
+
+    # A mutation arm whose search string no longer matches rewrites nothing, so the gate passes
+    # and the WILL_FAIL test reports a failure that names the wrong thing entirely. That is not
+    # hypothetical: npc_db_content searched for WORLD_DB_CONTENT_NR "31" long after the declared
+    # value became "1", so the arm guarding the pin died at the same moment the pin went stale,
+    # and the two were indistinguishable from one confusing red test.
+    #
+    # Exit 0 here rather than FATAL_ERROR: the arm is registered WILL_FAIL, so a clean exit still
+    # fails the test, but the reason is now stated instead of inferred.
+    set(_mutation_applied FALSE)
+    foreach(_blob IN LISTS _gate_blobs)
+        if(NOT "${${_blob}}" STREQUAL "${_pre_${_blob}}")
+            set(_mutation_applied TRUE)
+        endif()
+    endforeach()
+    if(NOT _mutation_applied)
+        message(STATUS
+            "MUTATION '${MUTATION}' rewrote nothing -- its search string no longer matches the "
+            "source. The arm is dead and is protecting nothing; update it to track the current "
+            "text. Exiting 0 so the WILL_FAIL arm reports this rather than a false pass.")
+        return()
     endif()
 endif()
 
@@ -267,8 +303,8 @@ endforeach()
 # with it or the check silently asserts an obsolete database.
 foreach(requirement IN ITEMS
         "WORLD_DB_VERSION_NR[ \t]+\"23\""
-        "WORLD_DB_STRUCTURE_NR[ \t]+\"2\""
-        "WORLD_DB_CONTENT_NR[ \t]+\"31\"")
+        "WORLD_DB_STRUCTURE_NR[ \t]+\"3\""
+        "WORLD_DB_CONTENT_NR[ \t]+\"1\"")
     require_once("${revision_data}"
         "${requirement}"
         "BroadcastText-aware world database requirement")
