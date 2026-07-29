@@ -168,6 +168,53 @@ namespace MopGuildPackets
         }
     }
 
+    /// One rank as SMSG_GUILD_QUERY_RANKS_RESULT carries it.
+    struct RankEntry
+    {
+        uint32 index = 0;
+        uint32 bankMoneyPerDay = 0;
+        uint32 tabSlots[GUILD_BANK_MAX_TABS] = {};
+        uint32 tabRights[GUILD_BANK_MAX_TABS] = {};
+        std::string name;
+        uint32 rankId = 0;
+        uint32 rights = 0;
+    };
+
+    /**
+     * SMSG_GUILD_QUERY_RANKS_RESULT body.
+     *
+     * Proven byte-for-byte against capture-000019 seq 185 (447 bytes): a 17-bit
+     * rank count, then one 7-bit name length per rank, then a flush, then each
+     * rank as index, money-per-day, eight (slots, rights) tab pairs, the name,
+     * the rank id and the rights mask.
+     *
+     * The inherited body wrote an 18-bit count and ordered the per-rank fields
+     * index, tabs, money, rights, name, id. That happens to total the same 80
+     * bytes plus name, which is why only a byte comparison catches it.
+     */
+    inline void BuildGuildRanks(WorldPacket& out, std::vector<RankEntry> const& ranks)
+    {
+        out.Initialize(SMSG_GUILD_QUERY_RANKS_RESULT, 3 + ranks.size() * 92);
+        out.WriteBits(uint32(ranks.size()), 17);
+        for (RankEntry const& rank : ranks)
+            out.WriteBits(uint32(rank.name.length()), 7);
+        out.FlushBits();
+
+        for (RankEntry const& rank : ranks)
+        {
+            out << uint32(rank.index);
+            out << uint32(rank.bankMoneyPerDay);
+            for (uint8 tab = 0; tab < GUILD_BANK_MAX_TABS; ++tab)
+            {
+                out << uint32(rank.tabSlots[tab]);
+                out << uint32(rank.tabRights[tab]);
+            }
+            out.WriteStringData(rank.name);
+            out << uint32(rank.rankId);
+            out << uint32(rank.rights);
+        }
+    }
+
     inline EmblemDesign ReadSaveGuildEmblem(WorldPacket& in)
     {
         EmblemDesign design;

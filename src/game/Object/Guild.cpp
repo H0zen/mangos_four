@@ -1164,33 +1164,26 @@ void Guild::Query(WorldSession* session)
 
 void Guild::QueryRanks(WorldSession* session)
 {
-    WorldPacket data(SMSG_GUILD_QUERY_RANKS_RESULT, (4 * 2 * 8 + 4 * 3 + 1) * m_Ranks.size()); // we can only guess size
-
-    data.WriteBits(m_Ranks.size(), 18);
-
+    std::vector<MopGuildPackets::RankEntry> ranks;
+    ranks.reserve(m_Ranks.size());
     for (uint8 i = 0; i < m_Ranks.size(); ++i)
     {
-        data.WriteBits(m_Ranks[i].Name.length(), 7);
-    }
-
-    for (uint8 i = 0; i < m_Ranks.size(); ++i)
-    {
-        data << uint32(i);
-
+        MopGuildPackets::RankEntry entry;
+        entry.index = i;
+        entry.bankMoneyPerDay = m_Ranks[i].BankMoneyPerDay;
         for (uint8 j = 0; j < GUILD_BANK_MAX_TABS; ++j)
         {
-            data << uint32(m_Ranks[i].TabSlotPerDay[j]);
-            data << uint32(m_Ranks[i].TabRight[j]);
+            entry.tabSlots[j] = m_Ranks[i].TabSlotPerDay[j];
+            entry.tabRights[j] = m_Ranks[i].TabRight[j];
         }
-
-        data << uint32(m_Ranks[i].BankMoneyPerDay);
-        data << uint32(m_Ranks[i].Rights);
-
-        data.WriteStringData(m_Ranks[i].Name);
-
-        data << uint32(i);  // rank id
+        entry.name = m_Ranks[i].Name;
+        entry.rankId = i;
+        entry.rights = m_Ranks[i].Rights;
+        ranks.push_back(entry);
     }
 
+    WorldPacket data;
+    MopGuildPackets::BuildGuildRanks(data, ranks);
     session->SendPacket(&data);
 }
 

@@ -844,13 +844,28 @@ void InitializeOpcodes()
     DefC(CMSG_GUILD_PERMISSIONS, "CMSG_GUILD_PERMISSIONS", STATUS_LOGGEDIN, PROCESS_THREADUNSAFE, &WorldSession::HandleGuildPermissions);
     DefS(SMSG_GUILD_PERMISSIONS, "SMSG_GUILD_PERMISSIONS");
 
-    // CMSG_GUILD_ROSTER (0x1459) and CMSG_GUILD_QUERY_RANKS (0x0D50) stay dormant for
-    // now even though their readers were corrected against the client binary in this
-    // same series. Their replies are the blocker: Guild::Roster still writes an 11-bit
-    // MOTD length, an 18-bit member count and 7-bit names, and Guild::QueryRanks still
-    // writes an 18-bit rank count, none of which has been checked against a capture the
-    // way the permissions body below now has. Registering the request without a proven
-    // reply just moves the fault from a dropped packet to a malformed one.
+    // Guild rank query. The reader takes its guid order from the client's own send
+    // serializer sub_C860F3, and the reply is now byte-exact against retail:
+    // mop_guild_packets rebuilds capture-000019 seq 185 in full, all 447 bytes of a
+    // five-rank guild carrying the stock MoP rank names.
+    //
+    // The inherited reply was wrong in ways no length check could see. It wrote an
+    // 18-bit rank count where the client reads 17, and ordered each rank as index,
+    // tabs, money, rights, name, id where the client reads index, money, tabs, name,
+    // id, rights. Both orderings total 80 bytes plus the name, so the packet came out
+    // the right length and the wrong shape. The capture settles it: the first name
+    // begins 72 bytes into the body, which is index plus money plus the eight tab
+    // pairs, and an 18-bit count would have claimed ten ranks in a 447-byte packet
+    // that cannot hold more than five.
+    DefC(CMSG_GUILD_QUERY_RANKS, "CMSG_GUILD_QUERY_RANKS", STATUS_LOGGEDIN, PROCESS_THREADUNSAFE, &WorldSession::HandleGuildQueryRanksOpcode);
+    DefS(SMSG_GUILD_QUERY_RANKS_RESULT, "SMSG_GUILD_QUERY_RANKS_RESULT");
+
+    // CMSG_GUILD_ROSTER (0x1459) stays dormant. Its reader was corrected against
+    // sub_C85E7C in the same series, but Guild::Roster still writes an 11-bit MOTD
+    // length, an 18-bit member count and 7-bit names, none of it checked against a
+    // capture. Given the rank reply above was wrong in exactly that way, the roster
+    // reply is assumed wrong until proven otherwise; registering the request first
+    // would only turn a dropped packet into a malformed one.
 
     // Live-log guild-bank withdrawal allowance query. The 18414 request is
     // empty and its response contains one uint64 remaining allowance.

@@ -175,9 +175,9 @@
  *   TOTAL SMSG rows                   925
  *
  * SUBSYSTEM CONFIDENCE: high=365, low=221, medium=182, none=157
- * STATUS TOTALS: ACTIVE=428, DOC=435, DORMANT=657
- *   SMSG: ACTIVE=264, DOC=271, DORMANT=390
- *   CMSG: ACTIVE=164, DOC=164, DORMANT=267
+ * STATUS TOTALS: ACTIVE=430, DOC=435, DORMANT=655
+ *   SMSG: ACTIVE=265, DOC=271, DORMANT=389
+ *   CMSG: ACTIVE=165, DOC=164, DORMANT=266
  */
 
 // CAVEATS -- read before trusting any single row:
@@ -557,7 +557,7 @@ typedef uint16_t uint16;
  *  -- GuildInfo.cpp (33) --
  *   SMSG_GUILD_EVENT_BANK_TAB_TEXT_CHANGED         0x0A70  DORMANT  [low-conf]
  *   SMSG_GUILD_PARTY_STATE_RESPONSE                0x0A78  DORMANT  [low-conf]
- *   SMSG_GUILD_QUERY_RANKS_RESULT                  0x0A79  DORMANT  [low-conf]
+ *   SMSG_GUILD_QUERY_RANKS_RESULT                  0x0A79  ACTIVE   [low-conf]
  *   SMSG_GUILD_NEWS_UPDATE                         0x0AE8  DORMANT  [medium-conf]
  *   SMSG_GUILD_CHALLENGE_UPDATED                   0x0AE9  DORMANT  [low-conf]
  *   SMSG_UNKNOWN_0x0AF1                            0x0AF1  DOC      [low-conf]
@@ -1657,7 +1657,7 @@ typedef uint16_t uint16;
  *   CMSG_QUERY_GUILD_MEMBERS_FOR_RECIPE            0x0CFA  DORMANT 
  *   CMSG_READ_ITEM                                 0x0D00  DORMANT 
  *   CMSG_ADD_IGNORE                                0x0D20  DORMANT 
- *   CMSG_GUILD_QUERY_RANKS                         0x0D50  DORMANT
+ *   CMSG_GUILD_QUERY_RANKS                         0x0D50  ACTIVE
  *   CMSG_GROUP_INVITE_RESPONSE                     0x0D61  DORMANT 
  *   CMSG_GUILD_DISBAND                             0x0D73  DORMANT 
  *   CMSG_GUILD_DEL_RANK                            0x0D79  DORMANT 
