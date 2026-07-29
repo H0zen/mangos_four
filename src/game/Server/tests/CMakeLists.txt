@@ -831,7 +831,7 @@ add_test(NAME mop_chat_packets_source
 
 foreach(mutation IN ITEMS builder registration allowlist emote_builder emote_reader emote_registration emote_allowlist emote_body cross_faction_denial text_bound receiver_identity addon_identity
         addon_count_width addon_length_width addon_softcap addon_unregister_registration addon_batch_registration addon_unregister_handler addon_batch_handler addon_group_filter addon_group_delivery addon_guild_filter addon_whisper_filter
-        say_registration say_parser_wiring say_parser_layout say_language_spell say_reference_status
+        say_registration say_parser_wiring say_parser_layout say_language_spell say_reference_status inline_length_width
         afk_registration afk_parser_wiring afk_parser_layout
         notice_length not_found_sender ambiguous_sender restricted_sender
         notice_registration notice_allowlist notice_reference

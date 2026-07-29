@@ -336,12 +336,17 @@ void InitializeOpcodes()
     // GM commands, which ride the chat opcode, and which is why a typed
     // .revive appeared to do nothing at all.
     //
-    // HandleMessagechatOpcode already switches on all thirteen types, and its
-    // reads are 18414 shaped rather than inherited: a uint32 language followed
-    // by ReadString(ReadBits(9)). Retail body sizes agree exactly -- guild,
-    // raid, party and instance all bottom out at six bytes, four for the
-    // language and two for the nine-bit length, the same minimum as say, which
-    // is registered and works.
+    // HandleMessagechatOpcode switches on all thirteen types and reads a uint32
+    // language followed by an 8-bit message length and the raw string.
+    //
+    // These originally read a NINE-bit length, admitted on the strength of body
+    // sizes agreeing with capture. Size could not tell the two apart -- a
+    // six-byte minimum is consistent with both -- and the nine-bit read
+    // consumed the length byte together with the first character byte, so every
+    // message arrived silently missing its first letter. Decoded corpus bodies
+    // and the client's own writer, which consumes exactly eight bits, settled
+    // it. mop_chat_packets_source_mutation_inline_length_width pins the width
+    // at all ten inline sites.
     DefC(CMSG_MESSAGECHAT_YELL, "CMSG_MESSAGECHAT_YELL", STATUS_LOGGEDIN, PROCESS_THREADUNSAFE, &WorldSession::HandleMessagechatOpcode);
     DefC(CMSG_MESSAGECHAT_EMOTE, "CMSG_MESSAGECHAT_EMOTE", STATUS_LOGGEDIN, PROCESS_THREADUNSAFE, &WorldSession::HandleMessagechatOpcode);
     DefC(CMSG_MESSAGECHAT_DND, "CMSG_MESSAGECHAT_DND", STATUS_LOGGEDIN, PROCESS_THREADUNSAFE, &WorldSession::HandleMessagechatOpcode);
@@ -355,8 +360,14 @@ void InitializeOpcodes()
     DefC(CMSG_MESSAGECHAT_INSTANCE, "CMSG_MESSAGECHAT_INSTANCE", STATUS_LOGGEDIN, PROCESS_THREADUNSAFE, &WorldSession::HandleMessagechatOpcode);
 
     // Addon traffic rides its own six opcodes and its own handler, which reads
-    // a nine-bit message length and a five-bit prefix length. Also 18414
-    // shaped, and the observed minimum of six bytes matches.
+    // a nine-bit message length and a five-bit prefix length.
+    //
+    // KNOWN WRONG, not yet fixed: the client writes an EIGHT-bit message length
+    // for every addon channel, and the field order varies by channel -- addon
+    // raid is prefix-5 then message-8, addon guild is message-8 then prefix-5,
+    // and addon whisper is target-9, message-8, prefix-5 emitted as target,
+    // prefix, message. Each needs its own decode and fixture rather than one
+    // blanket width change, so they are left alone here deliberately.
     DefC(CMSG_MESSAGECHAT_ADDON_RAID, "CMSG_MESSAGECHAT_ADDON_RAID", STATUS_LOGGEDIN, PROCESS_THREADUNSAFE, &WorldSession::HandleAddonMessagechatOpcode);
     DefC(CMSG_MESSAGECHAT_ADDON_PARTY, "CMSG_MESSAGECHAT_ADDON_PARTY", STATUS_LOGGEDIN, PROCESS_THREADUNSAFE, &WorldSession::HandleAddonMessagechatOpcode);
     DefC(CMSG_MESSAGECHAT_ADDON_INSTANCE, "CMSG_MESSAGECHAT_ADDON_INSTANCE", STATUS_LOGGEDIN, PROCESS_THREADUNSAFE, &WorldSession::HandleAddonMessagechatOpcode);

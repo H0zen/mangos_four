@@ -143,6 +143,11 @@ elseif(MUTATION STREQUAL "say_parser_layout")
         "uint8 const length = uint8(in.ReadBits(8));"
         "uint8 const length = uint8(in.ReadBits(9)); /* damaged SAY length */"
         chat_header "${chat_header}")
+elseif(MUTATION STREQUAL "inline_length_width")
+    string(REPLACE
+        "msg = recv_data.ReadString(recv_data.ReadBits(8));"
+        "msg = recv_data.ReadString(recv_data.ReadBits(9)); /* damaged inline length */"
+        chat_handler "${chat_handler}")
 elseif(MUTATION STREQUAL "say_language_spell")
     string(REPLACE
         "!_player->HasSpell(langDesc->spell_id)"
@@ -341,6 +346,16 @@ require_once("${channel_sender}"
 require_once("${chat_handler}"
     "receiver->GetSession()->SendPacket(&data);"
     "addon whisper recipient")
+# The ten chat types that read their message length inline rather than through
+# ReadSayMessageRequest. The 18414 client writes an 8-bit byte-aligned length
+# (its writer consumes exactly eight bits), and a 9-bit read silently drops the
+# first character of every message. Pin the width at every site, because a
+# fixture that calls ReadBits(8) itself would stay green if the handlers
+# regressed.
+require_count("${chat_handler}"
+    "msg = recv_data.ReadString(recv_data.ReadBits(8));"
+    10
+    "inline chat message 8-bit length")
 require_once("${chat_header}"
     "uint32 const count = in.ReadBits(24);"
     "registered-addon-prefix 24-bit count")
