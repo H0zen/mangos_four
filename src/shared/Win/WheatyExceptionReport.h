@@ -145,9 +145,27 @@ class WheatyExceptionReport
 
         static int __cdecl _tprintf(const TCHAR* format, ...);
 
-        // Writes the .dmp beside the .txt. Called before the report is generated,
-        // because that is the part likely to fail in a damaged process.
+        // Longest a dump may take before it is abandoned. Bounds the case where
+        // MiniDumpWriteDump deadlocks on a heap lock the crashing thread still holds,
+        // which would otherwise freeze the process instead of letting it die.
+        static const DWORD kMiniDumpTimeoutMs = 60 * 1000;
+
+        // What the helper thread needs from the faulting one. The thread id is carried
+        // explicitly because the helper cannot ask for it.
+        struct MiniDumpRequest
+        {
+            PEXCEPTION_POINTERS pExceptionInfo;
+            DWORD               faultingThreadId;
+            bool                written;
+        };
+
+        // Writes the .dmp beside the .txt, on a thread of its own, before the report is
+        // generated - that being the part most likely to fail in a damaged process.
         static bool WriteMiniDump(PEXCEPTION_POINTERS pExceptionInfo);
+
+        static bool WriteMiniDumpWorker(PEXCEPTION_POINTERS pExceptionInfo, DWORD faultingThreadId);
+
+        static DWORD WINAPI MiniDumpThreadProc(LPVOID param);
 
         // Variables used by the class
         static TCHAR m_szLogFileName[MAX_PATH];

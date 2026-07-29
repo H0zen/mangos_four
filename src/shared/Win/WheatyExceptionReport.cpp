@@ -76,7 +76,7 @@ WheatyExceptionReport::~WheatyExceptionReport()
 // did. A dump hands the same question to WinDbg, which has the real unwind
 // machinery and the variable-range records the compiler emitted.
 //===========================================================
-bool WheatyExceptionReport::WriteMiniDump(PEXCEPTION_POINTERS pExceptionInfo)
+bool WheatyExceptionReport::WriteMiniDumpWorker(PEXCEPTION_POINTERS pExceptionInfo, DWORD faultingThreadId)
 {
     HANDLE hDumpFile = CreateFile(m_szDumpFileName,
                                   GENERIC_WRITE,
@@ -94,7 +94,9 @@ bool WheatyExceptionReport::WriteMiniDump(PEXCEPTION_POINTERS pExceptionInfo)
     }
 
     MINIDUMP_EXCEPTION_INFORMATION mei;
-    mei.ThreadId = GetCurrentThreadId();                    // the filter runs on the faulting thread
+    // Passed in, never GetCurrentThreadId(): this runs on a helper thread, so asking
+    // here would name the helper and the dump would open on the wrong thread.
+    mei.ThreadId = faultingThreadId;
     mei.ExceptionPointers = pExceptionInfo;
     mei.ClientPointers = FALSE;                             // same process, so the pointer is ours to deref
 
@@ -142,6 +144,61 @@ bool WheatyExceptionReport::WriteMiniDump(PEXCEPTION_POINTERS pExceptionInfo)
     }
 
     return written;
+}
+
+//===========================================================
+// Runs WriteMiniDumpWorker on a thread of its own.
+//===========================================================
+DWORD WINAPI WheatyExceptionReport::MiniDumpThreadProc(LPVOID param)
+{
+    MiniDumpRequest* request = (MiniDumpRequest*)param;
+    request->written = WriteMiniDumpWorker(request->pExceptionInfo, request->faultingThreadId);
+    return 0;
+}
+
+//===========================================================
+// Takes the dump from a dedicated thread.
+//
+// Two failure modes make this worth the extra thread. On EXCEPTION_STACK_OVERFLOW
+// the filter runs on the exhausted stack with about a page to spare, and
+// MiniDumpWriteDump needs considerably more than that - so the one crash where a
+// dump is hardest to get is the one where an in-filter dump is guaranteed to fail.
+// And MiniDumpWriteDump allocates: if the fault happened inside the heap manager
+// while it held the heap lock, that allocation deadlocks, and because the dumper
+// suspends every other thread while it works, the process freezes instead of
+// dying. A wait with a timeout turns that hang into a missing dump.
+//
+// The crashing thread blocks in WaitForSingleObject, so its stack stays intact and
+// pExceptionInfo - which lives on it - remains valid for the helper to read.
+//===========================================================
+bool WheatyExceptionReport::WriteMiniDump(PEXCEPTION_POINTERS pExceptionInfo)
+{
+    MiniDumpRequest request;
+    request.pExceptionInfo = pExceptionInfo;
+    request.faultingThreadId = GetCurrentThreadId();        // captured here, on the faulting thread
+    request.written = false;
+
+    // A modest reservation of its own, since the point is not to inherit whatever
+    // is left of the crashing thread's stack.
+    HANDLE hThread = CreateThread(0, 256 * 1024, MiniDumpThreadProc, &request, 0, 0);
+
+    if (!hThread)
+    {
+        // No thread to be had - better a dump attempted on this stack than none.
+        return WriteMiniDumpWorker(pExceptionInfo, request.faultingThreadId);
+    }
+
+    if (WaitForSingleObject(hThread, kMiniDumpTimeoutMs) != WAIT_OBJECT_0)
+    {
+        // Deadlocked or simply too slow. The handle is left to the process teardown
+        // rather than terminated: killing a thread mid-MiniDumpWriteDump would leave
+        // other threads suspended, and this process is about to exit regardless.
+        CloseHandle(hThread);
+        return false;
+    }
+
+    CloseHandle(hThread);
+    return request.written;
 }
 
 //===========================================================
