@@ -145,8 +145,13 @@ class WheatyExceptionReport
 
         static int __cdecl _tprintf(const TCHAR* format, ...);
 
+        // Writes the .dmp beside the .txt. Called before the report is generated,
+        // because that is the part likely to fail in a damaged process.
+        static bool WriteMiniDump(PEXCEPTION_POINTERS pExceptionInfo);
+
         // Variables used by the class
         static TCHAR m_szLogFileName[MAX_PATH];
+        static TCHAR m_szDumpFileName[MAX_PATH];
         static LPTOP_LEVEL_EXCEPTION_FILTER m_previousFilter;
         static HANDLE m_hReportFile;
         static HANDLE m_hProcess;

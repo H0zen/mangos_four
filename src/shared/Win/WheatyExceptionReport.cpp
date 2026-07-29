@@ -39,6 +39,7 @@ inline LPTSTR ErrorMessage(DWORD dw)
 // Declare the static variables of the WheatyExceptionReport class
 //
 TCHAR WheatyExceptionReport::m_szLogFileName[MAX_PATH];
+TCHAR WheatyExceptionReport::m_szDumpFileName[MAX_PATH];
 LPTOP_LEVEL_EXCEPTION_FILTER WheatyExceptionReport::m_previousFilter;
 HANDLE WheatyExceptionReport::m_hReportFile;
 HANDLE WheatyExceptionReport::m_hProcess;
@@ -67,11 +68,99 @@ WheatyExceptionReport::~WheatyExceptionReport()
 }
 
 //===========================================================
+// Writes a minidump beside the text report.
+//
+// The text report can only describe what its symbol walker manages to decode,
+// and on optimised x64 that is not much: it prints parameter names without
+// values, because the walker computes stack addresses the way a 2002 x86 sample
+// did. A dump hands the same question to WinDbg, which has the real unwind
+// machinery and the variable-range records the compiler emitted.
+//===========================================================
+bool WheatyExceptionReport::WriteMiniDump(PEXCEPTION_POINTERS pExceptionInfo)
+{
+    HANDLE hDumpFile = CreateFile(m_szDumpFileName,
+                                  GENERIC_WRITE,
+                                  0,
+                                  0,
+                                  CREATE_ALWAYS,
+                                  FILE_ATTRIBUTE_NORMAL,
+                                  0);
+
+    // CreateFile signals failure with INVALID_HANDLE_VALUE, which is truthy - a
+    // plain `if (handle)` would happily write into a dead handle.
+    if (hDumpFile == INVALID_HANDLE_VALUE)
+    {
+        return false;
+    }
+
+    MINIDUMP_EXCEPTION_INFORMATION mei;
+    mei.ThreadId = GetCurrentThreadId();                    // the filter runs on the faulting thread
+    mei.ExceptionPointers = pExceptionInfo;
+    mei.ClientPointers = FALSE;                             // same process, so the pointer is ours to deref
+
+    // Triage set, then two progressively smaller fallbacks. MiniDumpWriteDump fails
+    // the whole call rather than ignoring a flag it does not understand, and a single
+    // unreadable page can sink it, so a smaller dump is worth more than none.
+    //
+    // IndirectlyReferencedMemory is the one that earns its size here: it captures a
+    // window around anything on a thread stack that looks like a pointer, which is
+    // what lets you read the string an argument refers to rather than just its value.
+    MINIDUMP_TYPE const attempts[] =
+    {
+        MINIDUMP_TYPE(MiniDumpWithIndirectlyReferencedMemory
+                      | MiniDumpWithDataSegs
+                      | MiniDumpWithProcessThreadData
+                      | MiniDumpWithThreadInfo
+                      | MiniDumpWithUnloadedModules
+                      | MiniDumpWithFullMemoryInfo
+                      | MiniDumpIgnoreInaccessibleMemory),
+        MINIDUMP_TYPE(MiniDumpWithIndirectlyReferencedMemory | MiniDumpWithDataSegs),
+        MiniDumpNormal
+    };
+
+    bool written = false;
+
+    for (int i = 0; i < ARRAYSIZE(attempts) && !written; ++i)
+    {
+        SetFilePointer(hDumpFile, 0, 0, FILE_BEGIN);
+        SetEndOfFile(hDumpFile);
+
+        written = MiniDumpWriteDump(GetCurrentProcess(),
+                                    GetCurrentProcessId(),
+                                    hDumpFile,
+                                    attempts[i],
+                                    &mei,
+                                    0,
+                                    0) != FALSE;
+    }
+
+    CloseHandle(hDumpFile);
+
+    if (!written)
+    {
+        DeleteFile(m_szDumpFileName);
+    }
+
+    return written;
+}
+
+//===========================================================
 // Entry point where control comes on an unhandled exception
 //===========================================================
 LONG WINAPI WheatyExceptionReport::WheatyUnhandledExceptionFilter(
     PEXCEPTION_POINTERS pExceptionInfo)
 {
+    // Everything below writes to statics - m_szLogFileName, m_hReportFile - with no
+    // serialisation, so two threads faulting at once corrupt each other's filenames
+    // and handles. A crash in the reporting path would also re-enter here. One entry
+    // only; a second caller returns and lets the process die.
+    static LONG s_inFilter = 0;
+
+    if (InterlockedExchange(&s_inFilter, 1) != 0)
+    {
+        return EXCEPTION_EXECUTE_HANDLER;
+    }
+
     TCHAR module_folder_name[MAX_PATH];
     GetModuleFileName(0, module_folder_name, MAX_PATH);
     TCHAR* pos = _tcsrchr(module_folder_name, '\\');
@@ -96,6 +185,17 @@ LONG WINAPI WheatyExceptionReport::WheatyUnhandledExceptionFilter(
     GetLocalTime(&systime);
     sprintf(m_szLogFileName, "%s\\%s_[%u-%u_%u-%u-%u].txt",
             crash_folder_path, pos, systime.wDay, systime.wMonth, systime.wHour, systime.wMinute, systime.wSecond);
+
+    // Same systime, so the .dmp and .txt for one crash always pair by name.
+    sprintf(m_szDumpFileName, "%s\\%s_[%u-%u_%u-%u-%u].dmp",
+            crash_folder_path, pos, systime.wDay, systime.wMonth, systime.wHour, systime.wMinute, systime.wSecond);
+
+    // Written before the report, deliberately. GenerateExceptionReport loads and
+    // parses every module's symbols, walks all threads, and formats megabytes of
+    // text - a great deal of work in a process that has already faulted, any of
+    // which can fail and take the dump with it. The dump is also the artifact that
+    // survives being mailed to someone else, so it is the one worth having first.
+    WriteMiniDump(pExceptionInfo);
 
     m_hReportFile = CreateFile(m_szLogFileName,
                                GENERIC_WRITE,
@@ -348,6 +448,18 @@ void WheatyExceptionReport::GenerateExceptionReport(
     // Start out with a banner
     _tprintf(_T("Revision: %s\r\n"), GitRevision::GetProjectRevision());
     _tprintf(_T("Date %u:%u:%u. Time %u:%u \r\n"), systime.wDay, systime.wMonth, systime.wYear, systime.wHour, systime.wMinute);
+
+    // Named here so whoever opens the report knows the dump exists and where it is;
+    // it carries the argument values this text cannot recover on optimised x64.
+    if (m_szDumpFileName[0] && GetFileAttributes(m_szDumpFileName) != INVALID_FILE_ATTRIBUTES)
+    {
+        _tprintf(_T("Minidump: %s\r\n"), m_szDumpFileName);
+    }
+    else
+    {
+        _tprintf(_T("Minidump: not written\r\n"));
+    }
+
     PEXCEPTION_RECORD pExceptionRecord = pExceptionInfo->ExceptionRecord;
 
     PrintSystemInfo();
