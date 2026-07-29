@@ -988,4 +988,46 @@ void InitializeOpcodes()
     // request and consumes exactly one uint32 from the response.
     DefC(CMSG_CALENDAR_GET_NUM_PENDING, "CMSG_CALENDAR_GET_NUM_PENDING", STATUS_LOGGEDIN, PROCESS_THREADUNSAFE, &WorldSession::HandleCalendarGetNumPending);
     DefS(SMSG_CALENDAR_SEND_NUM_PENDING, "SMSG_CALENDAR_SEND_NUM_PENDING");
+
+    // Empty-bodied client actions. Every one is observed in the 18414 corpus with a
+    // zero-length body in every single observation, and every handler reads nothing
+    // at all -- no `>>`, no bit reads -- so there is no reader to get wrong and no
+    // inherited body shape to inherit. That is the reason they are grouped: the
+    // failure that ran through the guild query family cannot apply to a body that
+    // does not exist.
+    //
+    // What is NOT claimed here is that these handlers are silent. Registering a
+    // request only puts the client's existing trigger back in reach; the side
+    // effects downstream are ordinary game lifecycle traffic and were already
+    // reachable by other means:
+    //
+    //   REQUEST_PET_INFO       sends nothing.
+    //   COMPLETE_CINEMATIC,    can produce visibility and update-object traffic.
+    //   NEXT_CINEMATIC_CAMERA
+    //   REQUEST_VEHICLE_EXIT   produces aura and spline traffic on unboarding.
+    //   LEAVE_BATTLEFIELD      produces battleground status and teleport traffic.
+    //                          SMSG_BATTLEGROUND_PLAYER_LEFT is reachable and is
+    //                          NOT currently admitted by the in-world send gate, so
+    //                          that particular notification is still dropped. It is
+    //                          a pre-existing gap, not one opened here.
+    //   GUILD_ACCEPT           reaches SMSG_GUILD_EVENT_PLAYER_JOINED, already
+    //                          registered, already admitted and already live via the
+    //                          invite path, so it adds no new outbound surface.
+    //
+    // CMSG_RESET_INSTANCES is deliberately NOT in this group. It looked like the
+    // cheapest member -- an empty body and a four-byte SMSG_INSTANCE_RESET reply
+    // that retail carries at exactly 4 bytes in all 15 corpus observations -- but
+    // its failure paths reach SMSG_RESET_FAILED_NOTIFY from DungeonMap::Reset and
+    // SMSG_INSTANCE_RESET_FAILED from Group::ResetInstances, neither of which is
+    // registered or admitted. Resetting an occupied instance would silently do
+    // nothing visible, which is the exact no-op this grouping exists to avoid. It
+    // returns once both failure bodies are recovered and admitted; note the current
+    // SMSG_INSTANCE_RESET_FAILED writer emits two uint32 against a four-byte
+    // capacity hint and must not be admitted on trust.
+    DefC(CMSG_REQUEST_PET_INFO, "CMSG_REQUEST_PET_INFO", STATUS_LOGGEDIN, PROCESS_THREADUNSAFE, &WorldSession::HandleRequestPetInfoOpcode);
+    DefC(CMSG_LEAVE_BATTLEFIELD, "CMSG_LEAVE_BATTLEFIELD", STATUS_LOGGEDIN, PROCESS_THREADUNSAFE, &WorldSession::HandleLeaveBattlefieldOpcode);
+    DefC(CMSG_COMPLETE_CINEMATIC, "CMSG_COMPLETE_CINEMATIC", STATUS_LOGGEDIN, PROCESS_THREADUNSAFE, &WorldSession::HandleCompleteCinematic);
+    DefC(CMSG_NEXT_CINEMATIC_CAMERA, "CMSG_NEXT_CINEMATIC_CAMERA", STATUS_LOGGEDIN, PROCESS_THREADUNSAFE, &WorldSession::HandleNextCinematicCamera);
+    DefC(CMSG_REQUEST_VEHICLE_EXIT, "CMSG_REQUEST_VEHICLE_EXIT", STATUS_LOGGEDIN, PROCESS_THREADUNSAFE, &WorldSession::HandleRequestVehicleExit);
+    DefC(CMSG_GUILD_ACCEPT, "CMSG_GUILD_ACCEPT", STATUS_LOGGEDIN, PROCESS_THREADUNSAFE, &WorldSession::HandleGuildAcceptOpcode);
 }

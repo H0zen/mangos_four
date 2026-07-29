@@ -415,3 +415,34 @@ endif()
 if(voice MATCHES "read_skip<uint8>\\(\\)")
     message(FATAL_ERROR "legacy two-byte voice-session body remains")
 endif()
+
+# Empty-bodied client actions. These carry no body in any corpus observation and
+# their handlers read nothing, so the registration tuple is the whole contract:
+# match the full DefC line, not just the opcode, so a changed handler, status or
+# processing mode fails here rather than silently altering dispatch.
+set(empty_body_registrations
+    "DefC(CMSG_REQUEST_PET_INFO, \"CMSG_REQUEST_PET_INFO\", STATUS_LOGGEDIN, PROCESS_THREADUNSAFE, &WorldSession::HandleRequestPetInfoOpcode);"
+    "DefC(CMSG_LEAVE_BATTLEFIELD, \"CMSG_LEAVE_BATTLEFIELD\", STATUS_LOGGEDIN, PROCESS_THREADUNSAFE, &WorldSession::HandleLeaveBattlefieldOpcode);"
+    "DefC(CMSG_COMPLETE_CINEMATIC, \"CMSG_COMPLETE_CINEMATIC\", STATUS_LOGGEDIN, PROCESS_THREADUNSAFE, &WorldSession::HandleCompleteCinematic);"
+    "DefC(CMSG_NEXT_CINEMATIC_CAMERA, \"CMSG_NEXT_CINEMATIC_CAMERA\", STATUS_LOGGEDIN, PROCESS_THREADUNSAFE, &WorldSession::HandleNextCinematicCamera);"
+    "DefC(CMSG_REQUEST_VEHICLE_EXIT, \"CMSG_REQUEST_VEHICLE_EXIT\", STATUS_LOGGEDIN, PROCESS_THREADUNSAFE, &WorldSession::HandleRequestVehicleExit);"
+    "DefC(CMSG_GUILD_ACCEPT, \"CMSG_GUILD_ACCEPT\", STATUS_LOGGEDIN, PROCESS_THREADUNSAFE, &WorldSession::HandleGuildAcceptOpcode);")
+foreach(empty_body_registration IN LISTS empty_body_registrations)
+    string(FIND "${opcodes}" "${empty_body_registration}" empty_body_found)
+    if(empty_body_found EQUAL -1)
+        message(FATAL_ERROR "empty-body registration missing or altered: ${empty_body_registration}")
+    endif()
+endforeach()
+
+# CMSG_RESET_INSTANCES must stay unregistered until SMSG_RESET_FAILED_NOTIFY and
+# SMSG_INSTANCE_RESET_FAILED are recovered and admitted. Registering it earlier
+# makes resetting an occupied instance a silent no-op.
+string(FIND "${opcodes}" "DefC(CMSG_RESET_INSTANCES," reset_instances_registered)
+if(NOT reset_instances_registered EQUAL -1)
+    string(FIND "${session}" "case SMSG_RESET_FAILED_NOTIFY:" reset_notify_gate)
+    string(FIND "${session}" "case SMSG_INSTANCE_RESET_FAILED:" reset_failed_gate)
+    if(reset_notify_gate EQUAL -1 OR reset_failed_gate EQUAL -1)
+        message(FATAL_ERROR
+            "CMSG_RESET_INSTANCES is registered but its failure replies are not admitted by the in-world send gate")
+    endif()
+endif()

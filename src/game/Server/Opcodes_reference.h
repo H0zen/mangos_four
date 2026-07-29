@@ -175,9 +175,9 @@
  *   TOTAL SMSG rows                   925
  *
  * SUBSYSTEM CONFIDENCE: high=365, low=221, medium=182, none=157
- * STATUS TOTALS: ACTIVE=432, DOC=435, DORMANT=653
+ * STATUS TOTALS: ACTIVE=438, DOC=435, DORMANT=647
  *   SMSG: ACTIVE=266, DOC=271, DORMANT=388
- *   CMSG: ACTIVE=166, DOC=164, DORMANT=265
+ *   CMSG: ACTIVE=172, DOC=164, DORMANT=259
  */
 
 // CAVEATS -- read before trusting any single row:
@@ -1368,7 +1368,7 @@ typedef uint16_t uint16;
  *   CMSG_CANCEL_TEMP_ENCHANTMENT                   0x024B  DORMANT 
  *   CMSG_GUILD_BANK_BUY_TAB                        0x0251  DORMANT 
  *   CMSG_PETITION_QUERY                            0x0255  DORMANT 
- *   CMSG_LEAVE_BATTLEFIELD                         0x0257  DORMANT 
+ *   CMSG_LEAVE_BATTLEFIELD                         0x0257  ACTIVE
  *   CMSG_AUCTION_REMOVE_ITEM                       0x0259  DORMANT 
  *   CMSG_PET_ACTION                                0x025B  DORMANT 
  *   CMSG_AUTOEQUIP_ITEM                            0x025F  ACTIVE
@@ -1643,7 +1643,7 @@ typedef uint16_t uint16;
  *   CMSG_UNKNOWN_0x0C62                            0x0C62  DOC     
  *   CMSG_LF_GUILD_ADD_APPLICATION                  0x0C63  DOC     
  *   CMSG_SET_SAVED_INSTANCE_EXTEND                 0x0C68  DORMANT 
- *   CMSG_RESET_INSTANCES                           0x0C69  DORMANT 
+ *   CMSG_RESET_INSTANCES                           0x0C69  DORMANT
  *   CMSG_GUILD_INFO_TEXT                           0x0C70  DORMANT 
  *   CMSG_UNKNOWN_0x0C79                            0x0C79  DOC     
  *   CMSG_GUILD_SET_RANK                            0x0C7A  DORMANT 
@@ -1703,7 +1703,7 @@ typedef uint16_t uint16;
  *   CMSG_MOVE_WATER_WALK_ACK                       0x10F2  DORMANT 
  *   CMSG_FORCE_RUN_SPEED_CHANGE_ACK                0x10F3  DORMANT 
  *   CMSG_DEL_FRIEND                                0x1103  DORMANT 
- *   CMSG_NEXT_CINEMATIC_CAMERA                     0x1124  DORMANT 
+ *   CMSG_NEXT_CINEMATIC_CAMERA                     0x1124  ACTIVE
  *   CMSG_REQUEST_VEHICLE_SWITCH_SEAT               0x1143  DORMANT 
  *   CMSG_MOVE_JUMP                                 0x1153  ACTIVE
  *   CMSG_MOVE_STOP_ASCEND                          0x115A  DORMANT 
@@ -1748,7 +1748,7 @@ typedef uint16_t uint16;
  *   CMSG_LOGOUT_REQUEST                            0x1349  ACTIVE   server-binding=CMSG_LOGOUT_REQUEST_IDLE
  *   CMSG_REPOP_REQUEST                             0x134A  ACTIVE
  *   CMSG_SELL_ITEM                                 0x1358  ACTIVE
- *   CMSG_REQUEST_PET_INFO                          0x135B  DORMANT 
+ *   CMSG_REQUEST_PET_INFO                          0x135B  ACTIVE
  *   CMSG_COMPLETE_MOVIE                            0x1362  DORMANT 
  *   CMSG_GUILD_BANK_SWAP_ITEMS                     0x136A  DORMANT 
  *   CMSG_PETITION_SHOW_SIGNATURES                  0x136B  DORMANT 
@@ -1831,7 +1831,7 @@ typedef uint16_t uint16;
  *   CMSG_BATTLE_PET_MODIFY_NAME                    0x1887  DOC     
  *   CMSG_BATTLE_PET_SUMMON_COMPANION               0x1896  DOC     
  *   CMSG_GROUP_ASSISTANT_LEADER                    0x1897  DORMANT 
- *   CMSG_GUILD_ACCEPT                              0x18A2  DORMANT 
+ *   CMSG_GUILD_ACCEPT                              0x18A2  ACTIVE
  *   CMSG_WHO                                       0x18A3  DORMANT 
  *   CMSG_BATTLE_PAY_GET_PURCHASE_LIST              0x18B2  ACTIVE
  *   CMSG_BATTLE_PET_DELETE_PET                     0x18B6  DOC     
@@ -1883,10 +1883,10 @@ typedef uint16_t uint16;
  *   CMSG_UNKNOWN_0x1DB9                            0x1DB9  DOC     
  *   CMSG_SEND_MAIL                                 0x1DBA  DORMANT 
  *   CMSG_LOAD_SCREEN                               0x1DBD  ACTIVE
- *   CMSG_REQUEST_VEHICLE_EXIT                      0x1DC3  DORMANT 
+ *   CMSG_REQUEST_VEHICLE_EXIT                      0x1DC3  ACTIVE
  *   CMSG_CANCEL_MOD_SPEED_NO_CONTROL_AURAS         0x1DE0  DOC     
  *   CMSG_LOOT_MASTER_GIVE                          0x1DE1  DORMANT 
- *   CMSG_COMPLETE_CINEMATIC                        0x1F34  DORMANT 
+ *   CMSG_COMPLETE_CINEMATIC                        0x1F34  ACTIVE
  *   CMSG_UNKNOWN_0x1F88                            0x1F88  DOC     
  *   CMSG_GMTICKET_GETTICKET                        0x1F89  ACTIVE
  *   CMSG_SET_ACTION_BUTTON                         0x1F8C  DORMANT 
