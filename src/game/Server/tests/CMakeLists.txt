@@ -218,7 +218,8 @@ add_test(NAME mop_client_build_split_source
 
 foreach(build_split_mutation IN ITEMS
         merge_wire_into_data widen_wire_list narrow_data_list
-        drop_wire_predicate gridmap_uses_wire_list)
+        drop_wire_predicate gridmap_uses_wire_list
+        realmbuilds_advertises_data_list banner_advertises_data_list)
     add_test(NAME mop_client_build_split_source_mutation_${build_split_mutation}
         COMMAND ${CMAKE_COMMAND} -DSOURCE_ROOT=${CMAKE_SOURCE_DIR}
             -DMUTATION=${build_split_mutation}

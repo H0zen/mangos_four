@@ -346,7 +346,10 @@ int Master::Run()
         sWorld.getConfig(CONFIG_BOOL_REALM_RECOMMENDED_OR_NEW_ENABLED)
             ? recommendedOrNew : uint8(REALM_FLAG_NONE);
 
-    std::string builds = AcceptableClientBuildsListStr();
+    // Wire list, not the data-file list. realmd matches a connecting client's build against
+    // realmbuilds to decide whether it may see and join this realm (AuthSocket ok_build).
+    // Publishing 18273 here would advertise a realm to a client that WorldGateway then rejects.
+    std::string builds = AcceptableClientWireBuildsListStr();
     LoginDatabase.escape_string(builds);
     LoginDatabase.DirectPExecute(
         "UPDATE `realmlist` SET `realmflags` = %u, `population` = 0, "

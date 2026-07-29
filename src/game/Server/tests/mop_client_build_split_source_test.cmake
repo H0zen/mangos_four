@@ -29,7 +29,9 @@ set(_shared  "${SOURCE_ROOT}/src/game/Server/SharedDefines.h")
 set(_stores  "${SOURCE_ROOT}/src/game/Server/DBCStores.cpp")
 set(_gateway "${SOURCE_ROOT}/src/game/Server/WorldGateway.cpp")
 set(_gridmap "${SOURCE_ROOT}/src/game/WorldHandlers/GridMap.cpp")
-foreach(_f "${_shared}" "${_stores}" "${_gateway}" "${_gridmap}")
+set(_master  "${SOURCE_ROOT}/src/mangosd/Master.cpp")
+set(_world   "${SOURCE_ROOT}/src/game/WorldHandlers/World.cpp")
+foreach(_f "${_shared}" "${_stores}" "${_gateway}" "${_gridmap}" "${_master}" "${_world}")
     if(NOT EXISTS "${_f}")
         message(FATAL_ERROR "missing source: ${_f}")
     endif()
@@ -49,8 +51,12 @@ file(READ "${_gateway}" _gateway_src)
 strip_comments(_gateway_src)
 file(READ "${_gridmap}" _gridmap_src)
 strip_comments(_gridmap_src)
+file(READ "${_master}" _master_src)
+strip_comments(_master_src)
+file(READ "${_world}" _world_src)
+strip_comments(_world_src)
 
-set(_blobs _shared_src _stores_src _gateway_src _gridmap_src)
+set(_blobs _shared_src _stores_src _gateway_src _gridmap_src _master_src _world_src)
 if(DEFINED MUTATION)
     foreach(_b IN LISTS _blobs)
         set(_pre_${_b} "${${_b}}")
@@ -79,6 +85,14 @@ if(DEFINED MUTATION)
         string(REPLACE "IsAcceptableClientBuild(header.buildMagic)"
                        "IsAcceptableClientWireBuild(header.buildMagic)"
                        _gridmap_src "${_gridmap_src}")
+    elseif(MUTATION STREQUAL "realmbuilds_advertises_data_list")
+        string(REPLACE "std::string builds = AcceptableClientWireBuildsListStr();"
+                       "std::string builds = AcceptableClientBuildsListStr();"
+                       _master_src "${_master_src}")
+    elseif(MUTATION STREQUAL "banner_advertises_data_list")
+        string(REPLACE "std::string thisClientBuilds = AcceptableClientWireBuildsListStr();"
+                       "std::string thisClientBuilds = AcceptableClientBuildsListStr();"
+                       _world_src "${_world_src}")
     else()
         message(FATAL_ERROR "unknown MUTATION '${MUTATION}'")
     endif()
@@ -142,5 +156,30 @@ if(_at EQUAL -1)
         "on disk.")
 endif()
 
+# ---------------------------------------------------------------------------
+# 3. What we ADVERTISE must be the client list, not the data-file list.
+#
+# realmd matches a connecting client's build against realmlist.realmbuilds to decide whether it
+# may see and join the realm (AuthSocket ok_build). Publishing the data list there advertises the
+# realm to an 18273 client that WorldGateway then rejects -- the client gets in far enough to be
+# refused. The startup banner has the same problem in reverse: it says "Supporting Clients", so
+# printing the data-file list states something untrue to whoever reads the console.
+# ---------------------------------------------------------------------------
+string(FIND "${_master_src}" "std::string builds = AcceptableClientWireBuildsListStr();" _at)
+if(_at EQUAL -1)
+    message(FATAL_ERROR
+        "realmlist.realmbuilds is not being published from the wire list.\n\n"
+        "realmd uses that column to decide which clients may join this realm. Publishing the\n"
+        "data-file list advertises the realm to an 18273 client, which WorldGateway then refuses.")
+endif()
+
+string(FIND "${_world_src}" "std::string thisClientBuilds = AcceptableClientWireBuildsListStr();" _at)
+if(_at EQUAL -1)
+    message(FATAL_ERROR
+        "The startup banner is not printing the wire list.\n\n"
+        "It is labelled \"Supporting Clients\" / \"Builds\", so printing the data-file list claims\n"
+        "18273 clients are supported when they are rejected at login.")
+endif()
+
 message(STATUS "client build split: data list {18273,18414}, wire list {18414}, "
-               "gateway on wire predicate, GridMap on data predicate")
+               "gateway + realmbuilds + banner on wire predicate, GridMap on data predicate")
