@@ -193,11 +193,20 @@ if(
   OR NOT "${dep_eluna_rev_branch_cached}" MATCHES "${dep_eluna_rev_branch}"
   OR NOT "${dep_sd3_rev_hash_cached}"     MATCHES "${dep_sd3_rev_hash}"
   OR NOT "${dep_sd3_rev_branch_cached}"   MATCHES "${dep_sd3_rev_branch}"
-  OR NOT EXISTS "${CMAKE_CURRENT_BINARY_DIR}/src/shared/revision_data.h"
+  OR NOT EXISTS "${BUILDDIR}/src/shared/revision_data.h"
 )
+  # BUILDDIR, not CMAKE_CURRENT_BINARY_DIR. This script also runs at build time via
+  # `cmake -P` from the revision_data.h target, and in script mode
+  # CMAKE_CURRENT_BINARY_DIR is simply the working directory - which that target sets
+  # to CMAKE_SOURCE_DIR. The generated header therefore landed in the source tree,
+  # which nothing compiles, while the copy the compiler actually includes was only
+  # ever refreshed when CMake re-configured. A database version bump could then sit
+  # in revision_data.h.in for hours without reaching the binary, leaving the
+  # db_version check comparing against stale constants and silently accepting an
+  # out-of-date database.
   configure_file(
     "${CMAKE_SOURCE_DIR}/src/shared/revision_data.h.in"
-    "${CMAKE_CURRENT_BINARY_DIR}/src/shared/revision_data.h"
+    "${BUILDDIR}/src/shared/revision_data.h"
     @ONLY
   )
   set(rev_hash_cached             "${rev_hash}"             CACHE INTERNAL "Cached commit-hash"       )
