@@ -175,9 +175,9 @@
  *   TOTAL SMSG rows                   925
  *
  * SUBSYSTEM CONFIDENCE: high=365, low=221, medium=182, none=157
- * STATUS TOTALS: ACTIVE=426, DOC=435, DORMANT=659
- *   SMSG: ACTIVE=263, DOC=271, DORMANT=391
- *   CMSG: ACTIVE=163, DOC=164, DORMANT=268
+ * STATUS TOTALS: ACTIVE=432, DOC=435, DORMANT=653
+ *   SMSG: ACTIVE=266, DOC=271, DORMANT=388
+ *   CMSG: ACTIVE=166, DOC=164, DORMANT=265
  */
 
 // CAVEATS -- read before trusting any single row:
@@ -557,14 +557,14 @@ typedef uint16_t uint16;
  *  -- GuildInfo.cpp (33) --
  *   SMSG_GUILD_EVENT_BANK_TAB_TEXT_CHANGED         0x0A70  DORMANT  [low-conf]
  *   SMSG_GUILD_PARTY_STATE_RESPONSE                0x0A78  DORMANT  [low-conf]
- *   SMSG_GUILD_QUERY_RANKS_RESULT                  0x0A79  DORMANT  [low-conf]
+ *   SMSG_GUILD_QUERY_RANKS_RESULT                  0x0A79  ACTIVE   [low-conf]
  *   SMSG_GUILD_NEWS_UPDATE                         0x0AE8  DORMANT  [medium-conf]
  *   SMSG_GUILD_CHALLENGE_UPDATED                   0x0AE9  DORMANT  [low-conf]
  *   SMSG_UNKNOWN_0x0AF1                            0x0AF1  DOC      [low-conf]
  *   SMSG_UNKNOWN_0x0B69                            0x0B69  ACTIVE   [low-conf]  server-binding=SMSG_GUILD_EVENT_PLAYER_JOINED
  *   SMSG_UNKNOWN_0x0B70                            0x0B70  ACTIVE   [low-conf]  server-binding=SMSG_GUILD_EVENT_PRESENCE_CHANGE
  *   SMSG_GUILD_BANK_MONEY_WITHDRAWN                0x0B78  ACTIVE   [low-conf]
- *   SMSG_GUILD_ROSTER                              0x0BE0  DORMANT 
+ *   SMSG_GUILD_ROSTER                              0x0BE0  ACTIVE
  *   SMSG_GUILD_MEMBER_UPDATE_NOTE                  0x0BE1  DOC      [low-conf]
  *   SMSG_UNKNOWN_0x0BE9                            0x0BE9  DOC      [low-conf]
  *   SMSG_GUILD_MEMBERS_FOR_RECIPE                  0x0BF0  DORMANT  [low-conf]
@@ -579,7 +579,7 @@ typedef uint16_t uint16;
  *   SMSG_GUILD_INVITE                              0x0F71  DORMANT  [low-conf]
  *   SMSG_GUILD_XP_GAIN                             0x0FE0  DORMANT  [low-conf]
  *   SMSG_GUILD_FLAGGED_FOR_RENAME                  0x0FE9  DORMANT  [low-conf]
- *   SMSG_GUILD_PERMISSIONS                         0x0FF9  DORMANT  [low-conf]
+ *   SMSG_GUILD_PERMISSIONS                         0x0FF9  ACTIVE   [low-conf]
  *   SMSG_GUILD_REWARDS_LIST                        0x1A69  DORMANT  [medium-conf]
  *   SMSG_GUILD_REPUTATION_WEEKLY_CAP               0x1A71  DORMANT  [low-conf]
  *   SMSG_GUILD_BANK_QUERY_TEXT_RESULT              0x1AE0  DORMANT  [low-conf]
@@ -1657,7 +1657,7 @@ typedef uint16_t uint16;
  *   CMSG_QUERY_GUILD_MEMBERS_FOR_RECIPE            0x0CFA  DORMANT 
  *   CMSG_READ_ITEM                                 0x0D00  DORMANT 
  *   CMSG_ADD_IGNORE                                0x0D20  DORMANT 
- *   CMSG_GUILD_QUERY_RANKS                         0x0D50  DORMANT 
+ *   CMSG_GUILD_QUERY_RANKS                         0x0D50  ACTIVE
  *   CMSG_GROUP_INVITE_RESPONSE                     0x0D61  DORMANT 
  *   CMSG_GUILD_DISBAND                             0x0D73  DORMANT 
  *   CMSG_GUILD_DEL_RANK                            0x0D79  DORMANT 
@@ -1764,8 +1764,8 @@ typedef uint16_t uint16;
  *   CMSG_ACCEPT_TRADE                              0x144D  DORMANT 
  *   CMSG_LF_GUILD_POST_REQUEST                     0x1450  DORMANT 
  *   CMSG_GET_CHALLENGE_MODE_REWARDS                0x1452  DOC     
- *   CMSG_GUILD_ROSTER                              0x1459  DORMANT 
- *   CMSG_GUILD_PERMISSIONS                         0x145A  DORMANT 
+ *   CMSG_GUILD_ROSTER                              0x1459  ACTIVE
+ *   CMSG_GUILD_PERMISSIONS                         0x145A  ACTIVE
  *   CMSG_GAMEOBJECT_QUERY                          0x1461  ACTIVE
  *   CMSG_LEARN_PET_SPECIALIZATION_GROUP            0x1463  DOC     
  *   CMSG_GUILD_ACHIEVEMENT_MEMBERS                 0x1470  DORMANT 

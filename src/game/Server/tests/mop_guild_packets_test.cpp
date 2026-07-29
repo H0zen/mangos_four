@@ -409,6 +409,89 @@ static void test_guild_invite_request()
     CHECK(uint32(CMSG_GUILD_INVITE) == 0x0869u);
 }
 
+/*
+ * The three guild read-only queries. Every fixture below is a byte-for-byte retail
+ * capture from the 18414 corpus (catalogue 2BE10C89), not a hand-rolled guess, and
+ * the guid orders are the ones the client's own send serializers emit.
+ */
+
+// capture-000006 seq 2082, 7 bytes. Two further captures carry the identical body.
+static void test_guild_query_ranks_request()
+{
+    std::vector<uint8> const capture = { 0xCF, 0xF5, 0x88, 0x24, 0x1E, 0x00, 0xFE };
+
+    WorldPacket packet(CMSG_GUILD_QUERY_RANKS, capture.size());
+    Append(packet, capture);
+
+    uint64 const guid = MopGuildPackets::ReadGuildQueryRanks(packet);
+
+    // Mask 0xCF leaves guid bytes 4 and 5 absent; the rest arrive XOR 1.
+    CHECK(guid == 0x1FF4000001FF2589ULL);
+    CHECK(packet.rpos() == capture.size());
+}
+
+// capture-000006 seq 2081, 18 bytes: mask 0xFFFF, so all sixteen bytes are present.
+static void test_guild_roster_request()
+{
+    std::vector<uint8> const capture =
+    {
+        0xFF, 0xFF, 0x00, 0x00, 0x0F, 0xDA, 0x35, 0x00, 0x69,
+        0xF7, 0x66, 0x0E, 0xF7, 0x41, 0x38, 0x38, 0x61, 0x4A
+    };
+
+    WorldPacket packet(CMSG_GUILD_ROSTER, capture.size());
+    Append(packet, capture);
+
+    uint64 guidA = 0;
+    uint64 guidB = 0;
+    MopGuildPackets::ReadGuildRoster(packet, guidA, guidB);
+
+    CHECK(guidA == 0x0139F6340139F668ULL);
+    CHECK(guidB == 0x0F674060014BDB0EULL);
+    CHECK(packet.rpos() == capture.size());
+}
+
+// capture-000006 seq 1959, 83 bytes. All 2,080 corpus observations are exactly 83.
+static void test_guild_permissions_response()
+{
+    std::vector<uint8> const capture =
+    {
+        0x05, 0x00, 0x00, 0x00,                             // rank id 5
+        0x00, 0x00, 0x00, 0x00,                             // money per day remaining
+        0x07, 0x00, 0x00, 0x00,                             // seven purchased tabs
+        0x53, 0x60, 0x10, 0x00,                             // rank rights mask
+        0x00, 0x00, 0x40,                                   // 21-bit tab count == 8
+        0x04, 0x00, 0x00, 0x00, 0x03, 0x00, 0x00, 0x00,
+        0x03, 0x00, 0x00, 0x00, 0x03, 0x00, 0x00, 0x00,
+        0x02, 0x00, 0x00, 0x00, 0x03, 0x00, 0x00, 0x00,
+        0x01, 0x00, 0x00, 0x00, 0x03, 0x00, 0x00, 0x00,
+        0x00, 0x00, 0x00, 0x00, 0x03, 0x00, 0x00, 0x00,
+        0x00, 0x00, 0x00, 0x00, 0x03, 0x00, 0x00, 0x00,
+        0x00, 0x00, 0x00, 0x00, 0x03, 0x00, 0x00, 0x00,
+        0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00      // eighth tab unpurchased
+    };
+
+    uint32 const remainingSlots[GUILD_BANK_MAX_TABS] = { 4, 3, 2, 1, 0, 0, 0, 0 };
+    uint32 const tabRights[GUILD_BANK_MAX_TABS]      = { 3, 3, 3, 3, 3, 3, 3, 0 };
+
+    WorldPacket packet;
+    MopGuildPackets::BuildGuildPermissions(packet, 5, 0, 7, 0x00106053,
+        remainingSlots, tabRights);
+
+    CHECK(packet.size() == 83);
+    CHECK(Equal(packet, capture));
+}
+
+static void test_guild_query_opcodes()
+{
+    CHECK(CMSG_GUILD_ROSTER == 0x1459);
+    CHECK(CMSG_GUILD_QUERY_RANKS == 0x0D50);
+    CHECK(CMSG_GUILD_PERMISSIONS == 0x145A);
+    CHECK(SMSG_GUILD_ROSTER == 0x0BE0);
+    CHECK(SMSG_GUILD_QUERY_RANKS_RESULT == 0x0A79);
+    CHECK(SMSG_GUILD_PERMISSIONS == 0x0FF9);
+}
+
 int main(int /*argc*/, char** /*argv*/)
 {
     test_empty_motd();
@@ -432,6 +515,10 @@ int main(int /*argc*/, char** /*argv*/)
     test_guild_bank_text_bounds();
     test_guild_command_result();
     test_guild_invite_request();
+    test_guild_query_ranks_request();
+    test_guild_roster_request();
+    test_guild_permissions_response();
+    test_guild_query_opcodes();
 
     if (g_fail)
     {

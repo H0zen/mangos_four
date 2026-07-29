@@ -400,29 +400,15 @@ void WorldSession::HandleGuildRosterOpcode(WorldPacket& recvPacket)
 {
     ObjectGuid guid1, guid2;
 
-    recvPacket.ReadGuidMask<2, 3>(guid2);
-    recvPacket.ReadGuidMask<6, 0>(guid1);
-    recvPacket.ReadGuidMask<7>(guid2);
-    recvPacket.ReadGuidMask<2>(guid1);
-    recvPacket.ReadGuidMask<6, 4>(guid2);
-
-    recvPacket.ReadGuidMask<1>(guid1);
-    recvPacket.ReadGuidMask<5>(guid2);
-    recvPacket.ReadGuidMask<4, 3>(guid1);
-    recvPacket.ReadGuidMask<0>(guid2);
-    recvPacket.ReadGuidMask<5>(guid1);
-    recvPacket.ReadGuidMask<1>(guid2);
-    recvPacket.ReadGuidMask<7>(guid1);
-
-    recvPacket.ReadGuidBytes<3>(guid1);
-    recvPacket.ReadGuidBytes<4>(guid2);
-    recvPacket.ReadGuidBytes<7, 2, 4, 0>(guid1);
-    recvPacket.ReadGuidBytes<5>(guid2);
-    recvPacket.ReadGuidBytes<1>(guid1);
-    recvPacket.ReadGuidBytes<0, 6>(guid2);
-    recvPacket.ReadGuidBytes<5>(guid1);
-    recvPacket.ReadGuidBytes<7, 2, 3, 1>(guid2);
-    recvPacket.ReadGuidBytes<6>(guid1);
+    // Order is taken from the 18414 client's own send serializer sub_C85E7C. It holds
+    // two guids at object offsets +16..23 (guid1) and +24..31 (guid2) and interleaves
+    // them; the order this handler inherited from MaNGOS Three was a different
+    // permutation entirely.
+    uint64 rawGuid1 = 0;
+    uint64 rawGuid2 = 0;
+    MopGuildPackets::ReadGuildRoster(recvPacket, rawGuid1, rawGuid2);
+    guid1.Set(rawGuid1);
+    guid2.Set(rawGuid2);
 
     DEBUG_LOG("WORLD: Received opcode CMSG_GUILD_ROSTER, guid1: %s raw: " UI64FMTD ", guid2: %s raw: " UI64FMTD "",
         guid1.GetString().c_str(), guid1.GetRawValue(), guid2.GetString().c_str(), guid2.GetRawValue());
@@ -1220,19 +1206,34 @@ void WorldSession::HandleGuildPermissions(WorldPacket& /* recv_data */)
         {
             uint32 rankId = GetPlayer()->GetRank();
 
-            WorldPacket data(SMSG_GUILD_PERMISSIONS, 4 * 15 + 2 * 8 + 3);
-            data << uint32(rankId);                         // guild rank id
-            data << uint32(pGuild->GetPurchasedTabs());     // tabs count
-            data << uint32(pGuild->GetRankRights(rankId));  // rank rights
-            // money per day left
-            // WTF uint32?
-            data << uint32(pGuild->GetMemberMoneyWithdrawRem(GetPlayer()->GetGUIDLow()));
-            data.WriteBits(GUILD_BANK_MAX_TABS, 23);
-            for (int i = 0; i < GUILD_BANK_MAX_TABS; ++i)
+            // Layout is fixed by retail capture (capture-000006 seq 1959, 83 bytes,
+            // and 2,080 packets all exactly 83). The inherited body had three separate
+            // faults, each visible in those bytes:
+            //
+            //   field order   bytes 0..15 are 05 00000000 07 00106053. Read as
+            //                 rank/money/tabs/rights that is rank 5, no money left,
+            //                 7 purchased tabs and a rights mask -- and the tab array
+            //                 below indeed carries rights on 7 tabs and 0 on the 8th.
+            //                 Read as the old rank/tabs/rights/money it claims 0
+            //                 purchased tabs while still describing 7 of them.
+            //   count width   bytes 16..18 are 00 00 40. At 21 bits that is 8, which is
+            //                 GUILD_BANK_MAX_TABS. At the old 23 bits it is 32.
+            //   tab pairing   the pairs run (4,3) (3,3) (2,3) (1,3) (0,3) (0,3) (0,3)
+            //                 (0,0), i.e. remaining slots first and rights second, not
+            //                 the other way round.
+            uint32 remainingSlots[GUILD_BANK_MAX_TABS];
+            uint32 tabRights[GUILD_BANK_MAX_TABS];
+            for (uint8 tab = 0; tab < GUILD_BANK_MAX_TABS; ++tab)
             {
-                data << uint32(pGuild->GetBankRights(rankId, uint8(i)));
-                data << uint32(pGuild->GetMemberSlotWithdrawRem(GetPlayer()->GetGUIDLow(), uint8(i)));
+                remainingSlots[tab] = pGuild->GetMemberSlotWithdrawRem(GetPlayer()->GetGUIDLow(), tab);
+                tabRights[tab] = pGuild->GetBankRights(rankId, tab);
             }
+
+            WorldPacket data;
+            MopGuildPackets::BuildGuildPermissions(data, rankId,
+                pGuild->GetMemberMoneyWithdrawRem(GetPlayer()->GetGUIDLow()),
+                pGuild->GetPurchasedTabs(), pGuild->GetRankRights(rankId),
+                remainingSlots, tabRights);
             SendPacket(&data);
             DEBUG_LOG("WORLD: Sent (SMSG_GUILD_PERMISSIONS)");
         }
@@ -1749,10 +1750,11 @@ void WorldSession::HandleGuildQueryRanksOpcode(WorldPacket& recv_data)
 {
     DEBUG_LOG("WORLD: Received CMSG_GUILD_QUERY_RANKS");
 
-    ObjectGuid guildGuid;
-
-    recv_data.ReadGuidMask<2, 3, 0, 6, 4, 7, 5, 1>(guildGuid);
-    recv_data.ReadGuidBytes<3, 4, 5, 7, 1, 0, 6, 2>(guildGuid);
+    // Order is taken from the 18414 client's own send serializer sub_C860F3, which
+    // writes the mask bits from guid bytes 0,2,5,4,3,7,6,1 and then the present bytes
+    // in order 6,0,1,7,3,2,5,4 (each XOR 1). The order this handler inherited from
+    // MaNGOS Three is a different permutation, so it decoded the wrong guild.
+    ObjectGuid guildGuid(MopGuildPackets::ReadGuildQueryRanks(recv_data));
     if (Guild* guild = sGuildMgr.GetGuildByGuid(guildGuid))
     {
         guild->QueryRanks(this);

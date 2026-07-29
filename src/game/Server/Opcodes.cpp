@@ -821,6 +821,31 @@ void InitializeOpcodes()
     DefS(SMSG_GUILD_EVENT_DISBANDED, "SMSG_GUILD_EVENT_DISBANDED");
     DefS(SMSG_GUILD_COMMAND_RESULT, "SMSG_GUILD_COMMAND_RESULT");
 
+    // The guild read-only queries. All three handlers already read 18414 bit-packed
+    // shapes rather than inherited ones, and the retail body sizes agree with what
+    // each one consumes:
+    //
+    //   ROSTER        two bit-packed GUIDs -> 2 mask bytes + 0..16 present = 2..18
+    //                 observed 3,953 packets, min 5 max 18 (the max is exactly the bound)
+    //   QUERY_RANKS   one bit-packed GUID  -> 1 mask byte  + 0..8  present = 1..9
+    //                 observed 3,966 packets, min 7 max 8
+    //   PERMISSIONS   reads nothing at all
+    //                 observed 2,089 packets, min 0 max 0
+    //
+    // CMSG_GUILD_QUERY (0x1AB6) is deliberately NOT registered here despite being the
+    // heaviest of the family at 30,939 observations. HandleGuildQueryOpcode still reads
+    // `recvPacket >> guildGuid >> playerGuid`, and operator>>(ByteBuffer&, ObjectGuid&)
+    // takes a fixed raw uint64, so it demands exactly 16 bytes. The 18414 wire body is
+    // 9..17 and variable, i.e. bit-packed. That is an inherited-shape handler and
+    // registering it would misparse every request -- the same mistake the corpse-reclaim
+    // registrations made. It stays dormant until the handler is converted.
+    DefC(CMSG_GUILD_ROSTER, "CMSG_GUILD_ROSTER", STATUS_LOGGEDIN, PROCESS_THREADUNSAFE, &WorldSession::HandleGuildRosterOpcode);
+    DefS(SMSG_GUILD_ROSTER, "SMSG_GUILD_ROSTER");
+    DefC(CMSG_GUILD_QUERY_RANKS, "CMSG_GUILD_QUERY_RANKS", STATUS_LOGGEDIN, PROCESS_THREADUNSAFE, &WorldSession::HandleGuildQueryRanksOpcode);
+    DefS(SMSG_GUILD_QUERY_RANKS_RESULT, "SMSG_GUILD_QUERY_RANKS_RESULT");
+    DefC(CMSG_GUILD_PERMISSIONS, "CMSG_GUILD_PERMISSIONS", STATUS_LOGGEDIN, PROCESS_THREADUNSAFE, &WorldSession::HandleGuildPermissions);
+    DefS(SMSG_GUILD_PERMISSIONS, "SMSG_GUILD_PERMISSIONS");
+
     // Live-log guild-bank withdrawal allowance query. The 18414 request is
     // empty and its response contains one uint64 remaining allowance.
     DefC(CMSG_GUILD_BANK_MONEY_WITHDRAWN, "CMSG_GUILD_BANK_MONEY_WITHDRAWN", STATUS_LOGGEDIN, PROCESS_THREADUNSAFE, &WorldSession::HandleGuildBankMoneyWithdrawn);

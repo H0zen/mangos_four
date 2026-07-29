@@ -93,6 +93,81 @@ namespace MopGuildPackets
             out.WriteByteSeq(GuidByte(vendorGuid, index));
     }
 
+    /// One bit or byte slot in a packet that interleaves two guids.
+    struct GuidBitRef
+    {
+        uint8 which;                                        // 0 = first guid, 1 = second
+        uint8 index;                                        // guid byte 0..7
+    };
+
+    /**
+     * CMSG_GUILD_QUERY_RANKS body, orders taken from the client's own send
+     * serializer sub_C860F3 in Wow.exe 5.4.8.18414.
+     */
+    inline uint64 ReadGuildQueryRanks(WorldPacket& in)
+    {
+        uint8 const maskOrder[] = { 0, 2, 5, 4, 3, 7, 6, 1 };
+        uint8 const byteOrder[] = { 6, 0, 1, 7, 3, 2, 5, 4 };
+        return ReadGuid(in, maskOrder, byteOrder);
+    }
+
+    /**
+     * CMSG_GUILD_ROSTER body, orders taken from the client's own send serializer
+     * sub_C85E7C. It holds the two guids at object offsets +16..23 and +24..31 and
+     * interleaves their mask bits and bytes.
+     */
+    inline void ReadGuildRoster(WorldPacket& in, uint64& guidA, uint64& guidB)
+    {
+        static GuidBitRef const maskOrder[16] =
+        {
+            { 0, 4 }, { 0, 3 }, { 0, 2 }, { 1, 7 }, { 0, 0 }, { 0, 6 }, { 0, 5 }, { 1, 0 },
+            { 1, 2 }, { 1, 6 }, { 0, 7 }, { 1, 1 }, { 0, 1 }, { 1, 4 }, { 1, 5 }, { 1, 3 }
+        };
+        static GuidBitRef const byteOrder[16] =
+        {
+            { 0, 7 }, { 1, 3 }, { 1, 0 }, { 1, 1 }, { 0, 4 }, { 0, 3 }, { 0, 0 }, { 0, 1 },
+            { 1, 6 }, { 1, 7 }, { 0, 5 }, { 1, 5 }, { 0, 6 }, { 0, 2 }, { 1, 4 }, { 1, 2 }
+        };
+
+        uint8 bytes[2][8] = {};
+        for (GuidBitRef const& ref : maskOrder)
+            bytes[ref.which][ref.index] = in.ReadBit();
+        for (GuidBitRef const& ref : byteOrder)
+            in.ReadByteSeq(bytes[ref.which][ref.index]);
+
+        guidA = 0;
+        guidB = 0;
+        for (uint8 index = 0; index < 8; ++index)
+        {
+            guidA |= uint64(bytes[0][index]) << (index * 8);
+            guidB |= uint64(bytes[1][index]) << (index * 8);
+        }
+    }
+
+    /**
+     * SMSG_GUILD_PERMISSIONS body. Field order, the 21-bit tab count and the
+     * slots-before-rights tab pairing are all fixed by retail capture; see the
+     * comment on WorldSession::HandleGuildPermissions.
+     */
+    inline void BuildGuildPermissions(WorldPacket& out, uint32 rankId, uint32 moneyPerDay,
+        uint32 purchasedTabs, uint32 rankRights,
+        uint32 const (&remainingSlots)[GUILD_BANK_MAX_TABS],
+        uint32 const (&tabRights)[GUILD_BANK_MAX_TABS])
+    {
+        out.Initialize(SMSG_GUILD_PERMISSIONS, 4 * 4 + 3 + GUILD_BANK_MAX_TABS * 2 * 4);
+        out << uint32(rankId);
+        out << uint32(moneyPerDay);
+        out << uint32(purchasedTabs);
+        out << uint32(rankRights);
+        out.WriteBits(GUILD_BANK_MAX_TABS, 21);
+        out.FlushBits();
+        for (uint8 tab = 0; tab < GUILD_BANK_MAX_TABS; ++tab)
+        {
+            out << uint32(remainingSlots[tab]);
+            out << uint32(tabRights[tab]);
+        }
+    }
+
     inline EmblemDesign ReadSaveGuildEmblem(WorldPacket& in)
     {
         EmblemDesign design;
