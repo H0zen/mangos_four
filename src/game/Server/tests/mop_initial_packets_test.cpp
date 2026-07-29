@@ -334,6 +334,45 @@ static void test_weather()
             0x44, 0x33, 0x22, 0x11, 0x00, 0x00, 0xC0, 0x3F, 0x80
         }));
     }
+
+    // The cases above use invented values, which pin the encoding but say nothing
+    // about whether the field order matches 18414. These three are retail bytes.
+    // All 2,891 corpus observations of this opcode are exactly 9 bytes.
+
+    // capture-000004 seq 99: the quiescent case, repeated identically at seq 29236
+    // and seq 48593 -- state 1 at zero intensity.
+    {
+        WorldPacket packet(SMSG_WEATHER, 9);
+        MopInitialPackets::BuildWeather(packet, 1u, 0.0f, false);
+        CHECK(ExpectBytes(packet, {
+            0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00
+        }));
+    }
+
+    // capture-000044 seq 63233: state 3 at half intensity. A zero intensity cannot
+    // distinguish state/intensity/bit from state/bit/intensity, because both orders
+    // produce the same nine bytes. A nonzero one can: this fixes the intensity
+    // argument at bytes 4..7 in little-endian IEEE-754, 0x3F000000 being 0.5f.
+    // It is not on its own proof that the field is declared float -- only that the
+    // argument is encoded there that way.
+    {
+        WorldPacket packet(SMSG_WEATHER, 9);
+        MopInitialPackets::BuildWeather(packet, 3u, 0.5f, false);
+        CHECK(ExpectBytes(packet, {
+            0x03, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x3F, 0x00
+        }));
+    }
+
+    // capture-000075 seq 888845: the same state and intensity with the trailing
+    // bit set, so both polarities of that byte-aligned bit are covered by retail
+    // data rather than by construction.
+    {
+        WorldPacket packet(SMSG_WEATHER, 9);
+        MopInitialPackets::BuildWeather(packet, 3u, 0.5f, true);
+        CHECK(ExpectBytes(packet, {
+            0x03, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x3F, 0x80
+        }));
+    }
 }
 
 static void test_motd()
