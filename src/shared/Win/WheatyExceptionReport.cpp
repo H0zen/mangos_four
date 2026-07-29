@@ -205,6 +205,11 @@ bool WheatyExceptionReport::WriteMiniDump(PEXCEPTION_POINTERS pExceptionInfo)
     // process that is already short of memory - and failing here drops us back to
     // dumping on the faulting stack, which is precisely what this thread exists to
     // avoid for stack-overflow crashes.
+    // Cleared up front so every exit from here leaves it meaning what it says. Only
+    // the timeout path sets it, and a static that one path forgets is how a later
+    // change to the guard logic turns into a report racing a live dump.
+    m_dumpHelperRunning = false;
+
     HANDLE hThread = CreateThread(0, 256 * 1024, MiniDumpThreadProc, &request,
                                   STACK_SIZE_PARAM_IS_A_RESERVATION, 0);
 
