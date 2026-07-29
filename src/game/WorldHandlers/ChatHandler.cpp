@@ -260,7 +260,7 @@ void WorldSession::HandleMessagechatOpcode(WorldPacket& recv_data)
             }
             else
             {
-                msg = recv_data.ReadString(recv_data.ReadBits(9));
+                msg = recv_data.ReadString(recv_data.ReadBits(8));
             }
 
             if (msg.empty())
@@ -389,7 +389,7 @@ void WorldSession::HandleMessagechatOpcode(WorldPacket& recv_data)
         case CHAT_MSG_PARTY_LEADER:
         {
             std::string msg;
-            msg = recv_data.ReadString(recv_data.ReadBits(9));
+            msg = recv_data.ReadString(recv_data.ReadBits(8));
 
             if (msg.empty())
             {
@@ -447,7 +447,7 @@ void WorldSession::HandleMessagechatOpcode(WorldPacket& recv_data)
         case CHAT_MSG_GUILD:
         {
             std::string msg;
-            msg = recv_data.ReadString(recv_data.ReadBits(9));
+            msg = recv_data.ReadString(recv_data.ReadBits(8));
 
             if (msg.empty())
             {
@@ -491,7 +491,7 @@ void WorldSession::HandleMessagechatOpcode(WorldPacket& recv_data)
         case CHAT_MSG_OFFICER:
         {
             std::string msg;
-            msg = recv_data.ReadString(recv_data.ReadBits(9));
+            msg = recv_data.ReadString(recv_data.ReadBits(8));
 
             if (msg.empty())
             {
@@ -535,7 +535,7 @@ void WorldSession::HandleMessagechatOpcode(WorldPacket& recv_data)
         case CHAT_MSG_RAID:
         {
             std::string msg;
-            msg = recv_data.ReadString(recv_data.ReadBits(9));
+            msg = recv_data.ReadString(recv_data.ReadBits(8));
 
             if (msg.empty())
             {
@@ -586,7 +586,7 @@ void WorldSession::HandleMessagechatOpcode(WorldPacket& recv_data)
         case CHAT_MSG_RAID_LEADER:
         {
             std::string msg;
-            msg = recv_data.ReadString(recv_data.ReadBits(9));
+            msg = recv_data.ReadString(recv_data.ReadBits(8));
 
             if (msg.empty())
             {
@@ -638,7 +638,7 @@ void WorldSession::HandleMessagechatOpcode(WorldPacket& recv_data)
         case CHAT_MSG_RAID_WARNING:
         {
             std::string msg;
-            msg = recv_data.ReadString(recv_data.ReadBits(9));
+            msg = recv_data.ReadString(recv_data.ReadBits(8));
 
             // A dot command typed with this destination selected has to be
             // executed, not announced. Every other destination does this; the
@@ -687,7 +687,7 @@ void WorldSession::HandleMessagechatOpcode(WorldPacket& recv_data)
         case CHAT_MSG_BATTLEGROUND:
         {
             std::string msg;
-            msg = recv_data.ReadString(recv_data.ReadBits(9));
+            msg = recv_data.ReadString(recv_data.ReadBits(8));
 
             if (!processChatmessageFurtherAfterSecurityChecks(msg, lang))
             {
@@ -725,7 +725,7 @@ void WorldSession::HandleMessagechatOpcode(WorldPacket& recv_data)
         case CHAT_MSG_BATTLEGROUND_LEADER:
         {
             std::string msg;
-            msg = recv_data.ReadString(recv_data.ReadBits(9));
+            msg = recv_data.ReadString(recv_data.ReadBits(8));
 
             if (!processChatmessageFurtherAfterSecurityChecks(msg, lang))
             {
@@ -853,7 +853,7 @@ void WorldSession::HandleMessagechatOpcode(WorldPacket& recv_data)
         case CHAT_MSG_DND:
         {
             std::string msg;
-            msg = recv_data.ReadString(recv_data.ReadBits(9));
+            msg = recv_data.ReadString(recv_data.ReadBits(8));
 
             if (_player->isDND())                           // Already DND
             {

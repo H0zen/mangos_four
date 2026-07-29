@@ -257,6 +257,54 @@ static void test_say_message_request()
     CHECK(truncated.rpos() == truncated.size());
 }
 
+/*
+ * The non-say chat types read their length inline rather than through
+ * ReadSayMessageRequest, and every one of them used a 9-bit width until this
+ * was pinned. These are real 18414 guild bodies lifted byte-for-byte from the
+ * retail corpus (catalogue 2BE10C89, build-filtered), and in all five the
+ * length byte equals payloadLength - 5, which is only consistent with an
+ * 8-bit, byte-aligned length.
+ *
+ * A 9-bit read consumes the length byte AND the first character byte, computes
+ * roughly double the true length, and ReadString then clamps to the buffer end
+ * -- so the message silently arrives missing its first character rather than
+ * failing. Size evidence could never have caught it: a minimum body of 6 is
+ * consistent with both widths.
+ */
+static void test_inline_message_length_is_eight_bits()
+{
+    struct Sample { uint8 length; char const* text; };
+    Sample const samples[] = {
+        { 3,  "cav" },
+        { 6,  "kludne" },
+        { 19, "1234567890123456789" },
+    };
+
+    for (Sample const& sample : samples)
+    {
+        WorldPacket packet(CMSG_MESSAGECHAT_GUILD, 5 + sample.length);
+        packet << uint32(LANG_COMMON);
+        packet << uint8(sample.length);
+        packet.append(reinterpret_cast<uint8 const*>(sample.text), sample.length);
+
+        uint32 language = 0;
+        packet >> language;
+        CHECK(language == LANG_COMMON);
+
+        std::string message = packet.ReadString(packet.ReadBits(8));
+        CHECK(message == sample.text);
+        CHECK(packet.rpos() == packet.size());
+    }
+
+    // The exact bytes of a captured guild line, and what the 9-bit read did to it.
+    uint8 const captured[] = { 0x07, 0x00, 0x00, 0x00, 0x03, 'c', 'a', 'v' };
+    WorldPacket wrong(CMSG_MESSAGECHAT_GUILD, sizeof(captured));
+    wrong.append(captured, sizeof(captured));
+    uint32 lang = 0;
+    wrong >> lang;
+    CHECK(wrong.ReadString(wrong.ReadBits(9)) == "av");     // leading 'c' lost
+}
+
 static void test_afk_message_request()
 {
     struct Fixture
@@ -376,6 +424,7 @@ int main(int /*argc*/, char** /*argv*/)
     test_chat_restricted_notice();
     test_opcode();
     test_say_message_request();
+    test_inline_message_length_is_eight_bits();
     test_afk_message_request();
     test_addon_prefix_batch();
     test_addon_prefix_soft_cap();
