@@ -126,3 +126,56 @@ string(FIND "${player_source}"
 if(NOT over_money_status EQUAL -1)
     message(FATAL_ERROR "status 24 remains in the over-money path")
 endif()
+
+# The trade conversation. Only cancel was registered before, so a player could
+# abort a trade they had no way to start. Pin the whole registration tuple for each
+# step so a changed handler, status or processing mode fails here.
+set(trade_registrations
+    "DefC(CMSG_BEGIN_TRADE, \"CMSG_BEGIN_TRADE\", STATUS_LOGGEDIN, PROCESS_THREADUNSAFE, &WorldSession::HandleBeginTradeOpcode);"
+    "DefC(CMSG_INITIATE_TRADE, \"CMSG_INITIATE_TRADE\", STATUS_LOGGEDIN, PROCESS_THREADUNSAFE, &WorldSession::HandleInitiateTradeOpcode);"
+    "DefC(CMSG_UNACCEPT_TRADE, \"CMSG_UNACCEPT_TRADE\", STATUS_LOGGEDIN, PROCESS_THREADUNSAFE, &WorldSession::HandleUnacceptTradeOpcode);"
+    "DefC(CMSG_SET_TRADE_GOLD, \"CMSG_SET_TRADE_GOLD\", STATUS_LOGGEDIN, PROCESS_THREADUNSAFE, &WorldSession::HandleSetTradeGoldOpcode);"
+    "DefC(CMSG_SET_TRADE_ITEM, \"CMSG_SET_TRADE_ITEM\", STATUS_LOGGEDIN, PROCESS_THREADUNSAFE, &WorldSession::HandleSetTradeItemOpcode);"
+    "DefC(CMSG_CLEAR_TRADE_ITEM, \"CMSG_CLEAR_TRADE_ITEM\", STATUS_LOGGEDIN, PROCESS_THREADUNSAFE, &WorldSession::HandleClearTradeItemOpcode);")
+foreach(trade_registration IN LISTS trade_registrations)
+    string(FIND "${opcode_registry}" "${trade_registration}" trade_found)
+    if(trade_found EQUAL -1)
+        message(FATAL_ERROR "trade registration missing or altered: ${trade_registration}")
+    endif()
+endforeach()
+
+# The initiate-trade guid order is binary-derived. The inherited permutation
+# consumed the same six bytes while decoding a different byte set, so a size check
+# would not catch a regression here; pin the orders themselves.
+string(FIND "${player_header}" "uint8 const maskOrder[] = { 5, 1, 4, 2, 3, 7, 0, 6 };" initiate_mask)
+string(FIND "${player_header}" "uint8 const byteOrder[] = { 4, 6, 2, 0, 3, 7, 5, 1 };" initiate_bytes)
+if(initiate_mask EQUAL -1 OR initiate_bytes EQUAL -1)
+    message(FATAL_ERROR "initiate-trade guid order is not the 18414 client order")
+endif()
+string(FIND "${trade_source}" "recvPacket >> tradeSlot;" set_item_trade_slot)
+string(FIND "${trade_source}" "recvPacket >> slot;" set_item_inventory_slot)
+string(FIND "${trade_source}" "recvPacket >> bag;" set_item_bag)
+if(set_item_trade_slot EQUAL -1 OR set_item_inventory_slot EQUAL -1 OR set_item_bag EQUAL -1)
+    message(FATAL_ERROR "set-trade-item does not read all three 18414 fields")
+endif()
+if(NOT set_item_trade_slot LESS set_item_inventory_slot OR NOT set_item_inventory_slot LESS set_item_bag)
+    message(FATAL_ERROR "set-trade-item must read trade slot, then inventory slot, then bag")
+endif()
+
+string(FIND "${trade_source}" "MopTradePackets::ReadInitiateTrade(recvPacket)" initiate_reader)
+if(initiate_reader EQUAL -1)
+    message(FATAL_ERROR "initiate-trade handler does not use the shared 18414 reader")
+endif()
+
+# CMSG_ACCEPT_TRADE must not be registered while its state token is discarded. The
+# token is the only thing that rejects an accept aimed at an offer that has since
+# changed: clearing both accepted flags on mutation cannot invalidate an accept the
+# server has not materialised yet, and sessions drain independently.
+string(FIND "${opcode_registry}" "DefC(CMSG_ACCEPT_TRADE," accept_registered)
+if(NOT accept_registered EQUAL -1)
+    string(FIND "${trade_source}" "read_skip<uint32>()" accept_token_discarded)
+    if(NOT accept_token_discarded EQUAL -1)
+        message(FATAL_ERROR
+            "CMSG_ACCEPT_TRADE is registered while its trade-state token is still discarded")
+    endif()
+endif()

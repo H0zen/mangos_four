@@ -322,6 +322,38 @@ namespace MopControlPackets
 
 namespace MopTradePackets
 {
+    /**
+     * CMSG_INITIATE_TRADE body: the target player's guid, bit-packed.
+     *
+     * Orders are read out of the client's own send serializer sub_69238D in
+     * Wow.exe 5.4.8.18414, reached through the wrapper sub_690321 that stamps
+     * opcode 615. It holds the guid at object offsets +16..23 and emits the mask
+     * bits from guid bytes 5,1,4,2,3,7,0,6 and then the present bytes in order
+     * 4,6,2,0,3,7,5,1, each XOR 1.
+     *
+     * The order this replaced was inherited and decoded a different byte set
+     * entirely: on capture-000110 seq 659268 it claimed bytes 1,3,4,6,7 were
+     * present and produced 0x3CC800E805000400, where the client's own order
+     * gives 0x04000000053CC8E8 -- bytes 4,5,6 zero and a plausible counter,
+     * which is what a player guid actually looks like.
+     */
+    inline uint64 ReadInitiateTrade(WorldPacket& in)
+    {
+        uint8 const maskOrder[] = { 5, 1, 4, 2, 3, 7, 0, 6 };
+        uint8 const byteOrder[] = { 4, 6, 2, 0, 3, 7, 5, 1 };
+
+        uint8 guidBytes[8] = {};
+        for (uint8 index : maskOrder)
+            guidBytes[index] = in.ReadBit();
+        for (uint8 index : byteOrder)
+            in.ReadByteSeq(guidBytes[index]);
+
+        uint64 guid = 0;
+        for (uint8 index = 0; index < 8; ++index)
+            guid |= uint64(guidBytes[index]) << (index * 8);
+        return guid;
+    }
+
     struct StatusData
     {
         bool flag = false;

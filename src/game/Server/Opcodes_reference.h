@@ -175,9 +175,9 @@
  *   TOTAL SMSG rows                   925
  *
  * SUBSYSTEM CONFIDENCE: high=365, low=221, medium=182, none=157
- * STATUS TOTALS: ACTIVE=438, DOC=435, DORMANT=647
+ * STATUS TOTALS: ACTIVE=444, DOC=435, DORMANT=641
  *   SMSG: ACTIVE=266, DOC=271, DORMANT=388
- *   CMSG: ACTIVE=172, DOC=164, DORMANT=259
+ *   CMSG: ACTIVE=178, DOC=164, DORMANT=253
  */
 
 // CAVEATS -- read before trusting any single row:
@@ -1309,7 +1309,7 @@ typedef uint16_t uint16;
  *   CMSG_SET_ACHIEVEMENTS_HIDDEN                   0x0002  DOC     
  *   CMSG_CHANNEL_MUTE                              0x000A  DORMANT 
  *   CMSG_PING                                      0x0012  ACTIVE  
- *   CMSG_UNACCEPT_TRADE                            0x0023  DORMANT 
+ *   CMSG_UNACCEPT_TRADE                            0x0023  ACTIVE
  *   CMSG_DESTROY_ITEM                              0x0026  ACTIVE
  *   CMSG_NEUTRAL_PLAYER_SELECT_FACTION             0x0027  DOC     
  *   CMSG_MESSAGECHAT_DND                           0x002E  ACTIVE
@@ -1326,7 +1326,7 @@ typedef uint16_t uint16;
  *   CMSG_MOUNTSPECIAL_ANIM                         0x0082  DORMANT 
  *   CMSG_SCENE_COMPLETED                           0x0087  DOC     
  *   CMSG_MESSAGECHAT_ADDON_RAID                    0x009A  ACTIVE
- *   CMSG_CLEAR_TRADE_ITEM                          0x00A7  DORMANT 
+ *   CMSG_CLEAR_TRADE_ITEM                          0x00A7  ACTIVE
  *   CMSG_CHANNEL_MODERATOR                         0x00AE  DORMANT 
  *   CMSG_CHANNEL_OWNER                             0x00AF  DORMANT 
  *   CMSG_AUTH_SESSION                              0x00B2  ACTIVE  
@@ -1374,7 +1374,7 @@ typedef uint16_t uint16;
  *   CMSG_AUTOEQUIP_ITEM                            0x025F  ACTIVE
  *   CMSG_KEYBOUND_OVERRIDE                         0x0264  DOC     
  *   CMSG_ZONEUPDATE                                0x0265  DORMANT 
- *   CMSG_INITIATE_TRADE                            0x0267  DORMANT 
+ *   CMSG_INITIATE_TRADE                            0x0267  ACTIVE
  *   CMSG_UNLEARN_SKILL                             0x0268  DORMANT 
  *   CMSG_UNKNOWN_0x0274                            0x0274  DOC     
  *   CMSG_CONFIRM_RESPEC_WIPE                       0x0275  ACTIVE
@@ -1452,7 +1452,7 @@ typedef uint16_t uint16;
  *   CMSG_ACTIVATETAXI                              0x03C9  DORMANT 
  *   CMSG_PUSHQUESTTOPARTY                          0x03D2  ACTIVE
  *   CMSG_RECLAIM_CORPSE                            0x03D3  DORMANT
- *   CMSG_SET_TRADE_ITEM                            0x03D5  DORMANT 
+ *   CMSG_SET_TRADE_ITEM                            0x03D5  ACTIVE
  *   CMSG_SWAP_INV_ITEM                             0x03DF  ACTIVE
  *   CMSG_DUEL_RESPONSE                             0x03E2  DOC     
  *   CMSG_SET_CURRENCY_FLAGS                        0x03E4  DORMANT 
@@ -1761,7 +1761,7 @@ typedef uint16_t uint16;
  *   CMSG_VOID_STORAGE_TRANSFER                     0x1440  DOC     
  *   CMSG_CLEAR_RAID_MARKER                         0x1443  DORMANT 
  *   CMSG_UNKNOWN_0x1446                            0x1446  DOC     
- *   CMSG_ACCEPT_TRADE                              0x144D  DORMANT 
+ *   CMSG_ACCEPT_TRADE                              0x144D  DORMANT
  *   CMSG_LF_GUILD_POST_REQUEST                     0x1450  DORMANT 
  *   CMSG_GET_CHALLENGE_MODE_REWARDS                0x1452  DOC     
  *   CMSG_GUILD_ROSTER                              0x1459  ACTIVE
@@ -1778,7 +1778,7 @@ typedef uint16_t uint16;
  *   CMSG_GUILD_BANK_MONEY_WITHDRAWN                0x14DB  ACTIVE
  *   CMSG_BUSY_TRADE                                0x14E0  DORMANT 
  *   CMSG_MAIL_DELETE                               0x14E2  DORMANT 
- *   CMSG_SET_TRADE_GOLD                            0x14E3  DORMANT 
+ *   CMSG_SET_TRADE_GOLD                            0x14E3  ACTIVE
  *   CMSG_LF_GUILD_DECLINE_RECRUIT                  0x14F3  DOC     
  *   CMSG_BATTLE_PET_LEARN                          0x1540  DOC     
  *   CMSG_CANCEL_MOUNT_AURA                         0x1552  DORMANT 
@@ -1869,7 +1869,7 @@ typedef uint16_t uint16;
  *   CMSG_USE_ITEM                                  0x1CC1  DORMANT 
  *   CMSG_BATTLE_PET_QUERY_NAME                     0x1CE0  DOC     
  *   CMSG_LOOT                                      0x1CE2  ACTIVE
- *   CMSG_BEGIN_TRADE                               0x1CE3  DORMANT 
+ *   CMSG_BEGIN_TRADE                               0x1CE3  ACTIVE
  *   CMSG_OPEN_ITEM                                 0x1D10  DORMANT 
  *   CMSG_SAVE_GUILD_EMBLEM                         0x1D60  ACTIVE
  *   CMSG_RESET_CHALLENGE_MODE                      0x1D61  DOC     

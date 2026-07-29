@@ -645,9 +645,9 @@ void WorldSession::HandleCancelTradeOpcode(WorldPacket& /*recvPacket*/)
  */
 void WorldSession::HandleInitiateTradeOpcode(WorldPacket& recvPacket)
 {
-    ObjectGuid otherGuid;
-    recvPacket.ReadGuidMask<0, 3, 5, 1, 4, 6, 7, 2>(otherGuid);
-    recvPacket.ReadGuidBytes<7, 4, 3, 5, 1, 2, 6, 0>(otherGuid);
+    // Order comes from the client's own send serializer sub_69238D; the previous
+    // permutation was inherited and decoded a different byte set entirely.
+    ObjectGuid otherGuid(MopTradePackets::ReadInitiateTrade(recvPacket));
 
     if (GetPlayer()->m_trade)
     {
@@ -772,13 +772,24 @@ void WorldSession::HandleSetTradeGoldOpcode(WorldPacket& recvPacket)
  */
 void WorldSession::HandleSetTradeItemOpcode(WorldPacket& recvPacket)
 {
-    // send update
+    // Field order is fixed by retail capture, and the inherited order had the first
+    // two swapped. Five 18414 bodies:
+    //
+    //   06 14 13   06 09 13   00 08 16   00 0F 16   00 18 FF
+    //
+    // Byte 0 never exceeds 6, the last of the seven trade slots. Byte 2 is only ever
+    // 19..22 or 255, which are the bag slots and INVENTORY_SLOT_BAG_0. Byte 1 runs up
+    // to 24, an inventory slot. So the order is trade slot, inventory slot, bag.
+    //
+    // Read the old way, `06 14 13` yields trade slot 20, which fails the bound check
+    // below and cancels the trade. Putting an item up would have closed the window
+    // instead of filling a slot.
     uint8 tradeSlot;
     uint8 bag;
     uint8 slot;
 
-    recvPacket >> slot;
     recvPacket >> tradeSlot;
+    recvPacket >> slot;
     recvPacket >> bag;
 
     TradeData* my_trade = _player->m_trade;

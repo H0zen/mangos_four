@@ -261,6 +261,36 @@ static void test_extended_bounds()
     CHECK(duplicateRejected.empty());
 }
 
+// CMSG_INITIATE_TRADE request decode. Both bodies are retail: capture-000110 seq
+// 659268 and capture-000183 seq 298059, each 6 bytes with mask 0x5E.
+//
+// The order this asserts comes from the client's send serializer sub_69238D, not
+// from a fork. The check that matters is not the size -- the inherited order also
+// consumed exactly 6 bytes -- but which bytes are claimed present. The client's
+// order yields bytes 0,1,2,3,7 with 4,5,6 zero, which is the shape of a player
+// guid. The inherited order claimed 1,3,4,6,7 and produced 0x3CC800E805000400.
+static void test_initiate_trade_request()
+{
+    {
+        std::vector<uint8> const capture = { 0x5E, 0x3D, 0xE9, 0x04, 0x05, 0xC9 };
+        WorldPacket packet(CMSG_INITIATE_TRADE, capture.size());
+        packet.append(capture.data(), capture.size());
+
+        uint64 const guid = MopTradePackets::ReadInitiateTrade(packet);
+        CHECK(guid == 0x04000000053CC8E8ULL);
+        CHECK(packet.rpos() == capture.size());
+    }
+    {
+        std::vector<uint8> const capture = { 0x5E, 0x8A, 0xB8, 0x04, 0x04, 0x1C };
+        WorldPacket packet(CMSG_INITIATE_TRADE, capture.size());
+        packet.append(capture.data(), capture.size());
+
+        uint64 const guid = MopTradePackets::ReadInitiateTrade(packet);
+        CHECK(guid == 0x05000000058B1DB9ULL);
+        CHECK(packet.rpos() == capture.size());
+    }
+}
+
 int main(int /*argc*/, char** /*argv*/)
 {
     test_compact_statuses();
@@ -268,5 +298,6 @@ int main(int /*argc*/, char** /*argv*/)
     test_extended_unwrapped_item();
     test_extended_wrapped_item();
     test_extended_bounds();
+    test_initiate_trade_request();
     return g_fail ? 1 : 0;
 }

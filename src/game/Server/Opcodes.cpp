@@ -427,6 +427,64 @@ void InitializeOpcodes()
     DefS(SMSG_CHANNEL_NOTIFY, "SMSG_CHANNEL_NOTIFY");
     DefS(SMSG_CHANNEL_LIST, "SMSG_CHANNEL_LIST");
     DefC(CMSG_CANCEL_TRADE, "CMSG_CANCEL_TRADE", STATUS_LOGGEDIN_OR_RECENTLY_LOGGEDOUT, PROCESS_THREADUNSAFE, &WorldSession::HandleCancelTradeOpcode);
+
+    // The rest of the trade conversation. Only cancel was registered, so a player
+    // could abort a trade they had no way to start: every other step was dropped.
+    //
+    // These add no new outbound surface. The exchange answers through
+    // SMSG_TRADE_STATUS via SendTradeStatus, and item and money changes additionally
+    // answer through SMSG_TRADE_STATUS_EXTENDED via TradeData::Update. Both are
+    // already registered, already admitted by the in-world send gate and already
+    // covered by mop_trade_packets, which is why this batch is the request side only.
+    //
+    // CMSG_ACCEPT_TRADE is deliberately NOT registered, so a trade can be set up here
+    // but not completed. That is the honest state: completing it safely needs work
+    // this batch does not do.
+    //
+    // Its uint32 is not padding. It varies across retail requests and tracks the
+    // trade state the client currently has displayed, and retail uses it to reject an
+    // accept aimed at an offer that has since changed. Discarding it looked safe on
+    // the argument that we already clear BOTH sides' accepted flags on every offer
+    // mutation, so a changed offer cannot carry an old accept. That argument is
+    // wrong, because it assumes the clear happens after the accept is recorded.
+    // Sessions have their own FIFOs and the world drains them independently, so:
+    //
+    //   A sends ACCEPT(V1), which sits queued.
+    //   B sends SET_ITEM(V2) then ACCEPT(V2).
+    //   B's session drains first: the mutation clears both flags, then B accepts V2.
+    //   A's older packet drains: the token is discarded and A is marked accepted
+    //   against the CURRENT offer, which is now V2.
+    //   Both sides read as accepted and V2 is finalized. A never accepted V2.
+    //
+    // The clear cannot invalidate an accept that does not exist yet, so the token is
+    // the actual protection against that interleaving, not a cross-check on top of
+    // one. Registering accept without consuming it would hand out a way to complete a
+    // trade against an offer the other party never agreed to.
+    //
+    // It returns once the token is derived and validated, which needs the
+    // SMSG_TRADE_STATUS_EXTENDED header semantics worked out first -- those fields are
+    // currently hardcoded 0, 7, 0, 7.
+    //
+    // Each handler's reads match the retail body, and every one of these bodies is
+    // fixed-width in the corpus:
+    //
+    //   BEGIN_TRADE      reads nothing            retail 0 bytes
+    //   UNACCEPT_TRADE   reads nothing            retail 0 bytes
+    //   CLEAR_TRADE_ITEM uint8                    retail 1 byte
+    //   SET_TRADE_ITEM   three uint8              retail 3 bytes
+    //   SET_TRADE_GOLD   uint64                   retail 8 bytes
+    //   INITIATE_TRADE   one bit-packed guid      retail 6 bytes
+    //
+    // INITIATE_TRADE needed its reader corrected first. The inherited permutation
+    // decoded a different byte set than the client sends -- see the note on
+    // MopTradePackets::ReadInitiateTrade, whose orders come from the client's own
+    // send serializer sub_69238D rather than from any fork.
+    DefC(CMSG_BEGIN_TRADE, "CMSG_BEGIN_TRADE", STATUS_LOGGEDIN, PROCESS_THREADUNSAFE, &WorldSession::HandleBeginTradeOpcode);
+    DefC(CMSG_INITIATE_TRADE, "CMSG_INITIATE_TRADE", STATUS_LOGGEDIN, PROCESS_THREADUNSAFE, &WorldSession::HandleInitiateTradeOpcode);
+    DefC(CMSG_UNACCEPT_TRADE, "CMSG_UNACCEPT_TRADE", STATUS_LOGGEDIN, PROCESS_THREADUNSAFE, &WorldSession::HandleUnacceptTradeOpcode);
+    DefC(CMSG_SET_TRADE_GOLD, "CMSG_SET_TRADE_GOLD", STATUS_LOGGEDIN, PROCESS_THREADUNSAFE, &WorldSession::HandleSetTradeGoldOpcode);
+    DefC(CMSG_SET_TRADE_ITEM, "CMSG_SET_TRADE_ITEM", STATUS_LOGGEDIN, PROCESS_THREADUNSAFE, &WorldSession::HandleSetTradeItemOpcode);
+    DefC(CMSG_CLEAR_TRADE_ITEM, "CMSG_CLEAR_TRADE_ITEM", STATUS_LOGGEDIN, PROCESS_THREADUNSAFE, &WorldSession::HandleClearTradeItemOpcode);
     DefC(CMSG_UI_TIME_REQUEST, "CMSG_UI_TIME_REQUEST", STATUS_LOGGEDIN, PROCESS_INPLACE, &WorldSession::HandleUITimeRequestOpcode);
     DefC(CMSG_LOAD_SCREEN, "CMSG_LOAD_SCREEN", STATUS_AUTHED, PROCESS_THREADUNSAFE, &WorldSession::HandleLoadScreenOpcode);
     DefC(CMSG_QUERY_COUNTDOWN_TIMER, "CMSG_QUERY_COUNTDOWN_TIMER", STATUS_LOGGEDIN, PROCESS_THREADUNSAFE, &WorldSession::HandleQueryCountdownTimerOpcode);
