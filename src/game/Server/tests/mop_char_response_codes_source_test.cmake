@@ -239,6 +239,13 @@ endif()
 #   capture-000019 seq 177 ACCOUNT_DATA_TIMES, 179 MOTD, 180 SET_TIME_ZONE_INFORMATION
 #   capture-000013 seq 161 ACCOUNT_DATA_TIMES, 164 MOTD, 166 SET_TIME_ZONE_INFORMATION
 # The packets in between differ between the two, so only the after-MOTD relation is asserted.
+#
+# The evidence is RECORDED SEQUENCE ORDER, not timestamps, and re-deriving it from timing will
+# look like it disproves the claim. All three packets are one server write burst: in
+# capture-000013 they share the 8000 ms bucket at 1000 ms capture resolution, and in
+# capture-000019 -- which has 1 ms resolution -- they still share the same millisecond, 26255.
+# So no timestamp can separate them in either capture; sequence is the only ordering available,
+# and for a single server connection that is the order the packets arrived, hence were sent.
 string(FIND "${_charh_src}" "data.Initialize(SMSG_MOTD," _motd_at)
 string(FIND "${_charh_src}" "WorldPacket tz(SMSG_SET_TIME_ZONE_INFORMATION" _tz_at)
 if(_motd_at EQUAL -1 OR _tz_at EQUAL -1)

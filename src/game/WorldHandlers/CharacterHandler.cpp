@@ -978,7 +978,11 @@ void WorldSession::HandlePlayerLogin(LoginQueryHolder* holder)
     //                 capture-000013 seq 161 ACCOUNT_DATA_TIMES, 164 MOTD, 166 SET_TIME_ZONE_INFO
     //
     // The packets between account-data-times and the timezone differ between those two captures,
-    // so only the after-MOTD relation is asserted here, not an exact index.
+    // so only the after-MOTD relation is asserted here, not an exact index. Those are recorded
+    // sequence numbers, not timestamps: all three are one server write burst and share a single
+    // timestamp in both captures (8000 ms at 1000 ms resolution in 13; the same millisecond,
+    // 26255, even at 1 ms resolution in 19), so timing cannot order them and does not contradict
+    // this.
     //
     // bypassSuppress stays true: m_suppressWorldSends is raised above and this opcode is not on the
     // enter-world admission list.
