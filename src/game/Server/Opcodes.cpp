@@ -821,16 +821,17 @@ void InitializeOpcodes()
     DefS(SMSG_GUILD_EVENT_DISBANDED, "SMSG_GUILD_EVENT_DISBANDED");
     DefS(SMSG_GUILD_COMMAND_RESULT, "SMSG_GUILD_COMMAND_RESULT");
 
-    // The guild read-only queries. All three handlers already read 18414 bit-packed
-    // shapes rather than inherited ones, and the retail body sizes agree with what
-    // each one consumes:
+    // Guild bank permissions query. The request carries no body at all (2,089 corpus
+    // observations, every one of them zero bytes) so there is no reader to get wrong,
+    // and the reply is now byte-exact against retail: mop_guild_packets compares the
+    // generated packet against capture-000006 seq 1959 in full. All 2,080 corpus
+    // observations of the reply are exactly 83 bytes.
     //
-    //   ROSTER        two bit-packed GUIDs -> 2 mask bytes + 0..16 present = 2..18
-    //                 observed 3,953 packets, min 5 max 18 (the max is exactly the bound)
-    //   QUERY_RANKS   one bit-packed GUID  -> 1 mask byte  + 0..8  present = 1..9
-    //                 observed 3,966 packets, min 7 max 8
-    //   PERMISSIONS   reads nothing at all
-    //                 observed 2,089 packets, min 0 max 0
+    // Note that body size alone would NOT have been sufficient warrant here. The
+    // inherited body also totalled 83 bytes while being wrong three ways over -- the
+    // field order, a 23-bit tab count where the client reads 21, and the tab pairs
+    // written rights-first instead of slots-first. 21 and 23 bits both round to the
+    // same three bytes, which is exactly why the fixture compares bytes and not length.
     //
     // CMSG_GUILD_QUERY (0x1AB6) is deliberately NOT registered here despite being the
     // heaviest of the family at 30,939 observations. HandleGuildQueryOpcode still reads
@@ -839,12 +840,16 @@ void InitializeOpcodes()
     // 9..17 and variable, i.e. bit-packed. That is an inherited-shape handler and
     // registering it would misparse every request -- the same mistake the corpse-reclaim
     // registrations made. It stays dormant until the handler is converted.
-    DefC(CMSG_GUILD_ROSTER, "CMSG_GUILD_ROSTER", STATUS_LOGGEDIN, PROCESS_THREADUNSAFE, &WorldSession::HandleGuildRosterOpcode);
-    DefS(SMSG_GUILD_ROSTER, "SMSG_GUILD_ROSTER");
-    DefC(CMSG_GUILD_QUERY_RANKS, "CMSG_GUILD_QUERY_RANKS", STATUS_LOGGEDIN, PROCESS_THREADUNSAFE, &WorldSession::HandleGuildQueryRanksOpcode);
-    DefS(SMSG_GUILD_QUERY_RANKS_RESULT, "SMSG_GUILD_QUERY_RANKS_RESULT");
     DefC(CMSG_GUILD_PERMISSIONS, "CMSG_GUILD_PERMISSIONS", STATUS_LOGGEDIN, PROCESS_THREADUNSAFE, &WorldSession::HandleGuildPermissions);
     DefS(SMSG_GUILD_PERMISSIONS, "SMSG_GUILD_PERMISSIONS");
+
+    // CMSG_GUILD_ROSTER (0x1459) and CMSG_GUILD_QUERY_RANKS (0x0D50) stay dormant for
+    // now even though their readers were corrected against the client binary in this
+    // same series. Their replies are the blocker: Guild::Roster still writes an 11-bit
+    // MOTD length, an 18-bit member count and 7-bit names, and Guild::QueryRanks still
+    // writes an 18-bit rank count, none of which has been checked against a capture the
+    // way the permissions body below now has. Registering the request without a proven
+    // reply just moves the fault from a dropped packet to a malformed one.
 
     // Live-log guild-bank withdrawal allowance query. The 18414 request is
     // empty and its response contains one uint64 remaining allowance.
