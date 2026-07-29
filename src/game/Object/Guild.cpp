@@ -1077,59 +1077,30 @@ void Guild::Roster(WorldSession* session /*= NULL*/)
  */
 void Guild::Query(WorldSession* session)
 {
-    WorldPacket data(SMSG_GUILD_QUERY_RESPONSE, (8 * 32 + 200)); // we can only guess size
-
-    data << GetObjectGuid();
-    data << m_Name;
-
-    for (size_t i = 0 ; i < GUILD_RANKS_MAX_COUNT; ++i)     // show always 10 ranks
+    std::vector<MopGuildPackets::QueryRank> ranks;
+    ranks.reserve(m_Ranks.size());
+    for (uint8 i = 0; i < m_Ranks.size(); ++i)
     {
-        if (i < m_Ranks.size())
-        {
-            data << m_Ranks[i].Name;
-        }
-        else
-        {
-            data << uint8(0);                                // null string
-        }
+        MopGuildPackets::QueryRank rank;
+        rank.index = i;
+        rank.rankId = i;
+        rank.name = m_Ranks[i].Name;
+        ranks.push_back(rank);
     }
 
-    // Rank order of creation
-    for (uint8 i = 0; i < GUILD_RANKS_MAX_COUNT; ++i)
+    WorldPacket data;
+    if (!MopGuildPackets::BuildGuildQueryResponse(data, GetObjectGuid().GetRawValue(),
+        m_Name, ranks, m_EmblemStyle, m_EmblemColor, m_BorderStyle, m_BorderColor,
+        m_BackgroundColor, realmID))
     {
-        if (i < m_Ranks.size())
-        {
-            data << uint32(i);
-        }
-        else
-        {
-            data << uint32(0);
-        }
+        sLog.outError("Guild::Query: guild %u has a field too long for the 18414 query response; not sending", m_Id);
+        return;
     }
-
-    // Rank order of "importance" (sorting by rights)
-    for (uint8 i = 0; i < GUILD_RANKS_MAX_COUNT; ++i)
-    {
-        if (i < m_Ranks.size())
-        {
-            data << uint32(i);
-        }
-        else
-        {
-            data << uint32(0);
-        }
-    }
-
-    data << uint32(m_EmblemStyle);
-    data << uint32(m_EmblemColor);
-    data << uint32(m_BorderStyle);
-    data << uint32(m_BorderColor);
-    data << uint32(m_BackgroundColor);
-    data << uint32(m_Ranks.size());
 
     session->SendPacket(&data);
     DEBUG_LOG("WORLD: Sent (SMSG_GUILD_QUERY_RESPONSE)");
 }
+
 
 void Guild::QueryRanks(WorldSession* session)
 {

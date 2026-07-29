@@ -731,6 +731,60 @@ static void test_guild_query_request()
     }
 }
 
+// capture-000004 seq 39473, 133 bytes: a four-rank guild. Decoding it field by field
+// consumes all 133 exactly, and the guid appears twice -- once inside the has-data
+// block and again at the end in a different byte order, identical both times.
+static void test_guild_query_response()
+{
+    std::vector<uint8> const capture =
+    {
+        0x40, 0x00, 0x08, 0xA1, 0xC3, 0x10, 0x1A, 0xE3, 0xDE, 0x80, 0x02, 0x00,
+        0x00, 0x00, 0x18, 0x00, 0x00, 0x00, 0x0B, 0x1E, 0x0E, 0x00, 0x00, 0x00,
+        0x0D, 0x00, 0x04, 0x03, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+        0x46, 0xC3, 0xBC, 0x68, 0x72, 0x65, 0x72, 0x03, 0x00, 0x00, 0x00, 0x05,
+        0x00, 0x00, 0x00, 0x4D, 0x65, 0x6D, 0x62, 0x65, 0x72, 0x02, 0x00, 0x00,
+        0x00, 0x06, 0x00, 0x00, 0x00, 0x4F, 0x62, 0x65, 0x72, 0x67, 0x72, 0x75,
+        0x70, 0x70, 0x65, 0x6E, 0x66, 0xC3, 0xBC, 0x68, 0x72, 0x01, 0x00, 0x00,
+        0x00, 0x09, 0x00, 0x00, 0x00, 0x52, 0x65, 0x69, 0x63, 0x68, 0x73, 0x66,
+        0xC3, 0xBC, 0x68, 0x72, 0x65, 0x72, 0x49, 0x20, 0x4E, 0x20, 0x43, 0x20,
+        0x4F, 0x20, 0x4D, 0x20, 0x49, 0x20, 0x4E, 0x20, 0x47, 0x02, 0x00, 0x00,
+        0x00, 0x03, 0x00, 0x00, 0x00, 0x78, 0xF5, 0x8D, 0x0B, 0xF5, 0x8D, 0x1E,
+        0x78
+    };
+
+    // The three names carry a U+00FC. Writing it as a \x escape is not reliable here:
+    // MSVC re-encodes the escape into the execution charset and emits four bytes where
+    // retail has two, which inflates both the name and its 7-bit length field. Build the
+    // byte sequence explicitly instead.
+    std::string const uuml = std::string(1, char(0xC3)) + char(0xBC);
+    std::vector<MopGuildPackets::QueryRank> const ranks =
+    {
+        { 0, 0, "F" + uuml + "hrer" },
+        { 3, 5, "Member" },
+        { 2, 6, "Obergruppenf" + uuml + "hr" },
+        { 1, 9, "Reichsf" + uuml + "hrer" }
+    };
+    CHECK(ranks[0].name.size() == 7);
+    CHECK(ranks[2].name.size() == 16);
+    CHECK(ranks[3].name.size() == 13);
+
+    WorldPacket packet;
+    CHECK(MopGuildPackets::BuildGuildQueryResponse(packet, 0x1FF40000000A798CULL,
+        "I N C O M I N G", ranks,
+        /*emblemStyle*/ 24, /*emblemColor*/ 14, /*borderStyle*/ 2,
+        /*borderColor*/ 2, /*backgroundColor*/ 3, /*realm*/ 50593805));
+
+    CHECK(packet.GetOpcode() == SMSG_GUILD_QUERY_RESPONSE);
+    std::fprintf(stderr, "GQ got: ");
+    for (size_t i = 0; i < packet.size(); ++i) std::fprintf(stderr, "%02X ", packet.contents()[i]);
+    std::fprintf(stderr, "|");
+    for (size_t i = 0; i < packet.size() && i < capture.size(); ++i)
+        if (packet.contents()[i] != capture[i]) { std::fprintf(stderr, "diff@%u got %02X want %02X ", unsigned(i), packet.contents()[i], capture[i]); break; }
+    std::fprintf(stderr, "|\n");
+    CHECK(packet.size() == 133);
+    CHECK(Equal(packet, capture));
+}
+
 static void test_guild_query_opcodes()
 {
     CHECK(CMSG_GUILD_QUERY == 0x1AB6);
@@ -772,6 +826,7 @@ int main(int /*argc*/, char** /*argv*/)
     test_guild_roster_response();
     test_guild_roster_length_bounds();
     test_guild_query_request();
+    test_guild_query_response();
     test_guild_query_opcodes();
 
     if (g_fail)

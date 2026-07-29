@@ -542,3 +542,21 @@ if(NOT guild_query_registered EQUAL -1)
             "CMSG_GUILD_QUERY is registered but SMSG_GUILD_QUERY_RESPONSE is not registered and admitted")
     endif()
 endif()
+
+# Guild info query, both halves. The dormancy guard above becomes a positive pin now
+# that the response is derived, registered and admitted.
+require_once("${opcode_registry}"
+    "DefC(CMSG_GUILD_QUERY, \"CMSG_GUILD_QUERY\", STATUS_LOGGEDIN, PROCESS_THREADUNSAFE, &WorldSession::HandleGuildQueryOpcode);"
+    "guild-query request registration")
+require_once("${opcode_registry}"
+    "DefS(SMSG_GUILD_QUERY_RESPONSE, \"SMSG_GUILD_QUERY_RESPONSE\");"
+    "guild-query response registration")
+require_once("${world_session}"
+    "case SMSG_GUILD_QUERY_RESPONSE:"
+    "guild-query response allowlist")
+require_once("${packet_builder}"
+    "out.WriteBits(uint32(ranks.size()), 21)"
+    "guild-query 21-bit rank count")
+require_once("${guild_sender}"
+    "MopGuildPackets::BuildGuildQueryResponse(data, GetObjectGuid().GetRawValue(),"
+    "guild-query production builder call")

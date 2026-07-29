@@ -168,6 +168,88 @@ namespace MopGuildPackets
         }
     }
 
+    /// One rank as SMSG_GUILD_QUERY_RESPONSE carries it: a display index, the rank's
+    /// own id, and its name. The two numbers are genuinely different -- retail shows
+    /// (0,0) (3,5) (2,6) (1,9) in one capture -- so neither can be derived.
+    struct QueryRank
+    {
+        uint32 index = 0;
+        uint32 rankId = 0;
+        std::string name;
+    };
+
+    /**
+     * SMSG_GUILD_QUERY_RESPONSE body.
+     *
+     * Proven byte-for-byte against capture-000004 seq 39473 (133 bytes): a guid bit,
+     * a has-data bit, a 21-bit rank count, four guid bits, one 7-bit name length per
+     * rank, four more guid bits, a 7-bit guild-name length, seven more guid bits, a
+     * flush, then the byte block -- and finally the guid's present bytes a SECOND
+     * time in a different order. That duplication is not a transcription slip; the
+     * capture carries both copies and they are identical.
+     *
+     * The inherited body was a different packet entirely: a raw ObjectGuid, then
+     * null-terminated strings, then always ten ranks. Nothing about it matched.
+     */
+    inline bool BuildGuildQueryResponse(WorldPacket& out, uint64 guid,
+        std::string const& guildName, std::vector<QueryRank> const& ranks,
+        uint32 emblemStyle, uint32 emblemColor, uint32 borderStyle, uint32 borderColor,
+        uint32 backgroundColor, uint32 realm)
+    {
+        if (ranks.size() >= (size_t(1) << 21) || guildName.size() >= (size_t(1) << 7))
+            return false;
+        for (QueryRank const& rank : ranks)
+            if (rank.name.size() >= (size_t(1) << 7))
+                return false;
+
+        out.Initialize(SMSG_GUILD_QUERY_RESPONSE, 40 + guildName.size() + ranks.size() * 24);
+
+        out.WriteBit(GuidByte(guid, 5) != 0);
+        out.WriteBit(true);                                 // has data
+        out.WriteBits(uint32(ranks.size()), 21);
+        out.WriteBit(GuidByte(guid, 5) != 0);
+        out.WriteBit(GuidByte(guid, 1) != 0);
+        out.WriteBit(GuidByte(guid, 4) != 0);
+        out.WriteBit(GuidByte(guid, 7) != 0);
+        for (QueryRank const& rank : ranks)
+            out.WriteBits(uint32(rank.name.length()), 7);
+        out.WriteBit(GuidByte(guid, 3) != 0);
+        out.WriteBit(GuidByte(guid, 2) != 0);
+        out.WriteBit(GuidByte(guid, 0) != 0);
+        out.WriteBit(GuidByte(guid, 6) != 0);
+        out.WriteBits(uint32(guildName.length()), 7);
+        for (uint8 index : { 3, 7, 2, 1, 0, 4, 6 })
+            out.WriteBit(GuidByte(guid, index) != 0);
+        out.FlushBits();
+
+        out << uint32(borderStyle);
+        out << uint32(emblemStyle);
+        out.WriteByteSeq(GuidByte(guid, 2));
+        out.WriteByteSeq(GuidByte(guid, 7));
+        out << uint32(emblemColor);
+        out << uint32(realm);
+        for (QueryRank const& rank : ranks)
+        {
+            out << uint32(rank.index);
+            out << uint32(rank.rankId);
+            out.append(rank.name.c_str(), rank.name.size());
+        }
+        out.append(guildName.c_str(), guildName.size());
+        out << uint32(borderColor);
+        out.WriteByteSeq(GuidByte(guid, 5));
+        out.WriteByteSeq(GuidByte(guid, 4));
+        out << uint32(backgroundColor);
+        out.WriteByteSeq(GuidByte(guid, 1));
+        out.WriteByteSeq(GuidByte(guid, 6));
+        out.WriteByteSeq(GuidByte(guid, 0));
+        out.WriteByteSeq(GuidByte(guid, 3));
+
+        // The guid's present bytes again, in a different order. Retail carries both.
+        for (uint8 index : { 2, 6, 4, 0, 7, 3, 5, 1 })
+            out.WriteByteSeq(GuidByte(guid, index));
+        return true;
+    }
+
     /// One rank as SMSG_GUILD_QUERY_RANKS_RESULT carries it.
     struct RankEntry
     {

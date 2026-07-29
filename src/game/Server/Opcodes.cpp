@@ -910,20 +910,23 @@ void InitializeOpcodes()
     // written rights-first instead of slots-first. 21 and 23 bits both round to the
     // same three bytes, which is exactly why the fixture compares bytes and not length.
     //
-    // CMSG_GUILD_QUERY (0x1AB6) is deliberately NOT registered here despite being the
-    // heaviest of the family at 30,939 observations. Its READER is now correct: it was
-    // converted to the client's own order from sub_665EE4 and is fixture-locked against
-    // two retail captures, so the old inherited-shape objection no longer applies.
+    // Guild info query, the heaviest member of the family at 30,939 observations and
+    // the last one to land. Both halves are now proven against retail.
     //
-    // What still blocks it is the reply. SMSG_GUILD_QUERY_RESPONSE has no DefS and no
-    // case in IsEnterWorldConverted, and Guild::Query still writes a body that has never
-    // been checked against a capture. Registering the request now would parse it
-    // correctly, build a reply and have the send gate throw the reply away -- which is
-    // the failure SMSG_GUILD_PERMISSIONS shipped with and had to be fixed for, and the
-    // reason CMSG_RESET_INSTANCES was pulled back out of a later batch.
+    // The request reader takes its two interleaved guid orders from the client's own
+    // send serializer sub_665EE4 and is fixture-locked against two captures. The reply
+    // is byte-exact: mop_guild_packets rebuilds capture-000004 seq 39473 in full, all
+    // 133 bytes of a four-rank guild.
     //
-    // It lands when the response body is derived from a capture, registered and
-    // admitted. Do not register the request before then.
+    // The inherited reply was not a variant of the right packet, it was a different one
+    // -- a raw ObjectGuid, null-terminated strings and always ten ranks. The 18414 body
+    // is a guid bit, a has-data bit, a 21-bit rank count, four guid bits, a 7-bit name
+    // length per rank, four more guid bits, a 7-bit guild-name length, seven more guid
+    // bits, a flush, the byte block, and then the guid's present bytes A SECOND TIME in
+    // a different order. That duplication is real; the capture carries both copies and
+    // they are identical.
+    DefC(CMSG_GUILD_QUERY, "CMSG_GUILD_QUERY", STATUS_LOGGEDIN, PROCESS_THREADUNSAFE, &WorldSession::HandleGuildQueryOpcode);
+    DefS(SMSG_GUILD_QUERY_RESPONSE, "SMSG_GUILD_QUERY_RESPONSE");
     DefC(CMSG_GUILD_PERMISSIONS, "CMSG_GUILD_PERMISSIONS", STATUS_LOGGEDIN, PROCESS_THREADUNSAFE, &WorldSession::HandleGuildPermissions);
     DefS(SMSG_GUILD_PERMISSIONS, "SMSG_GUILD_PERMISSIONS");
 

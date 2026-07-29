@@ -175,9 +175,9 @@
  *   TOTAL SMSG rows                   925
  *
  * SUBSYSTEM CONFIDENCE: high=365, low=221, medium=182, none=157
- * STATUS TOTALS: ACTIVE=445, DOC=435, DORMANT=640
- *   SMSG: ACTIVE=266, DOC=271, DORMANT=388
- *   CMSG: ACTIVE=179, DOC=164, DORMANT=252
+ * STATUS TOTALS: ACTIVE=447, DOC=435, DORMANT=638
+ *   SMSG: ACTIVE=267, DOC=271, DORMANT=387
+ *   CMSG: ACTIVE=180, DOC=164, DORMANT=251
  */
 
 // CAVEATS -- read before trusting any single row:
@@ -428,7 +428,7 @@ typedef uint16_t uint16;
  *   SMSG_NPC_TEXT_UPDATE                           0x140A  ACTIVE   [high-conf]
  *   SMSG_BATTLE_PET_QUERY_NAME_RESPONSE            0x1540  DORMANT
  *   SMSG_NAME_QUERY_RESPONSE                       0x169B  ACTIVE
- *   SMSG_GUILD_QUERY_RESPONSE                      0x1B79  DORMANT 
+ *   SMSG_GUILD_QUERY_RESPONSE                      0x1B79  ACTIVE
  *
  *  -- DressUpModelFrame.cpp (9) --
  *   SMSG_BLACK_MARKET_OPEN_RESULT                  0x00AE  DOC      [low-conf]
@@ -1857,7 +1857,7 @@ typedef uint16_t uint16;
  *   CMSG_LFG_TELEPORT                              0x1AA6  DORMANT 
  *   CMSG_UNKNOWN_0x1AA7                            0x1AA7  DOC     
  *   CMSG_CALENDAR_EVENT_STATUS                     0x1AB3  DORMANT 
- *   CMSG_GUILD_QUERY                               0x1AB6  DORMANT 
+ *   CMSG_GUILD_QUERY                               0x1AB6  ACTIVE
  *   CMSG_BATTLEFIELD_LIST                          0x1C41  DORMANT 
  *   CMSG_AREATRIGGER                               0x1C44  ACTIVE   [high-conf]
  *   CMSG_PET_BATTLE_QUIT_NOTIFY                    0x1C45  DOC     
