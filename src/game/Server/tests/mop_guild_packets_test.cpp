@@ -692,8 +692,48 @@ static void test_guild_roster_length_bounds()
     CHECK(!MopGuildPackets::BuildGuildRoster(packet, overLimit, "", "", 1, 0, 0));
 }
 
+// CMSG_GUILD_QUERY request decode. Both bodies are retail. The inherited reader took
+// two raw uint64 -- a fixed 16 bytes -- against a wire body of 9..17, so it could not
+// have parsed either of these.
+static void test_guild_query_request()
+{
+    {
+        std::vector<uint8> const capture =
+        {
+            0xD5, 0x5F, 0x05, 0xC4, 0x1E, 0xA0, 0xF5, 0xEB, 0x00, 0x12, 0x04, 0xF5, 0xCD
+        };
+        WorldPacket packet(CMSG_GUILD_QUERY, capture.size());
+        Append(packet, capture);
+
+        uint64 playerGuid = 0;
+        uint64 guildGuid = 0;
+        MopGuildPackets::ReadGuildQuery(packet, playerGuid, guildGuid);
+
+        CHECK(playerGuid == 0x040000000513CCA1ULL);
+        CHECK(guildGuid == 0x1FF4000001C5F4EAULL);
+        CHECK(packet.rpos() == capture.size());
+    }
+    {
+        std::vector<uint8> const capture =
+        {
+            0x95, 0x5F, 0x05, 0x21, 0x1E, 0xFD, 0xF5, 0x1A, 0x03, 0xC6, 0xC7, 0xC5
+        };
+        WorldPacket packet(CMSG_GUILD_QUERY, capture.size());
+        Append(packet, capture);
+
+        uint64 playerGuid = 0;
+        uint64 guildGuid = 0;
+        MopGuildPackets::ReadGuildQuery(packet, playerGuid, guildGuid);
+
+        CHECK(playerGuid == 0x0400000000C7C4FCULL);
+        CHECK(guildGuid == 0x1FF400000220C61BULL);
+        CHECK(packet.rpos() == capture.size());
+    }
+}
+
 static void test_guild_query_opcodes()
 {
+    CHECK(CMSG_GUILD_QUERY == 0x1AB6);
     CHECK(CMSG_GUILD_ROSTER == 0x1459);
     CHECK(CMSG_GUILD_QUERY_RANKS == 0x0D50);
     CHECK(CMSG_GUILD_PERMISSIONS == 0x145A);
@@ -731,6 +771,7 @@ int main(int /*argc*/, char** /*argv*/)
     test_guild_ranks_response();
     test_guild_roster_response();
     test_guild_roster_length_bounds();
+    test_guild_query_request();
     test_guild_query_opcodes();
 
     if (g_fail)

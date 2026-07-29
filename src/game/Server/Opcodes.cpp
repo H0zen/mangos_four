@@ -911,13 +911,19 @@ void InitializeOpcodes()
     // same three bytes, which is exactly why the fixture compares bytes and not length.
     //
     // CMSG_GUILD_QUERY (0x1AB6) is deliberately NOT registered here despite being the
-    // heaviest of the family at 30,939 observations. HandleGuildQueryOpcode still reads
-    // `recvPacket >> guildGuid >> playerGuid`, and operator>>(ByteBuffer&, ObjectGuid&)
-    // takes a fixed raw uint64, so it consumes at least 16 bytes and does not enforce
-    // end of packet -- a longer body leaves a logged tail. The 18414 wire body is
-    // 9..17 and variable, i.e. bit-packed. That is an inherited-shape handler and
-    // registering it would misparse every request -- the same mistake the corpse-reclaim
-    // registrations made. It stays dormant until the handler is converted.
+    // heaviest of the family at 30,939 observations. Its READER is now correct: it was
+    // converted to the client's own order from sub_665EE4 and is fixture-locked against
+    // two retail captures, so the old inherited-shape objection no longer applies.
+    //
+    // What still blocks it is the reply. SMSG_GUILD_QUERY_RESPONSE has no DefS and no
+    // case in IsEnterWorldConverted, and Guild::Query still writes a body that has never
+    // been checked against a capture. Registering the request now would parse it
+    // correctly, build a reply and have the send gate throw the reply away -- which is
+    // the failure SMSG_GUILD_PERMISSIONS shipped with and had to be fixed for, and the
+    // reason CMSG_RESET_INSTANCES was pulled back out of a later batch.
+    //
+    // It lands when the response body is derived from a capture, registered and
+    // admitted. Do not register the request before then.
     DefC(CMSG_GUILD_PERMISSIONS, "CMSG_GUILD_PERMISSIONS", STATUS_LOGGEDIN, PROCESS_THREADUNSAFE, &WorldSession::HandleGuildPermissions);
     DefS(SMSG_GUILD_PERMISSIONS, "SMSG_GUILD_PERMISSIONS");
 

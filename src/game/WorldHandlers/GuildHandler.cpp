@@ -68,8 +68,16 @@ void WorldSession::HandleGuildQueryOpcode(WorldPacket& recvPacket)
 {
     DEBUG_LOG("WORLD: Received opcode CMSG_GUILD_QUERY");
 
-    ObjectGuid guildGuid, playerGuid;
-    recvPacket >> guildGuid >> playerGuid;
+    // The inherited reader took two raw uint64, i.e. a fixed 16 bytes, against a wire
+    // body that is 9..17 and bit-packed. Orders now come from the client's own send
+    // serializer sub_665EE4; see MopGuildPackets::ReadGuildQuery. Note the wire order
+    // is player first, then guild -- the reverse of how this was named.
+    uint64 rawPlayerGuid = 0;
+    uint64 rawGuildGuid = 0;
+    MopGuildPackets::ReadGuildQuery(recvPacket, rawPlayerGuid, rawGuildGuid);
+
+    ObjectGuid const guildGuid(rawGuildGuid);
+    ObjectGuid const playerGuid(rawPlayerGuid);
 
     if (Guild* guild = sGuildMgr.GetGuildByGuid(guildGuid))
     {

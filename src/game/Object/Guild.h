@@ -242,6 +242,50 @@ namespace MopGuildPackets
     };
 
     /**
+     * CMSG_GUILD_QUERY body: the player's guid and the guild's, bit-packed and
+     * interleaved. Orders come from the client's own send serializer sub_665EE4 in
+     * Wow.exe 5.4.8.18414, reached through wrapper sub_66107F which stamps opcode
+     * 6838. It holds the two guids at object offsets +16..23 (A) and +24..31 (B).
+     *
+     * A is the player and B is the guild, which the retail bodies make plain:
+     *
+     *   capture-000004 seq 692    A 0x040000000513CCA1   B 0x1FF4000001C5F4EA
+     *   capture-000004 seq 37898  A 0x0400000000C7C4FC   B 0x1FF400000220C61B
+     *
+     * B's high half is the same guild high-guid that CMSG_GUILD_QUERY_RANKS decodes
+     * to, derived independently, so the two opcodes corroborate each other. Note that
+     * value is retail's; this server assigns guild guids from HIGHGUID_GUILD and the
+     * client echoes back whatever we sent it, so the lookup stays self-consistent.
+     */
+    inline void ReadGuildQuery(WorldPacket& in, uint64& playerGuid, uint64& guildGuid)
+    {
+        static GuidBitRef const maskOrder[16] =
+        {
+            { 0, 7 }, { 0, 3 }, { 0, 4 }, { 1, 3 }, { 1, 4 }, { 0, 2 }, { 0, 6 }, { 1, 2 },
+            { 1, 5 }, { 0, 1 }, { 0, 5 }, { 1, 7 }, { 0, 0 }, { 1, 1 }, { 1, 6 }, { 1, 0 }
+        };
+        static GuidBitRef const byteOrder[16] =
+        {
+            { 0, 7 }, { 1, 2 }, { 1, 4 }, { 1, 7 }, { 0, 6 }, { 0, 0 }, { 1, 6 }, { 1, 0 },
+            { 1, 3 }, { 0, 2 }, { 1, 5 }, { 0, 3 }, { 1, 1 }, { 0, 4 }, { 0, 1 }, { 0, 5 }
+        };
+
+        uint8 bytes[2][8] = {};
+        for (GuidBitRef const& ref : maskOrder)
+            bytes[ref.which][ref.index] = in.ReadBit();
+        for (GuidBitRef const& ref : byteOrder)
+            in.ReadByteSeq(bytes[ref.which][ref.index]);
+
+        playerGuid = 0;
+        guildGuid = 0;
+        for (uint8 index = 0; index < 8; ++index)
+        {
+            playerGuid |= uint64(bytes[0][index]) << (index * 8);
+            guildGuid |= uint64(bytes[1][index]) << (index * 8);
+        }
+    }
+
+    /**
      * SMSG_GUILD_ROSTER body.
      *
      * Proven by decoding capture-000019 seq 923 (235 bytes) field by field and

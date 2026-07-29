@@ -525,3 +525,20 @@ foreach(pattern IN LISTS legacy_patterns)
         message(FATAL_ERROR "legacy guild mutation escaped: ${pattern}")
     endif()
 endforeach()
+
+# CMSG_GUILD_QUERY: reader converted, request intentionally still dormant. Pin the
+# handler wiring so the conversion cannot silently regress, and pin the dormancy so
+# the request cannot be registered while its reply is still unregistered and
+# unadmitted -- that combination builds a reply and drops it at the send gate.
+require_once("${guild_handler}"
+    "MopGuildPackets::ReadGuildQuery(recvPacket, rawPlayerGuid, rawGuildGuid)"
+    "guild-query production reader call")
+string(FIND "${opcode_registry}" "DefC(CMSG_GUILD_QUERY," guild_query_registered)
+if(NOT guild_query_registered EQUAL -1)
+    string(FIND "${opcode_registry}" "DefS(SMSG_GUILD_QUERY_RESPONSE," guild_query_response_registered)
+    string(FIND "${world_session}" "case SMSG_GUILD_QUERY_RESPONSE:" guild_query_response_gate)
+    if(guild_query_response_registered EQUAL -1 OR guild_query_response_gate EQUAL -1)
+        message(FATAL_ERROR
+            "CMSG_GUILD_QUERY is registered but SMSG_GUILD_QUERY_RESPONSE is not registered and admitted")
+    endif()
+endif()
