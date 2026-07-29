@@ -232,9 +232,12 @@ void WorldSession::HandleCharEnumOpcode(WorldPacket & /*recv_data*/)
 /**
  * @brief Queries the account's characters and sends the SMSG_CHAR_ENUM response.
  *
- * Factored out of HandleCharEnumOpcode so the server can (re)send the character list without a
- * client request. The 5.4.8 client does not refresh the list on its own after a character delete;
- * it renders whatever enumeration the server pushes, so HandleCharDeleteOpcode calls this directly.
+ * Factored out of HandleCharEnumOpcode. The only caller is that handler, i.e. the client's own
+ * CMSG_CHAR_ENUM request -- the server does not push an enumeration unasked. An earlier revision
+ * claimed the 5.4.8 client "does not refresh the list on its own after a character delete" and had
+ * HandleCharDeleteOpcode call this directly; that was measured while the delete handler answered
+ * with the wrong response code, so the client never saw a terminal result to refresh on. See the
+ * note in HandleCharDeleteOpcode.
  */
 void WorldSession::SendCharacterEnum()
 {
