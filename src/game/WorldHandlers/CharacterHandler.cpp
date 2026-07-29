@@ -744,11 +744,18 @@ void WorldSession::HandleCharDeleteOpcode(WorldPacket& recv_data)
  * currently selected on screen; the button does nothing at all without a reply. NameGen.dbc
  * supplies the candidates.
  *
- * The request body is read as two flat bytes (sex then race) per the 5.4.8 reference
- * implementation. Neither this opcode nor its response has a single observation in the 18414
- * corpus, so both the opcode value and this layout are unconfirmed on the wire - the size
- * check below is what stops a wrong layout becoming a malformed read rather than a clean
- * rejection.
+ * The request body is two flat bytes, sex then race, and that ordering is taken from the
+ * client rather than from a reference server. RequestRandomName (sub_1403B3E80) reads the
+ * char-create globals at +0x40 and +0x44 and passes them to sub_1403A3290; the packet
+ * constructor stores the +0x44 byte at object offset 0x20 and the +0x40 byte at 0x21, and
+ * the body writer (sub_1403D7A50) emits 0x20 before 0x21 - so +0x44 goes first. The
+ * CreateCharacter path (sub_1403B5190) fixes which is which: it lays out the same globals as
+ * race, class, gender with +0x40 at the race slot and +0x44 at the gender slot. Hence sex
+ * first, then race.
+ *
+ * Neither opcode appears anywhere in the 18414 corpus, so the binary is the only evidence -
+ * but it is direct. The size check still guards the read: a client that disagrees should get
+ * a clean rejection rather than a walk off the end of the buffer.
  */
 void WorldSession::HandleRandomizeCharNameOpcode(WorldPacket& recvPacket)
 {

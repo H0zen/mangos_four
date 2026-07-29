@@ -1393,13 +1393,12 @@ enum OpcodesList
     SMSG_PET_STABLE_LIST                         = 0x1613,    // 5.4.8 18414 (Wow.exe leaf; name fork tables, low confidence)
     SMSG_MINIMAP_PING                            = 0x168F,    // 5.4.8 18414 (Wow.exe leaf; name fork tables)
     SMSG_RANDOMIZE_CHAR_NAME                     = 0x169F,    // 5.4.8 18414 (Wow.exe leaf; name fork tables)
-    // The request half of the creation screen's randomise button. The name is the one
-    // Opcodes_reference.h already carried for this value at status DOC - "the client
-    // materializes this value when sending" - so the value is client-derived, not merely
-    // taken from a reference server. Kept under that name rather than the reference
-    // implementation's CMSG_RANDOMIZE_CHAR_NAME so one wire value keeps one symbol.
-    // Still zero observations in the 18414 corpus, so the live click is the confirmation.
-    CMSG_GENERATE_RANDOM_CHARACTER_NAME          = 0x0B1C,    // 5.4.8 18414 (Wow.exe sender; corpus-silent)
+    // The request half of the creation screen's randomise button. VERIFIED IN THE BINARY,
+    // not inferred: RequestRandomName (sub_1403B3E80) reads the char-create globals at
+    // +0x40 and +0x44 and hands them to sub_1403A3290, whose packet constructor writes the
+    // opcode literal 2844 = 0x0B1C (sub_1403CB780). Zero observations in the 18414 corpus,
+    // so the binary is the only evidence -- but it is direct evidence, not a fork table.
+    CMSG_GENERATE_RANDOM_CHARACTER_NAME          = 0x0B1C,    // 5.4.8 18414 (Wow.exe sender, decompiled)
     SMSG_CALENDAR_EVENT_INITIAL_INVITE           = 0x16AE,    // 5.4.8 18414 (Wow.exe reader; name via 5.4.7 bridge)
     SMSG_BATTLE_PET_SLOT_UPDATE                  = 0x16AF,    // 5.4.8 18414 (Wow.exe leaf; name fork tables)
     SMSG_MOVE_UPDATE_COLLISION_HEIGHT            = 0x1812,    // 5.4.8 18414 (Wow.exe leaf; name fork tables)
