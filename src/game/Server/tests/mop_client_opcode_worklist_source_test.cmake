@@ -36,8 +36,8 @@ elseif(MUTATION STREQUAL "battle_pay_registration")
     string(REPLACE "DefC(CMSG_BATTLE_PAY_GET_PURCHASE_LIST," "DefC(CMSG_UNUSED_BATTLE_PAY_GET_PURCHASE_LIST," opcodes "${opcodes}")
 elseif(MUTATION STREQUAL "battle_pay_duplicate_raw")
     string(REPLACE
-        "DefC(CMSG_BATTLE_PAY_GET_PURCHASE_LIST, \"CMSG_BATTLE_PAY_GET_PURCHASE_LIST\", STATUS_AUTHED, PROCESS_INPLACE, &WorldSession::Handle_NULL);"
-        "DefC(CMSG_BATTLE_PAY_GET_PURCHASE_LIST, \"CMSG_BATTLE_PAY_GET_PURCHASE_LIST\", STATUS_AUTHED, PROCESS_INPLACE, &WorldSession::Handle_NULL);\n    DefC(0x18B2, \"CMSG_BATTLE_PAY_GET_PURCHASE_LIST\", STATUS_AUTHED, PROCESS_INPLACE, &WorldSession::Handle_NULL);"
+        "DefC(CMSG_BATTLE_PAY_GET_PURCHASE_LIST, \"CMSG_BATTLE_PAY_GET_PURCHASE_LIST\", STATUS_AUTHED, PROCESS_INPLACE, &WorldSession::HandleBattlePayGetPurchaseListOpcode);"
+        "DefC(CMSG_BATTLE_PAY_GET_PURCHASE_LIST, \"CMSG_BATTLE_PAY_GET_PURCHASE_LIST\", STATUS_AUTHED, PROCESS_INPLACE, &WorldSession::HandleBattlePayGetPurchaseListOpcode);\n    DefC(0x18B2, \"CMSG_BATTLE_PAY_GET_PURCHASE_LIST\", STATUS_AUTHED, PROCESS_INPLACE, &WorldSession::HandleBattlePayGetPurchaseListOpcode);"
         opcodes "${opcodes}")
 elseif(MUTATION STREQUAL "battle_pay_value")
     string(REPLACE "CMSG_BATTLE_PAY_GET_PURCHASE_LIST            = 0x18B2" "CMSG_BATTLE_PAY_GET_PURCHASE_LIST            = 0x0000" opcode_header "${opcode_header}")
@@ -268,8 +268,13 @@ if(battlefield_status_handler_body MATCHES "recv_data[ \t]*(>>|\\.|->)")
     message(FATAL_ERROR "empty battlefield-status request must not read request data")
 endif()
 
+# The purchase-list request is no longer recognition-only. Retail answers it at character
+# select -- 434 requests and 420 responses across the 18414 corpus, request always zero
+# bytes, response always exactly seven and 419 of 420 entirely zero -- so leaving it on
+# Handle_NULL left the client's request outstanding. It now answers with an empty purchase
+# list, which is what retail sends a player who has bought nothing.
 set(expected_battle_pay_registration
-    "DefC(CMSG_BATTLE_PAY_GET_PURCHASE_LIST, \"CMSG_BATTLE_PAY_GET_PURCHASE_LIST\", STATUS_AUTHED, PROCESS_INPLACE, &WorldSession::Handle_NULL);")
+    "DefC(CMSG_BATTLE_PAY_GET_PURCHASE_LIST, \"CMSG_BATTLE_PAY_GET_PURCHASE_LIST\", STATUS_AUTHED, PROCESS_INPLACE, &WorldSession::HandleBattlePayGetPurchaseListOpcode);")
 string(FIND "${opcodes}" "${expected_battle_pay_registration}" exact_battle_pay_registration)
 string(REGEX MATCHALL "DefC\\(CMSG_BATTLE_PAY_GET_PURCHASE_LIST," battle_pay_registrations "${opcodes}")
 list(LENGTH battle_pay_registrations battle_pay_registration_count)

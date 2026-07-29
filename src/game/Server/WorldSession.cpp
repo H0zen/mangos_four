@@ -567,8 +567,9 @@ void WorldSession::SendPacket(WorldPacket const* packet, bool bypassSuppress)
     // PHASE 6c (MoP enter-world bring-up): once a player has entered the world, drop the
     // remaining Cata-format sends. IsEnterWorldConverted() admits opcodes whose reachable
     // senders now emit genuine 18414 bodies, including UPDATE_OBJECT's guarded create/value
-    // subsets and DESTROY_OBJECT. bypassSuppress=true remains only for the
-    // SMSG_LOGIN_SETTIMESPEED bootstrap in CharacterHandler.cpp. Everything else is dropped.
+    // subsets and DESTROY_OBJECT. bypassSuppress=true is used by exactly two sends in
+    // CharacterHandler.cpp: the SMSG_LOGIN_SETTIMESPEED bootstrap, and the world-entry
+    // SMSG_SET_TIME_ZONE_INFORMATION that follows the MOTD. Everything else is dropped.
     // This stays active for the whole
     // in-world session, including logout cleanup, and dies with the session; it is a temporary
     // port scaffold until every live sender reaches 18414 parity.

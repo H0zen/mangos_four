@@ -206,6 +206,26 @@ set_target_properties(mop_client_opcode_worklist_test PROPERTIES CXX_STANDARD 17
 target_link_libraries(mop_client_opcode_worklist_test PRIVATE game)
 add_test(NAME mop_client_opcode_worklist COMMAND mop_client_opcode_worklist_test)
 
+add_test(NAME mop_char_response_codes_source
+    COMMAND ${CMAKE_COMMAND}
+        -DSOURCE_ROOT=${CMAKE_SOURCE_DIR}
+        -P ${CMAKE_CURRENT_SOURCE_DIR}/mop_char_response_codes_source_test.cmake)
+
+foreach(char_codes_mutation IN ITEMS
+        revert_delete_success drop_create_trial drop_heirloom_code
+        break_create_success_anchor break_name_in_use_anchor
+        restore_duplicate_enum drop_charselect_timezone world_entry_timezone_before_motd
+        battlepay_back_to_null drop_login_failed_registration drop_randomname_registration
+        corrupt_namegen_format swap_randomname_args drop_namegen_null_guard
+        namegen_index_locale_slot_zero)
+    add_test(NAME mop_char_response_codes_source_mutation_${char_codes_mutation}
+        COMMAND ${CMAKE_COMMAND} -DSOURCE_ROOT=${CMAKE_SOURCE_DIR}
+            -DMUTATION=${char_codes_mutation}
+            -P ${CMAKE_CURRENT_SOURCE_DIR}/mop_char_response_codes_source_test.cmake)
+    set_tests_properties(mop_char_response_codes_source_mutation_${char_codes_mutation}
+        PROPERTIES WILL_FAIL TRUE)
+endforeach()
+
 add_test(NAME mop_client_opcode_worklist_source
     COMMAND ${CMAKE_COMMAND}
         -DSOURCE_ROOT=${CMAKE_SOURCE_DIR}

@@ -175,9 +175,9 @@
  *   TOTAL SMSG rows                   925
  *
  * SUBSYSTEM CONFIDENCE: high=365, low=221, medium=182, none=157
- * STATUS TOTALS: ACTIVE=422, DOC=436, DORMANT=662
- *   SMSG: ACTIVE=260, DOC=271, DORMANT=394
- *   CMSG: ACTIVE=162, DOC=165, DORMANT=268
+ * STATUS TOTALS: ACTIVE=426, DOC=435, DORMANT=659
+ *   SMSG: ACTIVE=263, DOC=271, DORMANT=391
+ *   CMSG: ACTIVE=163, DOC=164, DORMANT=268
  */
 
 // CAVEATS -- read before trusting any single row:
@@ -253,7 +253,7 @@ typedef uint16_t uint16;
  *
  *  -- AuthChallenge.cpp (6) --
  *   SMSG_BATTLE_PAY_DELIVERY_ENDED                 0x020B  DORMANT  [low-conf]
- *   SMSG_BATTLE_PAY_GET_PURCHASE_LIST_RESPONSE     0x023A  DORMANT  [low-conf]
+ *   SMSG_BATTLE_PAY_GET_PURCHASE_LIST_RESPONSE     0x023A  ACTIVE   [low-conf]
  *   SMSG_UNKNOWN_0x08BF                            0x08BF  DOC     
  *   SMSG_UNKNOWN_0x143E                            0x143E  DOC     
  *   SMSG_BATTLE_PAY_PURCHASE_UPDATE                0x14E2  DOC      [low-conf]
@@ -319,7 +319,7 @@ typedef uint16_t uint16;
  *   SMSG_CHAR_RENAME                               0x0CBF  DORMANT 
  *   SMSG_UNKNOWN_0x10AF                            0x10AF  DOC     
  *   SMSG_CHAR_CUSTOMIZE                            0x1432  ACTIVE
- *   SMSG_RANDOMIZE_CHAR_NAME                       0x169F  DORMANT
+ *   SMSG_RANDOMIZE_CHAR_NAME                       0x169F  ACTIVE
  *   SMSG_SET_PLAYER_DECLINED_NAMES_RESULT          0x180E  DORMANT 
  *   SMSG_REALM_SPLIT                               0x1A2E  ACTIVE  
  *
@@ -1144,7 +1144,7 @@ typedef uint16_t uint16;
  *   SMSG_CHAR_ENUM                                 0x11C3  ACTIVE  
  *   SMSG_LOGOUT_COMPLETE                           0x142F  ACTIVE   [medium-conf]
  *   SMSG_ADDON_INFO                                0x160A  ACTIVE  
- *   SMSG_CHARACTER_LOGIN_FAILED                    0x1A0B  DORMANT  [medium-conf]
+ *   SMSG_CHARACTER_LOGIN_FAILED                    0x1A0B  ACTIVE   [medium-conf]
  *   SMSG_CHAR_CREATE                               0x1CAA  ACTIVE   [medium-conf]
  *
  *  -- unresolved (154) --
@@ -1632,7 +1632,7 @@ typedef uint16_t uint16;
  *   CMSG_UNKNOWN_0x0ABA                            0x0ABA  DOC     
  *   CMSG_MESSAGECHAT_OFFICER                       0x0ABF  ACTIVE
  *   CMSG_RESURRECT_RESPONSE                        0x0B0C  DORMANT
- *   CMSG_GENERATE_RANDOM_CHARACTER_NAME            0x0B1C  DOC     
+ *   CMSG_GENERATE_RANDOM_CHARACTER_NAME            0x0B1C  ACTIVE
  *   CMSG_BATTLE_PAY_ACK_FAILED_RESPONSE            0x0B38  DOC     
  *   CMSG_CONTACT_LIST                              0x0BB4  DORMANT 
  *   CMSG_CHANNEL_LIST                              0x0C1B  DORMANT 

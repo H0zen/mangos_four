@@ -2281,6 +2281,8 @@ class WorldSession
         void HandleEquipmentSetUseOpcode(WorldPacket& recv_data);
         void HandleUITimeRequestOpcode(WorldPacket& recv_data);
         void HandleReadyForAccountDataTimesOpcode(WorldPacket& recv_data);
+        void HandleBattlePayGetPurchaseListOpcode(WorldPacket& recvPacket);
+        void HandleRandomizeCharNameOpcode(WorldPacket& recvPacket);
         void HandleQuestPOIQueryOpcode(WorldPacket& recv_data);
         void HandleQuestNpcQueryOpcode(WorldPacket& recv_data);
         void HandleSetCurrencyFlagsOpcode(WorldPacket& recv_data);

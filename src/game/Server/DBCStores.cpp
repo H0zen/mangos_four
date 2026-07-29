@@ -168,6 +168,11 @@ DBCStorage <QuestV2Entry> sQuestV2Store(QuestV2fmt);
 DBCStorage <QuestSortEntry> sQuestSortStore(QuestSortEntryfmt);
 DBCStorage <QuestXPLevel> sQuestXPLevelStore(QuestXPLevelfmt);
 
+DBCStorage <NameGenEntry> sNameGenStore(NameGenEntryfmt);
+// (race, sex) -> the names the client's randomiser may return. Built once at load so the
+// handler is a bounded lookup rather than a scan of all 12972 rows per click.
+static std::map<uint32 /*MAKE_PAIR32(race, sex)*/, std::vector<std::string> > sNameGenIndex;
+
 DBCStorage <PhaseEntry> sPhaseStore(Phasefmt);
 DBCStorage <PowerDisplayEntry> sPowerDisplayStore(PowerDisplayfmt);
 DBCStorage <PvPDifficultyEntry> sPvPDifficultyStore(PvPDifficultyfmt);
@@ -702,6 +707,42 @@ void LoadDBCStores(const std::string& dataPath)
     LoadDBC(availableDbcLocales, bar, bad_dbc_files, sQuestV2Store,             dbcPath, "QuestV2.dbc");
     LoadDBC(availableDbcLocales, bar, bad_dbc_files, sQuestSortStore,           dbcPath, "QuestSort.dbc");
     LoadDBC(availableDbcLocales, bar, bad_dbc_files, sQuestXPLevelStore,        dbcPath, "QuestXP.dbc");
+    LoadDBC(availableDbcLocales, bar, bad_dbc_files, sNameGenStore,            dbcPath, "NameGen.dbc");
+    // Index from the locale the base file was actually loaded into, NOT slot 0. LoadDBC stores
+    // the base DBC at availableDbcLocales.defaultLocale, which ReadDBCBuild derives from whatever
+    // locale the dbc/ directory was extracted from -- only on an enUS extraction is that slot 0.
+    // The original `*entry->Name` read slot 0 unconditionally, so on a deDE or ruRU install every
+    // row saw the initialised empty string, the index stayed empty, and the randomise button
+    // answered failure forever. It worked here purely because this box extracts enUS.
+    for (uint32 i = 0; i < sNameGenStore.GetNumRows(); ++i)
+    {
+        NameGenEntry const* entry = sNameGenStore.LookupEntry(i);
+        if (!entry || !entry->Name)
+        {
+            continue;
+        }
+
+        char const* name = entry->Name[availableDbcLocales.defaultLocale];
+        if (!name || !*name)
+        {
+            // Fall back to any populated slot. NameGen rows are proper nouns and repeat heavily
+            // across locales, so a name from another locale beats refusing to generate one.
+            for (uint8 loc = 0; loc < MAX_LOCALE; ++loc)
+            {
+                if (entry->Name[loc] && *entry->Name[loc])
+                {
+                    name = entry->Name[loc];
+                    break;
+                }
+            }
+        }
+
+        if (name && *name)
+        {
+            sNameGenIndex[MAKE_PAIR32(entry->Race, entry->Sex)].push_back(name);
+        }
+    }
+
     LoadDBC(availableDbcLocales,bar,bad_dbc_files,sPhaseStore,               dbcPath,"Phase.dbc");
     //LoadDBC(availableDbcLocales,bar,bad_dbc_files,sPowerDisplayStore,        dbcPath,"PowerDisplay.dbc");
     LoadDBC(availableDbcLocales, bar, bad_dbc_files, sPvPDifficultyStore,       dbcPath, "PvpDifficulty.dbc");
@@ -1527,6 +1568,30 @@ void BuildMapSpawnModeMasks(std::map<uint32, uint32>& spawnMasks)
 
     // Map 0 was removed from dbc as of 4.x.x
     spawnMasks[0] = 1 << REGULAR_DIFFICULTY;
+}
+
+/**
+ * @brief Picks a random NameGen.dbc name for a race/sex, or NULL if there is none.
+ *
+ * Backs the character-creation randomise button. The client sends
+ * CMSG_RANDOMIZE_CHAR_NAME carrying the race and sex currently selected on screen and
+ * waits for a name to drop into the edit box; without a reply the button does nothing.
+ *
+ * NameGen.dbc ships 12972 names across 13 races and both sexes -- 219 human male, 539 orc
+ * male and so on -- so every creatable combination has candidates. A race/sex the DBC does
+ * not cover returns NULL and the caller answers with the failure bit rather than inventing
+ * a name, which is the one thing the client cannot recover from sensibly.
+ */
+std::string const* GetRandomCharacterName(uint32 race, uint32 sex)
+{
+    std::map<uint32, std::vector<std::string> >::const_iterator itr =
+        sNameGenIndex.find(MAKE_PAIR32(race, sex));
+    if (itr == sNameGenIndex.end() || itr->second.empty())
+    {
+        return NULL;
+    }
+
+    return &itr->second[urand(0, itr->second.size() - 1)];
 }
 
 PvPDifficultyEntry const* GetBattlegroundBracketByLevel(uint32 mapid, uint32 level)

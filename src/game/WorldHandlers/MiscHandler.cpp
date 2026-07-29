@@ -1854,6 +1854,78 @@ void WorldSession::HandleReadyForAccountDataTimesOpcode(WorldPacket& /*recv_data
     DEBUG_LOG("WORLD: Received opcode CMSG_READY_FOR_ACCOUNT_DATA_TIMES");
 
     SendAccountDataTimes(GLOBAL_CACHE_MASK);
+
+    // Retail sends SMSG_SET_TIME_ZONE_INFORMATION twice per session -- once here in the
+    // account-data phase and once at world entry -- and the two occurrences are ordered
+    // differently. Here it is immediately after SMSG_ACCOUNT_DATA_TIMES and before the character
+    // list: capture-000019 seq 22 ACCOUNT_DATA_TIMES -> 23 SET_TIME_ZONE_INFORMATION -> 24
+    // ENUM_CHARACTERS_RESULT. At world entry it instead follows the MOTD (see HandlePlayerLogin).
+    //
+    // An earlier revision of this comment claimed every corpus instance sits immediately after
+    // ACCOUNT_DATA_TIMES. That is true of this occurrence only; the world-entry one does not, and
+    // the total covers both. Character select previously had no send at all -- the login path's
+    // send was the only one -- which is what this fixes.
+    //
+    // 817 observations at build 18414 (catalogue 47A3C991). An earlier revision said 843, which
+    // was the previous catalogue folding the adjacent build 18291 in; 817 + 23 = 840 of that.
+    //
+    // Retail's payload is the zone name twice ("Europe/ParisEurope/Paris" in the captures), which
+    // is the shape this builder already emits; ours is shorter only because Etc/UTC is shorter.
+    // Every one of the 817 is exactly 26 bytes -- min == max -- which is 2 + 12 + 12 for that one
+    // name. That uniformity is a property of the capture set, not of the packet: these are all
+    // one region's servers. The field is length-prefixed, so our 16 bytes (2 + 7 + 7) is a valid
+    // encoding of a shorter name rather than a truncation, and a live client accepts it.
+    WorldPacket tz(SMSG_SET_TIME_ZONE_INFORMATION, 2 + 2 * 7);
+    MopWorldEntryPackets::BuildSetTimeZoneInformation(tz, "Etc/UTC");
+    SendPacket(&tz);
+}
+
+/**
+ * @brief Answers the character-select store query with an empty purchase list.
+ *
+ * The shipped UI's C_PurchaseAPI.GetPurchaseList writes an empty 0x18B2 and waits. Retail
+ * normally answers: across build 18414 the corpus holds 425 requests and 409 responses. The
+ * sixteen unmatched requests are not accounted for -- they may be capture or session boundaries
+ * -- so "normally" is as strong as the counts support, not "always".
+ *
+ * The body length is not a sample: all 425 requests are exactly zero bytes and all 409 responses
+ * are exactly seven (reported min == max == 7 over the whole population), so the seven-byte reply
+ * below matches every observation there is.
+ *
+ * Counts are from catalogue 47A3C991, and earlier revisions of this comment said 434/420. That
+ * was not a miscount -- it was the previous catalogue merging the adjacent build 18291 into
+ * 18414. Splitting them gives 409 + 11 = 420, exactly the old figure. Build separation matters
+ * more than it looks here: opcode 0x023A is this 7-byte SMSG in 18414/18291, but in builds
+ * 17359/17371/17399 the same number is a CMSG carrying 37-86 bytes -- a different message
+ * entirely. Re-derive against a stated catalogue generation, never across builds.
+ *
+ * We have no Store backend, so the reply we send is the one a player who has purchased nothing
+ * receives - an empty list - rather than dropping the request, which leaves the client waiting.
+ * Note that this emulates a successful zero-purchase account; it is not an observed "server with
+ * no Store" state, which the corpus does not contain.
+ *
+ * The client does decode the body: it reads a 19-bit list count followed by a uint32 result
+ * (Wow.exe.c sub at 1046525/1046565), so seven zero bytes mean count=0, result=0 and the handler
+ * marks the purchase list ready and empty. The constant is therefore both the observed bytes and
+ * a correct encoding, which is why it is safe to send without a Store.
+ *
+ * ORDERING CAVEAT: retail answers this after the character list, not before --
+ * capture-000019 seq 24 ENUM_CHARACTERS_RESULT then 25 BATTLE_PAY_GET_PURCHASE_LIST_RESPONSE (7
+ * bytes), even though the client sent the two requests in the opposite order at seq 20/21. We
+ * reply inline while SMSG_CHAR_ENUM waits on an async DB query, so ours lands first. With
+ * count=0 there is nothing the early reply can lose, so this is left as a transcript-level
+ * divergence; revisit if a real Store is ever implemented.
+ */
+void WorldSession::HandleBattlePayGetPurchaseListOpcode(WorldPacket& /*recvPacket*/)
+{
+    DEBUG_LOG("WORLD: Received opcode CMSG_BATTLE_PAY_GET_PURCHASE_LIST");
+
+    WorldPacket data(SMSG_BATTLE_PAY_GET_PURCHASE_LIST_RESPONSE, 7);
+    for (uint8 i = 0; i < 7; ++i)
+    {
+        data << uint8(0);
+    }
+    SendPacket(&data);
 }
 
 void WorldSession::HandleHearthandResurrect(WorldPacket& /*recv_data*/)

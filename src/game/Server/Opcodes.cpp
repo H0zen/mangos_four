@@ -215,10 +215,53 @@ void InitializeOpcodes()
     // non-empty per-character GUID permutation.
     DefS(SMSG_UPDATE_ACCOUNT_DATA, "SMSG_UPDATE_ACCOUNT_DATA");
 
-    // Shipped UI C_PurchaseAPI.GetPurchaseList maps through the retained API
-    // table directly to the empty 0x18B2 writer. The Store response/backend is
-    // not implemented, so this registration is intentionally recognition-only.
-    DefC(CMSG_BATTLE_PAY_GET_PURCHASE_LIST, "CMSG_BATTLE_PAY_GET_PURCHASE_LIST", STATUS_AUTHED, PROCESS_INPLACE, &WorldSession::Handle_NULL);
+    // Shipped UI C_PurchaseAPI.GetPurchaseList maps through the retained API table directly to
+    // the empty 0x18B2 writer. Retail answers it at character select: 434 requests and 420
+    // responses across the 18414 corpus, request always 0 bytes, response always exactly 7.
+    // We have no Store backend, so we answer the same thing retail answers a player who has
+    // bought nothing -- an empty list -- rather than dropping the request on the floor.
+    DefC(CMSG_BATTLE_PAY_GET_PURCHASE_LIST, "CMSG_BATTLE_PAY_GET_PURCHASE_LIST", STATUS_AUTHED, PROCESS_INPLACE, &WorldSession::HandleBattlePayGetPurchaseListOpcode);
+    DefS(SMSG_BATTLE_PAY_GET_PURCHASE_LIST_RESPONSE, "SMSG_BATTLE_PAY_GET_PURCHASE_LIST_RESPONSE");
+
+    // The character-creation randomise button. CharacterCreate.lua's RequestRandomName()
+    // round-trips to the server, so without this the button is inert. STATUS_AUTHED because
+    // it is character-select traffic with no player in world.
+    DefC(CMSG_GENERATE_RANDOM_CHARACTER_NAME, "CMSG_GENERATE_RANDOM_CHARACTER_NAME", STATUS_AUTHED, PROCESS_THREADUNSAFE, &WorldSession::HandleRandomizeCharNameOpcode);
+    DefS(SMSG_RANDOMIZE_CHAR_NAME, "SMSG_RANDOMIZE_CHAR_NAME");
+
+    // Login refusals. Every CHAR_LOGIN_* response code exists in ResponseCodes but has zero send
+    // sites, so a refused login still tells the client nothing: HandlePlayerLoginOpcode returns
+    // silently on a duplicate login and on a query-holder failure, and HandlePlayerLogin kicks the
+    // connection when LoadFromDB fails.
+    //
+    // Registering the opcode here is a prerequisite for fixing that, NOT the fix. It is named so
+    // the dispatcher knows it and it stops counting as unregistered; nothing sends it yet, and the
+    // three branches above are unchanged.
+    //
+    // The sender is deliberately not written on this branch because the body shape is unproven:
+    //
+    //   1. Zero observations of 0x1A0B in the 18414 corpus. Retail sniffs capture successful
+    //      logins, so a refusal packet would not appear even if it exists.
+    //   2. The one-byte reader that looks like its parser, sub_6BB6E9, is reached only from
+    //      sub_6C3D99 -- a constructor called from twelve distinct sites -- so it is a generic
+    //      single-byte message reader and does not bind this opcode to that shape.
+    //
+    // NOT a reason, despite looking like one: the absence of a 0x1A0B literal in the
+    // disassembly. That test does not discriminate. SMSG_SET_TIME_ZONE_INFORMATION is 0x19C1,
+    // is certainly correct (817 corpus observations at build 18414, and a live client acts on
+    // it), and likewise has no dword occurrence in either the 32- or 64-bit image. MoP client
+    // SMSG opcodes are not stored as searchable constants, so absence proves nothing about the
+    // value. Do not resurrect that argument.
+    //
+    // The client-side CHAR_LOGIN_* display path is also no help in binding this: all ten callers
+    // of the response-name lookup sub_A64ADB are local. Four pass literal CHAR_LOGIN_* codes
+    // (84, 86, 87, 91) after reading local character flags at dword_1095DD0+380, and the dynamic
+    // ones are fed by local name validators. No observed path carries a server byte into that
+    // display, so the in-game message is generated before anything is sent.
+    //
+    // Guessing wrong here is not cheap: a malformed body reaching the 18414 client can crash it,
+    // which is the same reason the enter-world admission list refuses unconverted senders.
+    DefS(SMSG_CHARACTER_LOGIN_FAILED, "SMSG_CHARACTER_LOGIN_FAILED");
 
     // Wave 2 server messages whose 5.4.8 bodies are encoded by MopCompactPackets.
     DefS(SMSG_ATTACKSWING_ERROR, "SMSG_ATTACKSWING_ERROR");

@@ -232,9 +232,12 @@ void WorldSession::HandleCharEnumOpcode(WorldPacket & /*recv_data*/)
 /**
  * @brief Queries the account's characters and sends the SMSG_CHAR_ENUM response.
  *
- * Factored out of HandleCharEnumOpcode so the server can (re)send the character list without a
- * client request. The 5.4.8 client does not refresh the list on its own after a character delete;
- * it renders whatever enumeration the server pushes, so HandleCharDeleteOpcode calls this directly.
+ * Factored out of HandleCharEnumOpcode. The only caller is that handler, i.e. the client's own
+ * CMSG_CHAR_ENUM request -- the server does not push an enumeration unasked. An earlier revision
+ * claimed the 5.4.8 client "does not refresh the list on its own after a character delete" and had
+ * HandleCharDeleteOpcode call this directly; that was measured while the delete handler answered
+ * with the wrong response code, so the client never saw a terminal result to refresh on. See the
+ * note in HandleCharDeleteOpcode.
  */
 void WorldSession::SendCharacterEnum()
 {
@@ -728,12 +731,72 @@ void WorldSession::HandleCharDeleteOpcode(WorldPacket& recv_data)
     data << (uint8)CHAR_DELETE_SUCCESS;
     SendPacket(&data);
 
-    // On a successful delete, push the refreshed character list. The 5.4.8 client does not
-    // re-request it on its own -- reversing the client shows the delete path is dialog -> send
-    // CMSG_CHAR_DELETE -> wait, with no self-refresh -- so it keeps showing the stale list (the
-    // player observed it only updated after a realm round-trip) until the server sends a new
-    // enumeration. See claude/FACTS_mop548_char_delete.md.
-    SendCharacterEnum();
+    // No unsolicited SMSG_CHAR_ENUM here. An earlier revision pushed one, on the finding that
+    // the 5.4.8 client never refreshed the list by itself -- but that observation was made while
+    // this handler was answering with the wrong success code. The client was receiving 71
+    // (CHAR_DELETE_IN_PROGRESS), never saw a terminal result, and so never refreshed; that looked
+    // like "the client does not self-refresh". With the code corrected the client sends its own
+    // CMSG_CHAR_ENUM immediately after the delete -- observed on the wire -- so the push became a
+    // duplicate 1.4 KB enumeration answering a request the client had already made.
+}
+
+/**
+ * @brief Answers the creation screen's randomise-name button.
+ *
+ * CharacterCreate.lua's RequestRandomName() round-trips to the server with the race and sex
+ * currently selected on screen; the button does nothing at all without a reply. NameGen.dbc
+ * supplies the candidates.
+ *
+ * The request body is two flat bytes, sex then race, and that ordering is taken from the
+ * client rather than from a reference server. RequestRandomName (sub_1403B3E80) reads the
+ * char-create globals at +0x40 and +0x44 and passes them to sub_1403A3290; the packet
+ * constructor stores the +0x44 byte at object offset 0x20 and the +0x40 byte at 0x21, and
+ * the body writer (sub_1403D7A50) emits 0x20 before 0x21 - so +0x44 goes first. The
+ * CreateCharacter path (sub_1403B5190) fixes which is which: it lays out the same globals as
+ * race, class, gender with +0x40 at the race slot and +0x44 at the gender slot. Hence sex
+ * first, then race.
+ *
+ * Neither opcode appears anywhere in the 18414 corpus, so the binary is the only evidence -
+ * but it is direct. The size check still guards the read: a client that disagrees should get
+ * a clean rejection rather than a walk off the end of the buffer.
+ */
+void WorldSession::HandleRandomizeCharNameOpcode(WorldPacket& recvPacket)
+{
+    if (recvPacket.size() < 2)
+    {
+        sLog.outError("HandleRandomizeCharNameOpcode: malformed CMSG_RANDOMIZE_CHAR_NAME (%u bytes)",
+                      uint32(recvPacket.size()));
+        return;
+    }
+
+    uint8 sex, race;
+    recvPacket >> sex;
+    recvPacket >> race;
+
+    std::string const* name = GetRandomCharacterName(race, sex);
+
+    WorldPacket data(SMSG_RANDOMIZE_CHAR_NAME, 1 + (name ? name->size() : 0));
+    if (!name)
+    {
+        // No candidates for that race/sex. Answer with the failure bit rather than an empty name.
+        // The client's reader takes one success bit, then a six-bit length, then the string, so
+        // clearing the bit produces a well-formed response that carries no name -- as opposed to a
+        // success bit with a zero length, which would assert a name that is the empty string. What
+        // the UI then does with the failure is not established here; only that the packet is
+        // well-formed and asserts nothing false.
+        DEBUG_LOG("WORLD: CMSG_RANDOMIZE_CHAR_NAME - no NameGen entry for race %u sex %u", race, sex);
+        data.WriteBit(false);
+        data.FlushBits();
+        SendPacket(&data);
+        return;
+    }
+
+    DEBUG_LOG("WORLD: CMSG_RANDOMIZE_CHAR_NAME race %u sex %u -> '%s'", race, sex, name->c_str());
+    data.WriteBit(true);
+    data.WriteBits(name->size(), 6);
+    data.FlushBits();
+    data.WriteStringData(*name);
+    SendPacket(&data);
 }
 
 /**
@@ -853,18 +916,6 @@ void WorldSession::HandlePlayerLogin(LoginQueryHolder* holder)
         lts << packedNow;
         lts << float(0.01666667f);
         SendPacket(&lts, true);
-
-        // SMSG_SET_TIME_ZONE_INFORMATION: names the server's timezone so the
-        // client can populate the two 127-byte buffers its date conversion
-        // resolves against. Without it those stay zero, the conversion writes
-        // nothing, and its caller copies an all-minus-one scratch struct over
-        // the date -- which is what hangs the calendar on open. Etc/UTC is one
-        // of the identifiers compiled into the client; a host timezone name is
-        // not, so this is deliberately a constant rather than anything read
-        // from the machine.
-        WorldPacket tz(SMSG_SET_TIME_ZONE_INFORMATION, 2 + 2 * 7);
-        MopWorldEntryPackets::BuildSetTimeZoneInformation(tz, "Etc/UTC");
-        SendPacket(&tz, true);
     }
     // PHASE 6c: NO control/mover packet is sent -- none is needed. The 18414 client grants player
     // control itself when it processes the SELF create-block: the create/add-to-world path marks the
@@ -909,6 +960,36 @@ void WorldSession::HandlePlayerLogin(LoginQueryHolder* holder)
         MopInitialPackets::BuildMotd(data, lines);
         SendPacket(&data);
         DEBUG_LOG("WORLD: Sent motd (SMSG_MOTD)");
+    }
+
+    // SMSG_SET_TIME_ZONE_INFORMATION: names the server's timezone so the client can populate the
+    // two 127-byte buffers its date conversion resolves against. Without it those stay zero, the
+    // conversion writes nothing, and its caller copies an all-minus-one scratch struct over the
+    // date -- which is what hangs the calendar on open. Etc/UTC is one of the identifiers compiled
+    // into the client; a host timezone name is not, so this is deliberately a constant rather than
+    // anything read from the machine.
+    //
+    // Placed after the MOTD because that is where retail puts the world-entry occurrence -- NOT
+    // adjacent to SMSG_ACCOUNT_DATA_TIMES, which is the char-select occurrence's position. The two
+    // phases order it differently and the distinction is easy to get backwards:
+    //
+    //   char-select   capture-000019 seq 22 ACCOUNT_DATA_TIMES -> 23 SET_TIME_ZONE_INFORMATION
+    //   world entry   capture-000019 seq 177 ACCOUNT_DATA_TIMES, 179 MOTD, 180 SET_TIME_ZONE_INFO
+    //                 capture-000013 seq 161 ACCOUNT_DATA_TIMES, 164 MOTD, 166 SET_TIME_ZONE_INFO
+    //
+    // The packets between account-data-times and the timezone differ between those two captures,
+    // so only the after-MOTD relation is asserted here, not an exact index. Those are recorded
+    // sequence numbers, not timestamps: all three are one server write burst and share a single
+    // timestamp in both captures (8000 ms at 1000 ms resolution in 13; the same millisecond,
+    // 26255, even at 1 ms resolution in 19), so timing cannot order them and does not contradict
+    // this.
+    //
+    // bypassSuppress stays true: m_suppressWorldSends is raised above and this opcode is not on the
+    // enter-world admission list.
+    {
+        WorldPacket tz(SMSG_SET_TIME_ZONE_INFORMATION, 2 + 2 * 7);
+        MopWorldEntryPackets::BuildSetTimeZoneInformation(tz, "Etc/UTC");
+        SendPacket(&tz, true);
     }
 
     // QueryResult *result = CharacterDatabase.PQuery("SELECT guildid,rank FROM guild_member WHERE guid = '%u'",pCurrChar->GetGUIDLow());

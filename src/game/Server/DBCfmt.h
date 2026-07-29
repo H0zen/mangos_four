@@ -108,6 +108,7 @@ const char QuestFactionRewardfmt[] = "niiiiiiiiii";
 const char QuestV2fmt[] = "ni";                                  // 5.4.8: ID, UniqueBitFlag
 const char QuestSortEntryfmt[]="nx";                                // 5.3.0 Checked
 const char QuestXPLevelfmt[] = "niiiiiiiiii";                       // 5.3.0 Checked
+const char NameGenEntryfmt[]="nsii";                                // 5.4.8: id, name, race, sex - 12972 rows, 13 races x 2 sexes
 const char Phasefmt[]="nsi";                                        // 5.4.8 registry: idx1 Name(string), was i PhaseShift
 const char PowerDisplayfmt[] = "nixxxx";
 const char PvPDifficultyfmt[] = "diiiii";
