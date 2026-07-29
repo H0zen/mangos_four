@@ -159,28 +159,46 @@ DWORD WINAPI WheatyExceptionReport::MiniDumpThreadProc(LPVOID param)
 //===========================================================
 // Takes the dump from a dedicated thread.
 //
-// Two failure modes make this worth the extra thread. On EXCEPTION_STACK_OVERFLOW
-// the filter runs on the exhausted stack with about a page to spare, and
-// MiniDumpWriteDump needs considerably more than that - so the one crash where a
-// dump is hardest to get is the one where an in-filter dump is guaranteed to fail.
-// And MiniDumpWriteDump allocates: if the fault happened inside the heap manager
-// while it held the heap lock, that allocation deadlocks, and because the dumper
-// suspends every other thread while it works, the process freezes instead of
-// dying. A wait with a timeout turns that hang into a missing dump.
+// The reason for the extra thread is EXCEPTION_STACK_OVERFLOW: the filter runs on
+// the exhausted stack with about a page to spare, and MiniDumpWriteDump needs far
+// more, so the crash hardest to read from a text report is the one where an
+// in-filter dump is guaranteed to fail. Measured - a stack-overflow crash produces
+// a 1.3 KB report and a complete dump.
 //
 // The crashing thread blocks in WaitForSingleObject, so its stack stays intact and
 // pExceptionInfo - which lives on it - remains valid for the helper to read.
+//
+// The timeout does NOT rescue the heap-lock deadlock case, and it would be wrong to
+// claim it does. MiniDumpWriteDump suspends every thread in the process except its
+// own caller, so the thread waiting here is suspended for the duration: the timeout
+// expires in the kernel but the thread cannot run to act on it. That is true of any
+// in-process watchdog on any thread - only a separate process can observe a hang
+// while the dumper holds the process down. The timeout still bounds the cases where
+// the helper fails or stalls before reaching MiniDumpWriteDump, which is worth
+// having, but a dumper that deadlocks on a heap lock the faulting thread was holding
+// will still freeze the process. Fixing that properly means an external watchdog.
 //===========================================================
 bool WheatyExceptionReport::WriteMiniDump(PEXCEPTION_POINTERS pExceptionInfo)
 {
-    MiniDumpRequest request;
+    // Static, not a local. On a timeout this function returns while the helper is
+    // still running and still holding this pointer; a stack local would be reclaimed
+    // underneath it, and the helper's later write to `written` would land in the
+    // frame the report generator is by then using. The filter admits one caller
+    // (see the guard in WheatyUnhandledExceptionFilter), so a single instance is
+    // enough and no lifetime management is needed.
+    static MiniDumpRequest request;
+
     request.pExceptionInfo = pExceptionInfo;
     request.faultingThreadId = GetCurrentThreadId();        // captured here, on the faulting thread
     request.written = false;
 
-    // A modest reservation of its own, since the point is not to inherit whatever
-    // is left of the crashing thread's stack.
-    HANDLE hThread = CreateThread(0, 256 * 1024, MiniDumpThreadProc, &request, 0, 0);
+    // STACK_SIZE_PARAM_IS_A_RESERVATION: without it this number is the amount to
+    // commit up front, not reserve, which makes creation likelier to fail on a
+    // process that is already short of memory - and failing here drops us back to
+    // dumping on the faulting stack, which is precisely what this thread exists to
+    // avoid for stack-overflow crashes.
+    HANDLE hThread = CreateThread(0, 256 * 1024, MiniDumpThreadProc, &request,
+                                  STACK_SIZE_PARAM_IS_A_RESERVATION, 0);
 
     if (!hThread)
     {
@@ -188,17 +206,13 @@ bool WheatyExceptionReport::WriteMiniDump(PEXCEPTION_POINTERS pExceptionInfo)
         return WriteMiniDumpWorker(pExceptionInfo, request.faultingThreadId);
     }
 
-    if (WaitForSingleObject(hThread, kMiniDumpTimeoutMs) != WAIT_OBJECT_0)
-    {
-        // Deadlocked or simply too slow. The handle is left to the process teardown
-        // rather than terminated: killing a thread mid-MiniDumpWriteDump would leave
-        // other threads suspended, and this process is about to exit regardless.
-        CloseHandle(hThread);
-        return false;
-    }
+    DWORD const waited = WaitForSingleObject(hThread, kMiniDumpTimeoutMs);
 
+    // Not terminated on timeout: killing a thread inside MiniDumpWriteDump would
+    // leave the threads it suspended suspended, and this process is exiting anyway.
     CloseHandle(hThread);
-    return request.written;
+
+    return (waited == WAIT_OBJECT_0) && request.written;
 }
 
 //===========================================================
@@ -240,12 +254,22 @@ LONG WINAPI WheatyExceptionReport::WheatyUnhandledExceptionFilter(
 
     SYSTEMTIME systime;
     GetLocalTime(&systime);
-    sprintf(m_szLogFileName, "%s\\%s_[%u-%u_%u-%u-%u].txt",
-            crash_folder_path, pos, systime.wDay, systime.wMonth, systime.wHour, systime.wMinute, systime.wSecond);
 
-    // Same systime, so the .dmp and .txt for one crash always pair by name.
-    sprintf(m_szDumpFileName, "%s\\%s_[%u-%u_%u-%u-%u].dmp",
-            crash_folder_path, pos, systime.wDay, systime.wMonth, systime.wHour, systime.wMinute, systime.wSecond);
+    // Year and process id are here because the previous form - day, month and time
+    // of day only - repeats across years and across two runs that crash at the same
+    // clock second. That was survivable while the report was the only artifact, since
+    // it is opened OPEN_ALWAYS and appends. A dump cannot append: it is written
+    // CREATE_ALWAYS, so a collision destroyed the older dump while its report was
+    // still sitting in the same file as the newer one, and the pair no longer matched.
+    // The process id also separates crashes from concurrent servers sharing a folder.
+    sprintf(m_szLogFileName, "%s\\%s_[%u-%u-%u_%u-%u-%u_%u].txt",
+            crash_folder_path, pos, systime.wDay, systime.wMonth, systime.wYear,
+            systime.wHour, systime.wMinute, systime.wSecond, GetCurrentProcessId());
+
+    // Same systime and pid, so the .dmp and .txt for one crash always pair by name.
+    sprintf(m_szDumpFileName, "%s\\%s_[%u-%u-%u_%u-%u-%u_%u].dmp",
+            crash_folder_path, pos, systime.wDay, systime.wMonth, systime.wYear,
+            systime.wHour, systime.wMinute, systime.wSecond, GetCurrentProcessId());
 
     // Written before the report, deliberately. GenerateExceptionReport loads and
     // parses every module's symbols, walks all threads, and formats megabytes of

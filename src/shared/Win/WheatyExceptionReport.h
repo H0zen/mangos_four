@@ -145,9 +145,10 @@ class WheatyExceptionReport
 
         static int __cdecl _tprintf(const TCHAR* format, ...);
 
-        // Longest a dump may take before it is abandoned. Bounds the case where
-        // MiniDumpWriteDump deadlocks on a heap lock the crashing thread still holds,
-        // which would otherwise freeze the process instead of letting it die.
+        // Longest a dump may take before it is abandoned. Bounds a helper that fails
+        // or stalls before it reaches MiniDumpWriteDump; it cannot bound a deadlock
+        // inside that call, because the dumper suspends the waiting thread. See the
+        // note above WriteMiniDump.
         static const DWORD kMiniDumpTimeoutMs = 60 * 1000;
 
         // What the helper thread needs from the faulting one. The thread id is carried
