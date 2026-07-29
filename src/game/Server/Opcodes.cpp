@@ -1116,4 +1116,46 @@ void InitializeOpcodes()
     DefC(CMSG_NEXT_CINEMATIC_CAMERA, "CMSG_NEXT_CINEMATIC_CAMERA", STATUS_LOGGEDIN, PROCESS_THREADUNSAFE, &WorldSession::HandleNextCinematicCamera);
     DefC(CMSG_REQUEST_VEHICLE_EXIT, "CMSG_REQUEST_VEHICLE_EXIT", STATUS_LOGGEDIN, PROCESS_THREADUNSAFE, &WorldSession::HandleRequestVehicleExit);
     DefC(CMSG_GUILD_ACCEPT, "CMSG_GUILD_ACCEPT", STATUS_LOGGEDIN, PROCESS_THREADUNSAFE, &WorldSession::HandleGuildAcceptOpcode);
+
+    // Three multi-byte scalar setters. A packed GUID hides its mask and byte
+    // order from size evidence -- every permutation of one GUID has the same
+    // length -- which is why the guild queries needed their reader taken from
+    // the client binary. None of these three carries a GUID, and each retail
+    // body is a single fixed width that the handler consumes exactly:
+    //
+    //   SET_TITLE             int32              4 bytes     18 observed, min 4 max 4
+    //   SET_WATCHED_FACTION   int32              4 bytes      3 observed, min 4 max 4
+    //   SET_CURRENCY_FLAGS    uint32 + uint32    8 bytes      4 observed, min 8 max 8
+    //
+    // Width alone would not be enough -- see the far-sight note below -- so each
+    // is corroborated by decoding real bodies. Titles decode to indices 202/107/99
+    // and watched factions to 118/106/99, all plausible little-endian indices. The
+    // currency bodies are decisive about field order, which size cannot be:
+    //
+    //   04 00 00 00 88 01 00 00     flags 4, currency 392
+    //   04 00 00 00 8B 01 00 00     flags 4, currency 395
+    //   04 00 00 00 8C 01 00 00     flags 4, currency 396
+    //
+    // 4 is exactly PLAYERCURRENCY_FLAG_SHOW_IN_BACKPACK, so the handler's
+    // `>> flags >> currencyId` is packet-proven despite the reversed declaration.
+    //
+    // None of the three invokes an opcode-specific response serializer, which is
+    // the hazard that held the guild queries back. They mark ordinary player
+    // fields or internal currency state, and the resulting SMSG_UPDATE_OBJECT
+    // traffic is already registered and already driven continuously by movement.
+    //
+    // CMSG_FAR_SIGHT is excluded, and it is the reason width alone is not warrant.
+    // Its body is one byte, so it looks like the safest member of this group, but
+    // all four sampled 18414 bodies are 0x80 or 0x00 -- an MSB-first single bit,
+    // not a uint8 boolean. HandleFarSightOpcode switches on 0 and 1, so a real
+    // 0x80 enable falls through the switch and SetView is never called: far sight
+    // would silently never engage. It needs ReadBit(), and its object lookup moved
+    // after the enable test since resetting the view must not depend on resolving
+    // the old object. CMSG_SHOWING_HELM is excluded for the same reason -- its
+    // three bodies are 0x80, 0x00, 0x80 -- compounded by HandleShowingHelmOpcode
+    // ignoring the packet and toggling PLAYER_FLAGS_HIDE_HELM rather than
+    // assigning it, which inverts the flag whenever the two disagree.
+    DefC(CMSG_SET_TITLE, "CMSG_SET_TITLE", STATUS_LOGGEDIN, PROCESS_THREADUNSAFE, &WorldSession::HandleSetTitleOpcode);
+    DefC(CMSG_SET_WATCHED_FACTION, "CMSG_SET_WATCHED_FACTION", STATUS_LOGGEDIN, PROCESS_THREADUNSAFE, &WorldSession::HandleSetWatchedFactionOpcode);
+    DefC(CMSG_SET_CURRENCY_FLAGS, "CMSG_SET_CURRENCY_FLAGS", STATUS_LOGGEDIN, PROCESS_THREADUNSAFE, &WorldSession::HandleSetCurrencyFlagsOpcode);
 }
