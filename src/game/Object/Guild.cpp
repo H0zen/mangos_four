@@ -1037,6 +1037,9 @@ void Guild::Roster(WorldSession* session /*= NULL*/)
         entry.zoneId = player ? player->GetZoneId() : member.ZoneId;
         entry.rankId = member.RankId;
         entry.virtualRealm = realmID;
+        // MemberSlot does not cache gender, so offline members necessarily go out as
+        // 0; online ones have a Player and should carry the real value.
+        entry.gender = player ? player->getGender() : 0;
         entry.lastLogoutDays = player ? 0.0f : float(time(NULL) - itr->second.LogoutTime) / float(DAY);
         entry.name = member.Name;
         entry.publicNote = member.Pnote;

@@ -323,6 +323,9 @@ require_once("${guild_sender}"
 require_once("${guild_sender}"
     "entry.virtualRealm = realmID;"
     "guild-roster virtual realm adapter field")
+require_once("${guild_sender}"
+    "entry.gender = player ? player->getGender() : 0;"
+    "guild-roster gender adapter field")
 require_once("${guild_handler}"
     "MopGuildPackets::BuildGuildCommandResult(data, typecmd, str, cmdresult)"
     "guild-command-result builder call")
