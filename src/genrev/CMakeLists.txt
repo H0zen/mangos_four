@@ -24,16 +24,39 @@
 # "unknown"/"Archived" with empty submodule fields. That was survivable only while
 # the script wrote somewhere nothing compiles; now that it writes the header the
 # compiler reads, those values would be stamped into every build.
+#
+# CMAKE_HOST_SYSTEM_VERSION is in the same category and easy to miss: script mode
+# leaves it empty, and revision_data.h.in substitutes it into CMAKE_HOST_SYSTEM,
+# so without it the build-time run degrades "Windows 10.0.26200" to "Windows ".
+# CMAKE_VERSION and CMAKE_HOST_SYSTEM_NAME are the only other substituted values
+# not computed inside the script, and cmake -P does set both.
+#
+# VERBATIM matters here because two of these are paths that routinely contain
+# spaces - a default Windows Git lives under "C:/Program Files/Git" - and without
+# it the escaping is generator-specific and can arrive as literal data.
+set(REVISION_DATA_HEADER "${CMAKE_BINARY_DIR}/src/shared/revision_data.h")
+
 add_custom_target(revision_data.h ALL
   COMMAND "${CMAKE_COMMAND}"
-    -DBUILDDIR="${CMAKE_BINARY_DIR}"
-    -DGIT_EXECUTABLE="${GIT_EXECUTABLE}"
+    -DBUILDDIR=${CMAKE_BINARY_DIR}
+    -DGIT_EXECUTABLE=${GIT_EXECUTABLE}
     -DWITHOUT_GIT=${WITHOUT_GIT}
     -DSCRIPT_LIB_ELUNA=${SCRIPT_LIB_ELUNA}
     -DSCRIPT_LIB_SD3=${SCRIPT_LIB_SD3}
+    -DCMAKE_HOST_SYSTEM_VERSION=${CMAKE_HOST_SYSTEM_VERSION}
     -P "${CMAKE_SOURCE_DIR}/cmake/GenRevision.cmake" "${CMAKE_BINARY_DIR}"
+  BYPRODUCTS "${REVISION_DATA_HEADER}"
   WORKING_DIRECTORY "${CMAKE_SOURCE_DIR}"
+  COMMENT "Generating revision_data.h"
+  VERBATIM
 )
+
+# Declaring the header a byproduct is what tells the generator this command is the
+# thing that produces it, rather than leaving it an untracked file that happens to
+# appear. Ninja in particular needs that edge: without it the header is unknown to
+# the graph, and the ordering edge below only sequences the command, it does not
+# mark anything dirty.
+set_source_files_properties("${REVISION_DATA_HEADER}" PROPERTIES GENERATED TRUE)
 
 # Without an explicit edge this is just another ALL target, so the build tool is
 # free to compile the consumers before - or alongside - the command that rewrites
