@@ -632,12 +632,53 @@ static void test_guild_roster_response()
     std::vector<MopGuildPackets::RosterMember> const roster = { first, second };
 
     WorldPacket packet;
-    MopGuildPackets::BuildGuildRoster(packet, roster, "You can leave any time:)",
-        "Smoula guild", 2, 0x0E44453A, 4375);
+    CHECK(MopGuildPackets::BuildGuildRoster(packet, roster, "You can leave any time:)",
+        "Smoula guild", 2, 0x0E44453A, 4375));
 
     CHECK(packet.GetOpcode() == SMSG_GUILD_ROSTER);
     CHECK(packet.size() == 235);
     CHECK(Equal(packet, capture));
+}
+
+// Each roster length goes out in a bit field narrower than the string it describes,
+// so an oversized field must be refused rather than silently truncated.
+static void test_guild_roster_length_bounds()
+{
+    MopGuildPackets::RosterMember member;
+    member.guid = 0x0600000007221301ULL;
+    member.name = "Yrreb";
+
+    std::vector<MopGuildPackets::RosterMember> roster = { member };
+    WorldPacket packet;
+
+    // Baseline accepts.
+    CHECK(MopGuildPackets::BuildGuildRoster(packet, roster, "", "", 1, 0, 0));
+
+    // 6-bit name length: 63 fits, 64 does not.
+    roster[0].name = std::string(63, 'a');
+    CHECK(MopGuildPackets::BuildGuildRoster(packet, roster, "", "", 1, 0, 0));
+    roster[0].name = std::string(64, 'a');
+    CHECK(!MopGuildPackets::BuildGuildRoster(packet, roster, "", "", 1, 0, 0));
+    roster[0].name = "Yrreb";
+
+    // 8-bit note lengths: 255 fits, 256 does not.
+    roster[0].publicNote = std::string(255, 'p');
+    CHECK(MopGuildPackets::BuildGuildRoster(packet, roster, "", "", 1, 0, 0));
+    roster[0].publicNote = std::string(256, 'p');
+    CHECK(!MopGuildPackets::BuildGuildRoster(packet, roster, "", "", 1, 0, 0));
+    roster[0].publicNote.clear();
+
+    roster[0].officerNote = std::string(256, 'o');
+    CHECK(!MopGuildPackets::BuildGuildRoster(packet, roster, "", "", 1, 0, 0));
+    roster[0].officerNote.clear();
+
+    // 10-bit MOTD length: 1023 fits, 1024 does not.
+    CHECK(MopGuildPackets::BuildGuildRoster(packet, roster, std::string(1023, 'm'), "", 1, 0, 0));
+    CHECK(!MopGuildPackets::BuildGuildRoster(packet, roster, std::string(1024, 'm'), "", 1, 0, 0));
+
+    // 11-bit guild-info length: 2047 fits, 2048 does not.
+    CHECK(MopGuildPackets::BuildGuildRoster(packet, roster, "", std::string(2047, 'i'), 1, 0, 0));
+    CHECK(!MopGuildPackets::BuildGuildRoster(packet, roster, "", std::string(2048, 'i'), 1, 0, 0));
 }
 
 static void test_guild_query_opcodes()
@@ -678,6 +719,7 @@ int main(int /*argc*/, char** /*argv*/)
     test_guild_permissions_response();
     test_guild_ranks_response();
     test_guild_roster_response();
+    test_guild_roster_length_bounds();
     test_guild_query_opcodes();
 
     if (g_fail)

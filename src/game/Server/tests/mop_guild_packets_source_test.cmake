@@ -318,7 +318,7 @@ require_once("${packet_builder}"
     "out.WriteBits(uint32(info.length()), 11)"
     "guild-roster 11-bit info length")
 require_once("${guild_sender}"
-    "MopGuildPackets::BuildGuildRoster(data, roster, MOTD, GINFO, m_accountsNumber,"
+    "MopGuildPackets::BuildGuildRoster(data, roster, MOTD, GINFO, GetAccountsNumber(),"
     "guild-roster production builder call")
 require_once("${guild_handler}"
     "MopGuildPackets::BuildGuildCommandResult(data, typecmd, str, cmdresult)"

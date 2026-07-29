@@ -256,10 +256,30 @@ namespace MopGuildPackets
      * 17 bits read 2 and the packet carries exactly two names, and the next 10
      * bits read 24 against a 24-character MOTD.
      */
-    inline void BuildGuildRoster(WorldPacket& out, std::vector<RosterMember> const& members,
+    inline bool BuildGuildRoster(WorldPacket& out, std::vector<RosterMember> const& members,
         std::string const& motd, std::string const& info, uint32 accountsNumber,
         uint32 createdDatePacked, uint32 weeklyReputationCap)
     {
+        // Every length below goes out in a bit field narrower than the string it
+        // describes. Writing a truncated length and then appending the whole string
+        // desynchronises the client's reader for the rest of the packet, so reject
+        // rather than emit, the same way the other bounded guild builders do.
+        if (members.size() >= (size_t(1) << 17) ||
+            motd.size() >= (size_t(1) << 10) ||
+            info.size() >= (size_t(1) << 11))
+        {
+            return false;
+        }
+        for (RosterMember const& member : members)
+        {
+            if (member.name.size() >= (size_t(1) << 6) ||
+                member.publicNote.size() >= (size_t(1) << 8) ||
+                member.officerNote.size() >= (size_t(1) << 8))
+            {
+                return false;
+            }
+        }
+
         ByteBuffer memberData;
 
         out.Initialize(SMSG_GUILD_ROSTER, 24 + members.size() * 100 + motd.size() + info.size());
@@ -327,6 +347,7 @@ namespace MopGuildPackets
         out << uint32(weeklyReputationCap);
         out.append(motd.c_str(), motd.size());
         out << uint32(0);
+        return true;
     }
 
     inline EmblemDesign ReadSaveGuildEmblem(WorldPacket& in)

@@ -1043,9 +1043,16 @@ void Guild::Roster(WorldSession* session /*= NULL*/)
         roster.push_back(entry);
     }
 
+    // GetAccountsNumber(), not m_accountsNumber: zero is that member's
+    // needs-recalculation marker, so reading it directly sends 0 accounts on the
+    // first roster after startup and after every membership change.
     WorldPacket data;
-    MopGuildPackets::BuildGuildRoster(data, roster, MOTD, GINFO, m_accountsNumber,
-        secsToTimeBitFields(m_CreatedDate), 0);
+    if (!MopGuildPackets::BuildGuildRoster(data, roster, MOTD, GINFO, GetAccountsNumber(),
+        secsToTimeBitFields(m_CreatedDate), 0))
+    {
+        sLog.outError("Guild::Roster: guild %u has a field too long for the 18414 roster body; not sending", m_Id);
+        return;
+    }
 
     if (session)
     {
