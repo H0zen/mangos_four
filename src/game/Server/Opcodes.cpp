@@ -836,7 +836,8 @@ void InitializeOpcodes()
     // CMSG_GUILD_QUERY (0x1AB6) is deliberately NOT registered here despite being the
     // heaviest of the family at 30,939 observations. HandleGuildQueryOpcode still reads
     // `recvPacket >> guildGuid >> playerGuid`, and operator>>(ByteBuffer&, ObjectGuid&)
-    // takes a fixed raw uint64, so it demands exactly 16 bytes. The 18414 wire body is
+    // takes a fixed raw uint64, so it consumes at least 16 bytes and does not enforce
+    // end of packet -- a longer body leaves a logged tail. The 18414 wire body is
     // 9..17 and variable, i.e. bit-packed. That is an inherited-shape handler and
     // registering it would misparse every request -- the same mistake the corpse-reclaim
     // registrations made. It stays dormant until the handler is converted.

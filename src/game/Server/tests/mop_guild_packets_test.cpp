@@ -478,6 +478,7 @@ static void test_guild_permissions_response()
     MopGuildPackets::BuildGuildPermissions(packet, 5, 0, 7, 0x00106053,
         remainingSlots, tabRights);
 
+    CHECK(packet.GetOpcode() == SMSG_GUILD_PERMISSIONS);
     CHECK(packet.size() == 83);
     CHECK(Equal(packet, capture));
 }
