@@ -974,20 +974,27 @@ bool SafeFormatDbString(char* buffer, size_t size, char const* format, va_list a
         bool const msvcSizePrefixes = false;
 #endif
 
+        char sizePrefix = '\0';                             // '\0' = none
+
         if (msvcSizePrefixes && p[0] == 'I' && ((p[1] == '3' && p[2] == '2') || (p[1] == '6' && p[2] == '4')))
         {
+            sizePrefix = p[1];                              // '3' for I32, '6' for I64
             p += 3;
         }
         else if ((p[0] == 'h' && p[1] == 'h') || (p[0] == 'l' && p[1] == 'l'))
         {
+            sizePrefix = (p[0] == 'h') ? 'H' : 'Q';         // 'H' = hh, 'Q' = ll (not 'L',
+                                                            // which is the distinct long-double modifier)
             p += 2;
         }
         else if (*p == 'h' || *p == 'l' || *p == 'L' || *p == 'j' || *p == 'z' || *p == 't')
         {
+            sizePrefix = *p;
             ++p;
         }
         else if (msvcSizePrefixes && (*p == 'I' || *p == 'w'))
         {
+            sizePrefix = *p;
             ++p;
         }
 
@@ -1002,6 +1009,57 @@ bool SafeFormatDbString(char* buffer, size_t size, char const* format, va_list a
 #else
         char const* const acceptedConversions = "diouxXfFeEgGaAcsp";
 #endif
+
+        // A size prefix is only meaningful for some conversions. "%I64s", "%zs" and
+        // "%Ld" satisfy the grammar piecewise but are not valid pairings: MSVC answers
+        // them with the invalid-parameter handler, which terminates and is precisely
+        // what the SEH block cannot contain, and a CRT that tolerates one instead reads
+        // the argument as the wrong type and returns success with garbage.
+        if (sizePrefix != '\0' && *p != '\0')
+        {
+            bool const integerConversion = strchr("diouxX", *p) != nullptr;
+            bool const floatConversion   = strchr("fFeEgGaA", *p) != nullptr;
+            bool const stringConversion  = (*p == 's' || *p == 'c');
+            bool valid = false;
+
+            switch (sizePrefix)
+            {
+                case 'H':                                   // hh
+                case 'Q':                                   // ll
+                case 'j':                                   // intmax_t
+                case 'z':                                   // size_t
+                case 't':                                   // ptrdiff_t
+                case '3':                                   // I32
+                case '6':                                   // I64
+                case 'I':                                   // pointer-width
+                    valid = integerConversion;
+                    break;
+                case 'h':                                   // short, or single-byte s/c on MSVC
+                    valid = integerConversion || (msvcSizePrefixes && stringConversion);
+                    break;
+                case 'l':                                   // long, or wide s/c
+                    valid = integerConversion || stringConversion;
+                    break;
+                case 'L':                                   // long double ONLY.
+                    // Not integers: UCRT answers %Ld with the invalid-parameter
+                    // handler, which raises STATUS_STACK_BUFFER_OVERRUN through
+                    // __fastfail and cannot be caught by the SEH block below.
+                    // Measured, not assumed - it terminated the test harness.
+                    valid = floatConversion;
+                    break;
+                case 'w':                                   // MSVC wide s/c
+                    valid = stringConversion;
+                    break;
+                default:
+                    valid = false;
+                    break;
+            }
+
+            if (!valid)
+            {
+                return false;
+            }
+        }
 
         if (*p == '\0' || !strchr(acceptedConversions, *p))
         {

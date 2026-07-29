@@ -92,12 +92,19 @@ namespace MaNGOS
                     if (!formatted)
                     {
                         sLog.outError("String entry %i could not be formatted; sending it unformatted. Check its conversions against the caller in `mangos_string`.", i_textId);
+
+                        // Copied into the bounded buffer rather than passed straight
+                        // through: BuildChatPacket carries the text length in 12 bits,
+                        // so a row of 4096 bytes or more would trip its assertion on an
+                        // assertion-enabled build and leave an empty packet otherwise -
+                        // the very outcome this fallback exists to avoid.
+                        CopyDbStringBounded(str, sizeof(str), text);
                     }
 
                     // The caller sends whatever this builder leaves in `data`, so a
-                    // failure has to fall back to the raw row rather than return and
-                    // put an empty packet on the wire.
-                    ChatHandler::BuildChatPacket(data, i_msgtype, formatted ? &str[0] : text, LANG_UNIVERSAL, CHAT_TAG_NONE, sourceGuid, sourceName.c_str());
+                    // failure falls back to the raw row rather than returning and
+                    // putting an empty packet on the wire.
+                    ChatHandler::BuildChatPacket(data, i_msgtype, &str[0], LANG_UNIVERSAL, CHAT_TAG_NONE, sourceGuid, sourceName.c_str());
                 }
                 else
                 {
@@ -140,10 +147,12 @@ namespace MaNGOS
                     if (!formatted)
                     {
                         sLog.outError("String entry %i could not be formatted; sending it unformatted. Check its conversions against the caller in `mangos_string`.", i_textId);
+                        CopyDbStringBounded(str, sizeof(str), text);
                     }
 
-                    // As above: returning here would send an empty packet.
-                    ChatHandler::BuildChatPacket(data, CHAT_MSG_MONSTER_YELL, formatted ? &str[0] : text, i_language, CHAT_TAG_NONE, i_source->GetObjectGuid(), i_source->GetName());
+                    // As above: returning here would send an empty packet, and the raw
+                    // row must be bounded before it reaches BuildChatPacket.
+                    ChatHandler::BuildChatPacket(data, CHAT_MSG_MONSTER_YELL, &str[0], i_language, CHAT_TAG_NONE, i_source->GetObjectGuid(), i_source->GetName());
                 }
                 else
                 {
