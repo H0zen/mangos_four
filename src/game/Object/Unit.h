@@ -1216,27 +1216,42 @@ namespace MopCompactPackets
     {
         out.Initialize(SMSG_PARTYKILLLOG, 18);
 
-        // Wow.exe 18414 reader sub_6F2FE4 consumes two packed GUIDs;
-        // terminal sub_841B83 treats them as credited killer then victim.
-        out.WriteGuidMask<7, 2>(victim);
-        out.WriteGuidMask<1>(killer);
-        out.WriteGuidMask<4>(victim);
-        out.WriteGuidMask<2, 5>(killer);
-        out.WriteGuidMask<3, 1, 0>(victim);
-        out.WriteGuidMask<3, 0, 4>(killer);
-        out.WriteGuidMask<6>(victim);
-        out.WriteGuidMask<7>(killer);
-        out.WriteGuidMask<5>(victim);
+        // Reader sub_6F2FE4 in Wow.exe 18414 decodes two packed GUIDs into adjacent buffers:
+        // slot A at this+16..23 and slot B at this+24..31. Its 16-bit mask order is
+        //   B7 B2 A1 B4 A2 A5 B3 B1 B0 A3 A0 A4 B6 A7 B5 A6
+        // which is exactly the interleaving written below, so the layout here is faithful.
+        //
+        // What the layout does NOT tell you is which slot the client shows as the killer, and an
+        // earlier revision of this comment asserted "terminal sub_841B83 treats them as credited
+        // killer then victim". There is no sub_841B83 anywhere in the 18414 export -- the citation
+        // was to a function that does not exist, and the roles it justified were the wrong way
+        // round. The vtable the message constructor installs (off_D6AB30 -> sub_6C4038) is a shared
+        // generic slot and does not resolve it either.
+        //
+        // The roles below are therefore set from OBSERVED CLIENT BEHAVIOUR, not from the binary:
+        // killing Hogger produced the combat-log line "Hogger killed you", i.e. the client treats
+        // slot B as the killer. So our killer goes in B and our victim in A -- the reverse of the
+        // original. If anyone later locates the real terminal, that is the citation to add here;
+        // do not restore the sub_841B83 reference.
+        out.WriteGuidMask<7, 2>(killer);
+        out.WriteGuidMask<1>(victim);
+        out.WriteGuidMask<4>(killer);
+        out.WriteGuidMask<2, 5>(victim);
+        out.WriteGuidMask<3, 1, 0>(killer);
+        out.WriteGuidMask<3, 0, 4>(victim);
         out.WriteGuidMask<6>(killer);
+        out.WriteGuidMask<7>(victim);
+        out.WriteGuidMask<5>(killer);
+        out.WriteGuidMask<6>(victim);
         out.FlushBits();
 
-        out.WriteGuidBytes<0, 5>(victim);
-        out.WriteGuidBytes<0, 2>(killer);
-        out.WriteGuidBytes<7, 6, 1, 4>(victim);
-        out.WriteGuidBytes<4, 1>(killer);
-        out.WriteGuidBytes<2>(victim);
-        out.WriteGuidBytes<6, 3, 5, 7>(killer);
-        out.WriteGuidBytes<3>(victim);
+        out.WriteGuidBytes<0, 5>(killer);
+        out.WriteGuidBytes<0, 2>(victim);
+        out.WriteGuidBytes<7, 6, 1, 4>(killer);
+        out.WriteGuidBytes<4, 1>(victim);
+        out.WriteGuidBytes<2>(killer);
+        out.WriteGuidBytes<6, 3, 5, 7>(victim);
+        out.WriteGuidBytes<3>(killer);
     }
 
     struct AttackStateUpdateData

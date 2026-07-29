@@ -550,21 +550,87 @@ static void test_cancel_combat()
     CHECK(uint32_t(packet.GetOpcode()) == 0x0E8Bu);
 }
 
+// Decodes SMSG_PARTYKILLLOG the way the 18414 client does, so the assertions below can be about
+// WHICH GUID ended up in which slot rather than about bytes the builder produced.
+//
+// The previous version of this test pinned exact bytes for one killer/victim pair. That locks the
+// wire layout, but the expected bytes had themselves been generated from the builder, so it was
+// asserting the builder against itself: it could not distinguish killer from victim and stayed
+// green while the two were transposed. A live client reading "Hogger killed you" was what caught
+// it. Decoding restores the property the byte fixture was missing.
+//
+// Both tables are read out of reader sub_6F2FE4 itself, NOT out of the builder -- otherwise this
+// would be circular again and a transposition would still pass. Taking slot A as this+16..23 and
+// slot B as this+24..31, the reader's mask order is
+//   B7 B2 A1 B4 A2 A5 B3 B1 B0 A3 A0 A4 B6 A7 B5 A6
+// and its byte order, from the sequence of "*(this + N) ^=" sites, is offsets
+//   24 29 16 18 31 30 25 28 20 17 26 22 19 21 23 27
+// which is
+//   B0 B5 A0 A2 B7 B6 B1 B4 A4 A1 B2 A6 A3 A5 A7 B3
+// Each present byte is XOR 1 on the wire.
+static void DecodePartyKillLog(WorldPacket const& packet, uint64_t& slotA, uint64_t& slotB)
+{
+    static const int kMaskOrder[16][2] = {
+        {1, 7}, {1, 2}, {0, 1}, {1, 4}, {0, 2}, {0, 5}, {1, 3}, {1, 1},
+        {1, 0}, {0, 3}, {0, 0}, {0, 4}, {1, 6}, {0, 7}, {1, 5}, {0, 6},
+    };
+    static const int kByteOrder[16][2] = {
+        {1, 0}, {1, 5}, {0, 0}, {0, 2}, {1, 7}, {1, 6}, {1, 1}, {1, 4},
+        {0, 4}, {0, 1}, {1, 2}, {0, 6}, {0, 3}, {0, 5}, {0, 7}, {1, 3},
+    };
+
+    uint8_t bytes[8][2] = {{0}};
+    bool present[8][2] = {{false}};
+
+    uint8_t const* p = packet.contents();
+    // 16 mask bits, MSB-first, in the reader's order
+    for (int i = 0; i < 16; ++i)
+    {
+        uint8_t const bit = (p[i / 8] >> (7 - (i % 8))) & 1;
+        present[kMaskOrder[i][1]][kMaskOrder[i][0]] = (bit != 0);
+    }
+
+    size_t at = 2;
+    for (int i = 0; i < 16; ++i)
+    {
+        int const slot = kByteOrder[i][0];
+        int const idx  = kByteOrder[i][1];
+        if (present[idx][slot])
+        {
+            bytes[idx][slot] = uint8_t(p[at++] ^ 1);
+        }
+    }
+
+    slotA = slotB = 0;
+    for (int i = 0; i < 8; ++i)
+    {
+        slotA |= uint64_t(bytes[i][0]) << (8 * i);
+        slotB |= uint64_t(bytes[i][1]) << (8 * i);
+    }
+}
+
 static void test_party_kill_log()
 {
+    uint64_t const killerGuid = UINT64_C(0x8877665544332211);
+    uint64_t const victimGuid = UINT64_C(0xFFEEDDCCBBAA9901);
+
     WorldPacket packet;
-    MopCompactPackets::BuildPartyKillLog(
-        packet,
-        ObjectGuid(UINT64_C(0x8877665544332211)),
-        ObjectGuid(UINT64_C(0xFFEEDDCCBBAA9901)));
+    MopCompactPackets::BuildPartyKillLog(packet, ObjectGuid(killerGuid), ObjectGuid(victimGuid));
     CHECK(packet.GetOpcode() == SMSG_PARTYKILLLOG);
-    CHECK(BytesEqual(packet, {
-        0xFF, 0xFF,
-        0x00, 0xDC, 0x10, 0x32,
-        0xFE, 0xEF, 0x98, 0xCD,
-        0x54, 0x23, 0xAB, 0x76,
-        0x45, 0x67, 0x89, 0xBA,
-    }));
+    CHECK(packet.size() == 18);
+
+    uint64_t slotA = 0;
+    uint64_t slotB = 0;
+    DecodePartyKillLog(packet, slotA, slotB);
+
+    // The client shows slot B as the killer -- see BuildPartyKillLog for why this is an observed
+    // fact rather than a binary-derived one. These two assertions are the whole point of the test:
+    // swapping the roles in the builder fails them, whereas the old byte fixture could not tell.
+    CHECK(slotB == killerGuid);
+    CHECK(slotA == victimGuid);
+
+    // Distinct GUIDs, so a builder that wrote one of them into both slots cannot pass.
+    CHECK(slotA != slotB);
 }
 
 static void test_duel_state_packets()
