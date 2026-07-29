@@ -778,9 +778,12 @@ void WorldSession::HandleRandomizeCharNameOpcode(WorldPacket& recvPacket)
     WorldPacket data(SMSG_RANDOMIZE_CHAR_NAME, 1 + (name ? name->size() : 0));
     if (!name)
     {
-        // No candidates for that race/sex. Answer with the failure bit rather than an empty
-        // name: the client leaves the edit box alone, which is recoverable, where a blank
-        // name is not.
+        // No candidates for that race/sex. Answer with the failure bit rather than an empty name.
+        // The client's reader takes one success bit, then a six-bit length, then the string, so
+        // clearing the bit produces a well-formed response that carries no name -- as opposed to a
+        // success bit with a zero length, which would assert a name that is the empty string. What
+        // the UI then does with the failure is not established here; only that the packet is
+        // well-formed and asserts nothing false.
         DEBUG_LOG("WORLD: CMSG_RANDOMIZE_CHAR_NAME - no NameGen entry for race %u sex %u", race, sex);
         data.WriteBit(false);
         data.FlushBits();
@@ -913,18 +916,6 @@ void WorldSession::HandlePlayerLogin(LoginQueryHolder* holder)
         lts << packedNow;
         lts << float(0.01666667f);
         SendPacket(&lts, true);
-
-        // SMSG_SET_TIME_ZONE_INFORMATION: names the server's timezone so the
-        // client can populate the two 127-byte buffers its date conversion
-        // resolves against. Without it those stay zero, the conversion writes
-        // nothing, and its caller copies an all-minus-one scratch struct over
-        // the date -- which is what hangs the calendar on open. Etc/UTC is one
-        // of the identifiers compiled into the client; a host timezone name is
-        // not, so this is deliberately a constant rather than anything read
-        // from the machine.
-        WorldPacket tz(SMSG_SET_TIME_ZONE_INFORMATION, 2 + 2 * 7);
-        MopWorldEntryPackets::BuildSetTimeZoneInformation(tz, "Etc/UTC");
-        SendPacket(&tz, true);
     }
     // PHASE 6c: NO control/mover packet is sent -- none is needed. The 18414 client grants player
     // control itself when it processes the SELF create-block: the create/add-to-world path marks the
@@ -969,6 +960,32 @@ void WorldSession::HandlePlayerLogin(LoginQueryHolder* holder)
         MopInitialPackets::BuildMotd(data, lines);
         SendPacket(&data);
         DEBUG_LOG("WORLD: Sent motd (SMSG_MOTD)");
+    }
+
+    // SMSG_SET_TIME_ZONE_INFORMATION: names the server's timezone so the client can populate the
+    // two 127-byte buffers its date conversion resolves against. Without it those stay zero, the
+    // conversion writes nothing, and its caller copies an all-minus-one scratch struct over the
+    // date -- which is what hangs the calendar on open. Etc/UTC is one of the identifiers compiled
+    // into the client; a host timezone name is not, so this is deliberately a constant rather than
+    // anything read from the machine.
+    //
+    // Placed after the MOTD because that is where retail puts the world-entry occurrence -- NOT
+    // adjacent to SMSG_ACCOUNT_DATA_TIMES, which is the char-select occurrence's position. The two
+    // phases order it differently and the distinction is easy to get backwards:
+    //
+    //   char-select   capture-000019 seq 22 ACCOUNT_DATA_TIMES -> 23 SET_TIME_ZONE_INFORMATION
+    //   world entry   capture-000019 seq 177 ACCOUNT_DATA_TIMES, 179 MOTD, 180 SET_TIME_ZONE_INFO
+    //                 capture-000013 seq 161 ACCOUNT_DATA_TIMES, 164 MOTD, 166 SET_TIME_ZONE_INFO
+    //
+    // The packets between account-data-times and the timezone differ between those two captures,
+    // so only the after-MOTD relation is asserted here, not an exact index.
+    //
+    // bypassSuppress stays true: m_suppressWorldSends is raised above and this opcode is not on the
+    // enter-world admission list.
+    {
+        WorldPacket tz(SMSG_SET_TIME_ZONE_INFORMATION, 2 + 2 * 7);
+        MopWorldEntryPackets::BuildSetTimeZoneInformation(tz, "Etc/UTC");
+        SendPacket(&tz, true);
     }
 
     // QueryResult *result = CharacterDatabase.PQuery("SELECT guildid,rank FROM guild_member WHERE guid = '%u'",pCurrChar->GetGUIDLow());

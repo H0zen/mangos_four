@@ -6,17 +6,23 @@
 # 71 in 18414 is CHAR_DELETE_IN_PROGRESS, not CHAR_DELETE_SUCCESS. The client never saw a
 # terminal result. 34 of 104 values were wrong.
 #
-# Nothing pinned any of it, which is why it survived. Two of the values below are confirmed
-# against retail traffic and are the anchors the rest hang off:
+# Nothing pinned any of it, which is why it survived. The values are confirmed from two
+# independent directions:
 #
-#   SMSG_CHAR_CREATE carries 0x2F (CHAR_CREATE_SUCCESS, 47) and 0x32 (CHAR_CREATE_NAME_IN_USE,
-#   50) across the five observations in the 18414 corpus. Both match, which is what makes the
-#   enum trustworthy up to 50 and localises the drift to the region after it.
+#   Wire. SMSG_CHAR_CREATE carries 0x2F (CHAR_CREATE_SUCCESS, 47) and 0x32
+#   (CHAR_CREATE_NAME_IN_USE, 50) across the five observations in the 18414 corpus.
 #
-# The delete code itself has NO wire observation - there is no SMSG_CHAR_DELETE anywhere in
-# the corpus - so it is pinned here because a live client accepted 72 and reported
-# COP_DELETE_CHARACTER result=TRUE. That is weaker evidence than the create codes and is
-# recorded as such rather than dressed up.
+#   Binary. The client carries its own ordered response-name table, off_DC9890[109] (base
+#   Wow.exe.c:80104, index 0 = RESPONSE_SUCCESS), where the array index IS the wire value.
+#   Every one of our 109 enumerators matches that table by name at its own value, and the
+#   table independently places CHAR_CREATE_SUCCESS at 47 and CHAR_CREATE_NAME_IN_USE at 50 --
+#   agreeing with the wire anchors it never saw.
+#
+# That second source is what makes CHAR_DELETE_SUCCESS = 0x48 solid. There is no
+# SMSG_CHAR_DELETE anywhere in the corpus, so it has no wire observation at all; it was
+# originally pinned only because a live client accepted 72 and reported
+# COP_DELETE_CHARACTER result=TRUE. The client's own table puts CHAR_DELETE_SUCCESS at 72
+# directly, which is stronger than the behavioural test and independent of it.
 #
 # Run:
 #   cmake -DSOURCE_ROOT=<repo> -P mop_char_response_codes_source_test.cmake
@@ -105,6 +111,14 @@ if(DEFINED MUTATION)
     elseif(MUTATION STREQUAL "restore_duplicate_enum")
         string(REPLACE "    data << (uint8)CHAR_DELETE_SUCCESS;\n    SendPacket(&data);"
                        "    data << (uint8)CHAR_DELETE_SUCCESS;\n    SendPacket(&data);\n    SendCharacterEnum();" _m_charh "${_charh_src}")
+    elseif(MUTATION STREQUAL "world_entry_timezone_before_motd")
+        # Put the world-entry timezone back next to the time-speed bootstrap, where it sat before
+        # the corpus showed retail emits it after the MOTD.
+        string(REPLACE "        WorldPacket tz(SMSG_SET_TIME_ZONE_INFORMATION, 2 + 2 * 7);\n        MopWorldEntryPackets::BuildSetTimeZoneInformation(tz, \"Etc/UTC\");\n        SendPacket(&tz, true);"
+                       "" _m_charh "${_charh_src}")
+        string(REPLACE "        SendPacket(&lts, true);"
+                       "        SendPacket(&lts, true);\n        WorldPacket tz(SMSG_SET_TIME_ZONE_INFORMATION, 2 + 2 * 7);\n        MopWorldEntryPackets::BuildSetTimeZoneInformation(tz, \"Etc/UTC\");\n        SendPacket(&tz, true);"
+                       _m_charh "${_m_charh}")
     elseif(MUTATION STREQUAL "drop_charselect_timezone")
         string(REPLACE "MopWorldEntryPackets::BuildSetTimeZoneInformation(tz, \"Etc/UTC\");\n    SendPacket(&tz);" "" _m_misc "${_misc_src}")
     elseif(MUTATION STREQUAL "battlepay_back_to_null")
@@ -184,8 +198,9 @@ if(_at EQUAL -1)
         "CHAR_DELETE_SUCCESS is not 0x48 (72).\n\n"
         "At 0x47 (71) the client reads CHAR_DELETE_IN_PROGRESS, never sees a terminal\n"
         "result, and reports the delete as failed - while the character has in fact already\n"
-        "been removed from the database. There is no SMSG_CHAR_DELETE in the corpus, so this\n"
-        "rests on a live client accepting 72 and answering result=TRUE.")
+        "been removed from the database. The client's own response-name table puts\n"
+        "CHAR_DELETE_SUCCESS at index 72, and a live client accepted 72 and answered\n"
+        "COP_DELETE_CHARACTER result=TRUE.")
 endif()
 
 # ---------------------------------------------------------------------------
@@ -212,10 +227,32 @@ string(FIND "${_misc_src}" "MopWorldEntryPackets::BuildSetTimeZoneInformation(tz
 if(_at EQUAL -1)
     message(FATAL_ERROR
         "The character-select SMSG_SET_TIME_ZONE_INFORMATION send is gone.\n\n"
-        "Retail binds this packet to the account-data phase, not to world entry: 843\n"
-        "observations across the corpus, every sampled one immediately after\n"
-        "SMSG_ACCOUNT_DATA_TIMES. The login-path send is a separate occurrence and does not\n"
-        "substitute for it.")
+        "Retail sends this packet twice per session. This is the account-data-phase occurrence,\n"
+        "which sits immediately after SMSG_ACCOUNT_DATA_TIMES and before the character list:\n"
+        "capture-000019 seq 22 -> 23 -> 24. The world-entry occurrence is a separate send in\n"
+        "CharacterHandler and does not substitute for it.")
+endif()
+
+# The world-entry occurrence is ordered differently from the char-select one, and the difference
+# is easy to 'fix' backwards -- a reviewer proposed moving it adjacent to SMSG_ACCOUNT_DATA_TIMES,
+# which is the char-select position, not this one. Two captures put it after the MOTD:
+#   capture-000019 seq 177 ACCOUNT_DATA_TIMES, 179 MOTD, 180 SET_TIME_ZONE_INFORMATION
+#   capture-000013 seq 161 ACCOUNT_DATA_TIMES, 164 MOTD, 166 SET_TIME_ZONE_INFORMATION
+# The packets in between differ between the two, so only the after-MOTD relation is asserted.
+string(FIND "${_charh_src}" "data.Initialize(SMSG_MOTD," _motd_at)
+string(FIND "${_charh_src}" "WorldPacket tz(SMSG_SET_TIME_ZONE_INFORMATION" _tz_at)
+if(_motd_at EQUAL -1 OR _tz_at EQUAL -1)
+    message(FATAL_ERROR
+        "Cannot locate the world-entry MOTD and timezone sends -- the ordering assertion below\n"
+        "would be vacuous. MOTD found at ${_motd_at}, timezone at ${_tz_at}.")
+endif()
+if(_tz_at LESS _motd_at)
+    message(FATAL_ERROR
+        "The world-entry SMSG_SET_TIME_ZONE_INFORMATION is emitted before the MOTD.\n\n"
+        "Retail emits it after: capture-000019 (177 ACCOUNT_DATA_TIMES, 179 MOTD, 180 timezone)\n"
+        "and capture-000013 (161, 164, 166). Note this is NOT the char-select ordering, where the\n"
+        "timezone does immediately follow SMSG_ACCOUNT_DATA_TIMES -- the two phases differ, and\n"
+        "moving this send next to the account-data packet makes it less retail-faithful, not more.")
 endif()
 
 foreach(_reg
@@ -229,9 +266,10 @@ foreach(_reg
         message(FATAL_ERROR
             "A character-screen registration is missing:\n  ${_reg}\n\n"
             "Battle pay: retail answers it 420 times across the corpus; on Handle_NULL the\n"
-            "client's request goes unanswered. SMSG_CHARACTER_LOGIN_FAILED: without it every\n"
-            "CHAR_LOGIN_* code has zero send sites and a refused login tells the client\n"
-            "nothing. Randomise name: the creation button round-trips to the server.")
+            "client's request goes unanswered. SMSG_CHARACTER_LOGIN_FAILED: naming it is a\n"
+            "prerequisite for ever sending a CHAR_LOGIN_* code -- note nothing sends it yet,\n"
+            "and this gate does not claim otherwise. Randomise name: the creation button\n"
+            "round-trips to the server.")
     endif()
 endforeach()
 

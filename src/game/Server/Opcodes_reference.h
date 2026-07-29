@@ -319,7 +319,7 @@ typedef uint16_t uint16;
  *   SMSG_CHAR_RENAME                               0x0CBF  DORMANT 
  *   SMSG_UNKNOWN_0x10AF                            0x10AF  DOC     
  *   SMSG_CHAR_CUSTOMIZE                            0x1432  ACTIVE
- *   SMSG_RANDOMIZE_CHAR_NAME                       0x169F  ACTIVE 
+ *   SMSG_RANDOMIZE_CHAR_NAME                       0x169F  ACTIVE
  *   SMSG_SET_PLAYER_DECLINED_NAMES_RESULT          0x180E  DORMANT 
  *   SMSG_REALM_SPLIT                               0x1A2E  ACTIVE  
  *
@@ -1632,7 +1632,7 @@ typedef uint16_t uint16;
  *   CMSG_UNKNOWN_0x0ABA                            0x0ABA  DOC     
  *   CMSG_MESSAGECHAT_OFFICER                       0x0ABF  ACTIVE
  *   CMSG_RESURRECT_RESPONSE                        0x0B0C  DORMANT
- *   CMSG_GENERATE_RANDOM_CHARACTER_NAME            0x0B1C  ACTIVE     
+ *   CMSG_GENERATE_RANDOM_CHARACTER_NAME            0x0B1C  ACTIVE
  *   CMSG_BATTLE_PAY_ACK_FAILED_RESPONSE            0x0B38  DOC     
  *   CMSG_CONTACT_LIST                              0x0BB4  DORMANT 
  *   CMSG_CHANNEL_LIST                              0x0C1B  DORMANT 

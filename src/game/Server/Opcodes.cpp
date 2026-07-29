@@ -229,9 +229,23 @@ void InitializeOpcodes()
     DefC(CMSG_GENERATE_RANDOM_CHARACTER_NAME, "CMSG_GENERATE_RANDOM_CHARACTER_NAME", STATUS_AUTHED, PROCESS_THREADUNSAFE, &WorldSession::HandleRandomizeCharNameOpcode);
     DefS(SMSG_RANDOMIZE_CHAR_NAME, "SMSG_RANDOMIZE_CHAR_NAME");
 
-    // Login refusals. Every CHAR_LOGIN_* response code existed but had zero send sites,
-    // because the packet that carries them was never registered - so a refused login told
-    // the client nothing at all.
+    // Login refusals. Every CHAR_LOGIN_* response code exists in ResponseCodes but has zero send
+    // sites, so a refused login still tells the client nothing: HandlePlayerLoginOpcode returns
+    // silently on a duplicate login and on a query-holder failure, and HandlePlayerLogin kicks the
+    // connection when LoadFromDB fails.
+    //
+    // Registering the opcode here is a prerequisite for fixing that, NOT the fix. It is named so
+    // the dispatcher knows it and it stops counting as unregistered; nothing sends it yet, and the
+    // three branches above are unchanged.
+    //
+    // The sender is deliberately not written on this branch because the body shape is unproven.
+    // There are zero observations of 0x1A0B in the 18414 corpus -- retail sniffs capture successful
+    // logins -- and the value came from our own binary leaf pass while the NAME is single-source
+    // fork attribution. A search of the disassembly finds no 0x1A0B literal at all, and the
+    // one-byte reader that looks like a candidate (sub_6BB6E9) is a generic single-byte message
+    // reader shared by twelve construction sites, so it does not bind this opcode to that shape.
+    // Guessing wrong here is not cheap: a malformed body reaching the 18414 client can crash it,
+    // which is the same reason the enter-world admission list refuses unconverted senders.
     DefS(SMSG_CHARACTER_LOGIN_FAILED, "SMSG_CHARACTER_LOGIN_FAILED");
 
     // Wave 2 server messages whose 5.4.8 bodies are encoded by MopCompactPackets.
