@@ -256,6 +256,35 @@ require_once("${guild_bank_sender}"
 require_once("${world_session}"
     "case SMSG_GUILD_BANK_MONEY_WITHDRAWN:"
     "guild-bank money framing gate")
+
+# The guild read-only queries. Registering the request is not enough on its own:
+# WorldSession::SendPacket drops any opcode missing from IsEnterWorldConverted, so a
+# reply whose grammar is proven but whose opcode is not admitted is silently discarded
+# in world. Both halves are pinned here.
+require_once("${opcode_registry}"
+    "DefC(CMSG_GUILD_PERMISSIONS, \"CMSG_GUILD_PERMISSIONS\""
+    "guild-permissions request registration")
+require_once("${opcode_registry}"
+    "DefS(SMSG_GUILD_PERMISSIONS, \"SMSG_GUILD_PERMISSIONS\");"
+    "guild-permissions response registration")
+require_once("${world_session}"
+    "case SMSG_GUILD_PERMISSIONS:"
+    "guild-permissions response allowlist")
+require_once("${opcode_registry}"
+    "DefC(CMSG_GUILD_QUERY_RANKS, \"CMSG_GUILD_QUERY_RANKS\""
+    "guild-rank-query request registration")
+require_once("${opcode_registry}"
+    "DefS(SMSG_GUILD_QUERY_RANKS_RESULT, \"SMSG_GUILD_QUERY_RANKS_RESULT\");"
+    "guild-rank-query response registration")
+require_once("${world_session}"
+    "case SMSG_GUILD_QUERY_RANKS_RESULT:"
+    "guild-rank-query response allowlist")
+require_once("${packet_builder}"
+    "out.WriteBits(uint32(ranks.size()), 17)"
+    "guild-rank-query 17-bit rank count")
+require_once("${packet_builder}"
+    "out.WriteBits(GUILD_BANK_MAX_TABS, 21)"
+    "guild-permissions 21-bit tab count")
 require_once("${guild_handler}"
     "MopGuildPackets::BuildGuildCommandResult(data, typecmd, str, cmdresult)"
     "guild-command-result builder call")
