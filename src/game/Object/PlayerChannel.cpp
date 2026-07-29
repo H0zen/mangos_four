@@ -167,8 +167,19 @@ void Player::UpdateLocalChannels(uint32 newZone)
         }
 
         //  new channel
+        //
+        // ChatChannels.dbc supplies the pattern ("LocalDefense - %s") and the zone name
+        // fills it in. A row whose conversions do not match that single argument would
+        // fault here, and this runs for every player on every zone change.
         char new_channel_name_buf[100];
-        snprintf(new_channel_name_buf, 100, ch->Name_lang[m_session->GetSessionDbcLocale()], current_zone_name.c_str());
+        char const* channelPattern = ch->Name_lang[m_session->GetSessionDbcLocale()];
+
+        if (!SafeFormatDbStringF(new_channel_name_buf, sizeof(new_channel_name_buf), channelPattern, current_zone_name.c_str()))
+        {
+            sLog.outError("ChatChannels.dbc entry %u could not be formatted; using its pattern unformatted.", ch->ID);
+            CopyDbStringBounded(new_channel_name_buf, sizeof(new_channel_name_buf), channelPattern);
+        }
+
         Channel* new_channel = cMgr->GetJoinChannel(new_channel_name_buf, ch->ID);
 
         if ((*i) != new_channel)

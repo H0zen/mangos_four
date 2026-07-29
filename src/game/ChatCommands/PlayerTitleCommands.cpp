@@ -172,7 +172,13 @@ bool ChatHandler::HandleTitlesAddCommand(char* args)
 
     char const* targetName = target->GetName();
     char titleNameStr[80];
-    snprintf(titleNameStr, 80, titleInfo->Name_lang[GetSessionDbcLocale()], targetName);
+    char const* titleFormat = titleInfo->Name_lang[GetSessionDbcLocale()];
+
+    if (!SafeFormatDbStringF(titleNameStr, sizeof(titleNameStr), titleFormat, targetName))
+    {
+        sLog.outError("CharTitles.dbc entry %u could not be formatted; showing it unformatted.", titleInfo->ID);
+        CopyDbStringBounded(titleNameStr, sizeof(titleNameStr), titleFormat);
+    }
 
     target->SetTitle(titleInfo);
     PSendSysMessage(LANG_TITLE_ADD_RES, id, titleNameStr, tNameLink.c_str());
@@ -224,7 +230,13 @@ bool ChatHandler::HandleTitlesRemoveCommand(char* args)
 
     char const* targetName = target->GetName();
     char titleNameStr[80];
-    snprintf(titleNameStr, 80, titleInfo->Name_lang[GetSessionDbcLocale()], targetName);
+    char const* titleFormat = titleInfo->Name_lang[GetSessionDbcLocale()];
+
+    if (!SafeFormatDbStringF(titleNameStr, sizeof(titleNameStr), titleFormat, targetName))
+    {
+        sLog.outError("CharTitles.dbc entry %u could not be formatted; showing it unformatted.", titleInfo->ID);
+        CopyDbStringBounded(titleNameStr, sizeof(titleNameStr), titleFormat);
+    }
 
     PSendSysMessage(LANG_TITLE_REMOVE_RES, id, titleNameStr, tNameLink.c_str());
 
