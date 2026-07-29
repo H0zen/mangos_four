@@ -36,7 +36,8 @@ set(_charh   "${SOURCE_ROOT}/src/game/WorldHandlers/CharacterHandler.cpp")
 set(_misc    "${SOURCE_ROOT}/src/game/WorldHandlers/MiscHandler.cpp")
 set(_opcodes "${SOURCE_ROOT}/src/game/Server/Opcodes.cpp")
 set(_dbcfmt  "${SOURCE_ROOT}/src/game/Server/DBCfmt.h")
-foreach(_f "${_shared}" "${_charh}" "${_misc}" "${_opcodes}" "${_dbcfmt}")
+set(_dbcstores "${SOURCE_ROOT}/src/game/Server/DBCStores.cpp")
+foreach(_f "${_shared}" "${_charh}" "${_misc}" "${_opcodes}" "${_dbcfmt}" "${_dbcstores}")
     if(NOT EXISTS "${_f}")
         message(FATAL_ERROR "missing source: ${_f}")
     endif()
@@ -81,6 +82,8 @@ file(READ "${_opcodes}" _opcodes_src)
 strip_comments(_opcodes_src)
 file(READ "${_dbcfmt}" _dbcfmt_src)
 strip_comments(_dbcfmt_src)
+file(READ "${_dbcstores}" _dbcstores_src)
+strip_comments(_dbcstores_src)
 
 # ---------------------------------------------------------------------------
 # Mutation arms. Each verifies it changed its target and exits 0 otherwise, so a
@@ -91,6 +94,7 @@ set(_m_charh   "${_charh_src}")
 set(_m_misc    "${_misc_src}")
 set(_m_opcodes "${_opcodes_src}")
 set(_m_dbcfmt  "${_dbcfmt_src}")
+set(_m_dbcstores "${_dbcstores_src}")
 if(DEFINED MUTATION)
     if(MUTATION STREQUAL "revert_delete_success")
         # The exact defect: CHAR_DELETE_SUCCESS back to the pre-5.4.8 slot.
@@ -128,6 +132,10 @@ if(DEFINED MUTATION)
         string(REPLACE "DefS(SMSG_CHARACTER_LOGIN_FAILED, \"SMSG_CHARACTER_LOGIN_FAILED\");" "" _m_opcodes "${_opcodes_src}")
     elseif(MUTATION STREQUAL "drop_randomname_registration")
         string(REPLACE "DefC(CMSG_GENERATE_RANDOM_CHARACTER_NAME," "DefC(CMSG_UNUSED_GENERATE_RANDOM_CHARACTER_NAME," _m_opcodes "${_opcodes_src}")
+    elseif(MUTATION STREQUAL "namegen_index_locale_slot_zero")
+        # The original defect: read locale slot 0 instead of the loaded default locale.
+        string(REPLACE "char const* name = entry->Name[availableDbcLocales.defaultLocale];"
+                       "char const* name = *entry->Name;" _m_dbcstores "${_dbcstores_src}")
     elseif(MUTATION STREQUAL "corrupt_namegen_format")
         # "nsii" is id, name, race, sex. Any other shape misreads all 12972 rows.
         string(REPLACE "NameGenEntryfmt[]=\"nsii\"" "NameGenEntryfmt[]=\"niii\"" _m_dbcfmt "${_dbcfmt_src}")
@@ -142,7 +150,7 @@ if(DEFINED MUTATION)
     endif()
     if(_m_shared STREQUAL "${_shared_src}" AND _m_charh STREQUAL "${_charh_src}" AND
        _m_misc STREQUAL "${_misc_src}" AND _m_opcodes STREQUAL "${_opcodes_src}" AND
-       _m_dbcfmt STREQUAL "${_dbcfmt_src}")
+       _m_dbcfmt STREQUAL "${_dbcfmt_src}" AND _m_dbcstores STREQUAL "${_dbcstores_src}")
         message(STATUS "MUTATION '${MUTATION}' changed nothing -- dead arm, exiting 0 so WILL_FAIL reports it")
         return()
     endif()
@@ -152,6 +160,7 @@ set(_charh_src   "${_m_charh}")
 set(_misc_src    "${_m_misc}")
 set(_opcodes_src "${_m_opcodes}")
 set(_dbcfmt_src  "${_m_dbcfmt}")
+set(_dbcstores_src "${_m_dbcstores}")
 
 # ---------------------------------------------------------------------------
 # 1. The two wire-confirmed anchors. Everything else in the enum is positioned
@@ -289,6 +298,20 @@ if(_at EQUAL -1)
     message(FATAL_ERROR
         "NameGen.dbc format string changed. It is id, name, race, sex - 'nsii'. Any other\n"
         "shape misreads all 12972 rows and the randomise button returns nothing or garbage.")
+endif()
+
+# The NameGen index must read the locale slot the base DBC was loaded into. This is the one
+# defect on this branch that local testing could never have surfaced, because this box extracts
+# enUS and enUS happens to be slot 0.
+string(FIND "${_dbcstores_src}" "entry->Name[availableDbcLocales.defaultLocale]" _at)
+if(_at EQUAL -1)
+    message(FATAL_ERROR
+        "The NameGen index is not reading the loaded default-locale slot.\n\n"
+        "LoadDBC stores the base DBC at availableDbcLocales.defaultLocale, which ReadDBCBuild\n"
+        "derives from whatever locale the dbc/ directory was extracted from. Only on an enUS\n"
+        "extraction is that slot 0, so `*entry->Name` works here and silently indexes nothing\n"
+        "on a deDE, ruRU or frFR install: every row reads the initialised empty string, the\n"
+        "index stays empty, and the randomise button answers failure forever.")
 endif()
 
 extract_function(_random_body "${_charh_src}" "void WorldSession::HandleRandomizeCharNameOpcode")

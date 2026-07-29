@@ -708,14 +708,38 @@ void LoadDBCStores(const std::string& dataPath)
     LoadDBC(availableDbcLocales, bar, bad_dbc_files, sQuestSortStore,           dbcPath, "QuestSort.dbc");
     LoadDBC(availableDbcLocales, bar, bad_dbc_files, sQuestXPLevelStore,        dbcPath, "QuestXP.dbc");
     LoadDBC(availableDbcLocales, bar, bad_dbc_files, sNameGenStore,            dbcPath, "NameGen.dbc");
+    // Index from the locale the base file was actually loaded into, NOT slot 0. LoadDBC stores
+    // the base DBC at availableDbcLocales.defaultLocale, which ReadDBCBuild derives from whatever
+    // locale the dbc/ directory was extracted from -- only on an enUS extraction is that slot 0.
+    // The original `*entry->Name` read slot 0 unconditionally, so on a deDE or ruRU install every
+    // row saw the initialised empty string, the index stayed empty, and the randomise button
+    // answered failure forever. It worked here purely because this box extracts enUS.
     for (uint32 i = 0; i < sNameGenStore.GetNumRows(); ++i)
     {
-        if (NameGenEntry const* entry = sNameGenStore.LookupEntry(i))
+        NameGenEntry const* entry = sNameGenStore.LookupEntry(i);
+        if (!entry || !entry->Name)
         {
-            if (entry->Name && *entry->Name && **entry->Name)
+            continue;
+        }
+
+        char const* name = entry->Name[availableDbcLocales.defaultLocale];
+        if (!name || !*name)
+        {
+            // Fall back to any populated slot. NameGen rows are proper nouns and repeat heavily
+            // across locales, so a name from another locale beats refusing to generate one.
+            for (uint8 loc = 0; loc < MAX_LOCALE; ++loc)
             {
-                sNameGenIndex[MAKE_PAIR32(entry->Race, entry->Sex)].push_back(*entry->Name);
+                if (entry->Name[loc] && *entry->Name[loc])
+                {
+                    name = entry->Name[loc];
+                    break;
+                }
             }
+        }
+
+        if (name && *name)
+        {
+            sNameGenIndex[MAKE_PAIR32(entry->Race, entry->Sex)].push_back(name);
         }
     }
 

@@ -216,7 +216,8 @@ foreach(char_codes_mutation IN ITEMS
         break_create_success_anchor break_name_in_use_anchor
         restore_duplicate_enum drop_charselect_timezone world_entry_timezone_before_motd
         battlepay_back_to_null drop_login_failed_registration drop_randomname_registration
-        corrupt_namegen_format swap_randomname_args drop_namegen_null_guard)
+        corrupt_namegen_format swap_randomname_args drop_namegen_null_guard
+        namegen_index_locale_slot_zero)
     add_test(NAME mop_char_response_codes_source_mutation_${char_codes_mutation}
         COMMAND ${CMAKE_COMMAND} -DSOURCE_ROOT=${CMAKE_SOURCE_DIR}
             -DMUTATION=${char_codes_mutation}
