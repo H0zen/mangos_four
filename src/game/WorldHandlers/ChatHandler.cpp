@@ -327,10 +327,15 @@ void WorldSession::HandleMessagechatOpcode(WorldPacket& recv_data)
         case CHAT_MSG_WHISPER:
         {
             std::string to, msg;
-            uint32 toLength = recv_data.ReadBits(10);
-            uint32 msgLength = recv_data.ReadBits(9);
-            to = recv_data.ReadString(toLength);
+            // 18414 writes the MESSAGE length first in 8 bits, then the TARGET
+            // length in 9 bits (as len>>1 in eight bits plus a separate low
+            // bit), then the message string, then the target string. The
+            // inherited 10+9 read had both the first width and the two
+            // assignments wrong, so a whisper was addressed to its own text.
+            uint32 msgLength = recv_data.ReadBits(8);
+            uint32 toLength = recv_data.ReadBits(9);
             msg = recv_data.ReadString(msgLength);
+            to = recv_data.ReadString(toLength);
 
             if (msg.empty())
             {
@@ -763,8 +768,12 @@ void WorldSession::HandleMessagechatOpcode(WorldPacket& recv_data)
         case CHAT_MSG_CHANNEL:
         {
             std::string channel, msg;
-            uint32 channelLength = recv_data.ReadBits(10);
-            uint32 msgLength = recv_data.ReadBits(9);
+            // 18414 writes the CHANNEL length in 9 bits, then the MESSAGE
+            // length in 8 bits, then the message string, then the channel
+            // string. The string order was already right; only the two widths
+            // were inherited, and 10+9 shifted every field that followed.
+            uint32 channelLength = recv_data.ReadBits(9);
+            uint32 msgLength = recv_data.ReadBits(8);
             msg = recv_data.ReadString(msgLength);
             channel = recv_data.ReadString(channelLength);
 

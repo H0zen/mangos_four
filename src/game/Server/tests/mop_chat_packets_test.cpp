@@ -305,6 +305,73 @@ static void test_inline_message_length_is_eight_bits()
     CHECK(wrong.ReadString(wrong.ReadBits(9)) == "av");     // leading 'c' lost
 }
 
+/*
+ * CHANNEL and WHISPER carry a second string, so they read two lengths rather
+ * than one. Both bodies below are real 18414 captures.
+ *
+ * CHANNEL is a 9-bit channel length then an 8-bit message length, then the
+ * message, then the channel name. WHISPER is an 8-bit message length then a
+ * 9-bit target length -- the client writes that second field as len>>1 in
+ * eight bits plus a separate low bit -- then the message, then the target.
+ *
+ * The inherited readers used 10+9 for both, which shifted every field after
+ * the first length, and WHISPER additionally had the two strings swapped, so a
+ * whisper was addressed to its own text.
+ */
+static void test_channel_message_lengths()
+{
+    // 9-bit channel length 5, 8-bit message length 3, "jop" then "czech".
+    uint8 const body[] = {
+        0x07, 0x00, 0x00, 0x00,
+        0x02, 0x81, 0x80,
+        'j', 'o', 'p', 'c', 'z', 'e', 'c', 'h'
+    };
+    WorldPacket packet(CMSG_MESSAGECHAT_CHANNEL, sizeof(body));
+    packet.append(body, sizeof(body));
+
+    uint32 language = 0;
+    packet >> language;
+    CHECK(language == LANG_COMMON);
+
+    uint32 const channelLength = packet.ReadBits(9);
+    uint32 const msgLength = packet.ReadBits(8);
+    CHECK(channelLength == 5);
+    CHECK(msgLength == 3);
+
+    std::string const msg = packet.ReadString(msgLength);
+    std::string const channel = packet.ReadString(channelLength);
+    CHECK(msg == "jop");
+    CHECK(channel == "czech");
+    CHECK(packet.rpos() == packet.size());
+}
+
+static void test_whisper_message_lengths()
+{
+    // 8-bit message length 8, 9-bit target length 6, "dps spec" then "chasis".
+    uint8 const body[] = {
+        0x07, 0x00, 0x00, 0x00,
+        0x08, 0x03, 0x00,
+        'd', 'p', 's', ' ', 's', 'p', 'e', 'c', 'c', 'h', 'a', 's', 'i', 's'
+    };
+    WorldPacket packet(CMSG_MESSAGECHAT_WHISPER, sizeof(body));
+    packet.append(body, sizeof(body));
+
+    uint32 language = 0;
+    packet >> language;
+    CHECK(language == LANG_COMMON);
+
+    uint32 const msgLength = packet.ReadBits(8);
+    uint32 const toLength = packet.ReadBits(9);
+    CHECK(msgLength == 8);
+    CHECK(toLength == 6);
+
+    std::string const msg = packet.ReadString(msgLength);
+    std::string const to = packet.ReadString(toLength);
+    CHECK(msg == "dps spec");
+    CHECK(to == "chasis");
+    CHECK(packet.rpos() == packet.size());
+}
+
 static void test_afk_message_request()
 {
     struct Fixture
@@ -425,6 +492,8 @@ int main(int /*argc*/, char** /*argv*/)
     test_opcode();
     test_say_message_request();
     test_inline_message_length_is_eight_bits();
+    test_channel_message_lengths();
+    test_whisper_message_lengths();
     test_afk_message_request();
     test_addon_prefix_batch();
     test_addon_prefix_soft_cap();
