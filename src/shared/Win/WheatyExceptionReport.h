@@ -122,9 +122,16 @@ class WheatyExceptionReport
 
         static bool FormatSymbolValue(PSYMBOL_INFO, STACKFRAME*, char* pszBuffer, unsigned cbBuffer);
 
-        static char* DumpTypeIndex(char*, DWORD64, DWORD, unsigned, DWORD_PTR, bool& , char*);
+        static char* DumpTypeIndex(char*, char const* pszEnd, DWORD64, DWORD, unsigned, DWORD_PTR, bool& , char*);
 
-        static char* FormatOutputValue(char* pszCurrBuffer, BasicType basicType, DWORD64 length, PVOID pAddress);
+        static char* FormatOutputValue(char* pszCurrBuffer, char const* pszEnd, BasicType basicType, DWORD64 length, PVOID pAddress);
+
+        // Bounded replacement for the `p += sprintf(p, ...)` pattern these three used
+        // to share. pszEnd points one past the last writable byte; the result never
+        // advances beyond it, and the buffer is always left terminated. Symbol dumps
+        // are recursive and attacker-shaped - a deeply nested UDT produces arbitrarily
+        // long output - so the unbounded form reliably smashed the caller's frame.
+        static char* AppendFormat(char* pszCurrBuffer, char const* pszEnd, char const* format, ...);
 
         static BasicType GetBasicType(DWORD typeIndex, DWORD64 modBase);
 

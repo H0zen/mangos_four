@@ -723,15 +723,16 @@ bool WheatyExceptionReport::FormatSymbolValue(
     unsigned cbBuffer)
 {
     char* pszCurrBuffer = pszBuffer;
+    char const* const pszEnd = pszBuffer + cbBuffer;
 
     // Indicate if the variable is a local or parameter
     if (pSym->Flags & IMAGEHLP_SYMBOL_INFO_PARAMETER)
     {
-        pszCurrBuffer += sprintf(pszCurrBuffer, "Parameter ");
+        pszCurrBuffer = AppendFormat(pszCurrBuffer, pszEnd, "Parameter ");
     }
     else if (pSym->Flags & IMAGEHLP_SYMBOL_INFO_LOCAL)
     {
-        pszCurrBuffer += sprintf(pszCurrBuffer, "Local ");
+        pszCurrBuffer = AppendFormat(pszCurrBuffer, pszEnd, "Local ");
     }
 
     // If it's a function, don't do anything.
@@ -765,7 +766,7 @@ bool WheatyExceptionReport::FormatSymbolValue(
     // Determine if the variable is a user defined type (UDT).  IF so, bHandled
     // will return true.
     bool bHandled;
-    pszCurrBuffer = DumpTypeIndex(pszCurrBuffer, pSym->ModBase, pSym->TypeIndex,
+    pszCurrBuffer = DumpTypeIndex(pszCurrBuffer, pszEnd, pSym->ModBase, pSym->TypeIndex,
                                   0, pVariable, bHandled, pSym->Name);
 
     if (!bHandled)
@@ -774,12 +775,12 @@ bool WheatyExceptionReport::FormatSymbolValue(
         // variable.  Based on the size, we're assuming it's a char, WORD, or
         // DWORD.
         BasicType basicType = GetBasicType(pSym->TypeIndex, pSym->ModBase);
-        pszCurrBuffer += sprintf(pszCurrBuffer, rgBaseType[basicType]);
+        pszCurrBuffer = AppendFormat(pszCurrBuffer, pszEnd, rgBaseType[basicType]);
 
         // Emit the variable name
-        pszCurrBuffer += sprintf(pszCurrBuffer, "\'%s\'", pSym->Name);
+        pszCurrBuffer = AppendFormat(pszCurrBuffer, pszEnd, "\'%s\'", pSym->Name);
 
-        pszCurrBuffer = FormatOutputValue(pszCurrBuffer, basicType, pSym->Size,
+        pszCurrBuffer = FormatOutputValue(pszCurrBuffer, pszEnd, basicType, pSym->Size,
                                           (PVOID)pVariable);
     }
 
@@ -793,6 +794,7 @@ bool WheatyExceptionReport::FormatSymbolValue(
 //////////////////////////////////////////////////////////////////////////////
 char* WheatyExceptionReport::DumpTypeIndex(
     char* pszCurrBuffer,
+    char const* pszEnd,
     DWORD64 modBase,
     DWORD dwTypeIndex,
     unsigned nestingLevel,
@@ -808,7 +810,7 @@ char* WheatyExceptionReport::DumpTypeIndex(
     if (SymGetTypeInfo(m_hProcess, modBase, dwTypeIndex, TI_GET_SYMNAME,
                        &pwszTypeName))
     {
-        pszCurrBuffer += sprintf(pszCurrBuffer, " %ls", pwszTypeName);
+        pszCurrBuffer = AppendFormat(pszCurrBuffer, pszEnd, " %ls", pwszTypeName);
         LocalFree(pwszTypeName);
     }
 
@@ -845,7 +847,7 @@ char* WheatyExceptionReport::DumpTypeIndex(
     }
 
     // Append a line feed
-    pszCurrBuffer += sprintf(pszCurrBuffer, "\r\n");
+    pszCurrBuffer = AppendFormat(pszCurrBuffer, pszEnd, "\r\n");
 
     // Iterate through each of the children
     for (unsigned i = 0; i < dwChildrenCount; ++i)
@@ -853,15 +855,15 @@ char* WheatyExceptionReport::DumpTypeIndex(
         // Add appropriate indentation level (since this routine is recursive)
         for (unsigned j = 0; j <= nestingLevel + 1; ++j)
         {
-            pszCurrBuffer += sprintf(pszCurrBuffer, "\t");
+            pszCurrBuffer = AppendFormat(pszCurrBuffer, pszEnd, "\t");
         }
 
         // Recurse for each of the child types
         bool bHandled2;
         BasicType basicType = GetBasicType(children.ChildId[i], modBase);
-        pszCurrBuffer += sprintf(pszCurrBuffer, rgBaseType[basicType]);
+        pszCurrBuffer = AppendFormat(pszCurrBuffer, pszEnd, rgBaseType[basicType]);
 
-        pszCurrBuffer = DumpTypeIndex(pszCurrBuffer, modBase,
+        pszCurrBuffer = DumpTypeIndex(pszCurrBuffer, pszEnd, modBase,
                                       children.ChildId[i], nestingLevel + 1,
                                       offset, bHandled2, ""/*Name */);
 
@@ -893,10 +895,10 @@ char* WheatyExceptionReport::DumpTypeIndex(
             // Emit the variable name
             //          pszCurrBuffer += sprintf( pszCurrBuffer, "\'%s\'", Name );
 
-            pszCurrBuffer = FormatOutputValue(pszCurrBuffer, basicType,
+            pszCurrBuffer = FormatOutputValue(pszCurrBuffer, pszEnd, basicType,
                                               length, (PVOID)dwFinalOffset);
 
-            pszCurrBuffer += sprintf(pszCurrBuffer, "\r\n");
+            pszCurrBuffer = AppendFormat(pszCurrBuffer, pszEnd, "\r\n");
         }
     }
 
@@ -905,6 +907,7 @@ char* WheatyExceptionReport::DumpTypeIndex(
 }
 
 char* WheatyExceptionReport::FormatOutputValue(char* pszCurrBuffer,
+    char const* pszEnd,
         BasicType basicType,
         DWORD64 length,
         PVOID pAddress)
@@ -912,43 +915,47 @@ char* WheatyExceptionReport::FormatOutputValue(char* pszCurrBuffer,
     // Format appropriately (assuming it's a 1, 2, or 4 bytes (!!!)
     if (length == 1)
     {
-        pszCurrBuffer += sprintf(pszCurrBuffer, " = %X", *(PBYTE)pAddress);
+        pszCurrBuffer = AppendFormat(pszCurrBuffer, pszEnd, " = %X", *(PBYTE)pAddress);
     }
     else if (length == 2)
     {
-        pszCurrBuffer += sprintf(pszCurrBuffer, " = %X", *(PWORD)pAddress);
+        pszCurrBuffer = AppendFormat(pszCurrBuffer, pszEnd, " = %X", *(PWORD)pAddress);
     }
     else if (length == 4)
     {
         if (basicType == btFloat)
         {
-            pszCurrBuffer += sprintf(pszCurrBuffer, " = %f", *(PFLOAT)pAddress);
+            pszCurrBuffer = AppendFormat(pszCurrBuffer, pszEnd, " = %f", *(PFLOAT)pAddress);
         }
         else if (basicType == btChar)
         {
             if (!IsBadStringPtr(*(PSTR*)pAddress, 32))
             {
-                pszCurrBuffer += sprintf(pszCurrBuffer, " = \"%.31s\"",
-                                         *(PDWORD)pAddress);
+                // Was *(PDWORD)pAddress: the pointer is validated as a PSTR and then
+                // only its low 32 bits were passed to %s, so on x64 the formatter was
+                // handed a truncated address that the check above never vetted. The
+                // compiler has been warning about this (C4313) the whole time.
+                pszCurrBuffer = AppendFormat(pszCurrBuffer, pszEnd, " = \"%.31s\"",
+                                         *(PSTR*)pAddress);
             }
             else
-                pszCurrBuffer += sprintf(pszCurrBuffer, " = %X",
+                pszCurrBuffer = AppendFormat(pszCurrBuffer, pszEnd, " = %X",
                                          *(PDWORD)pAddress);
         }
         else
         {
-            pszCurrBuffer += sprintf(pszCurrBuffer, " = %X", *(PDWORD)pAddress);
+            pszCurrBuffer = AppendFormat(pszCurrBuffer, pszEnd, " = %X", *(PDWORD)pAddress);
         }
     }
     else if (length == 8)
     {
         if (basicType == btFloat)
         {
-            pszCurrBuffer += sprintf(pszCurrBuffer, " = %lf",
+            pszCurrBuffer = AppendFormat(pszCurrBuffer, pszEnd, " = %lf",
                                      *(double*)pAddress);
         }
         else
-            pszCurrBuffer += sprintf(pszCurrBuffer, " = %I64X",
+            pszCurrBuffer = AppendFormat(pszCurrBuffer, pszEnd, " = %I64X",
                                      *(DWORD64*)pAddress);
     }
 
@@ -985,6 +992,36 @@ WheatyExceptionReport::GetBasicType(DWORD typeIndex, DWORD64 modBase)
 }
 
 //============================================================================
+// Bounded append into the symbol-formatting buffer. Returns the new write
+// position, never past pszEnd, with the buffer always terminated.
+//============================================================================
+char* WheatyExceptionReport::AppendFormat(char* pszCurrBuffer, char const* pszEnd, char const* format, ...)
+{
+    if (!pszCurrBuffer || !pszEnd || pszCurrBuffer >= pszEnd)
+    {
+        return pszCurrBuffer;
+    }
+
+    size_t const remaining = size_t(pszEnd - pszCurrBuffer);
+
+    va_list argptr;
+    va_start(argptr, format);
+    int const written = _vsnprintf(pszCurrBuffer, remaining, format, argptr);
+    va_end(argptr);
+
+    // _vsnprintf returns -1 when the output did not fit, and leaves the buffer
+    // unterminated in that case.
+    if (written < 0 || size_t(written) >= remaining)
+    {
+        pszCurrBuffer[remaining - 1] = '\0';
+        return pszCurrBuffer + remaining - 1;
+    }
+
+    pszCurrBuffer[written] = '\0';
+    return pszCurrBuffer + written;
+}
+
+//============================================================================
 // Helper function that writes to the report file, and allows the user to use
 // printf style formating
 //============================================================================
@@ -995,9 +1032,23 @@ int __cdecl WheatyExceptionReport::_tprintf(const TCHAR* format, ...)
     DWORD cbWritten;
     va_list argptr;
 
+    // vsprintf here was unbounded, and the WriteFile below then wrote the length it
+    // returned - so a symbol dump longer than the buffer both smashed this frame and
+    // flushed the overrun to disk. That is why every crash report this handler has
+    // produced stops mid-symbol: the report survives to the truncation point because
+    // the file is opened FILE_FLAG_WRITE_THROUGH, and nothing after it is ever
+    // written. Bounded, and the length clamped to what the buffer actually holds.
     va_start(argptr, format);
-    retValue = vsprintf(szBuff, format, argptr);
+    retValue = _vsnprintf(szBuff, ARRAYSIZE(szBuff) - 1, format, argptr);
     va_end(argptr);
+
+    // _vsnprintf returns -1 when the output did not fit, and does not terminate.
+    if (retValue < 0 || retValue > (int)(ARRAYSIZE(szBuff) - 1))
+    {
+        retValue = ARRAYSIZE(szBuff) - 1;
+    }
+
+    szBuff[retValue] = _T('\0');
 
     WriteFile(m_hReportFile, szBuff, retValue * sizeof(TCHAR), &cbWritten, 0);
 
