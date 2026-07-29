@@ -1217,9 +1217,24 @@ namespace MaNGOS
                     va_copy(ap, *i_args);
 
                     char str [2048];
-                    vsnprintf(str, 2048, text, ap);
+                    bool const formatted = SafeFormatDbString(str, sizeof(str), text, ap);
                     va_end(ap);
 
+                    if (!formatted)
+                    {
+                        sLog.outError("String entry %i could not be formatted; sending it unformatted. Check its conversions against the caller in `mangos_string`.", i_textId);
+
+                        // Copied rather than passed through: do_helper tokenizes in
+                        // place with strtok, and `text` points into the row cached by
+                        // ObjectMgr, so writing terminators into it would truncate the
+                        // string for every later reader.
+                        strncpy(str, text, sizeof(str) - 1);
+                        str[sizeof(str) - 1] = '\0';
+                    }
+
+                    // Falling back to the raw row rather than returning: the caller
+                    // treats an empty list as "not built yet", so an early return
+                    // would re-run this for every player on the locale.
                     do_helper(data_list, &str[0]);
                 }
                 else

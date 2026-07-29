@@ -1734,6 +1734,132 @@ inline void _DoStringError(int32 entry, char const* text, ...)
 }
 
 /**
+ * @brief Extracts the printf conversion sequence from a format string.
+ *
+ * Two format strings are interchangeable for one argument list only if this
+ * sequence matches. Flags, field width and precision affect presentation only and
+ * are left out, but length modifiers change which type is consumed and are kept,
+ * as are positional indices, which change which argument is consumed. A literal
+ * "%%" contributes nothing; a '*' width or precision consumes an extra int and is
+ * recorded in its own right.
+ *
+ * @param fmt The format string to scan.
+ * @return The ordered conversion sequence, comma-separated, one token per field.
+ */
+inline std::string _ExtractFormatSequence(std::string const& fmt)
+{
+    std::string seq;
+
+    for (size_t i = 0; i < fmt.size(); ++i)
+    {
+        if (fmt[i] != '%')
+        {
+            continue;
+        }
+
+        ++i;
+
+        if (i >= fmt.size())
+        {
+            break;                                          // trailing '%', consumes nothing
+        }
+
+        if (fmt[i] == '%')
+        {
+            continue;                                       // "%%" is a literal percent sign
+        }
+
+        if (!seq.empty())
+        {
+            seq += ',';                                     // keep tokens unambiguous: "ls" is not "l" then "s"
+        }
+
+        // A POSIX positional specifier ("%2$s") selects which argument is consumed,
+        // so two formats that use the same conversions in a different order are not
+        // interchangeable. Keep the position in the token so they compare unequal.
+        {
+            size_t digits = i;
+
+            while (digits < fmt.size() && fmt[digits] >= '0' && fmt[digits] <= '9')
+            {
+                ++digits;
+            }
+
+            if (digits > i && digits < fmt.size() && fmt[digits] == '$')
+            {
+                seq += fmt.substr(i, digits - i + 1);
+                i = digits + 1;
+            }
+        }
+
+        // flags, field width and precision; '*' draws its value from the argument list,
+        // and may itself carry a position ("%1$*2$s"), which selects which argument
+        // supplies the width - keep it, or two formats consuming different arguments
+        // would compare equal.
+        while (i < fmt.size() && !((fmt[i] >= 'a' && fmt[i] <= 'z') || (fmt[i] >= 'A' && fmt[i] <= 'Z')))
+        {
+            if (fmt[i] == '*')
+            {
+                seq += '*';
+
+                size_t digits = i + 1;
+
+                while (digits < fmt.size() && fmt[digits] >= '0' && fmt[digits] <= '9')
+                {
+                    ++digits;
+                }
+
+                if (digits > i + 1 && digits < fmt.size() && fmt[digits] == '$')
+                {
+                    seq += fmt.substr(i + 1, digits - i);
+                    i = digits;
+                }
+            }
+
+            ++i;
+        }
+
+        // Length modifiers change which type is consumed, so they belong in the
+        // signature: %I64u and %I32u are not interchangeable, and neither are %wc
+        // (a wide character, promoted to int) and %ws (a wchar_t*). "I", "I32", "I64"
+        // and "w" are the MSVC spellings, "I32"/"I64" being what the I32FMT/I64FMT
+        // macros in Common.h expand to.
+        while (i < fmt.size())
+        {
+            char const c = fmt[i];
+
+            if (c == 'h' || c == 'l' || c == 'L' || c == 'j' || c == 'z' || c == 't' || c == 'w')
+            {
+                seq += c;
+                ++i;
+            }
+            else if (c == 'I' && i + 2 < fmt.size() &&
+                     ((fmt[i + 1] == '3' && fmt[i + 2] == '2') || (fmt[i + 1] == '6' && fmt[i + 2] == '4')))
+            {
+                seq += fmt.substr(i, 3);
+                i += 3;
+            }
+            else if (c == 'I')                              // %Iu / %Id: pointer-width
+            {
+                seq += c;
+                ++i;
+            }
+            else
+            {
+                break;
+            }
+        }
+
+        if (i < fmt.size())
+        {
+            seq += fmt[i];
+        }
+    }
+
+    return seq;
+}
+
+/**
  * @brief Loads localized string templates from a database table.
  *
  * @param db The database to query.
@@ -1741,9 +1867,11 @@ inline void _DoStringError(int32 entry, char const* text, ...)
  * @param min_value The inclusive lower id bound.
  * @param max_value The exclusive upper id bound.
  * @param extra_content true to also load sound/chat metadata.
+ * @param printf_formatted true if the table's strings are used as printf formats,
+ *        which makes their conversion specifiers load-bearing.
  * @return true if the load succeeded; otherwise, false.
  */
-bool ObjectMgr::LoadMangosStrings(DatabaseType& db, char const* table, int32 min_value, int32 max_value, bool extra_content)
+bool ObjectMgr::LoadMangosStrings(DatabaseType& db, char const* table, int32 min_value, int32 max_value, bool extra_content, bool printf_formatted)
 {
     int32 start_value = min_value;
     int32 end_value   = max_value;
@@ -1845,11 +1973,46 @@ bool ObjectMgr::LoadMangosStrings(DatabaseType& db, char const* table, int32 min
         // 0 -> default, idx in to idx+1
         data.Content[0] = fields[1].GetCppString();
 
+        // Only meaningful where the string is used as a printf format. Text that is
+        // spoken verbatim may legitimately contain a bare '%', and rejecting a
+        // locale there would throw away a good translation over a non-problem.
+        std::string const defaultFormat = printf_formatted ? _ExtractFormatSequence(data.Content[0]) : std::string();
+
+        if (printf_formatted && defaultFormat.find('n') != std::string::npos)
+        {
+            // Reported here so the row can be fixed; the refusal to format it lives
+            // in SafeFormatDbString, which does not have to damage the text to be safe.
+            _DoStringError(entry, "Entry %i in table `%s` uses the %%n conversion in content_default; it will not be formatted.", entry, table);
+        }
+
         for (int i = 1; i < MAX_LOCALE; ++i)
         {
             std::string str = fields[i + 1].GetCppString();
             if (!str.empty())
             {
+                if (printf_formatted)
+                {
+                    // Every locale of an entry is fed to the same vsnprintf call with
+                    // the same arguments, so a locale that does not consume exactly
+                    // what the default consumes makes that call read the wrong types.
+                    // Consuming more than was passed walks off the end of the argument
+                    // list and dereferences whatever the stack held next, which is a
+                    // crash any player on that locale can trigger. Consuming fewer, or
+                    // consuming the same count at a different type, is undefined too,
+                    // though the one case measured here - entry 548 (LANG_PINFO_ACCOUNT)
+                    // ships a ruRU row one %s short - merely rendered a char* as %u.
+                    // Refuse the locale either way and keep the default, which is the
+                    // string the callers were written against.
+                    std::string const localeFormat = _ExtractFormatSequence(str);
+
+                    if (localeFormat != defaultFormat)
+                    {
+                        _DoStringError(entry, "Entry %i in table `%s` locale %s has format specifiers `%s` but content_default has `%s`; localized text ignored to avoid formatting it against the wrong arguments.",
+                                       entry, table, localeNames[i], localeFormat.c_str(), defaultFormat.c_str());
+                        continue;
+                    }
+                }
+
                 int idx = GetOrNewIndexForLocale(LocaleConstant(i));
                 if (idx >= 0)
                 {

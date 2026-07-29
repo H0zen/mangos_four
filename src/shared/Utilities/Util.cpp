@@ -853,6 +853,146 @@ std::string vutf8format(const char* str, va_list* ap)
 
 }
 
+// Kept free of C++ objects on purpose: MSVC rejects __try in a function that
+// requires object unwinding (C2712), so the guarded call gets its own frame.
+static bool _GuardedVsnprintf(char* buffer, size_t size, char const* format, va_list ap)
+{
+    // Gated on the compiler, not the OS: __try/__except is MSVC syntax, and a
+    // MinGW build targets Windows without supporting it.
+#ifdef _MSC_VER
+    __try
+    {
+        vsnprintf(buffer, size, format, ap);
+        return true;
+    }
+    // Only an access violation is expected here (a conversion dereferencing an
+    // argument that was never passed). Anything else keeps unwinding rather than
+    // being silently swallowed.
+    __except (GetExceptionCode() == EXCEPTION_ACCESS_VIOLATION ? EXCEPTION_EXECUTE_HANDLER : EXCEPTION_CONTINUE_SEARCH)
+    {
+        return false;
+    }
+#else
+    // No portable equivalent: a malformed format is still fatal here, but the
+    // callers' reporting and the load-time checks in ObjectMgr apply on every
+    // platform.
+    vsnprintf(buffer, size, format, ap);
+    return true;
+#endif
+}
+
+bool SafeFormatDbString(char* buffer, size_t size, char const* format, va_list ap)
+{
+    if (!buffer || !size)
+    {
+        return false;
+    }
+
+    buffer[0] = '\0';
+
+    if (!format)
+    {
+        return false;
+    }
+
+    // Two conversions must never reach vsnprintf, and neither can be contained
+    // afterwards:
+    //   %n writes a count through an argument pointer, and UCRT answers it by
+    //   invoking the invalid-parameter handler, which terminates rather than raising
+    //   anything an exception filter could catch;
+    //   a '%' followed by something that is not a valid conversion - including a
+    //   trailing '%' - reaches that same handler.
+    // Refusing them here is also why the load-time check never has to rewrite a row:
+    // `script_texts` carries a %n only as a typo for the $n name token, and that text
+    // is spoken verbatim elsewhere where it reads perfectly well.
+    for (char const* p = format; *p; ++p)
+    {
+        if (*p != '%')
+        {
+            continue;
+        }
+
+        ++p;
+
+        if (*p == '%')
+        {
+            continue;                                       // "%%" is a literal percent
+        }
+
+        // The field must match %[flags][width][.precision][size]type exactly. Anything
+        // else - a stray '.', a positional "%1$s" (which belongs to the _sprintf_p
+        // family, not the _vsnprintf this build maps to), or a truncated field -
+        // reaches the invalid-parameter handler too.
+        while (*p == '-' || *p == '+' || *p == ' ' || *p == '#' || *p == '0')
+        {
+            ++p;
+        }
+
+        if (*p == '*')
+        {
+            ++p;
+        }
+        else
+        {
+            while (*p >= '0' && *p <= '9')
+            {
+                ++p;
+            }
+        }
+
+        if (*p == '.')
+        {
+            ++p;
+
+            if (*p == '*')
+            {
+                ++p;
+            }
+            else
+            {
+                while (*p >= '0' && *p <= '9')
+                {
+                    ++p;
+                }
+            }
+        }
+
+        // size prefixes, longest match first
+        if ((p[0] == 'I' && p[1] == '3' && p[2] == '2') || (p[0] == 'I' && p[1] == '6' && p[2] == '4'))
+        {
+            p += 3;
+        }
+        else if ((p[0] == 'h' && p[1] == 'h') || (p[0] == 'l' && p[1] == 'l'))
+        {
+            p += 2;
+        }
+        else if (*p == 'h' || *p == 'l' || *p == 'L' || *p == 'j' || *p == 'z' ||
+                 *p == 't' || *p == 'I' || *p == 'w')
+        {
+            ++p;
+        }
+
+        // '\0' is tested first: strchr would otherwise match the set's own terminator
+        if (*p == '\0' || !strchr("diouxXfFeEgGaAcCsSpZ", *p))
+        {
+            return false;                                   // %n, trailing '%', or malformed
+        }
+    }
+
+    bool const formatted = _GuardedVsnprintf(buffer, size, format, ap);
+
+    // _vsnprintf does not terminate when the output is truncated, and a faulted
+    // call may have written a partial result.
+    buffer[size - 1] = '\0';
+
+    if (!formatted)
+    {
+        buffer[0] = '\0';
+    }
+
+    return formatted;
+}
+
 void hexEncodeByteArray(uint8* bytes, uint32 arrayLen, std::string& result)
 {
     std::ostringstream ss;

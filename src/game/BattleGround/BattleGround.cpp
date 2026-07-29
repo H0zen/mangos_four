@@ -42,6 +42,8 @@
 #include "BattleGround.h"
 #include "BattleGroundMgr.h"
 #include "Creature.h"
+#include "Log.h"
+#include "Util.h"
 #include "Language.h"
 #include "World.h"
 #include "Group.h"
@@ -84,10 +86,18 @@ namespace MaNGOS
                     va_copy(ap, *i_args);
 
                     char str [2048];
-                    vsnprintf(str, 2048, text, ap);
+                    bool const formatted = SafeFormatDbString(str, sizeof(str), text, ap);
                     va_end(ap);
 
-                    ChatHandler::BuildChatPacket(data, i_msgtype, &str[0], LANG_UNIVERSAL, CHAT_TAG_NONE, sourceGuid, sourceName.c_str());
+                    if (!formatted)
+                    {
+                        sLog.outError("String entry %i could not be formatted; sending it unformatted. Check its conversions against the caller in `mangos_string`.", i_textId);
+                    }
+
+                    // The caller sends whatever this builder leaves in `data`, so a
+                    // failure has to fall back to the raw row rather than return and
+                    // put an empty packet on the wire.
+                    ChatHandler::BuildChatPacket(data, i_msgtype, formatted ? &str[0] : text, LANG_UNIVERSAL, CHAT_TAG_NONE, sourceGuid, sourceName.c_str());
                 }
                 else
                 {
@@ -124,10 +134,16 @@ namespace MaNGOS
                     va_copy(ap, *i_args);
 
                     char str [2048];
-                    vsnprintf(str, 2048, text, ap);
+                    bool const formatted = SafeFormatDbString(str, sizeof(str), text, ap);
                     va_end(ap);
 
-                    ChatHandler::BuildChatPacket(data, CHAT_MSG_MONSTER_YELL, &str[0], i_language, CHAT_TAG_NONE, i_source->GetObjectGuid(), i_source->GetName());
+                    if (!formatted)
+                    {
+                        sLog.outError("String entry %i could not be formatted; sending it unformatted. Check its conversions against the caller in `mangos_string`.", i_textId);
+                    }
+
+                    // As above: returning here would send an empty packet.
+                    ChatHandler::BuildChatPacket(data, CHAT_MSG_MONSTER_YELL, formatted ? &str[0] : text, i_language, CHAT_TAG_NONE, i_source->GetObjectGuid(), i_source->GetName());
                 }
                 else
                 {

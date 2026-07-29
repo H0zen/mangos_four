@@ -877,6 +877,33 @@ void vutf8printf(FILE* out, const char* str, va_list* ap);
 std::string vutf8format(const char* str, va_list* ap);
 
 /**
+ * @brief Formats a string whose format comes from the database, without letting
+ *        a malformed format take the process down.
+ *
+ * Format strings loaded from `mangos_string` are mutable data, but they are handed
+ * to vsnprintf against a fixed argument list built by the C++ call site. A row
+ * whose conversions outnumber the arguments passed makes va_arg walk off the end
+ * of the list and dereference whatever the stack held next, so a single bad row is
+ * a server crash that any player can trigger by running the command that reaches
+ * it. Contain the fault here and let the caller report the offending entry instead.
+ *
+ * Returning false means only that the string could not be formatted safely: an
+ * argument-count mismatch, a %n, an invalid conversion, or a contained access
+ * violation. It does not identify which.
+ *
+ * Also terminates the buffer unconditionally: on Windows `vsnprintf` is
+ * `_vsnprintf` (Common.h), which leaves the buffer unterminated when the output
+ * does not fit.
+ *
+ * @param buffer The destination buffer.
+ * @param size The destination buffer size in bytes.
+ * @param format The format string, typically database-sourced.
+ * @param ap The argument list.
+ * @return bool true if formatting completed, false if it faulted.
+ */
+bool SafeFormatDbString(char* buffer, size_t size, char const* format, va_list ap);
+
+/**
  * @brief
  *
  * @param ipaddress

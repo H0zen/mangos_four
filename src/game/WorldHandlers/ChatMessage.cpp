@@ -32,6 +32,8 @@
  */
 
 #include "Chat.h"
+#include "Log.h"
+#include "Util.h"
 #include "Language.h"
 #include "WorldPacket.h"
 #include "WorldSession.h"
@@ -123,8 +125,15 @@ void ChatHandler::PSendSysMessage(int32 entry, ...)
     va_list ap;
     char str [2048];
     va_start(ap, entry);
-    vsnprintf(str, 2048, format, ap);
+    bool const formatted = SafeFormatDbString(str, sizeof(str), format, ap);
     va_end(ap);
+
+    if (!formatted)
+    {
+        sLog.outError("String entry %i could not be formatted; message dropped. Check its conversions against the caller in `mangos_string`.", entry);
+        return;
+    }
+
     SendSysMessage(str);
 }
 
@@ -141,8 +150,14 @@ void  ChatHandler::PSendSysMessageMultiline(int32 entry, ...)
     va_list ap;
     char str[2048];
     va_start(ap, entry);
-    vsnprintf(str, 2048, format, ap);
+    bool const formatted = SafeFormatDbString(str, sizeof(str), format, ap);
     va_end(ap);
+
+    if (!formatted)
+    {
+        sLog.outError("String entry %i could not be formatted; message dropped. Check its conversions against the caller in `mangos_string`.", entry);
+        return;
+    }
 
     std::string mangosString(str);
 
