@@ -932,7 +932,9 @@ void World::showFooter()
     }
 
     std::string thisClientVersion (EXPECTED_MANGOSD_CLIENT_VERSION);
-    std::string thisClientBuilds = AcceptableClientBuildsListStr();
+    // The banner says "Supporting Clients", so it must show the CLIENT list. Showing the
+    // data-file list here read as "18273 clients are supported", which they are not.
+    std::string thisClientBuilds = AcceptableClientWireBuildsListStr();
 
     std::string sModules;
     for (std::set<std::string>::const_iterator it = modules_.begin(); it != modules_.end(); ++it)

@@ -298,6 +298,45 @@ std::string AcceptableClientBuildsListStr()
     return data.str();
 }
 
+/**
+ * @brief Checks whether a connecting client's wire build is supported.
+ *
+ * Separate from IsAcceptableClientBuild on purpose. That one guards data files and must accept
+ * 18273, because that is how the 18414 client tags its own MPQ content. This one guards the
+ * session and accepts 18414 alone, because the opcode table and every packet body in this core
+ * are 18414-specific.
+ *
+ * @param build The build number the client reported in CMSG_AUTH_SESSION.
+ * @return true if the build is accepted; otherwise false.
+ */
+bool IsAcceptableClientWireBuild(uint32 build)
+{
+    int accepted_versions[] = EXPECTED_MANGOSD_WIRE_BUILD;
+    for (int i = 0; accepted_versions[i]; ++i)
+        if (int(build) == accepted_versions[i])
+        {
+            return true;
+        }
+
+    return false;
+}
+
+/**
+ * @brief Builds a space-separated list of supported client wire builds.
+ *
+ * @return std::string The formatted build list.
+ */
+std::string AcceptableClientWireBuildsListStr()
+{
+    std::ostringstream data;
+    int accepted_versions[] = EXPECTED_MANGOSD_WIRE_BUILD;
+    for (int i = 0; accepted_versions[i]; ++i)
+    {
+        data << accepted_versions[i] << " ";
+    }
+    return data.str();
+}
+
 static uint32 sDBCLoadedBuild = 0;                          ///< Client build of the DBC files loaded at startup
 
 /**

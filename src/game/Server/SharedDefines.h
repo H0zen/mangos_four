@@ -4274,8 +4274,26 @@ enum TrackedAuraType
 // we need to stick to 1 version or half of the stuff will work for someone
 // others will not and opposite
 // will only support WoW:MOP 5.4.8 client build 18414...however DBC Files are marked version 18273
+//
+// Those are two different questions and they need two different lists.
+//
+// EXPECTED_MANGOSD_CLIENT_BUILD is the DATA-FILE list. The 5.4.8.18414 client ships MPQ content
+// tagged 18273 -- dbc/component.wow-<locale>.txt reads version="18273" and every extracted .map
+// carries buildMagic 18273 -- so DBC/DB2 loading and GridMap must accept it or the server cannot
+// start against its own extraction.
+//
+// EXPECTED_MANGOSD_WIRE_BUILD is the CLIENT-ADMISSION list, and it is 18414 only. Every opcode
+// value, bit-packed body and handler in this core was recovered against 5.4.8.18414 specifically.
+// Opcode numbers are reassigned between builds -- 0x023A is a 7-byte SMSG in 18414 but a 37-86
+// byte CMSG in 17359/17371/17399 -- so admitting a different build would serve it packets it
+// cannot parse. A real 18414 client sends 18414 here: CMSG_AUTH_SESSION offset 44 reads EE 47 in
+// the retail corpus (capture-000019 seq 2), which is where MopAuthSession parses
+// builtNumberClient.
+//
+// Both lists are NUL-terminated; the readers iterate until a zero entry.
 
 #define EXPECTED_MANGOSD_CLIENT_BUILD        {18273, 18414, 0}
+#define EXPECTED_MANGOSD_WIRE_BUILD          {18414, 0}
 #define EXPECTED_MANGOSD_CLIENT_VERSION      "5.4.8"
 
 // max supported expansion level in mangosd
