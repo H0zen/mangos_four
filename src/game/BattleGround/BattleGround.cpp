@@ -178,7 +178,12 @@ namespace MaNGOS
                 char const* arg2str = i_arg2 ? sObjectMgr.GetMangosString(i_arg2, loc_idx) : "";
 
                 char str [2048];
-                snprintf(str, 2048, text, arg1str, arg2str);
+
+                if (!SafeFormatDbStringF(str, sizeof(str), text, arg1str, arg2str))
+                {
+                    sLog.outError("String entry %i could not be formatted; sending it unformatted. Check its conversions against the caller in `mangos_string`.", i_textId);
+                    CopyDbStringBounded(str, sizeof(str), text);
+                }
 
                 ObjectGuid guid;
                 char const* pName = NULL;
@@ -217,7 +222,13 @@ namespace MaNGOS
                 char const* arg2str = i_arg2 ? sObjectMgr.GetMangosString(i_arg2, loc_idx) : "";
 
                 char str [2048];
-                snprintf(str, 2048, text, arg1str, arg2str);
+
+                if (!SafeFormatDbStringF(str, sizeof(str), text, arg1str, arg2str))
+                {
+                    sLog.outError("String entry %i could not be formatted; sending it unformatted. Check its conversions against the caller in `mangos_string`.", i_textId);
+                    CopyDbStringBounded(str, sizeof(str), text);
+                }
+
                 // copied from BuildMonsterChat
                 data << uint8(CHAT_MSG_MONSTER_YELL);
                 data << uint32(i_language);

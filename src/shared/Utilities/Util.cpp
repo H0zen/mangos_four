@@ -957,8 +957,20 @@ bool SafeFormatDbString(char* buffer, size_t size, char const* format, va_list a
             }
         }
 
-        // size prefixes, longest match first
-        if ((p[0] == 'I' && p[1] == '3' && p[2] == '2') || (p[0] == 'I' && p[1] == '6' && p[2] == '4'))
+        // Size prefixes, longest match first.
+        //
+        // "I", "I32", "I64" and "w" are MSVC spellings that glibc does not implement:
+        // there the I is read as a flag and the 32/64 as a field width, so %I64u
+        // consumes an unsigned int and silently truncates anything above 32 bits.
+        // Accepting them only where the CRT understands them stops a row that renders
+        // correctly on Windows from rendering wrong numbers on Linux.
+#ifdef _MSC_VER
+        bool const msvcSizePrefixes = true;
+#else
+        bool const msvcSizePrefixes = false;
+#endif
+
+        if (msvcSizePrefixes && p[0] == 'I' && ((p[1] == '3' && p[2] == '2') || (p[1] == '6' && p[2] == '4')))
         {
             p += 3;
         }
@@ -966,8 +978,11 @@ bool SafeFormatDbString(char* buffer, size_t size, char const* format, va_list a
         {
             p += 2;
         }
-        else if (*p == 'h' || *p == 'l' || *p == 'L' || *p == 'j' || *p == 'z' ||
-                 *p == 't' || *p == 'I' || *p == 'w')
+        else if (*p == 'h' || *p == 'l' || *p == 'L' || *p == 'j' || *p == 'z' || *p == 't')
+        {
+            ++p;
+        }
+        else if (msvcSizePrefixes && (*p == 'I' || *p == 'w'))
         {
             ++p;
         }
@@ -991,6 +1006,33 @@ bool SafeFormatDbString(char* buffer, size_t size, char const* format, va_list a
     }
 
     return formatted;
+}
+
+bool SafeFormatDbStringF(char* buffer, size_t size, char const* format, ...)
+{
+    va_list ap;
+    va_start(ap, format);
+    bool const formatted = SafeFormatDbString(buffer, size, format, ap);
+    va_end(ap);
+
+    return formatted;
+}
+
+void CopyDbStringBounded(char* buffer, size_t size, char const* text)
+{
+    if (!buffer || !size)
+    {
+        return;
+    }
+
+    if (!text)
+    {
+        buffer[0] = '\0';
+        return;
+    }
+
+    strncpy(buffer, text, size - 1);
+    buffer[size - 1] = '\0';
 }
 
 void hexEncodeByteArray(uint8* bytes, uint32 arrayLen, std::string& result)

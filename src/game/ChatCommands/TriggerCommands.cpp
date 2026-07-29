@@ -56,7 +56,13 @@ void ChatHandler::ShowTriggerTargetListHelper(uint32 id, AreaTrigger const* at, 
         if (!subpart)
         {
             float dist = m_session->GetPlayer()->GetDistance2d(at->target_X, at->target_Y);
-            snprintf(dist_buf, 50, GetMangosString(LANG_TRIGGER_DIST), dist);
+            char const* distFormat = GetMangosString(LANG_TRIGGER_DIST);
+
+            if (!SafeFormatDbStringF(dist_buf, sizeof(dist_buf), distFormat, dist))
+            {
+                sLog.outError("String entry %i could not be formatted. Check its conversions against the caller in `mangos_string`.", LANG_TRIGGER_DIST);
+                CopyDbStringBounded(dist_buf, sizeof(dist_buf), distFormat);
+            }
         }
         else
         {
@@ -85,7 +91,13 @@ void ChatHandler::ShowTriggerListHelper(AreaTriggerEntry const* atEntry)
     {
         float dist = m_session->GetPlayer()->GetDistance2d(atEntry->x, atEntry->y);
         char dist_buf[50];
-        snprintf(dist_buf, 50, GetMangosString(LANG_TRIGGER_DIST), dist);
+        char const* distFormat = GetMangosString(LANG_TRIGGER_DIST);
+
+        if (!SafeFormatDbStringF(dist_buf, sizeof(dist_buf), distFormat, dist))
+        {
+            sLog.outError("String entry %i could not be formatted. Check its conversions against the caller in `mangos_string`.", LANG_TRIGGER_DIST);
+            CopyDbStringBounded(dist_buf, sizeof(dist_buf), distFormat);
+        }
 
         PSendSysMessage(LANG_TRIGGER_LIST_CHAT,
                         atEntry->ID, atEntry->ID, atEntry->ContinentID, atEntry->x, atEntry->y, atEntry->z, dist_buf, tavern, quest);

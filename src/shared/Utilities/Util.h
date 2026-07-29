@@ -904,6 +904,36 @@ std::string vutf8format(const char* str, va_list* ap);
 bool SafeFormatDbString(char* buffer, size_t size, char const* format, va_list ap);
 
 /**
+ * @brief SafeFormatDbString for the fixed-argument call sites.
+ *
+ * The same protection for the many places that hand a `mangos_string` row
+ * straight to snprintf or sprintf with a known argument list. On failure the
+ * buffer is left empty and false is returned, so the caller can report the entry
+ * and decide what to show instead.
+ *
+ * @param buffer The destination buffer.
+ * @param size The destination buffer size in bytes.
+ * @param format The format string, typically database-sourced.
+ * @return bool true if formatting completed, false if it was refused or faulted.
+ */
+// Deliberately not marked with a printf format attribute: the format is a
+// runtime database row, not a literal, so compile-time checking cannot apply.
+bool SafeFormatDbStringF(char* buffer, size_t size, char const* format, ...);
+
+/**
+ * @brief Copies a database row into a fixed buffer, always NUL-terminated.
+ *
+ * Used as the fallback when formatting is refused: showing the row unformatted
+ * beats showing nothing, and it must never be handed to code that writes through
+ * the pointer, because it belongs to ObjectMgr.
+ *
+ * @param buffer The destination buffer.
+ * @param size The destination buffer size in bytes.
+ * @param text The text to copy.
+ */
+void CopyDbStringBounded(char* buffer, size_t size, char const* text);
+
+/**
  * @brief
  *
  * @param ipaddress

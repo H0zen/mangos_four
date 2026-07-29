@@ -99,8 +99,15 @@ bool ChatHandler::HandleLookupTitleCommand(char* args)
                                         ? GetMangosString(LANG_ACTIVE)
                                         : "";
 
+                // DBC-sourced rather than database-sourced, but the same shape: a
+                // data-driven format ("%s the Explorer") against a fixed argument list.
                 char titleNameStr[80];
-                snprintf(titleNameStr, 80, name.c_str(), targetName);
+
+                if (!SafeFormatDbStringF(titleNameStr, sizeof(titleNameStr), name.c_str(), targetName))
+                {
+                    sLog.outError("CharTitles.dbc entry %u could not be formatted; showing it unformatted.", titleInfo->ID);
+                    CopyDbStringBounded(titleNameStr, sizeof(titleNameStr), name.c_str());
+                }
 
                 // send title in "id (idx:idx) - [namedlink locale]" format
                 if (m_session)
@@ -307,8 +314,14 @@ bool ChatHandler::HandleCharacterTitlesCommand(char* args)
                                     ? GetMangosString(LANG_ACTIVE)
                                     : "";
 
+            // As above: a DBC-sourced format against a fixed argument list.
             char titleNameStr[80];
-            snprintf(titleNameStr, 80, name.c_str(), targetName);
+
+            if (!SafeFormatDbStringF(titleNameStr, sizeof(titleNameStr), name.c_str(), targetName))
+            {
+                sLog.outError("CharTitles.dbc entry %u could not be formatted; showing it unformatted.", titleInfo->ID);
+                CopyDbStringBounded(titleNameStr, sizeof(titleNameStr), name.c_str());
+            }
 
             // send title in "id (idx:idx) - [namedlink locale]" format
             if (m_session)
