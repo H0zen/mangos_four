@@ -215,6 +215,120 @@ namespace MopGuildPackets
         }
     }
 
+    /// One member as SMSG_GUILD_ROSTER carries it.
+    struct RosterMember
+    {
+        uint64 guid = 0;
+        uint8 cls = 0;
+        uint8 level = 0;
+        uint8 flags = 0;
+        uint8 gender = 0;
+        uint32 zoneId = 0;
+        uint32 rankId = 0;
+        uint32 totalReputation = 0;
+        uint32 remainingWeekReputation = 0;
+        uint64 totalActivity = 0;
+        uint64 weekActivity = 0;
+        uint32 achievementPoints = 0;
+        uint32 virtualRealm = 0;
+        float lastLogoutDays = 0.0f;
+        // Two professions, each id/value/rank. Retail populates these; we have no
+        // guild profession tracking yet and send zeroes, but the field must exist
+        // or the member record is the wrong length.
+        uint32 professions[6] = {};
+        std::string name;
+        std::string publicNote;
+        std::string officerNote;
+    };
+
+    /**
+     * SMSG_GUILD_ROSTER body.
+     *
+     * Proven by decoding capture-000019 seq 923 (235 bytes) field by field and
+     * consuming it exactly: a 17-bit member count then a 10-bit MOTD length, a
+     * 32-bit block per member, an 11-bit guild-info length, then the member byte
+     * data and finally the guild-wide tail.
+     *
+     * The inherited body had the two header fields in the opposite order and at
+     * the wrong widths (11-bit MOTD then 18-bit count), a 12-bit info length, a
+     * 7-bit name length, a different member bit order, a different member byte
+     * order and a different tail order. The capture settles all of it: the first
+     * 17 bits read 2 and the packet carries exactly two names, and the next 10
+     * bits read 24 against a 24-character MOTD.
+     */
+    inline void BuildGuildRoster(WorldPacket& out, std::vector<RosterMember> const& members,
+        std::string const& motd, std::string const& info, uint32 accountsNumber,
+        uint32 createdDatePacked, uint32 weeklyReputationCap)
+    {
+        ByteBuffer memberData;
+
+        out.Initialize(SMSG_GUILD_ROSTER, 24 + members.size() * 100 + motd.size() + info.size());
+        out.WriteBits(uint32(members.size()), 17);
+        out.WriteBits(uint32(motd.length()), 10);
+
+        for (RosterMember const& member : members)
+        {
+            uint64 const guid = member.guid;
+
+            out.WriteBits(uint32(member.officerNote.length()), 8);
+            out.WriteBit(GuidByte(guid, 5) != 0);
+            out.WriteBit(false);                            // can scroll of resurrect
+            out.WriteBits(uint32(member.publicNote.length()), 8);
+            out.WriteBit(GuidByte(guid, 7) != 0);
+            out.WriteBit(GuidByte(guid, 0) != 0);
+            out.WriteBit(GuidByte(guid, 6) != 0);
+            out.WriteBits(uint32(member.name.length()), 6);
+            out.WriteBit(false);                            // has authenticator
+            out.WriteBit(GuidByte(guid, 3) != 0);
+            out.WriteBit(GuidByte(guid, 4) != 0);
+            out.WriteBit(GuidByte(guid, 1) != 0);
+            out.WriteBit(GuidByte(guid, 2) != 0);
+
+            memberData << uint8(member.cls);
+            memberData << uint32(member.totalReputation);
+            memberData.append(member.name.c_str(), member.name.size());
+            memberData.WriteByteSeq(GuidByte(guid, 0));
+            for (uint8 field = 0; field < 6; ++field)
+            {
+                memberData << uint32(member.professions[field]);
+            }
+            memberData << uint8(member.level);
+            memberData << uint8(member.flags);
+            memberData << uint32(member.zoneId);
+            memberData << uint32(member.remainingWeekReputation);
+            memberData.WriteByteSeq(GuidByte(guid, 3));
+            memberData << uint64(member.totalActivity);
+            memberData.append(member.officerNote.c_str(), member.officerNote.size());
+            memberData << float(member.lastLogoutDays);
+            memberData << uint8(member.gender);
+            memberData << uint32(member.rankId);
+            memberData << uint32(member.virtualRealm);
+            memberData.WriteByteSeq(GuidByte(guid, 5));
+            memberData.WriteByteSeq(GuidByte(guid, 7));
+            memberData.append(member.publicNote.c_str(), member.publicNote.size());
+            memberData.WriteByteSeq(GuidByte(guid, 4));
+            memberData << uint64(member.weekActivity);
+            memberData << uint32(member.achievementPoints);
+            memberData.WriteByteSeq(GuidByte(guid, 6));
+            memberData.WriteByteSeq(GuidByte(guid, 1));
+            memberData.WriteByteSeq(GuidByte(guid, 2));
+        }
+
+        out.WriteBits(uint32(info.length()), 11);
+        out.FlushBits();
+        if (memberData.size())
+        {
+            out.append(memberData);
+        }
+
+        out << uint32(accountsNumber);
+        out << uint32(createdDatePacked);
+        out.append(info.c_str(), info.size());
+        out << uint32(weeklyReputationCap);
+        out.append(motd.c_str(), motd.size());
+        out << uint32(0);
+    }
+
     inline EmblemDesign ReadSaveGuildEmblem(WorldPacket& in)
     {
         EmblemDesign design;

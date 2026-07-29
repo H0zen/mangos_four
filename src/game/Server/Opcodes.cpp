@@ -860,12 +860,21 @@ void InitializeOpcodes()
     DefC(CMSG_GUILD_QUERY_RANKS, "CMSG_GUILD_QUERY_RANKS", STATUS_LOGGEDIN, PROCESS_THREADUNSAFE, &WorldSession::HandleGuildQueryRanksOpcode);
     DefS(SMSG_GUILD_QUERY_RANKS_RESULT, "SMSG_GUILD_QUERY_RANKS_RESULT");
 
-    // CMSG_GUILD_ROSTER (0x1459) stays dormant. Its reader was corrected against
-    // sub_C85E7C in the same series, but Guild::Roster still writes an 11-bit MOTD
-    // length, an 18-bit member count and 7-bit names, none of it checked against a
-    // capture. Given the rank reply above was wrong in exactly that way, the roster
-    // reply is assumed wrong until proven otherwise; registering the request first
-    // would only turn a dropped packet into a malformed one.
+    // Guild roster. The reader takes its two interleaved guid orders from the client's
+    // send serializer sub_C85E7C, and the reply is byte-exact against retail:
+    // mop_guild_packets rebuilds capture-000019 seq 923 in full, all 235 bytes of a
+    // two-member guild.
+    //
+    // The inherited reply was wrong in every dimension. It wrote the MOTD length
+    // before the member count where the client reads the count first, at 11 and 18
+    // bits where the client reads 17 and 10, an info length of 12 bits where the
+    // client reads 11, a 7-bit name length where the client reads 6, and a different
+    // order again for both the per-member bit block and the member byte data and the
+    // guild-wide tail. The capture is unambiguous: the first 17 bits read 2 and the
+    // packet carries exactly two member names, and the next 10 bits read 24 against a
+    // 24-character MOTD.
+    DefC(CMSG_GUILD_ROSTER, "CMSG_GUILD_ROSTER", STATUS_LOGGEDIN, PROCESS_THREADUNSAFE, &WorldSession::HandleGuildRosterOpcode);
+    DefS(SMSG_GUILD_ROSTER, "SMSG_GUILD_ROSTER");
 
     // Live-log guild-bank withdrawal allowance query. The 18414 request is
     // empty and its response contains one uint64 remaining allowance.

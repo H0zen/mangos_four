@@ -175,9 +175,9 @@
  *   TOTAL SMSG rows                   925
  *
  * SUBSYSTEM CONFIDENCE: high=365, low=221, medium=182, none=157
- * STATUS TOTALS: ACTIVE=430, DOC=435, DORMANT=655
- *   SMSG: ACTIVE=265, DOC=271, DORMANT=389
- *   CMSG: ACTIVE=165, DOC=164, DORMANT=266
+ * STATUS TOTALS: ACTIVE=432, DOC=435, DORMANT=653
+ *   SMSG: ACTIVE=266, DOC=271, DORMANT=388
+ *   CMSG: ACTIVE=166, DOC=164, DORMANT=265
  */
 
 // CAVEATS -- read before trusting any single row:
@@ -564,7 +564,7 @@ typedef uint16_t uint16;
  *   SMSG_UNKNOWN_0x0B69                            0x0B69  ACTIVE   [low-conf]  server-binding=SMSG_GUILD_EVENT_PLAYER_JOINED
  *   SMSG_UNKNOWN_0x0B70                            0x0B70  ACTIVE   [low-conf]  server-binding=SMSG_GUILD_EVENT_PRESENCE_CHANGE
  *   SMSG_GUILD_BANK_MONEY_WITHDRAWN                0x0B78  ACTIVE   [low-conf]
- *   SMSG_GUILD_ROSTER                              0x0BE0  DORMANT
+ *   SMSG_GUILD_ROSTER                              0x0BE0  ACTIVE
  *   SMSG_GUILD_MEMBER_UPDATE_NOTE                  0x0BE1  DOC      [low-conf]
  *   SMSG_UNKNOWN_0x0BE9                            0x0BE9  DOC      [low-conf]
  *   SMSG_GUILD_MEMBERS_FOR_RECIPE                  0x0BF0  DORMANT  [low-conf]
@@ -1764,7 +1764,7 @@ typedef uint16_t uint16;
  *   CMSG_ACCEPT_TRADE                              0x144D  DORMANT 
  *   CMSG_LF_GUILD_POST_REQUEST                     0x1450  DORMANT 
  *   CMSG_GET_CHALLENGE_MODE_REWARDS                0x1452  DOC     
- *   CMSG_GUILD_ROSTER                              0x1459  DORMANT
+ *   CMSG_GUILD_ROSTER                              0x1459  ACTIVE
  *   CMSG_GUILD_PERMISSIONS                         0x145A  ACTIVE
  *   CMSG_GAMEOBJECT_QUERY                          0x1461  ACTIVE
  *   CMSG_LEARN_PET_SPECIALIZATION_GROUP            0x1463  DOC     

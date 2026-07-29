@@ -299,6 +299,27 @@ require_once("${guild_sender}"
 require_once("${guild_sender}"
     "entry.rights = m_Ranks[i].Rights;"
     "guild-rank-query rights adapter field")
+require_once("${opcode_registry}"
+    "DefC(CMSG_GUILD_ROSTER, \"CMSG_GUILD_ROSTER\""
+    "guild-roster request registration")
+require_once("${opcode_registry}"
+    "DefS(SMSG_GUILD_ROSTER, \"SMSG_GUILD_ROSTER\");"
+    "guild-roster response registration")
+require_once("${world_session}"
+    "case SMSG_GUILD_ROSTER:"
+    "guild-roster response allowlist")
+require_once("${packet_builder}"
+    "out.WriteBits(uint32(members.size()), 17)"
+    "guild-roster 17-bit member count")
+require_once("${packet_builder}"
+    "out.WriteBits(uint32(motd.length()), 10)"
+    "guild-roster 10-bit motd length")
+require_once("${packet_builder}"
+    "out.WriteBits(uint32(info.length()), 11)"
+    "guild-roster 11-bit info length")
+require_once("${guild_sender}"
+    "MopGuildPackets::BuildGuildRoster(data, roster, MOTD, GINFO, m_accountsNumber,"
+    "guild-roster production builder call")
 require_once("${guild_handler}"
     "MopGuildPackets::BuildGuildCommandResult(data, typecmd, str, cmdresult)"
     "guild-command-result builder call")

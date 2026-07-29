@@ -1007,27 +1007,13 @@ void Guild::Disband()
  */
 void Guild::Roster(WorldSession* session /*= NULL*/)
 {
-    ByteBuffer buffer;
-
-    // we can only guess size
-    WorldPacket data(SMSG_GUILD_ROSTER, (4 + MOTD.length() + 1 + GINFO.length() + 1 + 4 + members.size() * 50));
-    data.WriteBits(MOTD.length(), 11);
-    data.WriteBits(members.size(), 18);
+    std::vector<MopGuildPackets::RosterMember> roster;
+    roster.reserve(members.size());
 
     for (MemberList::const_iterator itr = members.begin(); itr != members.end(); ++itr)
     {
-        MemberSlot const member = itr->second;
+        MemberSlot const& member = itr->second;
         Player* player = sObjectAccessor.FindPlayer(ObjectGuid(HIGHGUID_PLAYER, itr->first));
-
-        ObjectGuid guid = member.guid;
-        data.WriteGuidMask<3, 4>(guid);
-        data.WriteBit(false);                           // Has Authenticator
-        data.WriteBit(false);                           // Can Scroll of Ressurect
-        data.WriteBits(member.Pnote.length(), 8);
-        data.WriteBits(member.OFFnote.length(), 8);
-        data.WriteGuidMask<0>(guid);
-        data.WriteBits(member.Name.length(), 7);
-        data.WriteGuidMask<1, 2, 6, 5, 7>(guid);
 
         uint8 flags = GUILDMEMBER_STATUS_NONE;
         if (player)
@@ -1043,52 +1029,23 @@ void Guild::Roster(WorldSession* session /*= NULL*/)
             }
         }
 
-        buffer << uint8(member.Class);
-        buffer << int32(0);                             // unk
-        buffer.WriteGuidBytes<0>(guid);
-        buffer << uint64(0);                            // weekly activity
-        buffer << uint32(member.RankId);
-        buffer << uint32(0);                            // achievement points
-
-        // professions: id, value, rank
-        buffer << uint32(0) << uint32(0) << uint32(0);
-        buffer << uint32(0) << uint32(0) << uint32(0);
-
-        buffer.WriteGuidBytes<2>(guid);
-        buffer << uint8(flags);
-        buffer << uint32(player ? player->GetZoneId() : member.ZoneId);
-        buffer << uint64(0);                            // Total activity
-        buffer.WriteGuidBytes<7>(guid);
-        buffer << uint32(0);                            // Remaining guild week Rep
-
-        buffer.WriteStringData(member.Pnote);
-
-        buffer.WriteGuidBytes<3>(guid);
-        buffer << uint8(player ? player->getLevel() : member.Level);
-        buffer << int32(0);                             // unk
-        buffer.WriteGuidBytes<5, 4>(guid);
-        buffer << uint8(0);                             // unk
-        buffer.WriteGuidBytes<1>(guid);
-        buffer << float(player ? 0.0f : float(time(NULL) - itr->second.LogoutTime) / DAY);
-
-        buffer.WriteStringData(member.OFFnote);
-
-        buffer.WriteGuidBytes<6>(guid);
-        buffer.WriteStringData(member.Name);
+        MopGuildPackets::RosterMember entry;
+        entry.guid = member.guid.GetRawValue();
+        entry.cls = member.Class;
+        entry.level = player ? player->getLevel() : member.Level;
+        entry.flags = flags;
+        entry.zoneId = player ? player->GetZoneId() : member.ZoneId;
+        entry.rankId = member.RankId;
+        entry.lastLogoutDays = player ? 0.0f : float(time(NULL) - itr->second.LogoutTime) / float(DAY);
+        entry.name = member.Name;
+        entry.publicNote = member.Pnote;
+        entry.officerNote = member.OFFnote;
+        roster.push_back(entry);
     }
 
-    data.WriteBits(GINFO.length(), 12);
-
-    data.FlushBits();
-    data.append(buffer);
-
-    data.WriteStringData(GINFO);
-    data.WriteStringData(MOTD);
-
-    data << uint32(m_accountsNumber);
-    data << uint32(0);                                      // weekly rep cap
-    data << secsToTimeBitFields(m_CreatedDate);
-    data << uint32(0);
+    WorldPacket data;
+    MopGuildPackets::BuildGuildRoster(data, roster, MOTD, GINFO, m_accountsNumber,
+        secsToTimeBitFields(m_CreatedDate), 0);
 
     if (session)
     {
@@ -1100,6 +1057,7 @@ void Guild::Roster(WorldSession* session /*= NULL*/)
     }
     DEBUG_LOG("WORLD: Sent (SMSG_GUILD_ROSTER)");
 }
+
 
 /**
  * @brief Sends guild query data to a session.
