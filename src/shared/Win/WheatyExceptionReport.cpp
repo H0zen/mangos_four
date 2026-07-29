@@ -39,6 +39,9 @@ inline LPTSTR ErrorMessage(DWORD dw)
 // Declare the static variables of the WheatyExceptionReport class
 //
 TCHAR WheatyExceptionReport::m_szLogFileName[MAX_PATH];
+TCHAR WheatyExceptionReport::m_szDumpFileName[MAX_PATH];
+bool  WheatyExceptionReport::m_dumpWritten;
+bool  WheatyExceptionReport::m_dumpHelperRunning;
 LPTOP_LEVEL_EXCEPTION_FILTER WheatyExceptionReport::m_previousFilter;
 HANDLE WheatyExceptionReport::m_hReportFile;
 HANDLE WheatyExceptionReport::m_hProcess;
@@ -67,35 +70,293 @@ WheatyExceptionReport::~WheatyExceptionReport()
 }
 
 //===========================================================
+// Writes a minidump beside the text report.
+//
+// The text report can only describe what its symbol walker manages to decode,
+// and on optimised x64 that is not much: it prints parameter names without
+// values, because the walker computes stack addresses the way a 2002 x86 sample
+// did. A dump hands the same question to WinDbg, which has the real unwind
+// machinery and the variable-range records the compiler emitted. That is a far
+// better position, not a guarantee: a value the optimiser never stored anywhere
+// is not in the dump either.
+//===========================================================
+bool WheatyExceptionReport::WriteMiniDumpWorker(PEXCEPTION_POINTERS pExceptionInfo, DWORD faultingThreadId)
+{
+    HANDLE hDumpFile = CreateFile(m_szDumpFileName,
+                                  GENERIC_WRITE,
+                                  0,
+                                  0,
+                                  CREATE_ALWAYS,
+                                  FILE_ATTRIBUTE_NORMAL,
+                                  0);
+
+    // CreateFile signals failure with INVALID_HANDLE_VALUE, which is truthy - a
+    // plain `if (handle)` would happily write into a dead handle.
+    if (hDumpFile == INVALID_HANDLE_VALUE)
+    {
+        return false;
+    }
+
+    MINIDUMP_EXCEPTION_INFORMATION mei;
+    // Passed in, never GetCurrentThreadId(): this runs on a helper thread, so asking
+    // here would name the helper and the dump would open on the wrong thread.
+    mei.ThreadId = faultingThreadId;
+    mei.ExceptionPointers = pExceptionInfo;
+    mei.ClientPointers = FALSE;                             // same process, so the pointer is ours to deref
+
+    // Triage set, then two progressively smaller fallbacks. MiniDumpWriteDump fails
+    // the whole call rather than ignoring a flag it does not understand, and a single
+    // unreadable page can sink it, so a smaller dump is worth more than none.
+    //
+    // IndirectlyReferencedMemory is the one that earns its size here: it captures a
+    // window around anything on a thread stack that looks like a pointer, which is
+    // what lets you read the string an argument refers to rather than just its value.
+    MINIDUMP_TYPE const attempts[] =
+    {
+        // IgnoreInaccessibleMemory is documented against MiniDumpWithFullMemory,
+        // which this set does not request, so it is kept only as belt-and-braces on
+        // implementations that honour it more broadly - the fallbacks below are what
+        // actually cover an unreadable page here.
+        MINIDUMP_TYPE(MiniDumpWithIndirectlyReferencedMemory
+                      | MiniDumpWithDataSegs
+                      | MiniDumpWithProcessThreadData
+                      | MiniDumpWithThreadInfo
+                      | MiniDumpWithUnloadedModules
+                      | MiniDumpWithFullMemoryInfo
+                      | MiniDumpIgnoreInaccessibleMemory),
+        MINIDUMP_TYPE(MiniDumpWithIndirectlyReferencedMemory | MiniDumpWithDataSegs),
+        MiniDumpNormal
+    };
+
+    bool written = false;
+
+    for (int i = 0; i < ARRAYSIZE(attempts) && !written; ++i)
+    {
+        SetFilePointer(hDumpFile, 0, 0, FILE_BEGIN);
+        SetEndOfFile(hDumpFile);
+
+        written = MiniDumpWriteDump(GetCurrentProcess(),
+                                    GetCurrentProcessId(),
+                                    hDumpFile,
+                                    attempts[i],
+                                    &mei,
+                                    0,
+                                    0) != FALSE;
+    }
+
+    CloseHandle(hDumpFile);
+
+    if (!written)
+    {
+        DeleteFile(m_szDumpFileName);
+    }
+
+    return written;
+}
+
+//===========================================================
+// Runs WriteMiniDumpWorker on a thread of its own.
+//===========================================================
+DWORD WINAPI WheatyExceptionReport::MiniDumpThreadProc(LPVOID param)
+{
+    MiniDumpRequest* request = (MiniDumpRequest*)param;
+    request->written = WriteMiniDumpWorker(request->pExceptionInfo, request->faultingThreadId);
+    return 0;
+}
+
+//===========================================================
+// Takes the dump from a dedicated thread.
+//
+// The reason for the extra thread is EXCEPTION_STACK_OVERFLOW: the filter runs on
+// the exhausted stack with about a page to spare, and MiniDumpWriteDump needs far
+// more, so the crash hardest to read from a text report is the one an in-filter dump
+// is least likely to survive. Measured on one such crash: a 1.3 KB report and a
+// complete dump. Not proven for every stack-overflow shape, only the tested one.
+//
+// The crashing thread blocks in WaitForSingleObject, so its stack stays intact and
+// pExceptionInfo - which lives on it - remains valid for the helper to read.
+//
+// The timeout does NOT rescue the heap-lock deadlock case, and it would be wrong to
+// claim it does. MiniDumpWriteDump suspends every thread in the process except its
+// own caller, so the thread waiting here is suspended for the duration: the timeout
+// expires in the kernel but the thread cannot run to act on it. That is true of any
+// in-process watchdog on any thread - only a separate process can observe a hang
+// while the dumper holds the process down. The timeout still bounds the cases where
+// the helper fails or stalls before reaching MiniDumpWriteDump, which is worth
+// having, but a dumper that deadlocks on a heap lock the faulting thread was holding
+// will still freeze the process. Fixing that properly means an external watchdog.
+//===========================================================
+bool WheatyExceptionReport::WriteMiniDump(PEXCEPTION_POINTERS pExceptionInfo)
+{
+    // Static, not a local. On a timeout this function returns while the helper is
+    // still running and still holding this pointer; a stack local would be reclaimed
+    // underneath it, and the helper's later write to `written` would land in the
+    // frame the report generator is by then using. The filter admits one caller
+    // (see the guard in WheatyUnhandledExceptionFilter), so a single instance is
+    // enough and no lifetime management is needed.
+    static MiniDumpRequest request;
+
+    request.pExceptionInfo = pExceptionInfo;
+    request.faultingThreadId = GetCurrentThreadId();        // captured here, on the faulting thread
+    request.written = false;
+
+    // STACK_SIZE_PARAM_IS_A_RESERVATION: without it this number is the amount to
+    // commit up front, not reserve, which makes creation likelier to fail on a
+    // process that is already short of memory - and failing here drops us back to
+    // dumping on the faulting stack, which is precisely what this thread exists to
+    // avoid for stack-overflow crashes.
+    HANDLE hThread = CreateThread(0, 256 * 1024, MiniDumpThreadProc, &request,
+                                  STACK_SIZE_PARAM_IS_A_RESERVATION, 0);
+
+    if (!hThread)
+    {
+        // No thread to be had - better a dump attempted on this stack than none.
+        return WriteMiniDumpWorker(pExceptionInfo, request.faultingThreadId);
+    }
+
+    DWORD const waited = WaitForSingleObject(hThread, kMiniDumpTimeoutMs);
+
+    // Not terminated on timeout: killing a thread inside MiniDumpWriteDump would
+    // leave the threads it suspended suspended, and this process is exiting anyway.
+    // But it is then still running, and probably still inside DbgHelp - which the
+    // caller must know, because the text report uses DbgHelp too and the two cannot
+    // safely overlap.
+    CloseHandle(hThread);
+
+    m_dumpHelperRunning = (waited != WAIT_OBJECT_0);
+
+    return (waited == WAIT_OBJECT_0) && request.written;
+}
+
+//===========================================================
+// Composes "<folder>\<name><suffix><ext>" without running past the buffer.
+//
+// Every part except the name is preserved. An installation directory long enough
+// to threaten MAX_PATH is a valid one, and this runs on the crash path, so the
+// question is only what to sacrifice: the timestamp, the pid and the extension
+// are what make a crash pair identifiable, and the module name is the one part
+// nothing depends on. So the name is what gets clipped.
+//===========================================================
+static void BuildCrashPath(TCHAR* out, size_t outSize, TCHAR const* folder,
+                           TCHAR const* name, TCHAR const* suffix, TCHAR const* ext)
+{
+    size_t const fixed = _tcslen(folder) + 1 + _tcslen(suffix) + _tcslen(ext) + 1;
+    int const nameRoom = (outSize > fixed) ? (int)(outSize - fixed) : 0;
+
+    int written = _sntprintf(out, outSize, _T("%s\\%.*s%s%s"), folder, nameRoom, name, suffix, ext);
+
+    // _sntprintf returns -1 on truncation as well as on error, and does not
+    // terminate when it fills the buffer exactly.
+    if (written < 0 || (size_t)written >= outSize)
+    {
+        // The folder alone leaves no room for the parts that had to survive. Fall back
+        // to the temp directory, which is absolute, writable and short. A bare relative
+        // name would land in whatever directory the process was launched from - only
+        // ServiceMain sets that to the executable's - so the artifacts of the one
+        // installation that needs this fallback would be scattered or lost.
+        TCHAR tempDir[MAX_PATH];
+        DWORD const tempLen = GetTempPath(ARRAYSIZE(tempDir), tempDir);
+
+        // 0 is failure; a value >= the buffer means it wanted more room than MAX_PATH.
+        // GetTempPath keeps the trailing backslash, so none is added here.
+        written = (tempLen > 0 && tempLen < ARRAYSIZE(tempDir))
+                  ? _sntprintf(out, outSize, _T("%scrash%s%s"), tempDir, suffix, ext)
+                  : -1;
+
+        if (written < 0 || (size_t)written >= outSize)
+        {
+            // Nowhere absolute left to go. The launch directory is a poor destination
+            // but a named file somewhere beats a mangled path or none.
+            _sntprintf(out, outSize, _T("crash%s%s"), suffix, ext);
+        }
+    }
+
+    out[outSize - 1] = _T('\0');
+}
+
+//===========================================================
 // Entry point where control comes on an unhandled exception
 //===========================================================
 LONG WINAPI WheatyExceptionReport::WheatyUnhandledExceptionFilter(
     PEXCEPTION_POINTERS pExceptionInfo)
 {
+    // Everything below writes to statics - m_szLogFileName, m_hReportFile - with no
+    // serialisation, so two threads faulting at once corrupt each other's filenames
+    // and handles. A crash in the reporting path would also re-enter here. One entry
+    // only; a second caller returns and lets the process die.
+    static LONG s_inFilter = 0;
+
+    if (InterlockedExchange(&s_inFilter, 1) != 0)
+    {
+        return EXCEPTION_EXECUTE_HANDLER;
+    }
+
     TCHAR module_folder_name[MAX_PATH];
-    GetModuleFileName(0, module_folder_name, MAX_PATH);
+    DWORD const moduleLen = GetModuleFileName(0, module_folder_name, MAX_PATH);
+
+    // 0 is failure; MAX_PATH means it filled the buffer, and older Windows does not
+    // terminate in that case. Either way there is no usable path to split.
+    if (moduleLen == 0 || moduleLen >= MAX_PATH)
+    {
+        InterlockedExchange(&s_inFilter, 0);
+        return 0;
+    }
+
+    module_folder_name[MAX_PATH - 1] = _T('\0');
     TCHAR* pos = _tcsrchr(module_folder_name, '\\');
     if (!pos)
     {
+        InterlockedExchange(&s_inFilter, 0);                // nothing was set up yet
         return 0;
     }
     pos[0] = '\0';
     ++pos;
 
     TCHAR crash_folder_path[MAX_PATH];
-    sprintf(crash_folder_path, "%s\\%s", module_folder_name, CrashFolder);
+    int const folderLen = _sntprintf(crash_folder_path, ARRAYSIZE(crash_folder_path),
+                                     _T("%s\\%s"), module_folder_name, CrashFolder);
+    if (folderLen < 0 || folderLen >= ARRAYSIZE(crash_folder_path))
+    {
+        InterlockedExchange(&s_inFilter, 0);
+        return 0;
+    }
+    crash_folder_path[ARRAYSIZE(crash_folder_path) - 1] = _T('\0');
+
     if (!CreateDirectory(crash_folder_path, NULL))
     {
         if (GetLastError() != ERROR_ALREADY_EXISTS)
         {
+            InterlockedExchange(&s_inFilter, 0);
             return 0;
         }
     }
 
     SYSTEMTIME systime;
     GetLocalTime(&systime);
-    sprintf(m_szLogFileName, "%s\\%s_[%u-%u_%u-%u-%u].txt",
-            crash_folder_path, pos, systime.wDay, systime.wMonth, systime.wHour, systime.wMinute, systime.wSecond);
+
+    // Year and process id are here because the previous form - day, month and time
+    // of day only - repeats across years and across two runs that crash at the same
+    // clock second. That was survivable while the report was the only artifact, since
+    // it is opened OPEN_ALWAYS and appends. A dump cannot append: it is written
+    // CREATE_ALWAYS, so a collision destroyed the older dump while its report was
+    // still sitting in the same file as the newer one, and the pair no longer matched.
+    // The process id also separates crashes from concurrent servers sharing a folder.
+    TCHAR name_suffix[64];
+    _sntprintf(name_suffix, ARRAYSIZE(name_suffix), _T("_[%u-%u-%u_%u-%u-%u_%u]"),
+               systime.wDay, systime.wMonth, systime.wYear,
+               systime.wHour, systime.wMinute, systime.wSecond, GetCurrentProcessId());
+    name_suffix[ARRAYSIZE(name_suffix) - 1] = _T('\0');
+
+    // Same suffix for both, so the .dmp and .txt for one crash always pair by name.
+    BuildCrashPath(m_szLogFileName, ARRAYSIZE(m_szLogFileName), crash_folder_path, pos, name_suffix, _T(".txt"));
+    BuildCrashPath(m_szDumpFileName, ARRAYSIZE(m_szDumpFileName), crash_folder_path, pos, name_suffix, _T(".dmp"));
+
+    // Written before the report, deliberately. GenerateExceptionReport loads and
+    // parses every module's symbols, walks all threads, and formats megabytes of
+    // text - a great deal of work in a process that has already faulted, any of
+    // which can fail and take the dump with it. The dump is also the artifact that
+    // survives being mailed to someone else, so it is the one worth having first.
+    m_dumpWritten = WriteMiniDump(pExceptionInfo);
 
     m_hReportFile = CreateFile(m_szLogFileName,
                                GENERIC_WRITE,
@@ -109,20 +370,54 @@ LONG WINAPI WheatyExceptionReport::WheatyUnhandledExceptionFilter(
     {
         SetFilePointer(m_hReportFile, 0, 0, FILE_END);
 
-        GenerateExceptionReport(pExceptionInfo);
+        if (m_dumpHelperRunning)
+        {
+            // The dump helper did not finish and was not killed, so it is very likely
+            // still inside MiniDumpWriteDump - which is DbgHelp. DbgHelp is documented
+            // single-threaded, and GenerateExceptionReport is nothing but DbgHelp:
+            // SymInitialize, StackWalk64, SymEnumSymbols, SymCleanup. Running them
+            // concurrently risks corrupting both, so the report is skipped rather than
+            // racing the dump that is more useful anyway.
+            _tprintf(_T("Revision: %s\r\n"), GitRevision::GetProjectRevision());
+            _tprintf(_T("Minidump: timed out after %u ms; the writer was still running.\r\n"), kMiniDumpTimeoutMs);
+            _tprintf(_T("Report skipped: generating it needs DbgHelp, which the dump writer still holds.\r\n"));
+            _tprintf(_T("Partial dump, if any: %s\r\n"), m_szDumpFileName);
+        }
+        else
+        {
+            GenerateExceptionReport(pExceptionInfo);
+        }
 
         CloseHandle(m_hReportFile);
         m_hReportFile = 0;
     }
 
-    if (m_previousFilter)
+    LONG const result = m_previousFilter
+                        ? m_previousFilter(pExceptionInfo)
+                        : EXCEPTION_EXECUTE_HANDLER/*EXCEPTION_CONTINUE_SEARCH*/;
+
+    // A chained filter can return EXCEPTION_CONTINUE_EXECUTION, meaning it fixed the
+    // fault and the process is to carry on. The guard must be released for that case
+    // or this filter is dead for the life of the process: the next unhandled
+    // exception would take the re-entry path, write nothing, skip the chained filter
+    // that might have recovered again, and return EXCEPTION_EXECUTE_HANDLER - killing
+    // a process that was still saveable. The other results end the process, and
+    // releasing there would just let a second faulting thread into a reporting path
+    // that is already unwinding.
+    //
+    // Except when the dump helper outlived its wait. It still holds the static request
+    // and reads the filename statics, so re-entry would overwrite both underneath it
+    // and start DbgHelp work beside a MiniDumpWriteDump still in progress - the exact
+    // race the m_dumpHelperRunning check exists to prevent. There is no way to learn
+    // that it has finished (its handle is closed, and it is deliberately not killed),
+    // so the guard stays shut: one crash report is worth less than corrupting the
+    // process that survived.
+    if (result == EXCEPTION_CONTINUE_EXECUTION && !m_dumpHelperRunning)
     {
-        return m_previousFilter(pExceptionInfo);
+        InterlockedExchange(&s_inFilter, 0);
     }
-    else
-    {
-        return EXCEPTION_EXECUTE_HANDLER/*EXCEPTION_CONTINUE_SEARCH*/;
-    }
+
+    return result;
 }
 
 /**
@@ -348,6 +643,23 @@ void WheatyExceptionReport::GenerateExceptionReport(
     // Start out with a banner
     _tprintf(_T("Revision: %s\r\n"), GitRevision::GetProjectRevision());
     _tprintf(_T("Date %u:%u:%u. Time %u:%u \r\n"), systime.wDay, systime.wMonth, systime.wYear, systime.wHour, systime.wMinute);
+
+    // Named here so whoever opens the report knows the dump exists and where it is;
+    // it carries the argument values this text cannot recover on optimised x64.
+    //
+    // m_dumpWritten, not GetFileAttributes: the dump is opened CREATE_ALWAYS, so the
+    // file exists from the moment writing starts, and a failed dump whose DeleteFile
+    // was refused leaves one behind. Testing for existence would send an investigator
+    // to a partial or stale artifact and call it this crash's dump.
+    if (m_dumpWritten)
+    {
+        _tprintf(_T("Minidump: %s\r\n"), m_szDumpFileName);
+    }
+    else
+    {
+        _tprintf(_T("Minidump: not written\r\n"));
+    }
+
     PEXCEPTION_RECORD pExceptionRecord = pExceptionInfo->ExceptionRecord;
 
     PrintSystemInfo();

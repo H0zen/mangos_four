@@ -145,8 +145,36 @@ class WheatyExceptionReport
 
         static int __cdecl _tprintf(const TCHAR* format, ...);
 
+        // Longest the faulting thread waits for the dump. It stops waiting; the helper
+        // is deliberately not terminated, so it may still be running afterwards -
+        // which is why a timeout also suppresses the text report (see WriteMiniDump).
+        // Bounds a helper that fails or stalls before it reaches MiniDumpWriteDump; it
+        // cannot bound a deadlock inside that call, because the dumper suspends the
+        // waiting thread.
+        static const DWORD kMiniDumpTimeoutMs = 60 * 1000;
+
+        // What the helper thread needs from the faulting one. The thread id is carried
+        // explicitly because the helper cannot ask for it.
+        struct MiniDumpRequest
+        {
+            PEXCEPTION_POINTERS pExceptionInfo;
+            DWORD               faultingThreadId;
+            bool                written;
+        };
+
+        // Writes the .dmp beside the .txt, on a thread of its own, before the report is
+        // generated - that being the part most likely to fail in a damaged process.
+        static bool WriteMiniDump(PEXCEPTION_POINTERS pExceptionInfo);
+
+        static bool WriteMiniDumpWorker(PEXCEPTION_POINTERS pExceptionInfo, DWORD faultingThreadId);
+
+        static DWORD WINAPI MiniDumpThreadProc(LPVOID param);
+
         // Variables used by the class
         static TCHAR m_szLogFileName[MAX_PATH];
+        static TCHAR m_szDumpFileName[MAX_PATH];
+        static bool  m_dumpWritten;        // WriteMiniDump's result, not 'the file exists'
+        static bool  m_dumpHelperRunning;  // true if the wait timed out and the helper may still be in DbgHelp
         static LPTOP_LEVEL_EXCEPTION_FILTER m_previousFilter;
         static HANDLE m_hReportFile;
         static HANDLE m_hProcess;
