@@ -1004,10 +1004,13 @@ bool SafeFormatDbString(char* buffer, size_t size, char const* format, va_list a
         // conversion makes vsnprintf return -1 having written nothing useful, which
         // is indistinguishable here from ordinary truncation. Refusing them up front
         // is what lets the call below ignore its return value safely.
+        // C and S are available on both: MSVC spells the wide forms that way, and
+        // glibc keeps them as XSI aliases for %lc and %ls. Z is the one that is
+        // genuinely MSVC-only, and glibc rejects it.
 #ifdef _MSC_VER
         char const* const acceptedConversions = "diouxXfFeEgGaAcCsSpZ";
 #else
-        char const* const acceptedConversions = "diouxXfFeEgGaAcsp";
+        char const* const acceptedConversions = "diouxXfFeEgGaAcCsSp";
 #endif
 
         // A size prefix is only meaningful for some conversions. "%I64s", "%zs" and
@@ -1037,8 +1040,10 @@ bool SafeFormatDbString(char* buffer, size_t size, char const* format, va_list a
                 case 'h':                                   // short, or single-byte s/c on MSVC
                     valid = integerConversion || (msvcSizePrefixes && stringConversion);
                     break;
-                case 'l':                                   // long, or wide s/c
-                    valid = integerConversion || stringConversion;
+                case 'l':                                   // long, wide s/c, or a no-op
+                    // before a float: %lf, %le and %lg are valid and consume the same
+                    // promoted double as the unmodified conversion.
+                    valid = integerConversion || stringConversion || floatConversion;
                     break;
                 case 'L':                                   // long double ONLY.
                     // Not integers: UCRT answers %Ld with the invalid-parameter
