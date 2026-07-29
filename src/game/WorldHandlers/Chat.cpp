@@ -1810,14 +1810,28 @@ std::string ChatHandler::PrepareStringNpcOrGoSpawnInformation(uint32 guid)
         {
             char buffer[100];
             const char* format = GetMangosString(LANG_NPC_GO_INFO_POOL_EVENT_STRING);
-            sprintf(buffer, format, pool_id, event_id);
+
+            // Was sprintf: unbounded, into 100 bytes, with a format that is database
+            // content. A long row or a wide field like %200d overflowed this buffer.
+            if (!SafeFormatDbStringF(buffer, sizeof(buffer), format, pool_id, event_id))
+            {
+                sLog.outError("String entry %i could not be formatted. Check its conversions against the caller in `mangos_string`.", LANG_NPC_GO_INFO_POOL_EVENT_STRING);
+                CopyDbStringBounded(buffer, sizeof(buffer), format);
+            }
+
             str = buffer;
         }
         else
         {
             char buffer[100];
             const char* format = GetMangosString(LANG_NPC_GO_INFO_POOL_STRING);
-            sprintf(buffer, format, pool_id);
+
+            if (!SafeFormatDbStringF(buffer, sizeof(buffer), format, pool_id))
+            {
+                sLog.outError("String entry %i could not be formatted. Check its conversions against the caller in `mangos_string`.", LANG_NPC_GO_INFO_POOL_STRING);
+                CopyDbStringBounded(buffer, sizeof(buffer), format);
+            }
+
             str = buffer;
         }
     }
@@ -1825,7 +1839,13 @@ std::string ChatHandler::PrepareStringNpcOrGoSpawnInformation(uint32 guid)
     {
         char buffer[100];
         const char* format = GetMangosString(LANG_NPC_GO_INFO_EVENT_STRING);
-        sprintf(buffer, format, event_id);
+
+        if (!SafeFormatDbStringF(buffer, sizeof(buffer), format, event_id))
+        {
+            sLog.outError("String entry %i could not be formatted. Check its conversions against the caller in `mangos_string`.", LANG_NPC_GO_INFO_EVENT_STRING);
+            CopyDbStringBounded(buffer, sizeof(buffer), format);
+        }
+
         str = buffer;
     }
 

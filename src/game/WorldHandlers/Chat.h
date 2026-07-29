@@ -444,6 +444,20 @@ class ChatHandler
         void PSendSysMessage(int32     entry, ...);
         void PSendSysMessageMultiline(int32 entry, ...);
 
+        /**
+         * @brief Renders a `mangos_string` entry for use as a log message.
+         *
+         * The logging macros take a printf format, so passing a database row to them
+         * directly hands mutable data to vfprintf with a fixed argument list - the
+         * same hazard PSendSysMessage was guarded against. Callers render here first
+         * and log the result through a literal "%s".
+         *
+         * @param entry The string table entry identifier.
+         * @return std::string The rendered text, or empty if the row could not be
+         *         formatted, in which case the failure has already been reported.
+         */
+        std::string FormatDbString(int32 entry, ...) const;
+
         bool ParseCommands(const char* text);
         ChatCommand const* FindCommand(char const* text);
 

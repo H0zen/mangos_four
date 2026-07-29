@@ -877,6 +877,67 @@ void vutf8printf(FILE* out, const char* str, va_list* ap);
 std::string vutf8format(const char* str, va_list* ap);
 
 /**
+ * @brief Formats a string whose format comes from the database, without letting
+ *        a malformed format take the process down.
+ *
+ * Format strings loaded from `mangos_string` are mutable data, but they are handed
+ * to vsnprintf against a fixed argument list built by the C++ call site. A row
+ * whose conversions outnumber the arguments passed makes va_arg walk off the end
+ * of the list and dereference whatever the stack held next, so a single bad row is
+ * a server crash that any player can trigger by running the command that reaches
+ * it. Contain the fault here and let the caller report the offending entry instead.
+ *
+ * Returning false means only that the string could not be formatted safely: an
+ * argument-count mismatch, a %n, an invalid conversion, or a contained access
+ * violation. It does not identify which.
+ *
+ * Also terminates the buffer unconditionally: on Windows `vsnprintf` is
+ * `_vsnprintf` (Common.h), which leaves the buffer unterminated when the output
+ * does not fit.
+ *
+ * @param buffer The destination buffer.
+ * @param size The destination buffer size in bytes.
+ * @param format The format string, typically database-sourced.
+ * @param ap The argument list.
+ * @return bool true if formatting completed, false if it faulted.
+ */
+bool SafeFormatDbString(char* buffer, size_t size, char const* format, va_list ap);
+
+/**
+ * @brief SafeFormatDbString for the fixed-argument call sites.
+ *
+ * The same protection for the many places that hand a `mangos_string` row
+ * straight to snprintf or sprintf with a known argument list. On failure the
+ * buffer is left empty and false is returned, so the caller can report the entry
+ * and decide what to show instead.
+ *
+ * @param buffer The destination buffer.
+ * @param size The destination buffer size in bytes.
+ * @param format The format string, typically database-sourced.
+ * @return bool true if formatting completed, false if it was refused or faulted.
+ */
+// Deliberately not marked with a printf format attribute: the format is a
+// runtime database row, not a literal, so compile-time checking cannot apply.
+bool SafeFormatDbStringF(char* buffer, size_t size, char const* format, ...);
+
+/**
+ * @brief Copies a data-driven string into a fixed buffer.
+ *
+ * Used as the fallback when formatting is refused: showing the row unformatted
+ * beats showing nothing. The copy also decouples the result from the source, which
+ * matters because callers pass storage they do not own - a `mangos_string` row held
+ * by ObjectMgr, or a DBC field - and some consumers tokenize what they are given.
+ *
+ * Terminates the destination whenever it is non-null and size is non-zero; a null
+ * or zero-size destination is left untouched.
+ *
+ * @param buffer The destination buffer.
+ * @param size The destination buffer size in bytes.
+ * @param text The text to copy; a null source yields an empty string.
+ */
+void CopyDbStringBounded(char* buffer, size_t size, char const* text);
+
+/**
  * @brief
  *
  * @param ipaddress

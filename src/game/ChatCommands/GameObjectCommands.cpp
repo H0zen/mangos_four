@@ -387,7 +387,7 @@ bool ChatHandler::HandleGameObjectAddCommand(char* args)
         return false;
     }
 
-    DEBUG_LOG(GetMangosString(LANG_GAMEOBJECT_CURRENT), gInfo->name, db_lowGUID, x, y, z, o);
+    DEBUG_LOG("%s", FormatDbString(LANG_GAMEOBJECT_CURRENT, gInfo->name, db_lowGUID, x, y, z, o).c_str());
 
     map->Add(pGameObj);
 

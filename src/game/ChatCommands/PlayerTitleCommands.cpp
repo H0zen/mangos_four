@@ -99,8 +99,15 @@ bool ChatHandler::HandleLookupTitleCommand(char* args)
                                         ? GetMangosString(LANG_ACTIVE)
                                         : "";
 
+                // DBC-sourced rather than database-sourced, but the same shape: a
+                // data-driven format ("%s the Explorer") against a fixed argument list.
                 char titleNameStr[80];
-                snprintf(titleNameStr, 80, name.c_str(), targetName);
+
+                if (!SafeFormatDbStringF(titleNameStr, sizeof(titleNameStr), name.c_str(), targetName))
+                {
+                    sLog.outError("CharTitles.dbc entry %u could not be formatted; showing it unformatted.", titleInfo->ID);
+                    CopyDbStringBounded(titleNameStr, sizeof(titleNameStr), name.c_str());
+                }
 
                 // send title in "id (idx:idx) - [namedlink locale]" format
                 if (m_session)
@@ -165,7 +172,13 @@ bool ChatHandler::HandleTitlesAddCommand(char* args)
 
     char const* targetName = target->GetName();
     char titleNameStr[80];
-    snprintf(titleNameStr, 80, titleInfo->Name_lang[GetSessionDbcLocale()], targetName);
+    char const* titleFormat = titleInfo->Name_lang[GetSessionDbcLocale()];
+
+    if (!SafeFormatDbStringF(titleNameStr, sizeof(titleNameStr), titleFormat, targetName))
+    {
+        sLog.outError("CharTitles.dbc entry %u could not be formatted; showing it unformatted.", titleInfo->ID);
+        CopyDbStringBounded(titleNameStr, sizeof(titleNameStr), titleFormat);
+    }
 
     target->SetTitle(titleInfo);
     PSendSysMessage(LANG_TITLE_ADD_RES, id, titleNameStr, tNameLink.c_str());
@@ -217,7 +230,13 @@ bool ChatHandler::HandleTitlesRemoveCommand(char* args)
 
     char const* targetName = target->GetName();
     char titleNameStr[80];
-    snprintf(titleNameStr, 80, titleInfo->Name_lang[GetSessionDbcLocale()], targetName);
+    char const* titleFormat = titleInfo->Name_lang[GetSessionDbcLocale()];
+
+    if (!SafeFormatDbStringF(titleNameStr, sizeof(titleNameStr), titleFormat, targetName))
+    {
+        sLog.outError("CharTitles.dbc entry %u could not be formatted; showing it unformatted.", titleInfo->ID);
+        CopyDbStringBounded(titleNameStr, sizeof(titleNameStr), titleFormat);
+    }
 
     PSendSysMessage(LANG_TITLE_REMOVE_RES, id, titleNameStr, tNameLink.c_str());
 
@@ -307,8 +326,14 @@ bool ChatHandler::HandleCharacterTitlesCommand(char* args)
                                     ? GetMangosString(LANG_ACTIVE)
                                     : "";
 
+            // As above: a DBC-sourced format against a fixed argument list.
             char titleNameStr[80];
-            snprintf(titleNameStr, 80, name.c_str(), targetName);
+
+            if (!SafeFormatDbStringF(titleNameStr, sizeof(titleNameStr), name.c_str(), targetName))
+            {
+                sLog.outError("CharTitles.dbc entry %u could not be formatted; showing it unformatted.", titleInfo->ID);
+                CopyDbStringBounded(titleNameStr, sizeof(titleNameStr), name.c_str());
+            }
 
             // send title in "id (idx:idx) - [namedlink locale]" format
             if (m_session)

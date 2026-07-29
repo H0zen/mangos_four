@@ -1226,7 +1226,7 @@ bool ChatHandler::HandleSetValueHelper(Object* target, uint32 field, char* typeS
             return false;
         }
 
-        DEBUG_LOG(GetMangosString(LANG_SET_UINT), guid.GetString().c_str(), field, iValue);
+        DEBUG_LOG("%s", FormatDbString(LANG_SET_UINT, guid.GetString().c_str(), field, iValue).c_str());
         target->SetUInt32Value(field , iValue);
         PSendSysMessage(LANG_SET_UINT_FIELD, guid.GetString().c_str(), field, iValue);
     }
@@ -1238,7 +1238,7 @@ bool ChatHandler::HandleSetValueHelper(Object* target, uint32 field, char* typeS
             return false;
         }
 
-        DEBUG_LOG(GetMangosString(LANG_SET_FLOAT), guid.GetString().c_str(), field, fValue);
+        DEBUG_LOG("%s", FormatDbString(LANG_SET_FLOAT, guid.GetString().c_str(), field, fValue).c_str());
         target->SetFloatValue(field , fValue);
         PSendSysMessage(LANG_SET_FLOAT_FIELD, guid.GetString().c_str(), field, fValue);
     }
@@ -1384,24 +1384,24 @@ bool ChatHandler::HandleGetValueHelper(Object* target, uint32 field, char* typeS
                 {
                     res += (iValue & (1 << (i - 1))) ? "1" : "0";
                 }
-                DEBUG_LOG(GetMangosString(LANG_GET_BITSTR), guid.GetString().c_str(), field, res.c_str());
+                DEBUG_LOG("%s", FormatDbString(LANG_GET_BITSTR, guid.GetString().c_str(), field, res.c_str()).c_str());
                 PSendSysMessage(LANG_GET_BITSTR_FIELD, guid.GetString().c_str(), field, res.c_str());
                 break;
             }
             case 16:
-                DEBUG_LOG(GetMangosString(LANG_GET_HEX), guid.GetString().c_str(), field, iValue);
+                DEBUG_LOG("%s", FormatDbString(LANG_GET_HEX, guid.GetString().c_str(), field, iValue).c_str());
                 PSendSysMessage(LANG_GET_HEX_FIELD, guid.GetString().c_str(), field, iValue);
                 break;
             case 10:
             default:
-                DEBUG_LOG(GetMangosString(LANG_GET_UINT), guid.GetString().c_str(), field, iValue);
+                DEBUG_LOG("%s", FormatDbString(LANG_GET_UINT, guid.GetString().c_str(), field, iValue).c_str());
                 PSendSysMessage(LANG_GET_UINT_FIELD, guid.GetString().c_str(), field, iValue);
         }
     }
     else
     {
         float fValue = target->GetFloatValue(field);
-        DEBUG_LOG(GetMangosString(LANG_GET_FLOAT), guid.GetString().c_str(), field, fValue);
+        DEBUG_LOG("%s", FormatDbString(LANG_GET_FLOAT, guid.GetString().c_str(), field, fValue).c_str());
         PSendSysMessage(LANG_GET_FLOAT_FIELD, guid.GetString().c_str(), field, fValue);
     }
 
@@ -1536,22 +1536,22 @@ bool ChatHandler::HandlerDebugModValueHelper(Object* target, uint32 field, char*
             default:
             case 1:                                         // int +
                 value = uint32(int32(value) + int32(iValue));
-                DEBUG_LOG(GetMangosString(LANG_CHANGE_INT32), guidString, field, iValue, value, value);
+                DEBUG_LOG("%s", FormatDbString(LANG_CHANGE_INT32, guidString, field, iValue, value, value).c_str());
                 PSendSysMessage(LANG_CHANGE_INT32_FIELD, guidString, field, iValue, value, value);
                 break;
             case 2:                                         // |= bit or
                 value |= iValue;
-                DEBUG_LOG(GetMangosString(LANG_CHANGE_HEX), guidString, field, typeStr, iValue, value);
+                DEBUG_LOG("%s", FormatDbString(LANG_CHANGE_HEX, guidString, field, typeStr, iValue, value).c_str());
                 PSendSysMessage(LANG_CHANGE_HEX_FIELD, guidString, field, typeStr, iValue, value);
                 break;
             case 3:                                         // &= bit and
                 value &= iValue;
-                DEBUG_LOG(GetMangosString(LANG_CHANGE_HEX), guidString, field, typeStr, iValue, value);
+                DEBUG_LOG("%s", FormatDbString(LANG_CHANGE_HEX, guidString, field, typeStr, iValue, value).c_str());
                 PSendSysMessage(LANG_CHANGE_HEX_FIELD, guidString, field, typeStr, iValue, value);
                 break;
             case 4:                                         // &=~ bit and not
                 value &= ~iValue;
-                DEBUG_LOG(GetMangosString(LANG_CHANGE_HEX), guidString, field, typeStr, iValue, value);
+                DEBUG_LOG("%s", FormatDbString(LANG_CHANGE_HEX, guidString, field, typeStr, iValue, value).c_str());
                 PSendSysMessage(LANG_CHANGE_HEX_FIELD, guidString, field, typeStr, iValue, value);
                 break;
         }
@@ -1570,7 +1570,7 @@ bool ChatHandler::HandlerDebugModValueHelper(Object* target, uint32 field, char*
 
         value += fValue;
 
-        DEBUG_LOG(GetMangosString(LANG_CHANGE_FLOAT), guid.GetString().c_str(), field, fValue, value);
+        DEBUG_LOG("%s", FormatDbString(LANG_CHANGE_FLOAT, guid.GetString().c_str(), field, fValue, value).c_str());
         PSendSysMessage(LANG_CHANGE_FLOAT_FIELD, guid.GetString().c_str(), field, fValue, value);
 
         target->SetFloatValue(field, value);

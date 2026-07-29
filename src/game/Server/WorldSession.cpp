@@ -50,6 +50,7 @@
 #include "Common.h"
 #include "Database/DatabaseEnv.h"
 #include "Log.h"
+#include "Util.h"
 #include "Opcodes.h"
 #include "WorldPacket.h"
 #include "WorldSession.h"
@@ -1157,8 +1158,19 @@ void WorldSession::SendNotification(const char* format, ...)
         char szStr [1024];
         szStr[0] = '\0';
         va_start(ap, format);
-        vsnprintf(szStr, 1024, format, ap);
+        // Guarded even though this overload takes a caller-supplied format: several
+        // callers resolve a `mangos_string` row first and pass that as the format -
+        // entering a level-locked area (PlayerAreaTrigger) and speaking while muted
+        // (ChatHandler) both do - so a malformed row reaches here just as it would
+        // the entry-id overload below.
+        bool const formatted = SafeFormatDbString(szStr, sizeof(szStr), format, ap);
         va_end(ap);
+
+        if (!formatted)
+        {
+            sLog.outError("A notification could not be formatted; message dropped. If it came from `mangos_string`, check that row's conversions against its caller.");
+            return;
+        }
 
         WorldPacket data(SMSG_NOTIFICATION, (strlen(szStr) + 1));
         data.WriteBits(strlen(szStr), 12);
@@ -1182,8 +1194,14 @@ void WorldSession::SendNotification(int32 string_id, ...)
         char szStr [1024];
         szStr[0] = '\0';
         va_start(ap, string_id);
-        vsnprintf(szStr, 1024, format, ap);
+        bool const formatted = SafeFormatDbString(szStr, sizeof(szStr), format, ap);
         va_end(ap);
+
+        if (!formatted)
+        {
+            sLog.outError("String entry %i could not be formatted; notification dropped. Check its conversions against the caller in `mangos_string`.", string_id);
+            return;
+        }
 
         WorldPacket data(SMSG_NOTIFICATION, (strlen(szStr) + 1));
         data.WriteBits(strlen(szStr), 12);

@@ -185,7 +185,7 @@ bool ChatHandler::HandleModifyEnergyCommand(char* args)
     chr->SetMaxPower(POWER_ENERGY, energym);
     chr->SetPower(POWER_ENERGY, energy);
 
-    DETAIL_LOG(GetMangosString(LANG_CURRENT_ENERGY), chr->GetMaxPower(POWER_ENERGY));
+    DETAIL_LOG("%s", FormatDbString(LANG_CURRENT_ENERGY, chr->GetMaxPower(POWER_ENERGY)).c_str());
 
     return true;
 }

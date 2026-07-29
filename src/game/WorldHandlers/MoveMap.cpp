@@ -239,7 +239,9 @@ namespace MMAP
         // load and init dtNavMesh - read parameters from file
         uint32 pathLen = sWorld.GetDataPath().length() + strlen("mmaps/%04u.mmap") + 1;
         char* fileName = new char[pathLen];
-        snprintf(fileName, pathLen, (sWorld.GetDataPath() + "mmaps/%04u.mmap").c_str(), mapId);
+        // The configured path is an argument, not part of the format: a '%' in it
+        // would otherwise be read as a conversion and consume mapId wrongly.
+        snprintf(fileName, pathLen, "%smmaps/%04u.mmap", sWorld.GetDataPath().c_str(), mapId);
 
         FILE* file = fopen(fileName, "rb");
         if (!file)
@@ -306,7 +308,8 @@ namespace MMAP
         // load this tile :: mmaps/MMMMXXYY.mmtile
         uint32 pathLen = sWorld.GetDataPath().length() + strlen("mmaps/%04u%02i%02i.mmtile") + 1;
         char* fileName = new char[pathLen];
-        snprintf(fileName, pathLen, (sWorld.GetDataPath() + "mmaps/%04u%02i%02i.mmtile").c_str(), mapId, x, y);
+        // As above: the configured path is an argument, never part of the format.
+        snprintf(fileName, pathLen, "%smmaps/%04u%02i%02i.mmtile", sWorld.GetDataPath().c_str(), mapId, x, y);
 
         FILE* file = fopen(fileName, "rb");
         if (!file)

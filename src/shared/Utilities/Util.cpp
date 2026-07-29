@@ -853,6 +853,266 @@ std::string vutf8format(const char* str, va_list* ap)
 
 }
 
+// Kept free of C++ objects on purpose: MSVC rejects __try in a function that
+// requires object unwinding (C2712), so the guarded call gets its own frame.
+static bool _GuardedVsnprintf(char* buffer, size_t size, char const* format, va_list ap)
+{
+    // Gated on the compiler, not the OS: __try/__except is MSVC syntax, and a
+    // MinGW build targets Windows without supporting it.
+    // The return value is deliberately not treated as a success flag: _vsnprintf
+    // returns -1 for ordinary truncation as well as for a rejected format, so
+    // testing it would drop every message merely too long for its buffer. Formats
+    // the CRT would reject are refused by the grammar check in the caller instead,
+    // which is why that check only accepts conversions the local CRT implements.
+#ifdef _MSC_VER
+    __try
+    {
+        vsnprintf(buffer, size, format, ap);
+        return true;
+    }
+    // Only an access violation is expected here (a conversion dereferencing an
+    // argument that was never passed). Anything else keeps unwinding rather than
+    // being silently swallowed.
+    __except (GetExceptionCode() == EXCEPTION_ACCESS_VIOLATION ? EXCEPTION_EXECUTE_HANDLER : EXCEPTION_CONTINUE_SEARCH)
+    {
+        return false;
+    }
+#else
+    // No portable equivalent: a malformed format is still fatal here, but the
+    // callers' reporting and the load-time checks in ObjectMgr apply on every
+    // platform.
+    return vsnprintf(buffer, size, format, ap) >= 0;
+#endif
+}
+
+bool SafeFormatDbString(char* buffer, size_t size, char const* format, va_list ap)
+{
+    if (!buffer || !size)
+    {
+        return false;
+    }
+
+    buffer[0] = '\0';
+
+    if (!format)
+    {
+        return false;
+    }
+
+    // Two conversions must never reach vsnprintf, and neither can be contained
+    // afterwards:
+    //   %n writes a count through an argument pointer, and UCRT answers it by
+    //   invoking the invalid-parameter handler, which terminates rather than raising
+    //   anything an exception filter could catch;
+    //   a '%' followed by something that is not a valid conversion - including a
+    //   trailing '%' - reaches that same handler.
+    // Refusing them here is also why the load-time check never has to rewrite a row:
+    // `script_texts` carries a %n only as a typo for the $n name token, and that text
+    // is spoken verbatim elsewhere where it reads perfectly well.
+    for (char const* p = format; *p; ++p)
+    {
+        if (*p != '%')
+        {
+            continue;
+        }
+
+        ++p;
+
+        if (*p == '%')
+        {
+            continue;                                       // "%%" is a literal percent
+        }
+
+        // The field must match %[flags][width][.precision][size]type exactly. Anything
+        // else - a stray '.', a positional "%1$s" (which belongs to the _sprintf_p
+        // family, not the _vsnprintf this build maps to), or a truncated field -
+        // reaches the invalid-parameter handler too.
+        while (*p == '-' || *p == '+' || *p == ' ' || *p == '#' || *p == '0')
+        {
+            ++p;
+        }
+
+        if (*p == '*')
+        {
+            ++p;
+        }
+        else
+        {
+            while (*p >= '0' && *p <= '9')
+            {
+                ++p;
+            }
+        }
+
+        if (*p == '.')
+        {
+            ++p;
+
+            if (*p == '*')
+            {
+                ++p;
+            }
+            else
+            {
+                while (*p >= '0' && *p <= '9')
+                {
+                    ++p;
+                }
+            }
+        }
+
+        // Size prefixes, longest match first.
+        //
+        // "I", "I32", "I64" and "w" are MSVC spellings that glibc does not implement:
+        // there the I is read as a flag and the 32/64 as a field width, so %I64u
+        // consumes an unsigned int and silently truncates anything above 32 bits.
+        // Accepting them only where the CRT understands them stops a row that renders
+        // correctly on Windows from rendering wrong numbers on Linux.
+#ifdef _MSC_VER
+        bool const msvcSizePrefixes = true;
+#else
+        bool const msvcSizePrefixes = false;
+#endif
+
+        char sizePrefix = '\0';                             // '\0' = none
+
+        if (msvcSizePrefixes && p[0] == 'I' && ((p[1] == '3' && p[2] == '2') || (p[1] == '6' && p[2] == '4')))
+        {
+            sizePrefix = p[1];                              // '3' for I32, '6' for I64
+            p += 3;
+        }
+        else if ((p[0] == 'h' && p[1] == 'h') || (p[0] == 'l' && p[1] == 'l'))
+        {
+            sizePrefix = (p[0] == 'h') ? 'H' : 'Q';         // 'H' = hh, 'Q' = ll (not 'L',
+                                                            // which is the distinct long-double modifier)
+            p += 2;
+        }
+        else if (*p == 'h' || *p == 'l' || *p == 'L' || *p == 'j' || *p == 'z' || *p == 't')
+        {
+            sizePrefix = *p;
+            ++p;
+        }
+        else if (msvcSizePrefixes && (*p == 'I' || *p == 'w'))
+        {
+            sizePrefix = *p;
+            ++p;
+        }
+
+        // '\0' is tested first: strchr would otherwise match the set's own terminator
+        // The accepted set is what the LOCAL CRT implements, not the union of every
+        // CRT. C, S and Z are MSVC spellings: glibc rejects them, and a rejected
+        // conversion makes vsnprintf return -1 having written nothing useful, which
+        // is indistinguishable here from ordinary truncation. Refusing them up front
+        // is what lets the call below ignore its return value safely.
+        // C and S are available on both: MSVC spells the wide forms that way, and
+        // glibc keeps them as XSI aliases for %lc and %ls. Z is the one that is
+        // genuinely MSVC-only, and glibc rejects it.
+#ifdef _MSC_VER
+        char const* const acceptedConversions = "diouxXfFeEgGaAcCsSpZ";
+#else
+        char const* const acceptedConversions = "diouxXfFeEgGaAcCsSp";
+#endif
+
+        // A size prefix is only meaningful for some conversions. "%I64s", "%zs" and
+        // "%Ld" satisfy the grammar piecewise but are not valid pairings: MSVC answers
+        // them with the invalid-parameter handler, which terminates and is precisely
+        // what the SEH block cannot contain, and a CRT that tolerates one instead reads
+        // the argument as the wrong type and returns success with garbage.
+        if (sizePrefix != '\0' && *p != '\0')
+        {
+            bool const integerConversion = strchr("diouxX", *p) != nullptr;
+            bool const floatConversion   = strchr("fFeEgGaA", *p) != nullptr;
+            bool const stringConversion  = (*p == 's' || *p == 'c');
+            bool valid = false;
+
+            switch (sizePrefix)
+            {
+                case 'H':                                   // hh
+                case 'Q':                                   // ll
+                case 'j':                                   // intmax_t
+                case 'z':                                   // size_t
+                case 't':                                   // ptrdiff_t
+                case '3':                                   // I32
+                case '6':                                   // I64
+                case 'I':                                   // pointer-width
+                    valid = integerConversion;
+                    break;
+                case 'h':                                   // short, or single-byte s/c on MSVC
+                    valid = integerConversion || (msvcSizePrefixes && stringConversion);
+                    break;
+                case 'l':                                   // long, wide s/c, or a no-op
+                    // before a float: %lf, %le and %lg are valid and consume the same
+                    // promoted double as the unmodified conversion.
+                    valid = integerConversion || stringConversion || floatConversion;
+                    break;
+                case 'L':                                   // long double ONLY.
+                    // Not integers: UCRT answers %Ld with the invalid-parameter
+                    // handler, which raises STATUS_STACK_BUFFER_OVERRUN through
+                    // __fastfail and cannot be caught by the SEH block below.
+                    // Measured, not assumed - it terminated the test harness.
+                    valid = floatConversion;
+                    break;
+                case 'w':                                   // MSVC wide s/c
+                    valid = stringConversion;
+                    break;
+                default:
+                    valid = false;
+                    break;
+            }
+
+            if (!valid)
+            {
+                return false;
+            }
+        }
+
+        if (*p == '\0' || !strchr(acceptedConversions, *p))
+        {
+            return false;                                   // %n, trailing '%', or malformed
+        }
+    }
+
+    bool const formatted = _GuardedVsnprintf(buffer, size, format, ap);
+
+    // _vsnprintf does not terminate when the output is truncated, and a faulted
+    // call may have written a partial result.
+    buffer[size - 1] = '\0';
+
+    if (!formatted)
+    {
+        buffer[0] = '\0';
+    }
+
+    return formatted;
+}
+
+bool SafeFormatDbStringF(char* buffer, size_t size, char const* format, ...)
+{
+    va_list ap;
+    va_start(ap, format);
+    bool const formatted = SafeFormatDbString(buffer, size, format, ap);
+    va_end(ap);
+
+    return formatted;
+}
+
+void CopyDbStringBounded(char* buffer, size_t size, char const* text)
+{
+    if (!buffer || !size)
+    {
+        return;
+    }
+
+    if (!text)
+    {
+        buffer[0] = '\0';
+        return;
+    }
+
+    strncpy(buffer, text, size - 1);
+    buffer[size - 1] = '\0';
+}
+
 void hexEncodeByteArray(uint8* bytes, uint32 arrayLen, std::string& result)
 {
     std::ostringstream ss;

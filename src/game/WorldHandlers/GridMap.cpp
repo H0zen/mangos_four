@@ -841,7 +841,10 @@ bool GridMap::ExistMap(uint32 mapid, int gx, int gy)
 {
     int len = sWorld.GetDataPath().length() + strlen("maps/%04u%02u%02u.map") + 1;
     char* tmp = new char[len];
-    snprintf(tmp, len, (char*)(sWorld.GetDataPath() + "maps/%04u%02u%02u.map").c_str(), mapid, gx, gy);
+    // DataDir goes in as an argument, not as part of the format: a '%' in the
+    // configured path is legal on both platforms and would otherwise be read as a
+    // conversion, consuming mapid/gx/gy in the wrong order.
+    snprintf(tmp, len, "%smaps/%04u%02u%02u.map", sWorld.GetDataPath().c_str(), mapid, gx, gy);
 
     FILE* pf = fopen(tmp, "rb");
 
@@ -1597,7 +1600,8 @@ GridMap* TerrainInfo::LoadMapAndVMap(const uint32 x, const uint32 y)
             // map file name
             int len = sWorld.GetDataPath().length() + strlen("maps/%04u%02u%02u.map") + 1;
             char* tmp = new char[len];
-            snprintf(tmp, len, (char*)(sWorld.GetDataPath() + "maps/%04u%02u%02u.map").c_str(), m_mapId, x, y);
+            // As above: the configured path is an argument, never part of the format.
+            snprintf(tmp, len, "%smaps/%04u%02u%02u.map", sWorld.GetDataPath().c_str(), m_mapId, x, y);
             DEBUG_FILTER_LOG(LOG_FILTER_MAP_LOADING, "Loading map %s", tmp);
 
             if (!map->loadData(tmp))

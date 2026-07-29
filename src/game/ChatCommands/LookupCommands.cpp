@@ -1080,7 +1080,12 @@ bool ChatHandler::HandleLookupSkillCommand(char* args)
                     uint32 tempValue = target->GetSkillTempBonusValue(id);
 
                     char const* valFormat = GetMangosString(LANG_SKILL_VALUES);
-                    snprintf(valStr, 50, valFormat, curValue, maxValue, permValue, tempValue);
+
+                    if (!SafeFormatDbStringF(valStr, sizeof(valStr), valFormat, curValue, maxValue, permValue, tempValue))
+                    {
+                        sLog.outError("String entry %i could not be formatted. Check its conversions against the caller in `mangos_string`.", LANG_SKILL_VALUES);
+                        CopyDbStringBounded(valStr, sizeof(valStr), valFormat);
+                    }
                 }
 
                 // send skill in "id - [namedlink locale]" format

@@ -479,7 +479,11 @@ bool ChatHandler::HandleTicketRespondCommand(char* args)
 
     if (m_session)
     {
-        snprintf(signature, signatureBufferSize, signatureFormat, m_session->GetPlayer()->GetName());
+        if (!SafeFormatDbStringF(signature, signatureBufferSize, signatureFormat, m_session->GetPlayer()->GetName()))
+        {
+            sLog.outError("String entry %i could not be formatted. Check its conversions against the caller in `mangos_string`.", LANG_COMMAND_TICKET_RESPOND_MAIL_SIGNATURE);
+            CopyDbStringBounded(signature, signatureBufferSize, signatureFormat);
+        }
     }
     else
     {

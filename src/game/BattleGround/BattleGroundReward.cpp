@@ -482,7 +482,12 @@ void BattleGround::SendRewardMarkByMail(Player* plr, uint32 mark, uint32 count)
         // text
         std::string textFormat = plr->GetSession()->GetMangosString(LANG_BG_MARK_BY_MAIL);
         char textBuf[300];
-        snprintf(textBuf, 300, textFormat.c_str(), GetName(), GetName());
+
+        if (!SafeFormatDbStringF(textBuf, sizeof(textBuf), textFormat.c_str(), GetName(), GetName()))
+        {
+            sLog.outError("String entry %i could not be formatted. Check its conversions against the caller in `mangos_string`.", LANG_BG_MARK_BY_MAIL);
+            CopyDbStringBounded(textBuf, sizeof(textBuf), textFormat.c_str());
+        }
 
         MailDraft(subject, textBuf)
         .AddItem(markItem)
