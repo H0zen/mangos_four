@@ -372,6 +372,105 @@ static void test_whisper_message_lengths()
     CHECK(packet.rpos() == packet.size());
 }
 
+/*
+ * Every addon channel uses an 8-bit message length, never nine, but they
+ * disagree on both the order of the two length fields and the order of the two
+ * strings. Every body below is a real 18414 capture except OFFICER, which has
+ * no traffic in the corpus and is built from the client writer sub_C888C4.
+ */
+static void test_addon_channel_layouts()
+{
+    // INSTANCE and RAID: 5-bit prefix, 8-bit message, then message, then prefix.
+    {
+        uint8 const body[] = { 0x38, 0x08, 'R', 'H', 'e', 'a', 'l', 'B', 'o', 't' };
+        WorldPacket p(CMSG_MESSAGECHAT_ADDON_INSTANCE, sizeof(body));
+        p.append(body, sizeof(body));
+        uint32 const prefixLen = p.ReadBits(5);
+        uint32 const msgLen = p.ReadBits(8);
+        CHECK(prefixLen == 7);
+        CHECK(msgLen == 1);
+        CHECK(p.ReadString(msgLen) == "R");
+        CHECK(p.ReadString(prefixLen) == "HealBot");
+        CHECK(p.rpos() == p.size());
+    }
+    {
+        uint8 const body[] = { 0x38, 0x20, 'V', 'Q', ':', '0', 'B', 'i', 'g', 'W', 'i', 'g', 's' };
+        WorldPacket p(CMSG_MESSAGECHAT_ADDON_RAID, sizeof(body));
+        p.append(body, sizeof(body));
+        uint32 const prefixLen = p.ReadBits(5);
+        uint32 const msgLen = p.ReadBits(8);
+        CHECK(prefixLen == 7);
+        CHECK(msgLen == 4);
+        CHECK(p.ReadString(msgLen) == "VQ:0");
+        CHECK(p.ReadString(prefixLen) == "BigWigs");
+        CHECK(p.rpos() == p.size());
+    }
+
+    // PARTY: the same strings, but the two lengths are the other way round.
+    {
+        uint8 const body[] = { 0x04, 0x38, 'V', 'Q', ':', '0', 'B', 'i', 'g', 'W', 'i', 'g', 's' };
+        WorldPacket p(CMSG_MESSAGECHAT_ADDON_PARTY, sizeof(body));
+        p.append(body, sizeof(body));
+        uint32 const msgLen = p.ReadBits(8);
+        uint32 const prefixLen = p.ReadBits(5);
+        CHECK(msgLen == 4);
+        CHECK(prefixLen == 7);
+        CHECK(p.ReadString(msgLen) == "VQ:0");
+        CHECK(p.ReadString(prefixLen) == "BigWigs");
+        CHECK(p.rpos() == p.size());
+    }
+
+    // GUILD: message length first, but the PREFIX string first.
+    {
+        uint8 const body[] = { 0x01, 0x38, 'H', 'e', 'a', 'l', 'B', 'o', 't', 'G' };
+        WorldPacket p(CMSG_MESSAGECHAT_ADDON_GUILD, sizeof(body));
+        p.append(body, sizeof(body));
+        uint32 const msgLen = p.ReadBits(8);
+        uint32 const prefixLen = p.ReadBits(5);
+        CHECK(msgLen == 1);
+        CHECK(prefixLen == 7);
+        CHECK(p.ReadString(prefixLen) == "HealBot");
+        CHECK(p.ReadString(msgLen) == "G");
+        CHECK(p.rpos() == p.size());
+    }
+
+    // OFFICER has no capture, but the client writer sub_C888C4 gives it the
+    // guild layout exactly: 8-bit message length, 5-bit prefix length, then the
+    // prefix string, then the message.
+    {
+        uint8 const body[] = { 0x01, 0x38, 'H', 'e', 'a', 'l', 'B', 'o', 't', 'G' };
+        WorldPacket p(CMSG_MESSAGECHAT_ADDON_OFFICER, sizeof(body));
+        p.append(body, sizeof(body));
+        uint32 const msgLen = p.ReadBits(8);
+        uint32 const prefixLen = p.ReadBits(5);
+        CHECK(msgLen == 1);
+        CHECK(prefixLen == 7);
+        CHECK(p.ReadString(prefixLen) == "HealBot");
+        CHECK(p.ReadString(msgLen) == "G");
+        CHECK(p.rpos() == p.size());
+    }
+
+    // WHISPER: three fields, and the strings come target, prefix, message.
+    {
+        uint8 const body[] = {
+            0x03, 0x00, 0x9C,
+            'C', 'h', 'a', 's', 'i', 's', 'H', 'e', 'a', 'l', 'B', 'o', 't', 'R'
+        };
+        WorldPacket p(CMSG_MESSAGECHAT_ADDON_WHISPER, sizeof(body));
+        p.append(body, sizeof(body));
+        uint32 const targetLen = p.ReadBits(9);
+        uint32 const msgLen = p.ReadBits(8);
+        uint32 const prefixLen = p.ReadBits(5);
+        CHECK(targetLen == 6);
+        CHECK(msgLen == 1);
+        CHECK(prefixLen == 7);
+        CHECK(p.ReadString(targetLen) == "Chasis");
+        CHECK(p.ReadString(prefixLen) == "HealBot");
+        CHECK(p.ReadString(msgLen) == "R");
+        CHECK(p.rpos() == p.size());
+    }
+}
+
 static void test_afk_message_request()
 {
     struct Fixture
@@ -494,6 +593,7 @@ int main(int /*argc*/, char** /*argv*/)
     test_inline_message_length_is_eight_bits();
     test_channel_message_lengths();
     test_whisper_message_lengths();
+    test_addon_channel_layouts();
     test_afk_message_request();
     test_addon_prefix_batch();
     test_addon_prefix_soft_cap();

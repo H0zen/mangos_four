@@ -359,15 +359,21 @@ void InitializeOpcodes()
     DefC(CMSG_MESSAGECHAT_RAID_WARNING, "CMSG_MESSAGECHAT_RAID_WARNING", STATUS_LOGGEDIN, PROCESS_THREADUNSAFE, &WorldSession::HandleMessagechatOpcode);
     DefC(CMSG_MESSAGECHAT_INSTANCE, "CMSG_MESSAGECHAT_INSTANCE", STATUS_LOGGEDIN, PROCESS_THREADUNSAFE, &WorldSession::HandleMessagechatOpcode);
 
-    // Addon traffic rides its own six opcodes and its own handler, which reads
-    // a nine-bit message length and a five-bit prefix length.
+    // Addon traffic rides its own six opcodes and its own handler. Every channel
+    // uses an EIGHT-bit message length and a five-bit prefix length, but they
+    // disagree on the order of the two lengths and on the order of the two
+    // strings, so each has its own decode and its own fixture:
     //
-    // KNOWN WRONG, not yet fixed: the client writes an EIGHT-bit message length
-    // for every addon channel, and the field order varies by channel -- addon
-    // raid is prefix-5 then message-8, addon guild is message-8 then prefix-5,
-    // and addon whisper is target-9, message-8, prefix-5 emitted as target,
-    // prefix, message. Each needs its own decode and fixture rather than one
-    // blanket width change, so they are left alone here deliberately.
+    //   instance  prefix-5, message-8   -> message, prefix
+    //   raid      prefix-5, message-8   -> message, prefix
+    //   party     message-8, prefix-5   -> message, prefix
+    //   guild     message-8, prefix-5   -> prefix, message
+    //   officer   message-8, prefix-5   -> prefix, message
+    //   whisper   target-9, message-8, prefix-5 -> target, prefix, message
+    //
+    // Five are decoded from capture. Officer has zero corpus observations and is
+    // taken from the client writer sub_C888C4 instead, which gives it the guild
+    // layout; an earlier revision inferred it from raid and had it backwards.
     DefC(CMSG_MESSAGECHAT_ADDON_RAID, "CMSG_MESSAGECHAT_ADDON_RAID", STATUS_LOGGEDIN, PROCESS_THREADUNSAFE, &WorldSession::HandleAddonMessagechatOpcode);
     DefC(CMSG_MESSAGECHAT_ADDON_PARTY, "CMSG_MESSAGECHAT_ADDON_PARTY", STATUS_LOGGEDIN, PROCESS_THREADUNSAFE, &WorldSession::HandleAddonMessagechatOpcode);
     DefC(CMSG_MESSAGECHAT_ADDON_INSTANCE, "CMSG_MESSAGECHAT_ADDON_INSTANCE", STATUS_LOGGEDIN, PROCESS_THREADUNSAFE, &WorldSession::HandleAddonMessagechatOpcode);

@@ -934,8 +934,11 @@ void WorldSession::HandleAddonMessagechatOpcode(WorldPacket& recv_data)
     {
         case CHAT_MSG_BATTLEGROUND:
         {
-            uint32 msgLen = recv_data.ReadBits(9);
+            // Addon instance: 5-bit prefix length, then 8-bit message length,
+            // then the message, then the prefix. Capture 38 08 "RHealBot"
+            // decodes as prefix 7, message 1 -- "HealBot" with the message "R".
             uint32 prefixLen = recv_data.ReadBits(5);
+            uint32 msgLen = recv_data.ReadBits(8);
             std::string msg = recv_data.ReadString(msgLen);
             std::string prefix = recv_data.ReadString(prefixLen);
 
@@ -953,10 +956,15 @@ void WorldSession::HandleAddonMessagechatOpcode(WorldPacket& recv_data)
         }
         case CHAT_MSG_GUILD:
         {
-            uint32 msgLen = recv_data.ReadBits(9);
+            // Addon guild: 8-bit message length, then 5-bit prefix length, then
+            // the PREFIX, then the message. Officer shares this layout, and
+            // whisper also places its prefix before its message. Capture
+            // 01 38 "HealBotG" decodes as message 1, prefix 7; reading
+            // message-first would yield the prefix "ealBotG".
+            uint32 msgLen = recv_data.ReadBits(8);
             uint32 prefixLen = recv_data.ReadBits(5);
-            std::string msg = recv_data.ReadString(msgLen);
             std::string prefix = recv_data.ReadString(prefixLen);
+            std::string msg = recv_data.ReadString(msgLen);
 
             if (_player->GetGuildId())
                 if (Guild* guild = sGuildMgr.GetGuildById(_player->GetGuildId()))
@@ -968,8 +976,14 @@ void WorldSession::HandleAddonMessagechatOpcode(WorldPacket& recv_data)
         }
         case CHAT_MSG_OFFICER:
         {
+            // Addon officer has zero corpus observations, but that does not make
+            // it unprovable: the client writer sub_C888C4 settles it outright.
+            // It writes strlen(+16) through the 8-bit writer, strlen(+272)
+            // through the 5-bit writer, flushes, then appends +272 before +16 --
+            // that is message length, prefix length, prefix string, message
+            // string, which is exactly the guild layout.
+            uint32 msgLen = recv_data.ReadBits(8);
             uint32 prefixLen = recv_data.ReadBits(5);
-            uint32 msgLen = recv_data.ReadBits(9);
             std::string prefix = recv_data.ReadString(prefixLen);
             std::string msg = recv_data.ReadString(msgLen);
 
@@ -982,12 +996,18 @@ void WorldSession::HandleAddonMessagechatOpcode(WorldPacket& recv_data)
         }
         case CHAT_MSG_WHISPER:
         {
-            uint32 msgLen = recv_data.ReadBits(9);
+            // Addon whisper: 9-bit target length, 8-bit message length, 5-bit
+            // prefix length, then target, prefix, message. Capture
+            // 03 00 9C "ChasisHealBotR" decodes as target 6, message 1,
+            // prefix 7 -- "Chasis" + "HealBot" + "R", which totals the body
+            // exactly and is the only assignment that yields a real addon
+            // prefix and a plausible character name.
+            uint32 targetLen = recv_data.ReadBits(9);
+            uint32 msgLen = recv_data.ReadBits(8);
             uint32 prefixLen = recv_data.ReadBits(5);
-            uint32 targetLen = recv_data.ReadBits(10);
-            std::string msg = recv_data.ReadString(msgLen);
-            std::string prefix = recv_data.ReadString(prefixLen);
             std::string targetName = recv_data.ReadString(targetLen);
+            std::string prefix = recv_data.ReadString(prefixLen);
+            std::string msg = recv_data.ReadString(msgLen);
 
             if (!normalizePlayerName(targetName))
             {
@@ -1023,10 +1043,29 @@ void WorldSession::HandleAddonMessagechatOpcode(WorldPacket& recv_data)
         case CHAT_MSG_PARTY:
         case CHAT_MSG_RAID:
         {
-            uint32 prefixLen = recv_data.ReadBits(5);
-            uint32 msgLen = recv_data.ReadBits(9);
-            std::string prefix = recv_data.ReadString(prefixLen);
+            // Party and raid cannot share one reader: they agree on the string
+            // order but reverse the two length fields.
+            //
+            //   raid   38 20 "VQ:0BigWigs"  prefix 7 then message 4
+            //   party  04 38 "VQ:0BigWigs"  message 4 then prefix 7
+            //
+            // Each is the only reading that fits an 11-byte body -- taking the
+            // first byte of the raid capture as an 8-bit message length gives 56,
+            // and reading party prefix-first gives a message length of 135.
+            uint32 prefixLen;
+            uint32 msgLen;
+            if (type == CHAT_MSG_RAID)
+            {
+                prefixLen = recv_data.ReadBits(5);
+                msgLen = recv_data.ReadBits(8);
+            }
+            else
+            {
+                msgLen = recv_data.ReadBits(8);
+                prefixLen = recv_data.ReadBits(5);
+            }
             std::string msg = recv_data.ReadString(msgLen);
+            std::string prefix = recv_data.ReadString(prefixLen);
 
             Group* group = _player->GetGroup();
             if (!group || group->isBGGroup())
