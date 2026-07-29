@@ -859,6 +859,11 @@ static bool _GuardedVsnprintf(char* buffer, size_t size, char const* format, va_
 {
     // Gated on the compiler, not the OS: __try/__except is MSVC syntax, and a
     // MinGW build targets Windows without supporting it.
+    // The return value is deliberately not treated as a success flag: _vsnprintf
+    // returns -1 for ordinary truncation as well as for a rejected format, so
+    // testing it would drop every message merely too long for its buffer. Formats
+    // the CRT would reject are refused by the grammar check in the caller instead,
+    // which is why that check only accepts conversions the local CRT implements.
 #ifdef _MSC_VER
     __try
     {
@@ -876,8 +881,7 @@ static bool _GuardedVsnprintf(char* buffer, size_t size, char const* format, va_
     // No portable equivalent: a malformed format is still fatal here, but the
     // callers' reporting and the load-time checks in ObjectMgr apply on every
     // platform.
-    vsnprintf(buffer, size, format, ap);
-    return true;
+    return vsnprintf(buffer, size, format, ap) >= 0;
 #endif
 }
 
@@ -988,7 +992,18 @@ bool SafeFormatDbString(char* buffer, size_t size, char const* format, va_list a
         }
 
         // '\0' is tested first: strchr would otherwise match the set's own terminator
-        if (*p == '\0' || !strchr("diouxXfFeEgGaAcCsSpZ", *p))
+        // The accepted set is what the LOCAL CRT implements, not the union of every
+        // CRT. C, S and Z are MSVC spellings: glibc rejects them, and a rejected
+        // conversion makes vsnprintf return -1 having written nothing useful, which
+        // is indistinguishable here from ordinary truncation. Refusing them up front
+        // is what lets the call below ignore its return value safely.
+#ifdef _MSC_VER
+        char const* const acceptedConversions = "diouxXfFeEgGaAcCsSpZ";
+#else
+        char const* const acceptedConversions = "diouxXfFeEgGaAcsp";
+#endif
+
+        if (*p == '\0' || !strchr(acceptedConversions, *p))
         {
             return false;                                   // %n, trailing '%', or malformed
         }

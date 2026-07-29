@@ -921,15 +921,19 @@ bool SafeFormatDbString(char* buffer, size_t size, char const* format, va_list a
 bool SafeFormatDbStringF(char* buffer, size_t size, char const* format, ...);
 
 /**
- * @brief Copies a database row into a fixed buffer, always NUL-terminated.
+ * @brief Copies a data-driven string into a fixed buffer.
  *
  * Used as the fallback when formatting is refused: showing the row unformatted
- * beats showing nothing, and it must never be handed to code that writes through
- * the pointer, because it belongs to ObjectMgr.
+ * beats showing nothing. The copy also decouples the result from the source, which
+ * matters because callers pass storage they do not own - a `mangos_string` row held
+ * by ObjectMgr, or a DBC field - and some consumers tokenize what they are given.
+ *
+ * Terminates the destination whenever it is non-null and size is non-zero; a null
+ * or zero-size destination is left untouched.
  *
  * @param buffer The destination buffer.
  * @param size The destination buffer size in bytes.
- * @param text The text to copy.
+ * @param text The text to copy; a null source yields an empty string.
  */
 void CopyDbStringBounded(char* buffer, size_t size, char const* text);
 
