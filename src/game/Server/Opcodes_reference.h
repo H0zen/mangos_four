@@ -175,9 +175,9 @@
  *   TOTAL SMSG rows                   925
  *
  * SUBSYSTEM CONFIDENCE: high=365, low=221, medium=182, none=157
- * STATUS TOTALS: ACTIVE=447, DOC=435, DORMANT=638
+ * STATUS TOTALS: ACTIVE=450, DOC=435, DORMANT=635
  *   SMSG: ACTIVE=267, DOC=271, DORMANT=387
- *   CMSG: ACTIVE=180, DOC=164, DORMANT=251
+ *   CMSG: ACTIVE=183, DOC=164, DORMANT=248
  */
 
 // CAVEATS -- read before trusting any single row:
@@ -1447,7 +1447,7 @@ typedef uint16_t uint16;
  *   CMSG_AUCTION_HELLO                             0x0379  ACTIVE
  *   CMSG_PETITION_SHOWLIST                         0x037B  DORMANT 
  *   CMSG_REQUEST_VEHICLE_PREV_SEAT                 0x03C4  DORMANT 
- *   CMSG_SET_TITLE                                 0x03C7  DORMANT 
+ *   CMSG_SET_TITLE                                 0x03C7  ACTIVE
  *   CMSG_AUCTION_PLACE_BID                         0x03C8  DORMANT 
  *   CMSG_ACTIVATETAXI                              0x03C9  DORMANT 
  *   CMSG_PUSHQUESTTOPARTY                          0x03D2  ACTIVE
@@ -1455,7 +1455,7 @@ typedef uint16_t uint16;
  *   CMSG_SET_TRADE_ITEM                            0x03D5  ACTIVE
  *   CMSG_SWAP_INV_ITEM                             0x03DF  ACTIVE
  *   CMSG_DUEL_RESPONSE                             0x03E2  DOC     
- *   CMSG_SET_CURRENCY_FLAGS                        0x03E4  DORMANT 
+ *   CMSG_SET_CURRENCY_FLAGS                        0x03E4  ACTIVE
  *   CMSG_STANDSTATECHANGE                          0x03E6  ACTIVE
  *   CMSG_AREA_SPIRIT_HEALER_QUERY                  0x03F1  DORMANT 
  *   CMSG_PLAYED_TIME                               0x03F6  ACTIVE
@@ -1512,7 +1512,7 @@ typedef uint16_t uint16;
  *   CMSG_QUERY_GUILD_REWARDS                       0x06C4  DOC     
  *   CMSG_BATTLE_PET_WILD_REQUEST                   0x06C5  DOC     
  *   CMSG_SET_PRIMARY_TALENT_TREE                   0x06C6  DOC     
- *   CMSG_SET_WATCHED_FACTION                       0x06C9  DORMANT 
+ *   CMSG_SET_WATCHED_FACTION                       0x06C9  ACTIVE
  *   CMSG_GUILD_AUTO_DECLINE                        0x06CB  DORMANT 
  *   CMSG_QUESTGIVER_ACCEPT_QUEST                   0x06D1  ACTIVE   [high-conf]
  *   CMSG_JOIN_PET_BATTLE_QUEUE                     0x06D4  DOC     
@@ -1744,7 +1744,7 @@ typedef uint16_t uint16;
  *   CMSG_QUESTGIVER_QUERY_QUEST                    0x12F0  ACTIVE   [high-conf]
  *   CMSG_BUY_BANK_SLOT                             0x12F2  DORMANT 
  *   CMSG_GOSSIP_HELLO                              0x12F3  ACTIVE
- *   CMSG_FAR_SIGHT                                 0x1341  DORMANT 
+ *   CMSG_FAR_SIGHT                                 0x1341  DORMANT
  *   CMSG_LOGOUT_REQUEST                            0x1349  ACTIVE   server-binding=CMSG_LOGOUT_REQUEST_IDLE
  *   CMSG_REPOP_REQUEST                             0x134A  ACTIVE
  *   CMSG_SELL_ITEM                                 0x1358  ACTIVE
