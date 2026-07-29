@@ -1144,10 +1144,6 @@ void InitializeOpcodes()
     // fields or internal currency state, and the resulting SMSG_UPDATE_OBJECT
     // traffic is already registered and already driven continuously by movement.
     //
-    // CMSG_SHOWING_HELM is still excluded for the bit-versus-byte reason below --
-    // its three bodies are 0x80, 0x00, 0x80 -- compounded by HandleShowingHelmOpcode
-    // ignoring the packet and toggling PLAYER_FLAGS_HIDE_HELM rather than assigning
-    // it, which inverts the flag whenever the two disagree.
     DefC(CMSG_SET_TITLE, "CMSG_SET_TITLE", STATUS_LOGGEDIN, PROCESS_THREADUNSAFE, &WorldSession::HandleSetTitleOpcode);
     DefC(CMSG_SET_WATCHED_FACTION, "CMSG_SET_WATCHED_FACTION", STATUS_LOGGEDIN, PROCESS_THREADUNSAFE, &WorldSession::HandleSetWatchedFactionOpcode);
     DefC(CMSG_SET_CURRENCY_FLAGS, "CMSG_SET_CURRENCY_FLAGS", STATUS_LOGGEDIN, PROCESS_THREADUNSAFE, &WorldSession::HandleSetCurrencyFlagsOpcode);
@@ -1160,4 +1156,20 @@ void InitializeOpcodes()
     // far-sight object on enable, so a reset no longer depends on that object
     // still being in scope. Fixtures pin both bodies in mop_far_sight_packets.
     DefC(CMSG_FAR_SIGHT, "CMSG_FAR_SIGHT", STATUS_LOGGEDIN, PROCESS_THREADUNSAFE, &WorldSession::HandleFarSightOpcode);
+
+    // Showing helm, once its reader was corrected, for the same bit-versus-byte
+    // reason as far sight: its three sampled bodies are 0x80, 0x00, 0x80.
+    // HandleShowingHelmOpcode previously ignored the packet entirely and toggled
+    // PLAYER_FLAGS_HIDE_HELM, so the helm inverted for the rest of the session the
+    // first time client and server disagreed. It now assigns the bit the client
+    // sent. Fixtures pin both bodies in mop_showing_helm_packets.
+    //
+    // CMSG_SHOWING_CLOAK (0x02F2) carried the identical defect and its handler
+    // has been repaired the same way, from the same kind of evidence rather than
+    // by symmetry: sub_4095E0 reads PLAYER_FLAGS & 0x800 and hands it to the same
+    // one-bit serializer. Its ENCODING is therefore proven; what is unproven is
+    // its OCCURRENCE -- the opcode has zero corpus observations, so nothing
+    // independently confirms the 18414 client sends it. It stays dormant on that
+    // ground alone.
+    DefC(CMSG_SHOWING_HELM, "CMSG_SHOWING_HELM", STATUS_LOGGEDIN, PROCESS_THREADUNSAFE, &WorldSession::HandleShowingHelmOpcode);
 }

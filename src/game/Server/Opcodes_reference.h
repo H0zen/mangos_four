@@ -175,9 +175,9 @@
  *   TOTAL SMSG rows                   925
  *
  * SUBSYSTEM CONFIDENCE: high=365, low=221, medium=182, none=157
- * STATUS TOTALS: ACTIVE=451, DOC=435, DORMANT=634
+ * STATUS TOTALS: ACTIVE=452, DOC=435, DORMANT=633
  *   SMSG: ACTIVE=267, DOC=271, DORMANT=387
- *   CMSG: ACTIVE=184, DOC=164, DORMANT=247
+ *   CMSG: ACTIVE=185, DOC=164, DORMANT=246
  */
 
 // CAVEATS -- read before trusting any single row:
@@ -1724,7 +1724,7 @@ typedef uint16_t uint16;
  *   CMSG_INSPECT                                   0x1259  ACTIVE
  *   CMSG_SET_LOOT_SPECIALIZATION                   0x1260  DOC     
  *   CMSG_TOTEM_DESTROYED                           0x1263  DORMANT 
- *   CMSG_SHOWING_HELM                              0x126B  DORMANT 
+ *   CMSG_SHOWING_HELM                              0x126B  ACTIVE
  *   CMSG_MAIL_CREATE_TEXT_ITEM                     0x1270  DORMANT 
  *   CMSG_CANCEL_AUTO_REPEAT_SPELL                  0x1272  DORMANT 
  *   CMSG_PETITION_DECLINE                          0x1279  DOC     

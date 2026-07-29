@@ -1948,3 +1948,11 @@ target_include_directories(mop_far_sight_packets_test PRIVATE
 set_target_properties(mop_far_sight_packets_test PROPERTIES CXX_STANDARD 17 CXX_STANDARD_REQUIRED ON)
 target_link_libraries(mop_far_sight_packets_test PRIVATE shared)
 add_test(NAME mop_far_sight_packets COMMAND mop_far_sight_packets_test)
+
+add_executable(mop_showing_helm_packets_test mop_showing_helm_packets_test.cpp)
+target_include_directories(mop_showing_helm_packets_test PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}/..
+    ${CMAKE_SOURCE_DIR}/src/shared)
+set_target_properties(mop_showing_helm_packets_test PROPERTIES CXX_STANDARD 17 CXX_STANDARD_REQUIRED ON)
+target_link_libraries(mop_showing_helm_packets_test PRIVATE shared)
+add_test(NAME mop_showing_helm_packets COMMAND mop_showing_helm_packets_test)
