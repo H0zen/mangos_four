@@ -693,7 +693,7 @@ WheatyExceptionReport::EnumerateSymbolsCallback(
     ULONG         SymbolSize,
     PVOID         UserContext)
 {
-    char szBuffer[2048];
+    char szBuffer[kSymbolBufferSize];
 
     __try
     {
@@ -1027,17 +1027,21 @@ char* WheatyExceptionReport::AppendFormat(char* pszCurrBuffer, char const* pszEn
 //============================================================================
 int __cdecl WheatyExceptionReport::_tprintf(const TCHAR* format, ...)
 {
-    TCHAR szBuff[1024];
+    TCHAR szBuff[kReportLineSize];
     int retValue;
     DWORD cbWritten;
     va_list argptr;
 
     // vsprintf here was unbounded, and the WriteFile below then wrote the length it
     // returned - so a symbol dump longer than the buffer both smashed this frame and
-    // flushed the overrun to disk. That is why every crash report this handler has
-    // produced stops mid-symbol: the report survives to the truncation point because
-    // the file is opened FILE_FLAG_WRITE_THROUGH, and nothing after it is ever
-    // written. Bounded, and the length clamped to what the buffer actually holds.
+    // flushed the overrun to disk. Bounded now, with the length clamped to what the
+    // buffer actually holds.
+    //
+    // The buffer is sized from kSymbolBufferSize rather than picked independently:
+    // callers hand this a whole formatted symbol plus their own wrapping, and a sink
+    // smaller than that would trade the overflow for silent truncation - dropping the
+    // tail of exactly the deep types this change exists to handle, line break
+    // included, so the next symbol would run onto the same line.
     va_start(argptr, format);
     retValue = _vsnprintf(szBuff, ARRAYSIZE(szBuff) - 1, format, argptr);
     va_end(argptr);

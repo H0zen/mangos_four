@@ -120,6 +120,14 @@ class WheatyExceptionReport
 
         static BOOL CALLBACK EnumerateSymbolsCallback(PSYMBOL_INFO, ULONG, PVOID);
 
+        // One formatted symbol, and one line of report output. The second must be able
+        // to hold the first plus whatever the caller wraps around it, or the sink
+        // silently drops the tail - including the line break, which runs symbols
+        // together. Deep user-defined types are exactly the input that reaches these
+        // sizes, so the two are defined together rather than left to drift apart.
+        static const unsigned kSymbolBufferSize = 2048;
+        static const unsigned kReportLineSize   = kSymbolBufferSize + 64;
+
         static bool FormatSymbolValue(PSYMBOL_INFO, STACKFRAME*, char* pszBuffer, unsigned cbBuffer);
 
         static char* DumpTypeIndex(char*, char const* pszEnd, DWORD64, DWORD, unsigned, DWORD_PTR, bool& , char*);
