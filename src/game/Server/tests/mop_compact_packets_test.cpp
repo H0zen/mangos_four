@@ -623,9 +623,10 @@ static void test_party_kill_log()
     uint64_t slotB = 0;
     DecodePartyKillLog(packet, slotA, slotB);
 
-    // The client shows slot B as the killer -- see BuildPartyKillLog for why this is an observed
-    // fact rather than a binary-derived one. These two assertions are the whole point of the test:
-    // swapping the roles in the builder fails them, whereas the old byte fixture could not tell.
+    // The client shows slot B as the killer: the handler at .text:00841B83 routes slot B to
+    // COMBAT_LOG_EVENT sourceGUID and slot A to destGUID -- see BuildPartyKillLog for the chain.
+    // These two assertions are the whole point of the test: swapping the roles in the builder
+    // fails them, whereas the old byte fixture could not tell.
     CHECK(slotB == killerGuid);
     CHECK(slotA == victimGuid);
 
