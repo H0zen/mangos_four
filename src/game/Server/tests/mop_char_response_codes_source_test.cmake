@@ -190,7 +190,8 @@ foreach(_row
 endforeach()
 
 # ---------------------------------------------------------------------------
-# 3. The value that actually broke deletion. Live-confirmed only - see header.
+# 3. The value that actually broke deletion. Client-table confirmed, plus a live client - see
+#    header. Not wire-observed: there is no SMSG_CHAR_DELETE anywhere in the corpus.
 # ---------------------------------------------------------------------------
 string(FIND "${_shared_src}" "CHAR_DELETE_SUCCESS                                    = 0x48," _at)
 if(_at EQUAL -1)

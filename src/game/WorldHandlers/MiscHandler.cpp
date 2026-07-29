@@ -1863,11 +1863,18 @@ void WorldSession::HandleReadyForAccountDataTimesOpcode(WorldPacket& /*recv_data
     //
     // An earlier revision of this comment claimed every corpus instance sits immediately after
     // ACCOUNT_DATA_TIMES. That is true of this occurrence only; the world-entry one does not, and
-    // the total (843) covers both. Character select previously had no send at all -- the login
-    // path's send was the only one -- which is what this fixes.
+    // the total covers both. Character select previously had no send at all -- the login path's
+    // send was the only one -- which is what this fixes.
+    //
+    // 817 observations at build 18414 (catalogue 47A3C991). An earlier revision said 843, which
+    // was the previous catalogue folding the adjacent build 18291 in; 817 + 23 = 840 of that.
     //
     // Retail's payload is the zone name twice ("Europe/ParisEurope/Paris" in the captures), which
     // is the shape this builder already emits; ours is shorter only because Etc/UTC is shorter.
+    // Every one of the 817 is exactly 26 bytes -- min == max -- which is 2 + 12 + 12 for that one
+    // name. That uniformity is a property of the capture set, not of the packet: these are all
+    // one region's servers. The field is length-prefixed, so our 16 bytes (2 + 7 + 7) is a valid
+    // encoding of a shorter name rather than a truncation, and a live client accepts it.
     WorldPacket tz(SMSG_SET_TIME_ZONE_INFORMATION, 2 + 2 * 7);
     MopWorldEntryPackets::BuildSetTimeZoneInformation(tz, "Etc/UTC");
     SendPacket(&tz);
@@ -1877,10 +1884,20 @@ void WorldSession::HandleReadyForAccountDataTimesOpcode(WorldPacket& /*recv_data
  * @brief Answers the character-select store query with an empty purchase list.
  *
  * The shipped UI's C_PurchaseAPI.GetPurchaseList writes an empty 0x18B2 and waits. Retail
- * normally answers: 434 requests and 420 responses across the 18414 corpus, the request always
- * zero bytes and the response always exactly seven, of which 419 of 420 are entirely zero. The
- * fourteen unmatched requests are not accounted for -- they may be capture or session boundaries
+ * normally answers: across build 18414 the corpus holds 425 requests and 409 responses. The
+ * sixteen unmatched requests are not accounted for -- they may be capture or session boundaries
  * -- so "normally" is as strong as the counts support, not "always".
+ *
+ * The body length is not a sample: all 425 requests are exactly zero bytes and all 409 responses
+ * are exactly seven (reported min == max == 7 over the whole population), so the seven-byte reply
+ * below matches every observation there is.
+ *
+ * Counts are from catalogue 47A3C991, and earlier revisions of this comment said 434/420. That
+ * was not a miscount -- it was the previous catalogue merging the adjacent build 18291 into
+ * 18414. Splitting them gives 409 + 11 = 420, exactly the old figure. Build separation matters
+ * more than it looks here: opcode 0x023A is this 7-byte SMSG in 18414/18291, but in builds
+ * 17359/17371/17399 the same number is a CMSG carrying 37-86 bytes -- a different message
+ * entirely. Re-derive against a stated catalogue generation, never across builds.
  *
  * We have no Store backend, so the reply we send is the one a player who has purchased nothing
  * receives - an empty list - rather than dropping the request, which leaves the client waiting.
