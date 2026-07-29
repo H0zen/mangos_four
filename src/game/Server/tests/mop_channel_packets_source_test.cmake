@@ -2,6 +2,7 @@ file(READ "${SOURCE_ROOT}/src/game/WorldHandlers/Channel.cpp" channel_source)
 file(READ "${SOURCE_ROOT}/src/game/WorldHandlers/Channel.h" channel_header)
 file(READ "${SOURCE_ROOT}/src/game/Server/Opcodes.cpp" opcode_registry)
 file(READ "${SOURCE_ROOT}/src/game/Server/WorldSession.cpp" session_source)
+file(READ "${SOURCE_ROOT}/src/game/WorldHandlers/ChannelHandler.cpp" channel_handler)
 
 if(MUTATION STREQUAL "list_realm")
     string(REPLACE
@@ -143,3 +144,30 @@ require_once("${session_source}"
 require_once("${session_source}"
     "case[ \t]+SMSG_CHANNEL_NOTIFY:"
     "channel-notify suppression gate")
+
+# Listing a channel's members. Joining was registered but listing was not, so
+# /chatlist did nothing. Pin the full registration tuple.
+string(FIND "${opcode_registry}" "DefC(CMSG_CHANNEL_LIST, \"CMSG_CHANNEL_LIST\", STATUS_LOGGEDIN, PROCESS_THREADUNSAFE, &WorldSession::HandleChannelListOpcode);" channel_list_registration)
+if(channel_list_registration EQUAL -1)
+    message(FATAL_ERROR "channel-list registration missing or altered")
+endif()
+
+# The channel name length is seven bits. Retail carries it in the top seven bits of
+# the first byte (0x12 for a 9 character name, 0x32 for 25, 0x3C for 30), and the
+# already-working join path reads the same field the same way. Reading eight returns
+# double, which only survives because the name occupies the rest of the payload.
+#
+# Isolate HandleChannelListOpcode before checking: several handlers in this file read
+# a seven-bit length for other fields, so a file-wide search could pass on someone
+# else's line while this handler regressed.
+string(FIND "${channel_handler}" "void WorldSession::HandleChannelListOpcode" channel_list_begin)
+string(FIND "${channel_handler}" "void WorldSession::HandleChannelPasswordOpcode" channel_list_end)
+if(channel_list_begin EQUAL -1 OR channel_list_end EQUAL -1 OR NOT channel_list_begin LESS channel_list_end)
+    message(FATAL_ERROR "cannot isolate HandleChannelListOpcode for the width check")
+endif()
+math(EXPR channel_list_span "${channel_list_end} - ${channel_list_begin}")
+string(SUBSTRING "${channel_handler}" ${channel_list_begin} ${channel_list_span} channel_list_body)
+string(FIND "${channel_list_body}" "recvPacket.ReadString(recvPacket.ReadBits(7))" channel_list_width)
+if(channel_list_width EQUAL -1)
+    message(FATAL_ERROR "channel-list name length is not read as seven bits")
+endif()

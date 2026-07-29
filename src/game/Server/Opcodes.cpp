@@ -426,6 +426,25 @@ void InitializeOpcodes()
     DefC(CMSG_JOIN_CHANNEL, "CMSG_JOIN_CHANNEL", STATUS_LOGGEDIN, PROCESS_THREADUNSAFE, &WorldSession::HandleJoinChannelOpcode);
     DefS(SMSG_CHANNEL_NOTIFY, "SMSG_CHANNEL_NOTIFY");
     DefS(SMSG_CHANNEL_LIST, "SMSG_CHANNEL_LIST");
+
+    // Listing a channel's members. Joining was registered but listing was not, so
+    // /chatlist did nothing. The reply is already registered and already admitted by
+    // the in-world send gate above, and is built by MopChannelPackets::BuildList, so
+    // this adds no new outbound surface.
+    //
+    // The request is a seven-bit name length then the raw name. Retail bodies:
+    //
+    //   12 6F 71 63 68 61 6E 6E 65 6C                  0x12 >> 1 == 9  "oqchannel"
+    //   32 "General - The Storm Peaks"                 0x32 >> 1 == 25
+    //   3C "LocalDefense - The Storm Peaks"            0x3C >> 1 == 30
+    //
+    // That is the same seven-bit channel-name length the already-working join path
+    // reads in MopChannelPackets::ReadJoinChannelRequest. The handler read eight bits,
+    // which returns double, and survived only because the name occupies the rest of
+    // the payload and ReadString clamps to the buffer end. With any field after the
+    // name the oversized count would swallow it into the channel name and misalign
+    // everything following, so it is corrected here.
+    DefC(CMSG_CHANNEL_LIST, "CMSG_CHANNEL_LIST", STATUS_LOGGEDIN, PROCESS_THREADUNSAFE, &WorldSession::HandleChannelListOpcode);
     DefC(CMSG_CANCEL_TRADE, "CMSG_CANCEL_TRADE", STATUS_LOGGEDIN_OR_RECENTLY_LOGGEDOUT, PROCESS_THREADUNSAFE, &WorldSession::HandleCancelTradeOpcode);
 
     // The rest of the trade conversation. Only cancel was registered, so a player

@@ -109,7 +109,22 @@ void WorldSession::HandleChannelListOpcode(WorldPacket& recvPacket)
 {
     DEBUG_LOG("WORLD: Received opcode %s (%u, 0x%X)", LookupOpcodeName(DIR_CLIENT, recvPacket.GetOpcode()), recvPacket.GetOpcode(), recvPacket.GetOpcode());
     // recvPacket.hexlike();
-    std::string channelname = recvPacket.ReadString(recvPacket.ReadBits(8));
+    // The name length is seven bits, not eight. Retail bodies carry it in the top
+    // seven bits of the first byte:
+    //
+    //   12 6F 71 63 68 61 6E 6E 65 6C                     0x12 >> 1 == 9   "oqchannel"
+    //   32 "General - The Storm Peaks"                    0x32 >> 1 == 25
+    //   3C "LocalDefense - The Storm Peaks"               0x3C >> 1 == 30
+    //
+    // The same seven-bit channel-name length is what the already-working join path
+    // reads, in MopChannelPackets::ReadJoinChannelRequest.
+    //
+    // Reading eight bits returns double the real length. That is harmless for this
+    // layout only because the name occupies the rest of the payload and ReadString
+    // clamps to the buffer end, so the right string comes back for the wrong reason.
+    // If any field followed the name, the oversized count would absorb it into the
+    // channel name and misalign every read after it.
+    std::string channelname = recvPacket.ReadString(recvPacket.ReadBits(7));
 
     if (ChannelMgr* cMgr = channelMgr(_player->GetTeam()))
         if (Channel* chn = cMgr->GetChannel(channelname, _player))

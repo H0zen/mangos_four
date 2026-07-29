@@ -175,9 +175,9 @@
  *   TOTAL SMSG rows                   925
  *
  * SUBSYSTEM CONFIDENCE: high=365, low=221, medium=182, none=157
- * STATUS TOTALS: ACTIVE=444, DOC=435, DORMANT=641
+ * STATUS TOTALS: ACTIVE=445, DOC=435, DORMANT=640
  *   SMSG: ACTIVE=266, DOC=271, DORMANT=388
- *   CMSG: ACTIVE=178, DOC=164, DORMANT=253
+ *   CMSG: ACTIVE=179, DOC=164, DORMANT=252
  */
 
 // CAVEATS -- read before trusting any single row:
@@ -1635,7 +1635,7 @@ typedef uint16_t uint16;
  *   CMSG_GENERATE_RANDOM_CHARACTER_NAME            0x0B1C  ACTIVE
  *   CMSG_BATTLE_PAY_ACK_FAILED_RESPONSE            0x0B38  DOC     
  *   CMSG_CONTACT_LIST                              0x0BB4  DORMANT 
- *   CMSG_CHANNEL_LIST                              0x0C1B  DORMANT 
+ *   CMSG_CHANNEL_LIST                              0x0C1B  ACTIVE
  *   CMSG_UNKNOWN_0x0C1F                            0x0C1F  DOC     
  *   CMSG_SET_TRADE_CURRENCY                        0x0C44  DOC     
  *   CMSG_REFORGE_ITEM                              0x0C4F  DORMANT 
