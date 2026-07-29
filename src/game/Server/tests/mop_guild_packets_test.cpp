@@ -668,6 +668,8 @@ static void test_guild_roster_length_bounds()
     CHECK(!MopGuildPackets::BuildGuildRoster(packet, roster, "", "", 1, 0, 0));
     roster[0].publicNote.clear();
 
+    roster[0].officerNote = std::string(255, 'o');
+    CHECK(MopGuildPackets::BuildGuildRoster(packet, roster, "", "", 1, 0, 0));
     roster[0].officerNote = std::string(256, 'o');
     CHECK(!MopGuildPackets::BuildGuildRoster(packet, roster, "", "", 1, 0, 0));
     roster[0].officerNote.clear();
@@ -679,6 +681,15 @@ static void test_guild_roster_length_bounds()
     // 11-bit guild-info length: 2047 fits, 2048 does not.
     CHECK(MopGuildPackets::BuildGuildRoster(packet, roster, "", std::string(2047, 'i'), 1, 0, 0));
     CHECK(!MopGuildPackets::BuildGuildRoster(packet, roster, "", std::string(2048, 'i'), 1, 0, 0));
+
+    // 17-bit member count: 131071 fits, 131072 does not. No real guild is anywhere
+    // near this, but the guard is what stops the count silently wrapping.
+    MopGuildPackets::RosterMember tiny;
+    tiny.name = "a";
+    std::vector<MopGuildPackets::RosterMember> const atLimit((size_t(1) << 17) - 1, tiny);
+    std::vector<MopGuildPackets::RosterMember> const overLimit(size_t(1) << 17, tiny);
+    CHECK(MopGuildPackets::BuildGuildRoster(packet, atLimit, "", "", 1, 0, 0));
+    CHECK(!MopGuildPackets::BuildGuildRoster(packet, overLimit, "", "", 1, 0, 0));
 }
 
 static void test_guild_query_opcodes()

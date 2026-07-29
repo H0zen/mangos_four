@@ -320,6 +320,9 @@ require_once("${packet_builder}"
 require_once("${guild_sender}"
     "MopGuildPackets::BuildGuildRoster(data, roster, MOTD, GINFO, GetAccountsNumber(),"
     "guild-roster production builder call")
+require_once("${guild_sender}"
+    "entry.virtualRealm = realmID;"
+    "guild-roster virtual realm adapter field")
 require_once("${guild_handler}"
     "MopGuildPackets::BuildGuildCommandResult(data, typecmd, str, cmdresult)"
     "guild-command-result builder call")

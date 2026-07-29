@@ -1036,6 +1036,7 @@ void Guild::Roster(WorldSession* session /*= NULL*/)
         entry.flags = flags;
         entry.zoneId = player ? player->GetZoneId() : member.ZoneId;
         entry.rankId = member.RankId;
+        entry.virtualRealm = realmID;
         entry.lastLogoutDays = player ? 0.0f : float(time(NULL) - itr->second.LogoutTime) / float(DAY);
         entry.name = member.Name;
         entry.publicNote = member.Pnote;
