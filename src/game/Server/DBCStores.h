@@ -38,9 +38,23 @@
 bool IsAcceptableClientBuild(uint32 build);
 
 /**
+ * Checks whether a connecting client's wire build is supported.
+ *
+ * Deliberately narrower than IsAcceptableClientBuild: that one validates DATA FILES, which the
+ * 18414 client tags 18273, whereas this validates the CLIENT ITSELF and admits 18414 only. Do not
+ * merge them -- see EXPECTED_MANGOSD_WIRE_BUILD in SharedDefines.h.
+ */
+bool IsAcceptableClientWireBuild(uint32 build);
+
+/**
  * Returns a formatted list of supported client builds.
  */
 std::string AcceptableClientBuildsListStr();
+
+/**
+ * Returns a formatted list of supported client wire builds.
+ */
+std::string AcceptableClientWireBuildsListStr();
 
 /**
  * Returns the client build of the DBC files loaded at startup,

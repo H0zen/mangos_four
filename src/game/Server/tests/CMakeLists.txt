@@ -211,6 +211,22 @@ add_test(NAME mop_char_response_codes_source
         -DSOURCE_ROOT=${CMAKE_SOURCE_DIR}
         -P ${CMAKE_CURRENT_SOURCE_DIR}/mop_char_response_codes_source_test.cmake)
 
+add_test(NAME mop_client_build_split_source
+    COMMAND ${CMAKE_COMMAND}
+        -DSOURCE_ROOT=${CMAKE_SOURCE_DIR}
+        -P ${CMAKE_CURRENT_SOURCE_DIR}/mop_client_build_split_source_test.cmake)
+
+foreach(build_split_mutation IN ITEMS
+        merge_wire_into_data widen_wire_list narrow_data_list
+        drop_wire_predicate gridmap_uses_wire_list)
+    add_test(NAME mop_client_build_split_source_mutation_${build_split_mutation}
+        COMMAND ${CMAKE_COMMAND} -DSOURCE_ROOT=${CMAKE_SOURCE_DIR}
+            -DMUTATION=${build_split_mutation}
+            -P ${CMAKE_CURRENT_SOURCE_DIR}/mop_client_build_split_source_test.cmake)
+    set_tests_properties(mop_client_build_split_source_mutation_${build_split_mutation}
+        PROPERTIES WILL_FAIL TRUE)
+endforeach()
+
 foreach(char_codes_mutation IN ITEMS
         revert_delete_success drop_create_trial drop_heirloom_code
         break_create_success_anchor break_name_in_use_anchor

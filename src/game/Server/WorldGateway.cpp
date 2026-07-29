@@ -116,7 +116,11 @@ proto::AuthLookup WorldGateway::LookupAccount(const proto::AuthRequest& request)
 
     // ---- Client build --------------------------------------------------------
     // WorldSocket.cpp:1303.
-    if (!IsAcceptableClientBuild(request.fields.builtNumberClient))
+    //
+    // Wire build, not data-file build. IsAcceptableClientBuild also accepts 18273 because the
+    // 18414 client tags its own DBCs and maps that way; admitting an 18273 CLIENT would hand it
+    // an 18414 opcode table it cannot parse. A real 18414 client reports 18414 here.
+    if (!IsAcceptableClientWireBuild(request.fields.builtNumberClient))
     {
         result.status = proto::AuthStatus::VersionMismatch;
         return result;
