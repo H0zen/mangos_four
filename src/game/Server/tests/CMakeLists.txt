@@ -1940,3 +1940,11 @@ foreach(mutation IN ITEMS spell_count_width cooldown_count_width
             -P ${CMAKE_CURRENT_SOURCE_DIR}/mop_pet_spells_packets_source_test.cmake)
     set_tests_properties(mop_pet_spells_packets_source_mutation_${mutation} PROPERTIES WILL_FAIL TRUE)
 endforeach()
+
+add_executable(mop_far_sight_packets_test mop_far_sight_packets_test.cpp)
+target_include_directories(mop_far_sight_packets_test PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}/..
+    ${CMAKE_SOURCE_DIR}/src/shared)
+set_target_properties(mop_far_sight_packets_test PROPERTIES CXX_STANDARD 17 CXX_STANDARD_REQUIRED ON)
+target_link_libraries(mop_far_sight_packets_test PRIVATE shared)
+add_test(NAME mop_far_sight_packets COMMAND mop_far_sight_packets_test)

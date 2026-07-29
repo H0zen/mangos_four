@@ -1651,28 +1651,32 @@ void WorldSession::HandleRealmSplitOpcode(WorldPacket& recv_data)
 void WorldSession::HandleFarSightOpcode(WorldPacket& recv_data)
 {
     DEBUG_LOG("WORLD: Received opcode CMSG_FAR_SIGHT");
-    // recv_data.hexlike();
 
-    uint8 op;
-    recv_data >> op;
+    // 18414 sends a single MSB-first bit, not a uint8 boolean. Every sampled
+    // retail body is 0x80 (enable) or 0x00 (disable), so the inherited
+    // `recv_data >> op` followed by `switch (op) case 0/case 1` never matched an
+    // enable at all -- 0x80 fell through the switch and the view was never set.
+    bool const enable = recv_data.ReadBit();
 
+    if (!enable)
+    {
+        DEBUG_LOG("Removed FarSight from %s", _player->GetGuidStr().c_str());
+        _player->GetCamera().ResetView(false);
+        return;
+    }
+
+    // Resolve the far-sight object only when enabling. The inherited handler
+    // looked it up before the switch, so a disable silently did nothing whenever
+    // the object had already gone out of scope -- which is exactly when a client
+    // most needs its view reset.
     WorldObject* obj = _player->GetMap()->GetWorldObject(_player->GetFarSightGuid());
     if (!obj)
     {
         return;
     }
 
-    switch (op)
-    {
-        case 0:
-            DEBUG_LOG("Removed FarSight from %s", _player->GetGuidStr().c_str());
-            _player->GetCamera().ResetView(false);
-            break;
-        case 1:
-            DEBUG_LOG("Added FarSight %s to %s", _player->GetFarSightGuid().GetString().c_str(), _player->GetGuidStr().c_str());
-            _player->GetCamera().SetView(obj, false);
-            break;
-    }
+    DEBUG_LOG("Added FarSight %s to %s", _player->GetFarSightGuid().GetString().c_str(), _player->GetGuidStr().c_str());
+    _player->GetCamera().SetView(obj, false);
 }
 
 void WorldSession::HandleSetTitleOpcode(WorldPacket& recv_data)

@@ -1144,18 +1144,20 @@ void InitializeOpcodes()
     // fields or internal currency state, and the resulting SMSG_UPDATE_OBJECT
     // traffic is already registered and already driven continuously by movement.
     //
-    // CMSG_FAR_SIGHT is excluded, and it is the reason width alone is not warrant.
-    // Its body is one byte, so it looks like the safest member of this group, but
-    // all four sampled 18414 bodies are 0x80 or 0x00 -- an MSB-first single bit,
-    // not a uint8 boolean. HandleFarSightOpcode switches on 0 and 1, so a real
-    // 0x80 enable falls through the switch and SetView is never called: far sight
-    // would silently never engage. It needs ReadBit(), and its object lookup moved
-    // after the enable test since resetting the view must not depend on resolving
-    // the old object. CMSG_SHOWING_HELM is excluded for the same reason -- its
-    // three bodies are 0x80, 0x00, 0x80 -- compounded by HandleShowingHelmOpcode
-    // ignoring the packet and toggling PLAYER_FLAGS_HIDE_HELM rather than
-    // assigning it, which inverts the flag whenever the two disagree.
+    // CMSG_SHOWING_HELM is still excluded for the bit-versus-byte reason below --
+    // its three bodies are 0x80, 0x00, 0x80 -- compounded by HandleShowingHelmOpcode
+    // ignoring the packet and toggling PLAYER_FLAGS_HIDE_HELM rather than assigning
+    // it, which inverts the flag whenever the two disagree.
     DefC(CMSG_SET_TITLE, "CMSG_SET_TITLE", STATUS_LOGGEDIN, PROCESS_THREADUNSAFE, &WorldSession::HandleSetTitleOpcode);
     DefC(CMSG_SET_WATCHED_FACTION, "CMSG_SET_WATCHED_FACTION", STATUS_LOGGEDIN, PROCESS_THREADUNSAFE, &WorldSession::HandleSetWatchedFactionOpcode);
     DefC(CMSG_SET_CURRENCY_FLAGS, "CMSG_SET_CURRENCY_FLAGS", STATUS_LOGGEDIN, PROCESS_THREADUNSAFE, &WorldSession::HandleSetCurrencyFlagsOpcode);
+
+    // Far sight, once its reader was corrected. This was held back from the batch
+    // above because its one-byte body is an MSB-first bit rather than a uint8
+    // boolean: every sampled 18414 body is 0x80 or 0x00, and the inherited
+    // `switch (op) case 0/case 1` matched neither, so enabling far sight silently
+    // did nothing. HandleFarSightOpcode now reads a bit and only resolves the
+    // far-sight object on enable, so a reset no longer depends on that object
+    // still being in scope. Fixtures pin both bodies in mop_far_sight_packets.
+    DefC(CMSG_FAR_SIGHT, "CMSG_FAR_SIGHT", STATUS_LOGGEDIN, PROCESS_THREADUNSAFE, &WorldSession::HandleFarSightOpcode);
 }
