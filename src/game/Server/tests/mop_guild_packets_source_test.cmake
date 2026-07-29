@@ -285,6 +285,20 @@ require_once("${packet_builder}"
 require_once("${packet_builder}"
     "out.WriteBits(GUILD_BANK_MAX_TABS, 21)"
     "guild-permissions 21-bit tab count")
+# Byte fixtures call the builders directly, so on their own they would still pass if
+# the production call sites were deleted or the rank adapter miswired. Pin the wiring.
+require_once("${guild_handler}"
+    "MopGuildPackets::BuildGuildPermissions(data, rankId,"
+    "guild-permissions production builder call")
+require_once("${guild_sender}"
+    "MopGuildPackets::BuildGuildRanks(data, ranks);"
+    "guild-rank-query production builder call")
+require_once("${guild_sender}"
+    "entry.bankMoneyPerDay = m_Ranks[i].BankMoneyPerDay;"
+    "guild-rank-query money adapter field")
+require_once("${guild_sender}"
+    "entry.rights = m_Ranks[i].Rights;"
+    "guild-rank-query rights adapter field")
 require_once("${guild_handler}"
     "MopGuildPackets::BuildGuildCommandResult(data, typecmd, str, cmdresult)"
     "guild-command-result builder call")
