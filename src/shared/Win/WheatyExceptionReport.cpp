@@ -249,9 +249,26 @@ static void BuildCrashPath(TCHAR* out, size_t outSize, TCHAR const* folder,
     // terminate when it fills the buffer exactly.
     if (written < 0 || (size_t)written >= outSize)
     {
-        // The folder alone leaves no room for the parts that had to survive. Drop it
-        // and write beside the executable rather than emit a mangled path.
-        _sntprintf(out, outSize, _T("crash%s%s"), suffix, ext);
+        // The folder alone leaves no room for the parts that had to survive. Fall back
+        // to the temp directory, which is absolute, writable and short. A bare relative
+        // name would land in whatever directory the process was launched from - only
+        // ServiceMain sets that to the executable's - so the artifacts of the one
+        // installation that needs this fallback would be scattered or lost.
+        TCHAR tempDir[MAX_PATH];
+        DWORD const tempLen = GetTempPath(ARRAYSIZE(tempDir), tempDir);
+
+        // 0 is failure; a value >= the buffer means it wanted more room than MAX_PATH.
+        // GetTempPath keeps the trailing backslash, so none is added here.
+        written = (tempLen > 0 && tempLen < ARRAYSIZE(tempDir))
+                  ? _sntprintf(out, outSize, _T("%scrash%s%s"), tempDir, suffix, ext)
+                  : -1;
+
+        if (written < 0 || (size_t)written >= outSize)
+        {
+            // Nowhere absolute left to go. The launch directory is a poor destination
+            // but a named file somewhere beats a mangled path or none.
+            _sntprintf(out, outSize, _T("crash%s%s"), suffix, ext);
+        }
     }
 
     out[outSize - 1] = _T('\0');
@@ -387,7 +404,15 @@ LONG WINAPI WheatyExceptionReport::WheatyUnhandledExceptionFilter(
     // a process that was still saveable. The other results end the process, and
     // releasing there would just let a second faulting thread into a reporting path
     // that is already unwinding.
-    if (result == EXCEPTION_CONTINUE_EXECUTION)
+    //
+    // Except when the dump helper outlived its wait. It still holds the static request
+    // and reads the filename statics, so re-entry would overwrite both underneath it
+    // and start DbgHelp work beside a MiniDumpWriteDump still in progress - the exact
+    // race the m_dumpHelperRunning check exists to prevent. There is no way to learn
+    // that it has finished (its handle is closed, and it is deliberately not killed),
+    // so the guard stays shut: one crash report is worth less than corrupting the
+    // process that survived.
+    if (result == EXCEPTION_CONTINUE_EXECUTION && !m_dumpHelperRunning)
     {
         InterlockedExchange(&s_inFilter, 0);
     }
@@ -621,7 +646,12 @@ void WheatyExceptionReport::GenerateExceptionReport(
 
     // Named here so whoever opens the report knows the dump exists and where it is;
     // it carries the argument values this text cannot recover on optimised x64.
-    if (m_szDumpFileName[0] && GetFileAttributes(m_szDumpFileName) != INVALID_FILE_ATTRIBUTES)
+    //
+    // m_dumpWritten, not GetFileAttributes: the dump is opened CREATE_ALWAYS, so the
+    // file exists from the moment writing starts, and a failed dump whose DeleteFile
+    // was refused leaves one behind. Testing for existence would send an investigator
+    // to a partial or stale artifact and call it this crash's dump.
+    if (m_dumpWritten)
     {
         _tprintf(_T("Minidump: %s\r\n"), m_szDumpFileName);
     }
