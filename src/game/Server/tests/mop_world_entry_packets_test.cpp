@@ -102,6 +102,14 @@ static void test_set_time_zone_information()
     // flushed to 0x0E 0x1C, then the string twice. The client copies each into
     // a 127-byte buffer and resolves it by name, so the bytes must be the
     // literal identifier and the lengths must precede both strings.
+    //
+    // Corroborated against a real retail body, which this fixture predates:
+    // capture-000019 seq 23 is 18 30 "Europe/ParisEurope/Paris". Twelve encodes as
+    // 0001100 0001100 -> 0x18 0x30 under exactly the rule asserted here, so the same
+    // encoder reproduces both retail's name and ours. All 817 timezone packets at
+    // build 18414 are 26 bytes (min == max), i.e. that one name -- the corpus never
+    // varies it, so the length field's behaviour is only provable from the encoding
+    // rule plus the 64-character case below, not from the captures.
     WorldPacket packet(SMSG_SET_TIME_ZONE_INFORMATION, 2 + 2 * 7);
     MopWorldEntryPackets::BuildSetTimeZoneInformation(packet, "Etc/UTC");
     CHECK(ExpectBytes(packet, {
