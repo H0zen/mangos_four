@@ -353,6 +353,92 @@ namespace MopCompactPackets
     /// the GUIDs that fall out carry the same high bytes as the movers those
     /// captures' name queries report -- 0x0400 for the creature, 0x0180 for the
     /// player.
+    /// SMSG_MOVE_SET_WALK_SPEED (0x0469), from reader sub_C8F849 (dispatcher
+    /// sub_C80E74, case 405).
+    ///
+    /// Verified against capture-000004 seq 23263: 14 bytes consuming exactly,
+    /// yielding guid 0x04000000053CC8E8, counter 497, speed 1.25. That is the
+    /// same mover as the run-speed bodies from the same capture, decoded under a
+    /// completely different interleave, which is a useful cross-check that the
+    /// per-opcode layouts really are distinct rather than a misreading.
+    ///
+    /// Walk puts TWO GUID bytes before the counter where run puts one and swim
+    /// puts none; there is no shared template across this family.
+    inline void BuildMoveSetWalkSpeed(WorldPacket& out, uint64 moverGuid,
+        uint32 counter, float speed)
+    {
+        uint8 const maskOrder[] = { 6, 7, 3, 1, 2, 0, 4, 5 };
+        uint8 const beforeCounter[] = { 5, 6 };
+        uint8 const beforeSpeed[] = { 4 };
+        uint8 const afterSpeed[] = { 2, 3, 0, 1, 7 };
+
+        for (uint8 index : maskOrder)
+            out.WriteBit(SwimSpeedGuidByte(moverGuid, index) != 0);
+        out.FlushBits();
+        for (uint8 index : beforeCounter)
+            out.WriteByteSeq(SwimSpeedGuidByte(moverGuid, index));
+        out << uint32(counter);
+        for (uint8 index : beforeSpeed)
+            out.WriteByteSeq(SwimSpeedGuidByte(moverGuid, index));
+        out << float(speed);
+        for (uint8 index : afterSpeed)
+            out.WriteByteSeq(SwimSpeedGuidByte(moverGuid, index));
+    }
+
+    /// SMSG_SPLINE_MOVE_SET_RUN_SPEED (0x02F1), from reader sub_C8C923.
+    ///
+    /// This is the observer broadcast, and unlike every direct speed packet it
+    /// carries NO counter -- only the mover and the speed.
+    ///
+    /// Verified against capture-000004 seq 2506: 12 bytes consuming exactly,
+    /// yielding guid 0xF1308319002275D5 (high 0xF13, HIGHGUID_UNIT) and speed
+    /// 4.85.
+    inline void BuildSplineMoveSetRunSpeed(WorldPacket& out, uint64 moverGuid,
+        float speed)
+    {
+        uint8 const maskOrder[] = { 3, 0, 1, 4, 7, 5, 6, 2 };
+        uint8 const beforeSpeed[] = { 4 };
+        uint8 const afterSpeed[] = { 1, 5, 3, 7, 6, 2, 0 };
+
+        for (uint8 index : maskOrder)
+            out.WriteBit(SwimSpeedGuidByte(moverGuid, index) != 0);
+        out.FlushBits();
+        for (uint8 index : beforeSpeed)
+            out.WriteByteSeq(SwimSpeedGuidByte(moverGuid, index));
+        out << float(speed);
+        for (uint8 index : afterSpeed)
+            out.WriteByteSeq(SwimSpeedGuidByte(moverGuid, index));
+    }
+
+    /// SMSG_MOVE_SET_SWIM_BACK_SPEED (0x0962), from reader sub_C8AF44
+    /// (dispatcher sub_C80E74, case 378).
+    ///
+    /// The body this replaced was broken on its face, independently of any
+    /// client evidence: it wrote GUID byte 0 TWICE and byte 2 never, nine
+    /// byte-writes for eight bytes.
+    ///
+    /// NOT corpus-verified. The layout is transcribed from the reader, but no
+    /// retail body for this opcode has been decoded, so unlike walk, run and
+    /// spline this one has no capture-pinned fixture and stays outside the send
+    /// gate until it does.
+    inline void BuildMoveSetSwimBackSpeed(WorldPacket& out, uint64 moverGuid,
+        uint32 counter, float speed)
+    {
+        uint8 const maskOrder[] = { 5, 0, 4, 2, 1, 3, 6, 7 };
+        uint8 const beforeCounter[] = { 5, 6, 0, 4 };
+        uint8 const afterSpeed[] = { 1, 7, 2, 3 };
+
+        for (uint8 index : maskOrder)
+            out.WriteBit(SwimSpeedGuidByte(moverGuid, index) != 0);
+        out.FlushBits();
+        for (uint8 index : beforeCounter)
+            out.WriteByteSeq(SwimSpeedGuidByte(moverGuid, index));
+        out << uint32(counter);                             // counter and speed
+        out << float(speed);                                // are adjacent here
+        for (uint8 index : afterSpeed)
+            out.WriteByteSeq(SwimSpeedGuidByte(moverGuid, index));
+    }
+
     inline void BuildMoveSetRunSpeed(WorldPacket& out, uint64 moverGuid,
         uint32 counter, float speed)
     {

@@ -282,13 +282,12 @@ void Unit::SetSpeedRate(UnitMoveType mtype, float rate, bool forced, bool ignore
             {
                 case MOVE_WALK:
                 {
+                    // Inherited body was wrong: the client reader sub_C8F849
+                    // takes two GUID bytes before the counter, one between the
+                    // counter and the speed, and five after. See
+                    // BuildMoveSetWalkSpeed.
                     data.Initialize(SMSG_MOVE_SET_WALK_SPEED, 1 + 8 + 4 + 4);
-                    data.WriteGuidMask<0, 4, 5, 2, 3, 1, 6, 7>(guid);
-                    data.WriteGuidBytes<6, 1, 5>(guid);
-                    data << float(GetSpeed(mtype));
-                    data.WriteGuidBytes<2>(guid);
-                    data << uint32(0);
-                    data.WriteGuidBytes<4, 0, 7, 3>(guid);
+                    MopCompactPackets::BuildMoveSetWalkSpeed(data, guid.GetRawValue(), 0, GetSpeed(mtype));
                     break;
                 }
                 case MOVE_RUN:
@@ -321,11 +320,10 @@ void Unit::SetSpeedRate(UnitMoveType mtype, float rate, bool forced, bool ignore
                 case MOVE_SWIM_BACK:
                 {
                     data.Initialize(SMSG_MOVE_SET_SWIM_BACK_SPEED, 1 + 8 + 4 + 4 );
-                    data.WriteGuidMask<4, 2, 3, 6, 5, 1, 0, 7>(guid);
-                    data << uint32(0);
-                    data.WriteGuidBytes<0, 3, 4, 6, 5, 1>(guid);
-                    data << float(GetSpeed(mtype));
-                    data.WriteGuidBytes<0, 7>(guid);
+                    // The body here wrote GUID byte 0 twice and byte 2 never.
+                    // Rebuilt from the client reader sub_C8AF44; see
+                    // BuildMoveSetSwimBackSpeed.
+                    MopCompactPackets::BuildMoveSetSwimBackSpeed(data, guid.GetRawValue(), 0, GetSpeed(mtype));
                     break;
                 }
                 case MOVE_TURN_RATE:
@@ -396,11 +394,11 @@ void Unit::SetSpeedRate(UnitMoveType mtype, float rate, bool forced, bool ignore
             }
             case MOVE_RUN:
             {
+                // Observer broadcast, and it carries no counter at all. The
+                // client reader sub_C8C923 takes guid[4], the speed, then the
+                // remaining seven bytes. See BuildSplineMoveSetRunSpeed.
                 data.Initialize(SMSG_SPLINE_MOVE_SET_RUN_SPEED, 1 + 8 + 4);
-                data.WriteGuidMask<4, 0, 5, 7, 6, 3, 1, 2>(guid);
-                data.WriteGuidBytes<0, 7, 6, 5, 3, 4>(guid);
-                data << float(GetSpeed(mtype));
-                data.WriteGuidBytes<2, 1>(guid);
+                MopCompactPackets::BuildSplineMoveSetRunSpeed(data, guid.GetRawValue(), GetSpeed(mtype));
                 break;
             }
             case MOVE_RUN_BACK:

@@ -220,10 +220,13 @@ static void test_attacker_state_update()
 static void test_run_speed_matches_retail_body()
 {
     // The captured speed is 0x40F66667, one ULP above what the literal 7.7f
-    // compiles to (0x40F66666). Retail's value was computed rather than typed --
-    // 7.0 base run times a 1.1 modifier -- so the exact bits are reconstructed
-    // here. Using the literal would fail on byte 9 alone, which is a fair
-    // demonstration that this fixture is byte-exact and not merely shape-exact.
+    // compiles to (0x40F66666), so the exact bits are reconstructed here. These
+    // bits are taken verbatim from the wire; the provenance of retail's own
+    // arithmetic is not established -- 7.0f * 1.1f in float lands on ...67 while
+    // the same product evaluated in double and narrowed lands on ...66, so the
+    // capture is the authority rather than any reconstruction of it. Using the
+    // literal fails on byte 9 alone, which is a fair demonstration that this
+    // fixture is byte-exact and not merely shape-exact.
     float speed;
     uint32 const speedBits = 0x40F66667u;
     std::memcpy(&speed, &speedBits, sizeof(speed));
@@ -237,6 +240,47 @@ static void test_run_speed_matches_retail_body()
         0x05, 0x04, 0xE9,                               // guid[7], guid[3], guid[0] ^ 1
         0x67, 0x66, 0xF6, 0x40,                         // 7.7f
         0x3D                                            // guid[2] ^ 1; 4,6,5 are zero
+    }));
+}
+
+/// SMSG_MOVE_SET_WALK_SPEED, from client reader sub_C8F849, pinned against
+/// capture-000004 seq 23263 (build 18414, catalogue 2BE10C89). The mover is the
+/// same creature as the run-speed body above -- guid 0x04000000053CC8E8 -- which
+/// cross-checks that these really are distinct per-opcode interleaves.
+static void test_walk_speed_matches_retail_body()
+{
+    float speed;
+    uint32 const speedBits = 0x3FA00000u;                   // 1.25f
+    std::memcpy(&speed, &speedBits, sizeof(speed));
+
+    WorldPacket packet(SMSG_MOVE_SET_WALK_SPEED, 17);
+    MopCompactPackets::BuildMoveSetWalkSpeed(packet, 0x04000000053CC8E8ull, 497u, speed);
+    CHECK(BytesEqual(packet, {
+        0x7C,                                               // mask, guid order 6,7,3,1,2,0,4,5
+        0xF1,                                               // guid[5]; guid[6] is zero so absent
+        0x01, 0x00, 0x00, 0x00,                             // counter 497
+        0x00,                                               // guid[4] ^ 1 -- present but zero-valued
+        0xA0, 0x3F,                                         // (speed continues)
+        0x3D, 0x04, 0xE9, 0xC9, 0x05                        // guid[2,3,0,1,7] ^ 1
+    }));
+}
+
+/// SMSG_SPLINE_MOVE_SET_RUN_SPEED, from client reader sub_C8C923, pinned against
+/// capture-000004 seq 2506. The observer broadcast carries NO counter, only the
+/// mover and the speed, which is what distinguishes it from every direct packet.
+static void test_spline_run_speed_matches_retail_body()
+{
+    float speed;
+    uint32 const speedBits = 0x409B3333u;                   // 4.85f
+    std::memcpy(&speed, &speedBits, sizeof(speed));
+
+    WorldPacket packet(SMSG_SPLINE_MOVE_SET_RUN_SPEED, 13);
+    MopCompactPackets::BuildSplineMoveSetRunSpeed(packet, 0xF1308319002275D5ull, speed);
+    CHECK(BytesEqual(packet, {
+        0x7F,                                               // mask, guid order 3,0,1,4,7,5,6,2
+        0x18,                                               // guid[4] ^ 1
+        0x33, 0x33, 0x9B, 0x40,                             // 4.85f
+        0x74, 0x82, 0xF0, 0x31, 0x23, 0xD4                  // guid[1,5,3,7,6,2,0] ^ 1, minus the absent one
     }));
 }
 
@@ -644,6 +688,9 @@ static void test_opcode_values_are_framable()
     CHECK(uint32_t(SMSG_ATTACKSWING_ERROR) == 0x11E1u);
     CHECK(uint32_t(SMSG_MOVE_SET_SWIM_SPEED) == 0x0817u);
     CHECK(uint32_t(SMSG_MOVE_SET_RUN_SPEED) == 0x184Cu);
+    CHECK(uint32_t(SMSG_MOVE_SET_WALK_SPEED) == 0x0469u);
+    CHECK(uint32_t(SMSG_SPLINE_MOVE_SET_RUN_SPEED) == 0x02F1u);
+    CHECK(uint32_t(SMSG_MOVE_SET_SWIM_BACK_SPEED) == 0x0962u);
     CHECK(uint32_t(SMSG_MOVE_SET_RUN_SPEED) <= 0x1FFFu);   // must fit the 13-bit wire header
     CHECK(uint32_t(SMSG_RANDOM_ROLL) == 0x141Au);
     CHECK(uint32_t(SMSG_UPDATE_INSTANCE_ENCOUNTER_UNIT) == 0x0332u);
@@ -710,6 +757,8 @@ int main(int /*argc*/, char** /*argv*/)
     test_attack_packets();
     test_attacker_state_update();
     test_run_speed_matches_retail_body();
+    test_walk_speed_matches_retail_body();
+    test_spline_run_speed_matches_retail_body();
     test_run_speed_differs_from_swim_interleave();
     test_swim_speed_guid_layouts();
     test_random_roll_guid_layouts();
