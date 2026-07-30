@@ -175,9 +175,9 @@
  *   TOTAL SMSG rows                   925
  *
  * SUBSYSTEM CONFIDENCE: high=365, low=221, medium=182, none=157
- * STATUS TOTALS: ACTIVE=466, DOC=435, DORMANT=619
- *   SMSG: ACTIVE=280, DOC=271, DORMANT=374
- *   CMSG: ACTIVE=186, DOC=164, DORMANT=245
+ * STATUS TOTALS: ACTIVE=468, DOC=435, DORMANT=617
+ *   SMSG: ACTIVE=281, DOC=271, DORMANT=373
+ *   CMSG: ACTIVE=187, DOC=164, DORMANT=244
  */
 
 // CAVEATS -- read before trusting any single row:
@@ -422,7 +422,7 @@ typedef uint16_t uint16;
  *   SMSG_REALM_NAME_QUERY_RESPONSE                 0x063E  ACTIVE   [low-conf]
  *   SMSG_GAMEOBJECT_QUERY_RESPONSE                 0x06BF  ACTIVE   [low-conf]
  *   SMSG_PAGE_TEXT_QUERY_RESPONSE                  0x081E  ACTIVE   [high-conf]
- *   SMSG_PET_NAME_QUERY_RESPONSE                   0x0ABE  DORMANT 
+ *   SMSG_PET_NAME_QUERY_RESPONSE                   0x0ABE  ACTIVE
  *   SMSG_INVALIDATE_PLAYER                         0x102E  DORMANT  [medium-conf]
  *   SMSG_PETITION_QUERY_RESPONSE                   0x1083  DORMANT  [medium-conf]
  *   SMSG_NPC_TEXT_UPDATE                           0x140A  ACTIVE   [high-conf]
@@ -1370,7 +1370,7 @@ typedef uint16_t uint16;
  *   CMSG_PETITION_QUERY                            0x0255  DORMANT 
  *   CMSG_LEAVE_BATTLEFIELD                         0x0257  ACTIVE
  *   CMSG_AUCTION_REMOVE_ITEM                       0x0259  DORMANT 
- *   CMSG_PET_ACTION                                0x025B  ACTIVE 
+ *   CMSG_PET_ACTION                                0x025B  ACTIVE
  *   CMSG_AUTOEQUIP_ITEM                            0x025F  ACTIVE
  *   CMSG_KEYBOUND_OVERRIDE                         0x0264  DOC     
  *   CMSG_ZONEUPDATE                                0x0265  DORMANT 
@@ -1864,7 +1864,7 @@ typedef uint16_t uint16;
  *   CMSG_LF_GUILD_REMOVE_APPLICATION               0x1C53  DOC     
  *   CMSG_GUILD_QUERY_NEWS                          0x1C58  DOC     
  *   CMSG_CHALLENGE_MODE_REQUEST_MAP_STATS          0x1C5A  DOC     
- *   CMSG_PET_NAME_QUERY                            0x1C62  DORMANT 
+ *   CMSG_PET_NAME_QUERY                            0x1C62  ACTIVE
  *   CMSG_UNKNOWN_0x1C63                            0x1C63  DOC     
  *   CMSG_USE_ITEM                                  0x1CC1  DORMANT 
  *   CMSG_BATTLE_PET_QUERY_NAME                     0x1CE0  DOC     

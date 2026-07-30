@@ -133,6 +133,17 @@ void WorldSession::HandlePetAction(WorldPacket& recv_data)
         return;
     }
 
+    // Registering this opcode made everything below reachable from the wire, and
+    // it is not only pets that reach it. The filter above constrains players and
+    // real pets; a charmed creature or a vehicle falls through both arms. Real
+    // traffic does exactly that -- bodies carrying a HIGHGUID_VEHICLE mover with
+    // ACT_COMMAND exist. Pet declares members past the end of a Creature, so
+    // ((Pet*)pet)->SetSpellOpener() on a vehicle is an out-of-bounds write driven
+    // by a client packet. Resolve the type once and guard every Pet-only call.
+    Pet* ownedPet = (pet->GetTypeId() == TYPEID_UNIT && ((Creature*)pet)->IsPet())
+                    ? static_cast<Pet*>(pet)
+                    : NULL;
+
     switch (flag)
     {
         case ACT_COMMAND:                                   // 0x07
@@ -143,9 +154,12 @@ void WorldSession::HandlePetAction(WorldPacket& recv_data)
                     pet->StopMoving();
                     pet->AttackStop(true);
                     pet->GetMotionMaster()->Clear();
-                    ((Pet*)pet)->SetStayPosition(true);
-                    ((Pet*)pet)->SetIsRetreating();
-                    ((Pet*)pet)->SetSpellOpener();
+                    if (ownedPet)
+                    {
+                        ownedPet->SetStayPosition(true);
+                        ownedPet->SetIsRetreating();
+                        ownedPet->SetSpellOpener();
+                    }
                     charmInfo->SetCommandState(COMMAND_STAY);
                     break;
                 }
@@ -154,16 +168,22 @@ void WorldSession::HandlePetAction(WorldPacket& recv_data)
                     pet->StopMoving();
                     pet->AttackStop(true);
                     pet->GetMotionMaster()->Clear();
-                    ((Pet*)pet)->SetStayPosition();
-                    ((Pet*)pet)->SetIsRetreating(true);
-                    ((Pet*)pet)->SetSpellOpener();
+                    if (ownedPet)
+                    {
+                        ownedPet->SetStayPosition();
+                        ownedPet->SetIsRetreating(true);
+                        ownedPet->SetSpellOpener();
+                    }
                     charmInfo->SetCommandState(COMMAND_FOLLOW);
                     break;
                 }
                 case COMMAND_ATTACK:                        // spellid=1792  // ATTACK
                 {
-                    ((Pet*)pet)->SetIsRetreating();
-                    ((Pet*)pet)->SetSpellOpener();
+                    if (ownedPet)
+                    {
+                        ownedPet->SetIsRetreating();
+                        ownedPet->SetSpellOpener();
+                    }
 
                     Unit* targetUnit = targetGuid ? _player->GetMap()->GetUnit(targetGuid) : NULL;
 
@@ -225,7 +245,19 @@ void WorldSession::HandlePetAction(WorldPacket& recv_data)
                         return;
                     }
 
-                    ((Pet*)pet)->SetStayPosition();
+                    if (ownedPet)
+                    {
+                        ownedPet->SetStayPosition();
+                    }
+                    break;
+                }
+                case COMMAND_MOVE_TO:                       // 0x04
+                {
+                    // A ground-targeted pet move. This tree has no move-to
+                    // behaviour, so accept and ignore it: it is ordinary player
+                    // input and does not belong in the error log. The position
+                    // that would drive it is the one part of this body whose
+                    // field order is not established.
                     break;
                 }
                 default:
@@ -238,7 +270,10 @@ void WorldSession::HandlePetAction(WorldPacket& recv_data)
                 case REACT_PASSIVE:                         // passive
                 {
                     pet->AttackStop(true);
-                    ((Pet*)pet)->SetSpellOpener();
+                    if (ownedPet)
+                    {
+                        ownedPet->SetSpellOpener();
+                    }
                 }
                 // fall through
                 case REACT_DEFENSIVE:                       // recovery
@@ -253,8 +288,11 @@ void WorldSession::HandlePetAction(WorldPacket& recv_data)
         case ACT_PASSIVE:                                   // 0x01
         case ACT_ENABLED:                                   // 0xC1    spell
         {
-            ((Pet*)pet)->SetIsRetreating();
-            ((Pet*)pet)->SetSpellOpener();
+            if (ownedPet)
+            {
+                ownedPet->SetIsRetreating();
+                ownedPet->SetSpellOpener();
+            }
 
             Unit* unit_target = targetGuid ? _player->GetMap()->GetUnit(targetGuid) : NULL;
 
@@ -304,7 +342,10 @@ void WorldSession::HandlePetAction(WorldPacket& recv_data)
             if (unit_target && !(pet->IsWithinDistInMap(unit_target, sRange->maxRange) && pet->IsWithinLOSInMap(unit_target, VMAP::ModelIgnoreFlags::M2))
                 && !(GetPlayer()->IsFriendlyTo(unit_target) || pet->HasAuraType(SPELL_AURA_MOD_POSSESS)))
             {
-                ((Pet*)pet)->SetSpellOpener(spellid, sRange->minRange, sRange->maxRange);
+                if (ownedPet)
+                {
+                    ownedPet->SetSpellOpener(spellid, sRange->minRange, sRange->maxRange);
+                }
                 spell->finish(false);
                 delete spell;
 
@@ -356,7 +397,10 @@ void WorldSession::HandlePetAction(WorldPacket& recv_data)
 
                 unit_target = spell->m_targets.getUnitTarget();
 
-                ((Pet*)pet)->SetSpellOpener();
+                if (ownedPet)
+                {
+                    ownedPet->SetSpellOpener();
+                }
                 spell->SpellStart(&(spell->m_targets));
             }
             else
@@ -432,11 +476,12 @@ void WorldSession::HandlePetNameQueryOpcode(WorldPacket& recv_data)
 {
     DETAIL_LOG("HandlePetNameQuery. CMSG_PET_NAME_QUERY");
 
-    uint32 petnumber;
+    // The pre-MoP body was a raw uint32 then a raw GUID. At 18414 both are
+    // packed behind sixteen interleaved presence bits, and the pet number is
+    // carried as eight bytes. See MopCompactPackets::ReadPetNameQuery.
     ObjectGuid petguid;
-
-    recv_data >> petnumber;
-    recv_data >> petguid;
+    uint64 petnumber = 0;
+    MopCompactPackets::ReadPetNameQuery(recv_data, petguid, petnumber);
 
     SendPetNameQuery(petguid, petnumber);
 }
@@ -447,16 +492,16 @@ void WorldSession::HandlePetNameQueryOpcode(WorldPacket& recv_data)
  * @param petguid The pet guid.
  * @param petnumber The pet number.
  */
-void WorldSession::SendPetNameQuery(ObjectGuid petguid, uint32 petnumber)
+void WorldSession::SendPetNameQuery(ObjectGuid petguid, uint64 petnumber)
 {
     Creature* pet = _player->GetMap()->GetAnyTypeCreature(petguid);
-    if (!pet || !pet->GetCharmInfo() || pet->GetCharmInfo()->GetPetNumber() != petnumber)
+    if (!pet || !pet->GetCharmInfo() ||
+        uint64(pet->GetCharmInfo()->GetPetNumber()) != petnumber)
     {
-        WorldPacket data(SMSG_PET_NAME_QUERY_RESPONSE, (4 + 1 + 4 + 1));
-        data << uint32(petnumber);
-        data << uint8(0);
-        data << uint32(0);
-        data << uint8(0);
+        // Not found. One bit clear, then the number echoed back, so the client
+        // can retire the request rather than wait on it.
+        WorldPacket data(SMSG_PET_NAME_QUERY_RESPONSE, 1 + 8);
+        MopCompactPackets::BuildPetNameQueryResponse(data, petnumber, NULL, 0, NULL);
         _player->GetSession()->SendPacket(&data);
         return;
     }
@@ -470,24 +515,22 @@ void WorldSession::SendPetNameQuery(ObjectGuid petguid, uint32 petnumber)
         sObjectMgr.GetCreatureLocaleStrings(pet->GetEntry(), loc_idx, &name);
     }
 
-    WorldPacket data(SMSG_PET_NAME_QUERY_RESPONSE, (4 + 4 + strlen(name) + 1));
-    data << uint32(petnumber);
-    data << name;
-    data << uint32(pet->GetUInt32Value(UNIT_FIELD_PET_NAME_TIMESTAMP));
+    std::string petName = name ? name : "";
+    std::string declinedStorage[MAX_DECLINED_NAME_CASES];
+    std::string const* declined = NULL;
 
     if (pet->IsPet() && ((Pet*)pet)->GetDeclinedNames())
     {
-        data << uint8(1);
         for (int i = 0; i < MAX_DECLINED_NAME_CASES; ++i)
         {
-            data << ((Pet*)pet)->GetDeclinedNames()->name[i];
+            declinedStorage[i] = ((Pet*)pet)->GetDeclinedNames()->name[i];
         }
-    }
-    else
-    {
-        data << uint8(0);
+        declined = declinedStorage;
     }
 
+    WorldPacket data(SMSG_PET_NAME_QUERY_RESPONSE, 6 + petName.size() + 4 + 8);
+    MopCompactPackets::BuildPetNameQueryResponse(data, petnumber, &petName,
+        pet->GetUInt32Value(UNIT_FIELD_PET_NAME_TIMESTAMP), declined);
     _player->GetSession()->SendPacket(&data);
 }
 

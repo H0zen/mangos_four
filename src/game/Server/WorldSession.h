@@ -1679,7 +1679,7 @@ class WorldSession
         void SendPetitionQueryOpcode(ObjectGuid petitionguid);
 
         // pet
-        void SendPetNameQuery(ObjectGuid guid, uint32 petnumber);
+        void SendPetNameQuery(ObjectGuid guid, uint64 petnumber);
         void SendStablePet(ObjectGuid guid);
         void SendStableResult(uint8 res);
         bool CheckStableMaster(ObjectGuid guid);

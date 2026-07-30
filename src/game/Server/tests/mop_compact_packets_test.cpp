@@ -995,16 +995,24 @@ static void test_pre_resurrect_packet()
 
 /// CMSG_PET_ACTION, pinned to real 18414 bodies.
 ///
-/// Four bodies at catalogue 2BE10C89, spanning three lengths and both the
-/// target-absent and target-present cases. Each must consume EXACTLY: a body
-/// that over- or under-reads would leave rpos short of size, and because the
-/// length is 18 + popcount of the sixteen presence bits, exact consumption is a
-/// real constraint rather than a tautology.
+/// Eight bodies at catalogue 2BE10C89 across FIVE DISTINCT PRESENCE MASKS:
+/// 0x7904, 0x7DAE, 0x7DAF, 0xFEBF and 0xFFBF. The mask is what matters, not the
+/// length. Bodies sharing a mask reproduce the reader instead of proving it,
+/// because bits that are always present together can be permuted without
+/// changing any decode. Two reviews of the first version of this test made that
+/// point independently, and they were right: it had only two distinct masks.
 ///
-/// The decoded GUIDs are checked against a fact outside the packet: 0xF14 is
-/// HIGHGUID_PET and 0xF13 is HIGHGUID_UNIT, so every pet slot decodes as a pet
-/// and the one populated target as a creature. A wrong byte interleave would
-/// have to produce a valid high type by accident, four times.
+/// 0x7DAE and 0x7DAF are the strongest pair here. They differ in exactly ONE
+/// mask bit, for the same pet, and the targets that fall out differ accordingly
+/// -- 0xF1311C18000000D4 against 0xF1311C180000012F. That pins the position of
+/// that single bit directly, which no amount of same-mask evidence can.
+///
+/// Each body must consume EXACTLY. Because the length is 18 + popcount of the
+/// sixteen presence bits, exact consumption is a real constraint, not a
+/// tautology.
+///
+/// The decoded GUIDs are then checked against a fact outside the packet: 0xF14
+/// is HIGHGUID_PET, 0xF13 HIGHGUID_UNIT and 0xF15 HIGHGUID_VEHICLE.
 static void CheckPetAction(char const* what, uint8_t const* body, size_t length,
     uint32 expectedAction, uint64 expectedPet, uint64 expectedTarget)
 {
@@ -1032,12 +1040,15 @@ static void CheckPetAction(char const* what, uint8_t const* body, size_t length,
 static void test_pet_action_matches_retail_bodies()
 {
     // Command actions carry no target. UNIT_ACTION_BUTTON_TYPE 0x07 is ACT_COMMAND.
-    uint8_t const stay[] = {
+    // Action 3 is COMMAND_ABANDON, not COMMAND_STAY -- this was mislabelled when
+    // the fixture landed. The distinction matters: for a hunter pet the abandon
+    // path unsummons with PET_SAVE_AS_DELETED, which is permanent.
+    uint8_t const abandon[] = {
         0x03, 0x00, 0x00, 0x07,
         0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
         0x79, 0x04, 0xF0, 0x43, 0x0D, 0x9A, 0x29, 0x02
     };
-    CheckPetAction("pet action stay", stay, sizeof(stay),
+    CheckPetAction("pet action abandon", abandon, sizeof(abandon),
         0x07000003u, UINT64_C(0xF1420C9B28000003), 0);
 
     uint8_t const follow[] = {
@@ -1058,10 +1069,16 @@ static void test_pet_action_matches_retail_bodies()
     CheckPetAction("pet action attack", attack, sizeof(attack),
         0x07000002u, UINT64_C(0xF141728D31027729), UINT64_C(0xF130EE0400AEA13D));
 
-    // The single positional body in all 21,530 packets of the build. Its middle
-    // float is 246.8356, the ground height every SMSG_ON_MONSTER_MOVE captured
-    // beside it reports, which is what identifies the middle slot as z. Which of
-    // the outer two is x and which is y is NOT established by any observed body.
+    // The only body of this build carrying a non-zero position. It is what
+    // identifies the middle slot as z, by coordinate BAND rather than by exact
+    // match: the movement bodies alongside it span x 1383..1501, y 548..775 and
+    // z 246.835..246.866, and this tuple is (772.5943, 246.8356, 1473.7810). An
+    // earlier comment here claimed every neighbour reported 246.8356 exactly;
+    // that was wrong, they vary in the fourth decimal and one by more.
+    //
+    // The same bands place the first value in the y range and the third in the x
+    // range, so y, z, x is well supported. It is not proven, since no body ties
+    // the tuple to a known actor, and the server does not consume the position.
     uint8_t const moveTo[] = {
         0x04, 0x00, 0x00, 0x07,
         0x09, 0x26, 0x41, 0x44,
@@ -1071,6 +1088,48 @@ static void test_pet_action_matches_retail_bodies()
     };
     CheckPetAction("pet action move to", moveTo, sizeof(moveTo),
         0x07000004u, UINT64_C(0xF1420C9AB9000003), 0);
+
+    // Masks 0x7DAE and 0x7DAF: identical but for one bit, same pet, targets that
+    // differ only in the byte that bit admits. This is the pair that pins the
+    // bit order rather than merely reproducing it.
+    uint8_t const targetBitClear[] = {
+        0x02, 0x00, 0x00, 0x07,
+        0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+        0x7D, 0xAE, 0xF0, 0x43, 0x0D, 0x9B, 0x1D, 0xB8, 0xD5, 0xF0, 0x19, 0x30,
+        0x00
+    };
+    CheckPetAction("pet action target bit clear", targetBitClear, sizeof(targetBitClear),
+        0x07000002u, UINT64_C(0xF1420C9AB9000001), UINT64_C(0xF1311C18000000D4));
+
+    uint8_t const targetBitSet[] = {
+        0x02, 0x00, 0x00, 0x07,
+        0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+        0x7D, 0xAF, 0xF0, 0x43, 0x0D, 0x9B, 0x1D, 0xB8, 0x2E, 0x00, 0xF0, 0x19,
+        0x30, 0x00
+    };
+    CheckPetAction("pet action target bit set", targetBitSet, sizeof(targetBitSet),
+        0x07000002u, UINT64_C(0xF1420C9AB9000001), UINT64_C(0xF1311C180000012F));
+
+    // Mask 0xFEBF, and the mover is a VEHICLE (0xF15), not a pet. These bodies
+    // are why HandlePetAction guards its Pet downcasts: ordinary traffic drives
+    // a non-pet through the command path.
+    uint8_t const vehicleMover[] = {
+        0x02, 0x00, 0x00, 0x07,
+        0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+        0xFE, 0xBF, 0xF0, 0x51, 0x1E, 0x22, 0x83, 0x24, 0x82, 0xD4, 0x74, 0xF0,
+        0x18, 0x31, 0x23, 0xD6
+    };
+    CheckPetAction("pet action vehicle mover", vehicleMover, sizeof(vehicleMover),
+        0x07000002u, UINT64_C(0xF150822500231FD7), UINT64_C(0xF1308319002275D5));
+
+    uint8_t const vehicleMoverTwo[] = {
+        0x02, 0x00, 0x00, 0x07,
+        0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+        0xFE, 0xBF, 0xF0, 0x51, 0x68, 0x44, 0x83, 0x27, 0x82, 0x62, 0xB8, 0xF0,
+        0x16, 0x31, 0x41, 0xC2
+    };
+    CheckPetAction("pet action vehicle mover two", vehicleMoverTwo, sizeof(vehicleMoverTwo),
+        0x07000002u, UINT64_C(0xF1508226004569C3), UINT64_C(0xF13083170040B963));
 
     // Pin the position itself, so a reordering of the three reads is caught.
     WorldPacket packet(CMSG_PET_ACTION, uint32(sizeof(moveTo)));
@@ -1092,6 +1151,100 @@ static void test_pet_action_matches_retail_bodies()
     CHECK(posY == expectedY);
     CHECK(posZ == expectedZ);
     CHECK(posX == expectedX);
+}
+
+/// CMSG_PET_NAME_QUERY and its response, pinned to real 18414 bodies.
+///
+/// The request carries sixteen presence bits interleaved across the pet GUID and
+/// the pet number. Four bodies across THREE distinct masks -- 0xB7DA, 0xB79A and
+/// 0xB7DE -- so the bit order is constrained rather than merely reproduced.
+///
+/// The response is tied to the request by evidence rather than by assumption:
+/// the "Blue" body below is the actual reply to the first request body, three
+/// packets later in the same capture, and the pet number it echoes is the one
+/// that falls out of that request. Decoding the two independently and finding
+/// the same number is what confirms the pair.
+static void test_pet_name_query_matches_retail_bodies()
+{
+    struct Request
+    {
+        char const* what;
+        uint8_t body[16];
+        size_t length;
+        uint64 guid;
+        uint64 number;
+    };
+
+    Request const requests[] = {
+        { "pet name query mask B7DA",
+          { 0xB7, 0xDA, 0x8F, 0x41, 0x30, 0x8F, 0x61, 0x41, 0x40, 0x00, 0x30, 0x10, 0xF0 },
+          13, UINT64_C(0xF1418E4031001160), 26099761 },
+        { "pet name query mask B79A",
+          { 0xB7, 0x9A, 0xE1, 0x10, 0xC2, 0xE1, 0xAE, 0x10, 0x41, 0xC2, 0x0E, 0xF0 },
+          12, UINT64_C(0xF140E011C3000FAF), 14684611 },
+        { "pet name query mask B7DE",
+          { 0xB7, 0xDE, 0x6A, 0xF8, 0xB3, 0x6A, 0x5C, 0xF8, 0x03, 0x40, 0x00, 0xB3, 0x04, 0xF0 },
+          14, UINT64_C(0xF1416BF9B202055D), 23853490 },
+        { "pet name query second B7DA",
+          { 0xB7, 0xDA, 0x3C, 0x32, 0x24, 0x3C, 0x7B, 0x32, 0x40, 0x00, 0x24, 0xDF, 0xF0 },
+          13, UINT64_C(0xF1413D332500DE7A), 20788005 },
+    };
+
+    for (size_t i = 0; i < sizeof(requests) / sizeof(requests[0]); ++i)
+    {
+        Request const& r = requests[i];
+        WorldPacket packet(CMSG_PET_NAME_QUERY, uint32(r.length));
+        packet.append(r.body, r.length);
+
+        ObjectGuid guid;
+        uint64 number = 0;
+        MopCompactPackets::ReadPetNameQuery(packet, guid, number);
+
+        if (guid.GetRawValue() != r.guid || number != r.number ||
+            packet.rpos() != packet.size())
+        {
+            std::fprintf(stderr,
+                "FAIL %s: guid 0x%016llX number %llu consumed %u/%u\n",
+                r.what, (unsigned long long)guid.GetRawValue(),
+                (unsigned long long)number,
+                unsigned(packet.rpos()), unsigned(packet.size()));
+            ++g_fail;
+        }
+    }
+
+    {   // The reply to the first request above, from the same capture.
+        std::string name = "Blue";
+        WorldPacket p(SMSG_PET_NAME_QUERY_RESPONSE, 22);
+        MopCompactPackets::BuildPetNameQueryResponse(p, 26099761, &name,
+            1403635742u, NULL);
+        CHECK(BytesEqual(p, {
+            0x80,                                           // hasData, then 5x7 declined lengths,
+            0x00, 0x00, 0x00, 0x00, 0x20,                   // one spare bit, and name length 4
+            0x42, 0x6C, 0x75, 0x65,                         // "Blue", unterminated
+            0x1E, 0xC8, 0xA9, 0x53,                         // timestamp
+            0x31, 0x40, 0x8E, 0x01, 0x00, 0x00, 0x00, 0x00  // pet number, eight bytes, trailing
+        }));
+    }
+    {   // A longer name, which moves the length field's low bits.
+        std::string name = "Werenika";
+        WorldPacket p(SMSG_PET_NAME_QUERY_RESPONSE, 26);
+        MopCompactPackets::BuildPetNameQueryResponse(p, 23853490, &name, 0, NULL);
+        CHECK(BytesEqual(p, {
+            0x80, 0x00, 0x00, 0x00, 0x00, 0x40,
+            0x57, 0x65, 0x72, 0x65, 0x6E, 0x69, 0x6B, 0x61,
+            0x00, 0x00, 0x00, 0x00,
+            0xB2, 0xF9, 0x6B, 0x01, 0x00, 0x00, 0x00, 0x00
+        }));
+    }
+    {   // No pet found: one clear bit, then the number echoed so the client can
+        // retire the request. Reader-derived shape; no observed body of this form.
+        WorldPacket p(SMSG_PET_NAME_QUERY_RESPONSE, 9);
+        MopCompactPackets::BuildPetNameQueryResponse(p, 26099761, NULL, 0, NULL);
+        CHECK(BytesEqual(p, {
+            0x00,
+            0x31, 0x40, 0x8E, 0x01, 0x00, 0x00, 0x00, 0x00
+        }));
+    }
 }
 
 static void test_opcode_values_are_framable()
@@ -1178,6 +1331,7 @@ int main(int /*argc*/, char** /*argv*/)
     test_spline_speed_family_full_interleaves_reader_derived();
     test_spline_speed_family_mask_order();
     test_pet_action_matches_retail_bodies();
+    test_pet_name_query_matches_retail_bodies();
     test_run_speed_differs_from_swim_interleave();
     test_swim_speed_guid_layouts();
     test_random_roll_guid_layouts();

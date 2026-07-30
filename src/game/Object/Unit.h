@@ -152,6 +152,108 @@ namespace MopCompactPackets
         targetGuid = ObjectGuid(targetRaw);
     }
 
+    /// CMSG_PET_NAME_QUERY (0x1C62), the 18414 body.
+    ///
+    /// Sixteen presence bits interleaved across the pet GUID and the pet number,
+    /// the latter carried as a packed eight-byte value rather than a uint32.
+    /// Nothing else: the body is 2 + popcount, which is 2 to 18.
+    ///
+    /// Verified against four decoded bodies of three different lengths. Each
+    /// consumes exactly, every pet GUID decodes under HIGHGUID_PET, and every
+    /// pet number falls in a plausible range with its top four bytes zero, which
+    /// is what makes the shorter bodies short.
+    inline void ReadPetNameQuery(WorldPacket& in, ObjectGuid& petGuid,
+        uint64& petNumber)
+    {
+        uint8 pet[8] = { 0, 0, 0, 0, 0, 0, 0, 0 };
+        uint8 number[8] = { 0, 0, 0, 0, 0, 0, 0, 0 };
+
+        in.ResetBitReader();
+        number[0] = in.ReadBit();  number[5] = in.ReadBit();
+        pet[1]    = in.ReadBit();  pet[7]    = in.ReadBit();
+        number[7] = in.ReadBit();  pet[6]    = in.ReadBit();
+        pet[4]    = in.ReadBit();  pet[5]    = in.ReadBit();
+        pet[0]    = in.ReadBit();  number[3] = in.ReadBit();
+        number[6] = in.ReadBit();  number[2] = in.ReadBit();
+        pet[3]    = in.ReadBit();  pet[2]    = in.ReadBit();
+        number[1] = in.ReadBit();  number[4] = in.ReadBit();
+
+        in.ReadByteSeq(number[2]); in.ReadByteSeq(number[1]);
+        in.ReadByteSeq(number[0]); in.ReadByteSeq(number[7]);
+        in.ReadByteSeq(pet[5]);    in.ReadByteSeq(pet[0]);
+        in.ReadByteSeq(number[6]); in.ReadByteSeq(pet[4]);
+        in.ReadByteSeq(number[5]); in.ReadByteSeq(pet[2]);
+        in.ReadByteSeq(pet[6]);    in.ReadByteSeq(number[3]);
+        in.ReadByteSeq(pet[3]);    in.ReadByteSeq(number[4]);
+        in.ReadByteSeq(pet[1]);    in.ReadByteSeq(pet[7]);
+
+        uint64 petRaw = 0;
+        uint64 numberRaw = 0;
+        for (uint8 index = 0; index < 8; ++index)
+        {
+            petRaw |= uint64(pet[index]) << (8 * index);
+            numberRaw |= uint64(number[index]) << (8 * index);
+        }
+        petGuid = ObjectGuid(petRaw);
+        petNumber = numberRaw;
+    }
+
+    /// SMSG_PET_NAME_QUERY_RESPONSE (0x0ABE), the 18414 body.
+    ///
+    /// The pre-MoP body was petNumber, a null-terminated name, the timestamp and
+    /// a declined-names flag. At 18414 the lengths lead as bit fields, the
+    /// strings follow unterminated, and the pet number TRAILS as eight bytes.
+    ///
+    /// Verified by decoding real responses: they yield the pet names "Blue" and
+    /// "Werenika" with a plausible timestamp, and one of them answers a request
+    /// decoded separately whose pet number matches the response's exactly, which
+    /// ties the two directions together.
+    ///
+    /// CAVEAT. Every observed response had no declined names, so all five length
+    /// fields were zero. That pins the TOTAL width of the run before the name
+    /// length at 36 bits, but not its division: five 7-bit fields plus one spare
+    /// bit is the reading taken here and matches MAX_DECLINED_NAME_CASES, yet the
+    /// same 36 bits would also admit other splits. Declined names are a
+    /// locale-specific feature, so the common path is unaffected either way.
+    inline void BuildPetNameQueryResponse(WorldPacket& out, uint64 petNumber,
+        std::string const* name, uint32 timestamp,
+        std::string const* declinedNames)
+    {
+        out.WriteBit(name != NULL);
+        if (name != NULL)
+        {
+            for (uint8 index = 0; index < 5; ++index)
+            {
+                out.WriteBits(declinedNames != NULL ? declinedNames[index].size() : 0, 7);
+            }
+            out.WriteBit(0);
+            out.WriteBits(name->size(), 8);
+            out.FlushBits();
+
+            if (declinedNames != NULL)
+            {
+                for (uint8 index = 0; index < 5; ++index)
+                {
+                    if (!declinedNames[index].empty())
+                    {
+                        out.append((uint8 const*)declinedNames[index].c_str(),
+                                   declinedNames[index].size());
+                    }
+                }
+            }
+            if (!name->empty())
+            {
+                out.append((uint8 const*)name->c_str(), name->size());
+            }
+            out << uint32(timestamp);
+        }
+        else
+        {
+            out.FlushBits();
+        }
+        out << uint64(petNumber);
+    }
+
     inline void BuildAttackStart(WorldPacket& out, uint64 attackerGuid,
         uint64 victimGuid)
     {
@@ -2188,7 +2290,8 @@ enum CommandStates
     COMMAND_STAY    = 0,
     COMMAND_FOLLOW  = 1,
     COMMAND_ATTACK  = 2,
-    COMMAND_ABANDON = 3
+    COMMAND_ABANDON = 3,
+    COMMAND_MOVE_TO = 4                                     // 18414, ground-targeted
 };
 
 #define UNIT_ACTION_BUTTON_ACTION(X) (uint32(X) & 0x00FFFFFF)
