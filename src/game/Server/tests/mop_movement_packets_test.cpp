@@ -1025,6 +1025,39 @@ static void test_linear_monster_move_fixture()
     CHECK(Equal(packet, expected));
 }
 
+/// CMSG_MOVE_KNOCK_BACK_ACK against a real 18414 body.
+///
+/// The sequence this tree carried for this opcode was wrong for the build: it
+/// desynced on every real body, consuming 34 to 39 bytes of 56 to 87. It never
+/// showed because the opcode is unregistered, so the wrong sequence was never
+/// reached -- a trap armed for whoever registered it next.
+///
+/// capture-000006 sequence 64718, build 18414, catalogue 2BE10C89. Consuming
+/// exactly is the check that matters most here: the old desync left twenty-odd
+/// bytes unread, which no field assertion alone would reveal.
+static void test_move_knock_back_ack_retail_body()
+{
+    static uint8 const body[] = {
+        0xD6, 0x00, 0x00, 0x00, 0xAE, 0x9E, 0x2B, 0xC6, 0xB0, 0x06, 0x2D, 0x41,
+        0x17, 0x55, 0xA1, 0xC4, 0x43, 0x80, 0x00, 0x01, 0x4A, 0x80, 0x00, 0x28,
+        0x01, 0xA0, 0x00, 0xC9, 0xE9, 0x3D, 0x04, 0x05, 0x00, 0x00, 0x70, 0x41,
+        0x93, 0x80, 0x7E, 0xBF, 0x03, 0x37, 0xDD, 0xBD, 0x25, 0x7B, 0xD5, 0xC0,
+        0x00, 0x00, 0x00, 0x00, 0xAC, 0x93, 0x01, 0x01, 0x06, 0xF1, 0x79, 0x40
+    };
+
+    WorldPacket packet(CMSG_MOVE_KNOCK_BACK_ACK, sizeof(body));
+    packet.append(body, sizeof(body));
+
+    MovementInfo info;
+    packet >> info;
+
+    CHECK(packet.rpos() == packet.size());
+    CHECK(info.GetGuid().GetRawValue() == UINT64_C(0x04000000053CC8E8));
+    CHECK(info.GetPos()->x == -10983.669922f);
+    CHECK(info.GetPos()->y == -1290.659058f);
+    CHECK(info.GetPos()->z == 10.814133f);
+}
+
 int main(int, char**)
 {
     test_thirteen_inbound_fixtures_and_exact_relay();
@@ -1034,6 +1067,7 @@ int main(int, char**)
     test_force_run_back_speed_change_ack_fixture();
     test_force_run_back_speed_change_ack_retail_body();
     test_back_speed_change_ack_round_trips();
+    test_move_knock_back_ack_retail_body();
     test_all_speed_ack_sequences_differ();
     test_speed_ack_sequences_are_distinct();
     test_spline_state_packets();
