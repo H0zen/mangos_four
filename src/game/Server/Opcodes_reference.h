@@ -175,9 +175,9 @@
  *   TOTAL SMSG rows                   925
  *
  * SUBSYSTEM CONFIDENCE: high=365, low=221, medium=182, none=157
- * STATUS TOTALS: ACTIVE=479, DOC=435, DORMANT=606
+ * STATUS TOTALS: ACTIVE=481, DOC=435, DORMANT=604
  *   SMSG: ACTIVE=286, DOC=271, DORMANT=368
- *   CMSG: ACTIVE=193, DOC=164, DORMANT=238
+ *   CMSG: ACTIVE=195, DOC=164, DORMANT=236
  */
 
 // CAVEATS -- read before trusting any single row:
@@ -1679,7 +1679,7 @@ typedef uint16_t uint16;
  *   CMSG_MOVE_SET_CAN_FLY_ACK                      0x1052  DORMANT
  *   CMSG_MOVE_START_STRAFE_RIGHT                   0x1058  ACTIVE
  *   CMSG_UNKNOWN_0x105A                            0x105A  DOC
- *   CMSG_FORCE_FLIGHT_BACK_SPEED_CHANGE_ACK        0x105B  DORMANT
+ *   CMSG_FORCE_FLIGHT_BACK_SPEED_CHANGE_ACK        0x105B  ACTIVE
  *   CMSG_OBJECT_UPDATE_FAILED                      0x1061  DORMANT
  *   CMSG_PET_BATTLE_FINAL_NOTIFY                   0x1063  DOC
  *   CMSG_FORCE_MOVE_ROOT_ACK                       0x107A  DORMANT
@@ -1696,7 +1696,7 @@ typedef uint16_t uint16;
  *   CMSG_UNKNOWN_0x10BB                            0x10BB  DOC
  *   CMSG_QUEST_POI_QUERY                           0x10C2  ACTIVE
  *   CMSG_GUILD_REQUEST_PARTY_STATE                 0x10C3  DOC
- *   CMSG_FORCE_SWIM_BACK_SPEED_CHANGE_ACK          0x10D1  DORMANT
+ *   CMSG_FORCE_SWIM_BACK_SPEED_CHANGE_ACK          0x10D1  ACTIVE
  *   MSG_MOVE_SET_SWIM_SPEED_CHEAT                  0x10D3  ACTIVE   server-binding=CMSG_TIME_SYNC_RESPONSE_DROPPED
  *   CMSG_MOVE_REMOVE_MOVEMENT_FORCE_ACK            0x10DB  DOC
  *   CMSG_UNKNOWN_0x10E3                            0x10E3  DOC      cand CMSG_CANCEL_MOUNT_AURA bound to 0x1552

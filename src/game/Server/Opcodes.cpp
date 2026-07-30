@@ -1278,6 +1278,11 @@ void InitializeOpcodes()
     // The other five carry the speed INSIDE the movement sequence, where no
     // element in this tree can express it. Registering them would misparse.
     DefC(CMSG_FORCE_RUN_BACK_SPEED_CHANGE_ACK, "CMSG_FORCE_RUN_BACK_SPEED_CHANGE_ACK", STATUS_LOGGEDIN, PROCESS_THREADUNSAFE, &WorldSession::HandleForceSpeedChangeAckOpcodes);
+    // The other two speed-leading members. Neither has observed traffic, so
+    // neither has a capture fixture, but their sequences come from the client's
+    // own writers and absence from the corpus is a gap in what was recorded.
+    DefC(CMSG_FORCE_SWIM_BACK_SPEED_CHANGE_ACK, "CMSG_FORCE_SWIM_BACK_SPEED_CHANGE_ACK", STATUS_LOGGEDIN, PROCESS_THREADUNSAFE, &WorldSession::HandleForceSpeedChangeAckOpcodes);
+    DefC(CMSG_FORCE_FLIGHT_BACK_SPEED_CHANGE_ACK, "CMSG_FORCE_FLIGHT_BACK_SPEED_CHANGE_ACK", STATUS_LOGGEDIN, PROCESS_THREADUNSAFE, &WorldSession::HandleForceSpeedChangeAckOpcodes);
 
     // CMSG_SET_ACTION_BUTTON is HELD. Its body is proven -- the reader matches
     // the client's writer sub_669CAE element for element and its fixtures stand

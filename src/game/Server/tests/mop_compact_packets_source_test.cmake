@@ -513,7 +513,8 @@ endif()
 # "Unknown move type opcode", so the forced-change bookkeeping never runs and the
 # packet is silently discarded -- indistinguishable from not registering it.
 mop_strip_cxx_comments("${movement_handler}" movement_handler_code)
-foreach(ack IN ITEMS CMSG_FORCE_RUN_BACK_SPEED_CHANGE_ACK CMSG_FORCE_SWIM_SPEED_CHANGE_ACK)
+foreach(ack IN ITEMS CMSG_FORCE_RUN_BACK_SPEED_CHANGE_ACK CMSG_FORCE_SWIM_SPEED_CHANGE_ACK
+                     CMSG_FORCE_SWIM_BACK_SPEED_CHANGE_ACK CMSG_FORCE_FLIGHT_BACK_SPEED_CHANGE_ACK)
     if(registry_code MATCHES "DefC${ws}*[(]${ws}*${ack}${ws}*,")
         if(NOT movement_handler_code MATCHES "case${ws}+${ack}${ws}*:")
             message(FATAL_ERROR

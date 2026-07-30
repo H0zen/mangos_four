@@ -405,6 +405,37 @@ static RefOp const kForceRunBackSpeedChangeAck[] = {
     TB(1), RefOp::TransportTime3, RefOp::FallCos, RefOp::FallSin, RefOp::FallHorizontal,
     RefOp::FallVertical, RefOp::FallTime, RefOp::Pitch, RefOp::SplineElevation,
     RefOp::UnknownUInt32, RefOp::PositionO, RefOp::Timestamp, RefOp::End };
+static RefOp const kForceSwimBackSpeedChangeAck[] = {
+    RefOp::PositionY, RefOp::MovementCounter, RefOp::PositionZ, RefOp::PositionX,
+    G(5), RefOp::ForceCount, RefOp::HasTransport, RefOp::HasUnknownUInt32,
+    RefOp::HasFlags, G(7), RefOp::HasOrientation, G(4), RefOp::HasSplineElevation,
+    RefOp::Raw149, G(6), G(2), RefOp::HasFlags2, RefOp::Raw148, G(0), RefOp::HasTimestamp,
+    G(3), RefOp::HasFall, RefOp::Raw172, RefOp::HasPitch, G(1), T(1), T(2),
+    T(7), T(3), T(0), T(5), RefOp::HasTransportTime3, T(6), RefOp::HasTransportTime2,
+    T(4), RefOp::HasFallDirection, RefOp::Flags, RefOp::Flags2, RefOp::ForceIds,
+    GB(5), GB(0), GB(6), GB(4), GB(3), GB(2), GB(1), GB(7), TB(7), RefOp::TransportY,
+    TB(2), TB(3), TB(4), TB(0), RefOp::TransportO, RefOp::TransportTime3, RefOp::TransportX,
+    RefOp::TransportTime2, RefOp::TransportZ, RefOp::TransportSeat, TB(6),
+    RefOp::TransportTime, TB(5), TB(1), RefOp::UnknownUInt32, RefOp::SplineElevation,
+    RefOp::FallVertical, RefOp::FallCos, RefOp::FallHorizontal, RefOp::FallSin,
+    RefOp::FallTime, RefOp::Timestamp, RefOp::PositionO, RefOp::Pitch, RefOp::End, };
+
+static RefOp const kForceFlightBackSpeedChangeAck[] = {
+    RefOp::PositionZ, RefOp::MovementCounter, RefOp::PositionX, RefOp::PositionY,
+    RefOp::HasTransport, RefOp::HasFlags, RefOp::HasOrientation, RefOp::HasUnknownUInt32,
+    RefOp::HasSplineElevation, RefOp::Raw149, RefOp::HasPitch, G(6), RefOp::HasFall,
+    RefOp::ForceCount, RefOp::HasFlags2, G(2), RefOp::Raw172, G(5), G(4), G(3),
+    RefOp::Raw148, G(1), RefOp::HasTimestamp, G(0), G(7), RefOp::HasTransportTime2,
+    T(4), RefOp::HasTransportTime3, T(2), T(6), T(1), T(5), T(0), T(7), T(3),
+    RefOp::Flags2, RefOp::Flags, RefOp::HasFallDirection, RefOp::ForceIds,
+    GB(7), GB(1), GB(0), GB(6), GB(4), GB(5), GB(3), GB(2), TB(7), RefOp::TransportX,
+    RefOp::TransportY, RefOp::TransportO, TB(0), TB(1), RefOp::TransportSeat,
+    TB(4), RefOp::TransportTime2, RefOp::TransportZ, RefOp::TransportTime,
+    TB(6), TB(3), TB(5), RefOp::TransportTime3, TB(2), RefOp::FallCos, RefOp::FallSin,
+    RefOp::FallHorizontal, RefOp::FallVertical, RefOp::FallTime, RefOp::Pitch,
+    RefOp::UnknownUInt32, RefOp::Timestamp, RefOp::SplineElevation, RefOp::PositionO,
+    RefOp::End };
+
 #undef G
 #undef GB
 #undef T
@@ -743,6 +774,67 @@ static void test_force_run_back_speed_change_ack_retail_body()
 /// the same state must encode differently, and a body built for one must not
 /// decode cleanly through the other. Without this the run-back registration
 /// could quietly be pointed at the swim sequence and nothing would complain.
+/// The two acks with no observed traffic. Their sequences come from the client's
+/// own writers, so absence from the corpus is a gap in what was recorded rather
+/// than evidence against the layout -- but it does mean there is no retail body
+/// to pin them, and a round-trip is all the coverage available.
+static void test_back_speed_change_ack_round_trips()
+{
+    RefState state;
+    state.flags2 = 0x0ABCu;
+
+    {
+        std::vector<uint8> const movement = Encode(kForceSwimBackSpeedChangeAck, state);
+        WorldPacket packet(CMSG_FORCE_SWIM_BACK_SPEED_CHANGE_ACK, movement.size() + sizeof(float));
+        packet << float(2.5f);
+        packet.append(movement.data(), movement.size());
+
+        float speed = 0.0f;
+        MovementInfo info;
+        packet >> speed;
+        packet >> info;
+        CHECK(speed == 2.5f);
+        CHECK(packet.rpos() == packet.size());
+        CheckDecoded(info, state, CMSG_FORCE_SWIM_BACK_SPEED_CHANGE_ACK);
+    }
+    {
+        std::vector<uint8> const movement = Encode(kForceFlightBackSpeedChangeAck, state);
+        WorldPacket packet(CMSG_FORCE_FLIGHT_BACK_SPEED_CHANGE_ACK, movement.size() + sizeof(float));
+        packet << float(4.5f);
+        packet.append(movement.data(), movement.size());
+
+        float speed = 0.0f;
+        MovementInfo info;
+        packet >> speed;
+        packet >> info;
+        CHECK(speed == 4.5f);
+        CHECK(packet.rpos() == packet.size());
+        CheckDecoded(info, state, CMSG_FORCE_FLIGHT_BACK_SPEED_CHANGE_ACK);
+    }
+}
+
+/// All four speed-leading acks must have distinct sequences. They share only the
+/// leading float, so one state must encode four different ways; any two matching
+/// would mean a sequence had been pointed at the wrong opcode.
+static void test_all_speed_ack_sequences_differ()
+{
+    RefState state;
+    state.flags2 = 0x0ABCu;
+    std::vector<uint8> const bodies[] = {
+        Encode(kForceSwimSpeedChangeAck, state),
+        Encode(kForceRunBackSpeedChangeAck, state),
+        Encode(kForceSwimBackSpeedChangeAck, state),
+        Encode(kForceFlightBackSpeedChangeAck, state),
+    };
+    for (size_t i = 0; i < 4; ++i)
+    {
+        for (size_t j = i + 1; j < 4; ++j)
+        {
+            CHECK(bodies[i] != bodies[j]);
+        }
+    }
+}
+
 static void test_speed_ack_sequences_are_distinct()
 {
     RefState state;
@@ -930,6 +1022,8 @@ int main(int, char**)
     test_force_swim_speed_change_ack_fixture();
     test_force_run_back_speed_change_ack_fixture();
     test_force_run_back_speed_change_ack_retail_body();
+    test_back_speed_change_ack_round_trips();
+    test_all_speed_ack_sequences_differ();
     test_speed_ack_sequences_are_distinct();
     test_spline_state_packets();
     test_hostile_counts_rejected();
