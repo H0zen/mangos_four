@@ -175,8 +175,8 @@
  *   TOTAL SMSG rows                   925
  *
  * SUBSYSTEM CONFIDENCE: high=365, low=221, medium=182, none=157
- * STATUS TOTALS: ACTIVE=468, DOC=435, DORMANT=617
- *   SMSG: ACTIVE=281, DOC=271, DORMANT=373
+ * STATUS TOTALS: ACTIVE=472, DOC=435, DORMANT=613
+ *   SMSG: ACTIVE=285, DOC=271, DORMANT=369
  *   CMSG: ACTIVE=187, DOC=164, DORMANT=244
  */
 
@@ -209,8 +209,8 @@ typedef uint16_t uint16;
  * ==== SMSG (925) ====
  *
  *  -- AccountData.cpp (2) --
- *   SMSG_UPDATE_ACCOUNT_DATA                       0x0AAE  ACTIVE  
- *   SMSG_ACCOUNT_DATA_TIMES                        0x162B  ACTIVE  
+ *   SMSG_UPDATE_ACCOUNT_DATA                       0x0AAE  ACTIVE
+ *   SMSG_ACCOUNT_DATA_TIMES                        0x162B  ACTIVE
  *
  *  -- AchievementInfo.cpp (13) --
  *   SMSG_RESPOND_INSPECT_ACHIEVEMENTS              0x009E  DORMANT  [low-conf]
@@ -233,7 +233,7 @@ typedef uint16_t uint16;
  *
  *  -- AreaTrigger_C.cpp (4) --
  *   SMSG_UNKNOWN_0x109B                            0x109B  DOC      [low-conf]
- *   SMSG_UNKNOWN_0x18E1                            0x18E1  DOC     
+ *   SMSG_UNKNOWN_0x18E1                            0x18E1  DOC
  *   SMSG_UNKNOWN_0x1AAA                            0x1AAA  DOC      [low-conf]
  *   SMSG_UNKNOWN_0x1E0A                            0x1E0A  DOC      [low-conf]
  *
@@ -248,14 +248,14 @@ typedef uint16_t uint16;
  *   SMSG_UNKNOWN_0x18AE                            0x18AE  ACTIVE   server-binding=SMSG_AUCTION_BID_UPDATE_NOTIFICATION
  *   SMSG_AUCTION_OWNER_NOTIFICATION                0x1A8E  ACTIVE
  *   SMSG_UNKNOWN_0x1A9F                            0x1A9F  ACTIVE   server-binding=SMSG_AUCTION_OUTBID_NOTIFICATION
- *   SMSG_UNKNOWN_0x1AAB                            0x1AAB  DOC     
+ *   SMSG_UNKNOWN_0x1AAB                            0x1AAB  DOC
  *   SMSG_INSTANCE_SAVE_CREATED                     0x1EAE  DORMANT  [low-conf]
  *
  *  -- AuthChallenge.cpp (6) --
  *   SMSG_BATTLE_PAY_DELIVERY_ENDED                 0x020B  DORMANT  [low-conf]
  *   SMSG_BATTLE_PAY_GET_PURCHASE_LIST_RESPONSE     0x023A  ACTIVE   [low-conf]
- *   SMSG_UNKNOWN_0x08BF                            0x08BF  DOC     
- *   SMSG_UNKNOWN_0x143E                            0x143E  DOC     
+ *   SMSG_UNKNOWN_0x08BF                            0x08BF  DOC
+ *   SMSG_UNKNOWN_0x143E                            0x143E  DOC
  *   SMSG_BATTLE_PAY_PURCHASE_UPDATE                0x14E2  DOC      [low-conf]
  *   SMSG_BATTLE_PAY_GET_PRODUCT_LIST_RESPONSE      0x1ABF  DORMANT  [low-conf]
  *
@@ -273,36 +273,36 @@ typedef uint16_t uint16;
  *   SMSG_PET_BATTLE_PVP_CHALLENGE                  0x1E0B  DORMANT  [name: binary-derived]
  *
  *  -- BattlefieldInfo.cpp (31) --
- *   SMSG_ARENA_UNIT_DESTROYED                      0x000F  DORMANT 
- *   SMSG_BATTLEFIELD_MANAGER_EJECT_PENDING         0x003E  DORMANT 
+ *   SMSG_ARENA_UNIT_DESTROYED                      0x000F  DORMANT
+ *   SMSG_BATTLEFIELD_MANAGER_EJECT_PENDING         0x003E  DORMANT
  *   SMSG_ARENA_PREP_OPPONENT_SPECIALIZATIONS       0x00BE  DORMANT
- *   SMSG_BATTLEGROUND_PLAYER_LEFT                  0x0206  DORMANT 
- *   SMSG_UNKNOWN_0x023F                            0x023F  DOC     
+ *   SMSG_BATTLEGROUND_PLAYER_LEFT                  0x0206  DORMANT
+ *   SMSG_UNKNOWN_0x023F                            0x023F  DOC
  *   SMSG_BATTLEFIELD_STATUS                        0x0433  ACTIVE
- *   SMSG_BATTLEGROUND_PLAYER_POSITIONS             0x060A  DORMANT 
+ *   SMSG_BATTLEGROUND_PLAYER_POSITIONS             0x060A  DORMANT
  *   SMSG_PVP_SEASON                                0x069B  DORMANT
- *   SMSG_PVP_OPTIONS_ENABLED                       0x080A  DORMANT 
+ *   SMSG_PVP_OPTIONS_ENABLED                       0x080A  DORMANT
  *   SMSG_BATTLEFIELD_MGR_ENTERED                   0x081B  DORMANT
  *   SMSG_BATTLEFIELD_MGR_STATE_CHANGE              0x083A  DORMANT
- *   SMSG_PVP_REWARDS                               0x08AA  DORMANT 
- *   SMSG_BATTLEFIELD_MANAGER_QUEUE_REQUEST_RESPONSE 0x08BE  DORMANT 
+ *   SMSG_PVP_REWARDS                               0x08AA  DORMANT
+ *   SMSG_BATTLEFIELD_MANAGER_QUEUE_REQUEST_RESPONSE 0x08BE  DORMANT
  *   SMSG_UNKNOWN_0x0C33                            0x0C33  DOC
  *   SMSG_WARGAME_REQUEST_SENT                      0x0CAE  DOC
  *   SMSG_CONQUEST_FORMULA_CONSTANTS                0x0EAB  ACTIVE
  *   SMSG_BATTLEFIELD_RATED_INFO                    0x0EBA  ACTIVE
- *   SMSG_UNKNOWN_0x1027                            0x1027  DOC     
- *   SMSG_BATTLEFIELD_STATUS_WAITFORGROUPS          0x10A6  DORMANT 
+ *   SMSG_UNKNOWN_0x1027                            0x1027  DOC
+ *   SMSG_BATTLEFIELD_STATUS_WAITFORGROUPS          0x10A6  DORMANT
  *   SMSG_BATTLEFIELD_STATUS_FAILED                 0x1140  ACTIVE
- *   SMSG_BATTLEFIELD_MANAGER_ENTRY_INVITE          0x1226  DORMANT 
+ *   SMSG_BATTLEFIELD_MANAGER_ENTRY_INVITE          0x1226  DORMANT
  *   SMSG_BATTLEFIELD_STATUS_QUEUED                 0x122E  ACTIVE
- *   SMSG_BATTLEFIELD_MANAGER_QUEUE_INVITE          0x142E  DORMANT 
- *   SMSG_BATTLEFIELD_PORT_DENIED                   0x149A  DORMANT 
- *   SMSG_BATTLEFIELD_LIST                          0x160E  DORMANT 
- *   SMSG_UNKNOWN_0x18AF                            0x18AF  DOC     
+ *   SMSG_BATTLEFIELD_MANAGER_QUEUE_INVITE          0x142E  DORMANT
+ *   SMSG_BATTLEFIELD_PORT_DENIED                   0x149A  DORMANT
+ *   SMSG_BATTLEFIELD_LIST                          0x160E  DORMANT
+ *   SMSG_UNKNOWN_0x18AF                            0x18AF  DOC
  *   SMSG_BATTLEFIELD_MGR_EJECTED                   0x18C2  DORMANT
  *   SMSG_BATTLEFIELD_STATUS_ACTIVE                 0x1AAF  ACTIVE
- *   SMSG_BATTLEGROUND_PLAYER_JOINED                0x1E2F  DORMANT 
- *   SMSG_PVP_LOG_DATA                              0x1E8F  DORMANT 
+ *   SMSG_BATTLEGROUND_PLAYER_JOINED                0x1E2F  DORMANT
+ *   SMSG_PVP_LOG_DATA                              0x1E8F  DORMANT
  *   SMSG_BATTLEFIELD_STATUS_NEEDCONFIRMATION       0x1EAF  ACTIVE
  *
  *  -- BattlenetLogin.cpp (2) --
@@ -310,18 +310,18 @@ typedef uint16_t uint16;
  *   SMSG_BATTLE_PAY_DISTRIBUTION_UPDATE            0x1E1B  DORMANT
  *
  *  -- BattlenetUI.cpp (2) --
- *   SMSG_UNKNOWN_0x140E                            0x140E  DOC     
+ *   SMSG_UNKNOWN_0x140E                            0x140E  DOC
  *   SMSG_UNKNOWN_0x1C8B                            0x1C8B  DOC      [low-conf]
  *
  *  -- CGlueMgr.cpp (8) --
  *   SMSG_DISPLAY_PROMOTION                         0x00A3  DORMANT
  *   SMSG_KICK_REASON                               0x0A1E  DORMANT  [medium-conf]
- *   SMSG_CHAR_RENAME                               0x0CBF  DORMANT 
- *   SMSG_UNKNOWN_0x10AF                            0x10AF  DOC     
+ *   SMSG_CHAR_RENAME                               0x0CBF  DORMANT
+ *   SMSG_UNKNOWN_0x10AF                            0x10AF  DOC
  *   SMSG_CHAR_CUSTOMIZE                            0x1432  ACTIVE
  *   SMSG_RANDOMIZE_CHAR_NAME                       0x169F  ACTIVE
- *   SMSG_SET_PLAYER_DECLINED_NAMES_RESULT          0x180E  DORMANT 
- *   SMSG_REALM_SPLIT                               0x1A2E  ACTIVE  
+ *   SMSG_SET_PLAYER_DECLINED_NAMES_RESULT          0x180E  DORMANT
+ *   SMSG_REALM_SPLIT                               0x1A2E  ACTIVE
  *
  *  -- CUFProfiles.cpp (3) --
  *   SMSG_LOAD_CUF_PROFILES                         0x0E32  DORMANT
@@ -372,7 +372,7 @@ typedef uint16_t uint16;
  *  -- ChatFrame.cpp (21) --
  *   SMSG_INSTANCE_RESET_FAILED                     0x0026  DORMANT  [medium-conf]
  *   SMSG_TEXT_EMOTE                                0x002E  ACTIVE   [medium-conf]
- *   SMSG_SERVER_FIRST_ACHIEVEMENT                  0x028B  DORMANT 
+ *   SMSG_SERVER_FIRST_ACHIEVEMENT                  0x028B  DORMANT
  *   SMSG_USERLIST_UPDATE                           0x063A  DORMANT  [medium-conf]
  *   SMSG_TITLE_EARNED                              0x068E  DORMANT  [medium-conf]
  *   SMSG_DEFENSE_MESSAGE                           0x0A1F  DORMANT  [medium-conf]
@@ -401,9 +401,9 @@ typedef uint16_t uint16;
  *   SMSG_NOTIFICATION                              0x0C2A  ACTIVE
  *   SMSG_TRANSFER_ABORTED                          0x0C8F  ACTIVE
  *   SMSG_PLAYED_TIME                               0x11E2  ACTIVE
- *   SMSG_WHOIS                                     0x12BA  DORMANT 
- *   SMSG_UNKNOWN_0x188F                            0x188F  DOC     
- *   SMSG_UNKNOWN_0x18BA                            0x18BA  DOC     
+ *   SMSG_WHOIS                                     0x12BA  DORMANT
+ *   SMSG_UNKNOWN_0x188F                            0x188F  DOC
+ *   SMSG_UNKNOWN_0x18BA                            0x18BA  DOC
  *   SMSG_LOGIN_VERIFY_WORLD                        0x1C0F  ACTIVE
  *   SMSG_NEW_WORLD                                 0x1C3B  ACTIVE
  *
@@ -444,7 +444,7 @@ typedef uint16_t uint16;
  *  -- DuelInfo.cpp (7) --
  *   SMSG_DUEL_OUTOFBOUNDS                          0x001A  ACTIVE   [high-conf]
  *   SMSG_DUEL_REQUESTED                            0x0022  ACTIVE   [high-conf]
- *   SMSG_UNKNOWN_0x083F                            0x083F  DOC     
+ *   SMSG_UNKNOWN_0x083F                            0x083F  DOC
  *   SMSG_DUEL_WINNER                               0x10E1  ACTIVE   [high-conf]
  *   SMSG_DUEL_COUNTDOWN                            0x129F  ACTIVE   [high-conf]
  *   SMSG_DUEL_INBOUNDS                             0x163A  ACTIVE   [high-conf]
@@ -457,19 +457,19 @@ typedef uint16_t uint16;
  *   SMSG_UNKNOWN_0x182E                            0x182E  DOC      [unattributed]
  *
  *  -- EquipmentManager.cpp (10) --
- *   SMSG_EQUIPMENT_SET_ID                          0x0006  DORMANT 
- *   SMSG_USE_EQUIPMENT_SET_RESULT                  0x0A2B  DORMANT 
+ *   SMSG_EQUIPMENT_SET_ID                          0x0006  DORMANT
+ *   SMSG_USE_EQUIPMENT_SET_RESULT                  0x0A2B  DORMANT
  *   SMSG_LF_GUILD_MEMBERSHIP_LIST_UPDATED          0x0AE0  DORMANT  [low-conf]
  *   SMSG_LF_GUILD_APPLICANT_LIST_UPDATED           0x0B71  DORMANT  [low-conf]
  *   SMSG_LF_GUILD_RECRUIT_LIST_UPDATED             0x0E68  DORMANT  [low-conf]
  *   SMSG_LF_GUILD_BROWSE_UPDATED                   0x0F69  DORMANT  [low-conf]
- *   SMSG_LOAD_EQUIPMENT_SET                        0x18E2  DORMANT 
+ *   SMSG_LOAD_EQUIPMENT_SET                        0x18E2  DORMANT
  *   SMSG_LF_GUILD_APPLICATIONS_LIST_CHANGED        0x1A70  DORMANT  [low-conf]
  *   SMSG_LF_GUILD_COMMAND_RESULT                   0x1A79  DORMANT  [low-conf]
  *   SMSG_LF_GUILD_POST_UPDATED                     0x1B71  DORMANT  [low-conf]
  *
  *  -- FriendList.cpp (1) --
- *   SMSG_WHO                                       0x161B  DORMANT 
+ *   SMSG_WHO                                       0x161B  DORMANT
  *
  *  -- GMTicketInfo.cpp (7) --
  *   SMSG_GM_TICKET_STATUS_UPDATE                   0x000B  DORMANT  [medium-conf]
@@ -487,9 +487,9 @@ typedef uint16_t uint16;
  *   SMSG_GAMEOBJECT_PAGETEXT                       0x14AF  ACTIVE   [high-conf]
  *
  *  -- GameUI.cpp (49) --
- *   SMSG_UNKNOWN_0x001B                            0x001B  DOC     
+ *   SMSG_UNKNOWN_0x001B                            0x001B  DOC
  *   SMSG_WORLD_SERVER_INFO                         0x0082  ACTIVE   [medium-conf]
- *   SMSG_BREAK_TARGET                              0x021A  DORMANT 
+ *   SMSG_BREAK_TARGET                              0x021A  DORMANT
  *   SMSG_REFER_A_FRIEND_FAILURE                    0x021E  DORMANT  [medium-conf]
  *   SMSG_CORPSE_RECLAIM_DELAY                      0x022A  ACTIVE   [medium-conf]
  *   SMSG_CLEAR_BOSS_EMOTES                         0x062B  DORMANT  [low-conf]
@@ -504,16 +504,16 @@ typedef uint16_t uint16;
  *   SMSG_ITEM_PUSH_RESULT                          0x0E0A  ACTIVE
  *   SMSG_CORPSE_TRANSPORT_QUERY                    0x0E0B  ACTIVE   server-binding=SMSG_CORPSE_QUERY_RESPONSE
  *   SMSG_START_MIRROR_TIMER                        0x0E12  ACTIVE  [high-conf]
- *   SMSG_UNKNOWN_0x0E2B                            0x0E2B  DOC     
+ *   SMSG_UNKNOWN_0x0E2B                            0x0E2B  DOC
  *   SMSG_UNKNOWN_0x0E2E                            0x0E2E  DOC      [medium-conf]
  *   SMSG_GUILD_INVITE_CANCEL                       0x0FE1  DORMANT  [low-conf]
- *   SMSG_PVP_CREDIT                                0x100A  DORMANT 
+ *   SMSG_PVP_CREDIT                                0x100A  DORMANT
  *   SMSG_UNKNOWN_0x101F                            0x101F  DOC      [medium-conf]
  *   SMSG_STOP_MIRROR_TIMER                         0x1026  ACTIVE  [high-conf]
  *   SMSG_PLAY_SOUND                                0x102A  ACTIVE
  *   SMSG_GM_PLAYER_INFO                            0x102B  DORMANT  [medium-conf]
  *   SMSG_CLEAR_TARGET                              0x1061  ACTIVE   [Wow.exe binary: sub_6D4AFB packed GUID reader; sub_85876E target-clear terminal]
- *   SMSG_PROPOSE_LEVEL_GRANT                       0x109A  DORMANT 
+ *   SMSG_PROPOSE_LEVEL_GRANT                       0x109A  DORMANT
  *   SMSG_UPDATE_INSTANCE_OWNERSHIP                 0x10E0  DORMANT  [medium-conf]
  *   SMSG_REFER_A_FRIEND_EXPIRED                    0x1143  DORMANT  [medium-conf]
  *   SMSG_DIFFERENT_INSTANCE_FROM_PARTY             0x120B  DORMANT
@@ -528,13 +528,13 @@ typedef uint16_t uint16;
  *   SMSG_INIT_WORLD_STATES                         0x1560  ACTIVE   [medium-conf]
  *   SMSG_PAUSE_MIRROR_TIMER                        0x162E  DORMANT  [medium-conf]
  *   SMSG_DISPLAY_GAME_ERROR                        0x181F  DORMANT  [medium-conf]
- *   SMSG_UNKNOWN_0x1841                            0x1841  DOC     
- *   SMSG_AREA_SPIRIT_HEALER_TIME                   0x188E  DORMANT 
+ *   SMSG_UNKNOWN_0x1841                            0x1841  DOC
+ *   SMSG_AREA_SPIRIT_HEALER_TIME                   0x188E  DORMANT
  *   SMSG_UNKNOWN_0x18E0                            0x18E0  DOC      [medium-conf]
  *   SMSG_UNKNOWN_0x19C3                            0x19C3  DOC      [medium-conf]
  *   SMSG_INVALID_PROMOTION_CODE                    0x1A0E  DORMANT  [medium-conf]
  *   SMSG_CORPSE_MAP_POSITION_QUERY_RESPONSE        0x1A3A  ACTIVE   [low-conf]
- *   SMSG_TOTEM_CREATED                             0x1C8F  DORMANT 
+ *   SMSG_TOTEM_CREATED                             0x1C8F  DORMANT
  *   SMSG_ENCOUNTER_START                           0x1E8A  DORMANT  [medium-conf]  [name: binary-derived]
  *
  *  -- GossipInfo.cpp (10) --
@@ -664,12 +664,12 @@ typedef uint16_t uint16;
  *
  *  -- MailInfo.cpp (4) --
  *   SMSG_MAIL_QUERY_NEXT_TIME_RESULT               0x089B  ACTIVE
- *   SMSG_RECEIVED_MAIL                             0x182B  DORMANT 
- *   SMSG_SEND_MAIL_RESULT                          0x1A9B  DORMANT 
- *   SMSG_MAIL_LIST_RESULT                          0x1C0B  DORMANT 
+ *   SMSG_RECEIVED_MAIL                             0x182B  DORMANT
+ *   SMSG_SEND_MAIL_RESULT                          0x1A9B  DORMANT
+ *   SMSG_MAIL_LIST_RESULT                          0x1C0B  DORMANT
  *
  *  -- Missile_C.cpp (1) --
- *   SMSG_MISSILE_CANCEL                            0x1203  DOC     
+ *   SMSG_MISSILE_CANCEL                            0x1203  DOC
  *
  *  -- Movie.cpp (1) --
  *   SMSG_STREAMING_MOVIE                           0x1843  DORMANT
@@ -678,7 +678,7 @@ typedef uint16_t uint16;
  *   SMSG_UNKNOWN_0x0EAF                            0x0EAF  DOC      [medium-conf]
  *
  *  -- ObjectMgrClient.cpp (2) --
- *   SMSG_UNKNOWN_0x0C9A                            0x0C9A  DOC     
+ *   SMSG_UNKNOWN_0x0C9A                            0x0C9A  DOC
  *   SMSG_DESTROY_OBJECT                            0x14C2  ACTIVE
  *
  *  -- PartyInfo.cpp (7) --
@@ -715,35 +715,35 @@ typedef uint16_t uint16;
  *  -- Player_C.cpp (140) --
  *   SMSG_SUMMON_CANCEL                             0x000A  DORMANT  [medium-conf]
  *   SMSG_VOICE_SESSION_ROSTER_UPDATE               0x000E  DORMANT  [medium-conf]
- *   SMSG_UNKNOWN_0x0050                            0x0050  DOC     
+ *   SMSG_UNKNOWN_0x0050                            0x0050  DOC
  *   SMSG_SOR_START_EXPERIENCE_INCOMPLETE           0x0083  DORMANT  [medium-conf]
  *   SMSG_RAID_MARKERS_CHANGED                      0x008A  DORMANT  [medium-conf]
  *   SMSG_VOID_STORAGE_CONTENTS                     0x008B  DORMANT  [low-conf]
  *   SMSG_INSTANCE_LOCK_WARNING_QUERY               0x00A7  DOC      [medium-conf]
  *   SMSG_SPELL_EXECUTE_LOG                         0x00D8  ACTIVE   [medium-conf]
- *   SMSG_UNKNOWN_0x0170                            0x0170  DOC     
+ *   SMSG_UNKNOWN_0x0170                            0x0170  DOC
  *   SMSG_CATEGORY_COOLDOWN                         0x01DB  ACTIVE   [high-conf]
  *   SMSG_FISH_ESCAPED                              0x0227  ACTIVE
- *   SMSG_QUESTUPDATE_ADD_PVP_KILL                  0x0256  DORMANT 
+ *   SMSG_QUESTUPDATE_ADD_PVP_KILL                  0x0256  DORMANT
  *   SMSG_QUESTGIVER_REQUEST_ITEMS                  0x0277  ACTIVE
  *   SMSG_QUESTGIVER_QUEST_INVALID                  0x027D  ACTIVE   [high-conf]
  *   SMSG_PET_LEARNED_SPELL                         0x0282  ACTIVE   [medium-conf]
  *   SMSG_PETITION_ALREADY_SIGNED                   0x0286  DORMANT  [medium-conf]
  *   SMSG_GROUPACTION_THROTTLED                     0x0287  DORMANT  [medium-conf]
- *   SMSG_PET_NAME_INVALID                          0x028E  DORMANT 
+ *   SMSG_PET_NAME_INVALID                          0x028E  DORMANT
  *   SMSG_AVAILABLE_VOICE_CHANNEL                   0x029A  DORMANT  [medium-conf]
  *   SMSG_RESPEC_WIPE_CONFIRM                       0x02AB  ACTIVE
  *   SMSG_QUESTGIVER_QUEST_LIST                     0x02D4  ACTIVE   [high-conf]
- *   SMSG_UNKNOWN_0x02EF                            0x02EF  DOC     
+ *   SMSG_UNKNOWN_0x02EF                            0x02EF  DOC
  *   SMSG_QUESTGIVER_QUEST_COMPLETE                 0x0346  ACTIVE
  *   SMSG_QUEST_NPC_QUERY_RESPONSE                  0x036D  ACTIVE   [medium-conf]
- *   SMSG_UNKNOWN_0x040F                            0x040F  DOC     
+ *   SMSG_UNKNOWN_0x040F                            0x040F  DOC
  *   SMSG_UNKNOWN_0x041E                            0x041E  DOC      [medium-conf]
  *   SMSG_REQUEST_CEMETERY_LIST_RESPONSE            0x042A  ACTIVE   [medium-conf]
  *   SMSG_TRAINER_BUY_FAILED                        0x042E  ACTIVE   [medium-conf]
  *   SMSG_INITIAL_SPELLS                            0x045A  ACTIVE
  *   SMSG_SELL_ITEM                                 0x048E  ACTIVE
- *   SMSG_ITEM_PURCHASE_REFUND_RESULT               0x049E  DORMANT 
+ *   SMSG_ITEM_PURCHASE_REFUND_RESULT               0x049E  DORMANT
  *   SMSG_UNKNOWN_0x04AA                            0x04AA  DOC      [medium-conf]
  *   SMSG_ARENA_ERROR                               0x04BA  DORMANT  [medium-conf]
  *   SMSG_VOICE_PARENTAL_CONTROLS                   0x04BF  DORMANT  [medium-conf]
@@ -758,29 +758,29 @@ typedef uint16_t uint16;
  *   SMSG_QUESTGIVER_OFFER_REWARD                   0x074F  ACTIVE
  *   SMSG_QUESTUPDATE_COMPLETE                      0x0776  ACTIVE
  *   SMSG_UNKNOWN_0x07C5                            0x07C5  DOC      [medium-conf]
- *   SMSG_QUESTUPDATE_FAILED                        0x07DD  DORMANT 
- *   SMSG_UNKNOWN_0x07F5                            0x07F5  DOC     
+ *   SMSG_QUESTUPDATE_FAILED                        0x07DD  DORMANT
+ *   SMSG_UNKNOWN_0x07F5                            0x07F5  DOC
  *   SMSG_QUESTLOG_FULL                             0x07FD  ACTIVE   [high-conf]
  *   SMSG_ACTION_BUTTONS                            0x081A  ACTIVE   [medium-conf]
- *   SMSG_SUMMON_REQUEST                            0x081F  DORMANT 
+ *   SMSG_SUMMON_REQUEST                            0x081F  DORMANT
  *   SMSG_PETITION_RENAME_RESULT                    0x082A  DORMANT
  *   SMSG_PLAYERBOUND                               0x088E  ACTIVE
  *   SMSG_UNKNOWN_0x089F                            0x089F  ACTIVE   [medium-conf]  server-binding=SMSG_SAVE_GUILD_EMBLEM
- *   SMSG_UNKNOWN_0x08FB                            0x08FB  DOC     
+ *   SMSG_UNKNOWN_0x08FB                            0x08FB  DOC
  *   SMSG_SPELLINSTAKILLLOG                         0x09F8  ACTIVE
  *   SMSG_SPELLHEALLOG                              0x09FB  ACTIVE
  *   SMSG_UNKNOWN_0x0A2F                            0x0A2F  DOC      [medium-conf]
- *   SMSG_UNKNOWN_0x0A3B                            0x0A3B  DOC     
+ *   SMSG_UNKNOWN_0x0A3B                            0x0A3B  DOC
  *   SMSG_GUILD_RANKS_UPDATE                        0x0A60  ACTIVE   [medium-conf]
  *   SMSG_CHAT_NOT_IN_PARTY                         0x0A8A  DORMANT  [medium-conf]
  *   SMSG_UNKNOWN_0x0A8B                            0x0A8B  ACTIVE   [medium-conf]  server-binding=SMSG_INITIAL_SETUP
  *   SMSG_PARTY_MEMBER_STATS                        0x0A9A  ACTIVE
  *   SMSG_GUILD_XP                                  0x0AF0  DORMANT  [medium-conf]
- *   SMSG_NEW_WORLD_ABORT                           0x0C1B  DOC     
+ *   SMSG_NEW_WORLD_ABORT                           0x0C1B  DOC
  *   SMSG_INVENTORY_CHANGE_FAILURE                  0x0C1E  ACTIVE   [medium-conf]
- *   SMSG_CAMERA_SHAKE                              0x0C3A  DORMANT 
+ *   SMSG_CAMERA_SHAKE                              0x0C3A  DORMANT
  *   SMSG_UNKNOWN_0x0C3B                            0x0C3B  DOC      [medium-conf]
- *   SMSG_UNKNOWN_0x0C8E                            0x0C8E  DOC     
+ *   SMSG_UNKNOWN_0x0C8E                            0x0C8E  DOC
  *   SMSG_UNKNOWN_0x0D51                            0x0D51  DOC      [medium-conf]
  *   SMSG_SPELLENERGIZELOG                          0x0D79  ACTIVE   [medium-conf]
  *   SMSG_SPELLDISPELLOG                            0x0DF9  ACTIVE
@@ -793,7 +793,7 @@ typedef uint16_t uint16;
  *   SMSG_GUILD_COMMAND_RESULT                      0x0EF1  ACTIVE   [high-conf]  direct command/result/name reader and guild-error consumer
  *   SMSG_GUILD_RECIPES                             0x0FF1  DORMANT
  *   SMSG_BUY_ITEM                                  0x101A  ACTIVE
- *   SMSG_UNKNOWN_0x1023                            0x1023  DOC     
+ *   SMSG_UNKNOWN_0x1023                            0x1023  DOC
  *   SMSG_RESURRECT_REQUEST                         0x1062  ACTIVE
  *   SMSG_DEATH_RELEASE_LOC                         0x1063  ACTIVE   [medium-conf]
  *   SMSG_CHAT_PLAYER_NOT_FOUND                     0x1082  ACTIVE   [medium-conf]
@@ -801,7 +801,7 @@ typedef uint16_t uint16;
  *   SMSG_ITEM_ENCHANT_TIME_UPDATE                  0x10A2  ACTIVE
  *   SMSG_UNKNOWN_0x10BB                            0x10BB  DOC      [medium-conf]
  *   SMSG_FISH_NOT_HOOKED                           0x10BE  ACTIVE
- *   SMSG_UNKNOWN_0x10C1                            0x10C1  DOC     
+ *   SMSG_UNKNOWN_0x10C1                            0x10C1  DOC
  *   SMSG_SEND_UNLEARN_SPELLS                       0x10F1  ACTIVE
  *   SMSG_CANCEL_SCENE                              0x120E  DORMANT  [low-conf]
  *   SMSG_UNKNOWN_0x122F                            0x122F  DOC      [medium-conf]
@@ -809,12 +809,12 @@ typedef uint16_t uint16;
  *   SMSG_UNKNOWN_0x1282                            0x1282  DOC      [medium-conf]
  *   SMSG_BINDER_CONFIRM                            0x1287  ACTIVE   [medium-conf]
  *   SMSG_LEARNED_SPELL                             0x129A  ACTIVE   [high-conf]
- *   SMSG_SOCKET_GEMS                               0x12A6  DORMANT 
+ *   SMSG_SOCKET_GEMS                               0x12A6  DORMANT
  *   SMSG_QUESTGIVER_QUEST_FAILED                   0x12DE  ACTIVE   [high-conf]
  *   SMSG_QUESTGIVER_QUEST_DETAILS                  0x134C  ACTIVE   [high-conf]
  *   SMSG_QUEST_CONFIRM_ACCEPT                      0x13C7  ACTIVE
  *   SMSG_RANDOM_ROLL                               0x141A  ACTIVE
- *   SMSG_UNKNOWN_0x1441                            0x1441  DOC     
+ *   SMSG_UNKNOWN_0x1441                            0x1441  DOC
  *   SMSG_SPELLNONMELEEDAMAGELOG                    0x1450  DORMANT  [medium-conf]
  *   SMSG_VOID_STORAGE_TRANSFER_CHANGES             0x14BA  DORMANT  [medium-conf]
  *   SMSG_REMOVED_SPELL                             0x14C3  ACTIVE   [high-conf]
@@ -825,7 +825,7 @@ typedef uint16_t uint16;
  *   SMSG_GMTICKET_SYSTEMSTATUS                     0x163B  ACTIVE   [medium-conf]
  *   SMSG_QUESTUPDATE_ADD_KILL                      0x1645  ACTIVE
  *   SMSG_MINIMAP_PING                              0x168F  ACTIVE
- *   SMSG_FEATURE_SYSTEM_STATUS                     0x16BB  ACTIVE  
+ *   SMSG_FEATURE_SYSTEM_STATUS                     0x16BB  ACTIVE
  *   SMSG_INSPECT_RESULTS                           0x1842  ACTIVE
  *   SMSG_SPELLINTERRUPTLOG                         0x1851  ACTIVE
  *   SMSG_GODMODE                                   0x1862  DORMANT  [medium-conf]
@@ -846,12 +846,12 @@ typedef uint16_t uint16;
  *   SMSG_GUILD_DECLINE                             0x1AF9  DORMANT  [medium-conf]
  *   SMSG_TRIGGER_MOVIE                             0x1C2E  DORMANT  [medium-conf]
  *   SMSG_PLAY_SCENE                                0x1C3A  DORMANT  [low-conf]
- *   SMSG_SET_ITEM_PURCHASE_DATA                    0x1C9A  DORMANT 
+ *   SMSG_SET_ITEM_PURCHASE_DATA                    0x1C9A  DORMANT
  *   SMSG_VOID_TRANSFER_RESULT                      0x1C9E  DORMANT  [medium-conf]
  *   SMSG_PET_REMOVED_SPELL                         0x1CAE  ACTIVE
  *   SMSG_SHOWTAXINODES                             0x1E1A  DORMANT  [medium-conf]
  *   SMSG_BATTLEGROUND_INFO_THROTTLED               0x1E1E  DORMANT  [medium-conf]
- *   SMSG_CROSSED_INEBRIATION_THRESHOLD             0x1E9E  DORMANT 
+ *   SMSG_CROSSED_INEBRIATION_THRESHOLD             0x1E9E  DORMANT
  *   SMSG_SPIRIT_HEALER_CONFIRM                     0x1EAA  ACTIVE   [medium-conf]
  *
  *  -- QuestCache.cpp (1) --
@@ -873,12 +873,12 @@ typedef uint16_t uint16;
  *
  *  -- ReputationInfo.cpp (7) --
  *   SMSG_SET_FORCED_REACTIONS                      0x068F  ACTIVE
- *   SMSG_UNKNOWN_0x0A0B                            0x0A0B  DOC     
+ *   SMSG_UNKNOWN_0x0A0B                            0x0A0B  DOC
  *   SMSG_INITIALIZE_FACTIONS                       0x0AAA  ACTIVE
- *   SMSG_SET_FACTION_ATWAR                         0x0C9B  DORMANT 
- *   SMSG_SET_FACTION_STANDING                      0x10AA  DORMANT 
- *   SMSG_UNKNOWN_0x1C2B                            0x1C2B  DOC     
- *   SMSG_SET_FACTION_VISIBLE                       0x1E8E  DORMANT 
+ *   SMSG_SET_FACTION_ATWAR                         0x0C9B  DORMANT
+ *   SMSG_SET_FACTION_STANDING                      0x10AA  DORMANT
+ *   SMSG_UNKNOWN_0x1C2B                            0x1C2B  DOC
+ *   SMSG_SET_FACTION_VISIBLE                       0x1E8E  DORMANT
  *
  *  -- ResearchFrame.cpp (9) --
  *   SMSG_UNKNOWN_0x069A                            0x069A  DOC      [low-conf]
@@ -917,43 +917,43 @@ typedef uint16_t uint16;
  *   SMSG_UNKNOWN_0x1412                            0x1412  DOC      [low-conf]
  *
  *  -- Spell_C.cpp (32) --
- *   SMSG_UNKNOWN_0x0002                            0x0002  DOC     
- *   SMSG_UNKNOWN_0x00F2                            0x00F2  DOC     
- *   SMSG_UNKNOWN_0x00F3                            0x00F3  DOC     
- *   SMSG_UNKNOWN_0x00F9                            0x00F9  DOC     
- *   SMSG_RESUME_CAST_BAR                           0x01D2  DORMANT 
- *   SMSG_FEIGN_DEATH_RESISTED                      0x029E  DORMANT 
- *   SMSG_SPELL_FAILED_OTHER                        0x040B  DORMANT 
- *   SMSG_PET_TAME_FAILURE                          0x040E  DORMANT 
- *   SMSG_COOLDOWN_CHEAT                            0x0432  DORMANT 
- *   SMSG_SPELL_FAILURE                             0x04AF  DORMANT 
- *   SMSG_SPELL_DELAYED                             0x087A  DORMANT 
- *   SMSG_SET_PCT_SPELL_MODIFIER                    0x09D3  DORMANT 
+ *   SMSG_UNKNOWN_0x0002                            0x0002  DOC
+ *   SMSG_UNKNOWN_0x00F2                            0x00F2  DOC
+ *   SMSG_UNKNOWN_0x00F3                            0x00F3  DOC
+ *   SMSG_UNKNOWN_0x00F9                            0x00F9  DOC
+ *   SMSG_RESUME_CAST_BAR                           0x01D2  DORMANT
+ *   SMSG_FEIGN_DEATH_RESISTED                      0x029E  DORMANT
+ *   SMSG_SPELL_FAILED_OTHER                        0x040B  DORMANT
+ *   SMSG_PET_TAME_FAILURE                          0x040E  DORMANT
+ *   SMSG_COOLDOWN_CHEAT                            0x0432  DORMANT
+ *   SMSG_SPELL_FAILURE                             0x04AF  DORMANT
+ *   SMSG_SPELL_DELAYED                             0x087A  DORMANT
+ *   SMSG_SET_PCT_SPELL_MODIFIER                    0x09D3  DORMANT
  *   SMSG_SPELL_GO                                  0x09D8  ACTIVE
- *   SMSG_UNKNOWN_0x0C5B                            0x0C5B  DOC     
- *   SMSG_SPELL_UPDATE_CHAIN_TARGETS                0x0D52  DORMANT 
- *   SMSG_GAMEOBJECT_RESET_STATE                    0x100E  DORMANT 
+ *   SMSG_UNKNOWN_0x0C5B                            0x0C5B  DOC
+ *   SMSG_SPELL_UPDATE_CHAIN_TARGETS                0x0D52  DORMANT
+ *   SMSG_GAMEOBJECT_RESET_STATE                    0x100E  DORMANT
  *   SMSG_SPELL_START                               0x107A  ACTIVE
- *   SMSG_SET_FLAT_SPELL_MODIFIER                   0x10F2  DORMANT 
+ *   SMSG_SET_FLAT_SPELL_MODIFIER                   0x10F2  DORMANT
  *   SMSG_CHANNEL_START                             0x10F9  ACTIVE  [high-conf]
  *   SMSG_COOLDOWN_EVENT                            0x1163  ACTIVE
- *   SMSG_UNKNOWN_0x117A                            0x117A  DOC     
+ *   SMSG_UNKNOWN_0x117A                            0x117A  DOC
  *   SMSG_CHANNEL_UPDATE                            0x11D9  ACTIVE  [high-conf]
  *   SMSG_PLAY_SPELL_VISUAL_KIT                     0x11E3  DORMANT
- *   SMSG_NOTIFY_MISSILE_TRAJECTORY_COLLISION       0x120A  DORMANT 
+ *   SMSG_NOTIFY_MISSILE_TRAJECTORY_COLLISION       0x120A  DORMANT
  *   SMSG_CAST_FAILED                               0x143A  ACTIVE
  *   SMSG_CLEAR_COOLDOWNS                           0x1458  ACTIVE
  *   SMSG_PET_CAST_FAILED                           0x149B  ACTIVE
- *   SMSG_CLEAR_COOLDOWN                            0x162A  DOC     
- *   SMSG_ON_CANCEL_EXPECTED_RIDE_VEHICLE_AURA      0x1A2A  DORMANT 
- *   SMSG_NOTIFY_DEST_LOC_SPELL_CAST                0x1E0E  DORMANT 
- *   SMSG_MODIFY_COOLDOWN                           0x1E2E  DORMANT 
- *   SMSG_UNKNOWN_0x1EBB                            0x1EBB  DOC     
+ *   SMSG_CLEAR_COOLDOWN                            0x162A  DOC
+ *   SMSG_ON_CANCEL_EXPECTED_RIDE_VEHICLE_AURA      0x1A2A  DORMANT
+ *   SMSG_NOTIFY_DEST_LOC_SPELL_CAST                0x1E0E  DORMANT
+ *   SMSG_MODIFY_COOLDOWN                           0x1E2E  DORMANT
+ *   SMSG_UNKNOWN_0x1EBB                            0x1EBB  DOC
  *
  *  -- TaxiMapFrame.cpp (3) --
  *   SMSG_ACTIVATETAXIREPLY                         0x02A7  DORMANT  [low-conf]
  *   SMSG_NEW_TAXI_PATH                             0x141B  DORMANT  [low-conf]
- *   SMSG_TAXINODE_STATUS                           0x169E  DORMANT 
+ *   SMSG_TAXINODE_STATUS                           0x169E  DORMANT
  *
  *  -- TradeFrame.cpp (3) --
  *   SMSG_STABLE_RESULT                             0x14BE  ACTIVE   [low-conf]
@@ -974,134 +974,134 @@ typedef uint16_t uint16;
  *
  *  -- UnitCombatLog_C.cpp (6) --
  *   SMSG_PARTYKILLLOG                              0x048A  ACTIVE   [Wow.exe binary: sub_6F2FE4 reads killer/victim GUIDs; sub_841B83 emits party-kill event]
- *   SMSG_DISPEL_FAILED                             0x085B  DORMANT 
+ *   SMSG_DISPEL_FAILED                             0x085B  DORMANT
  *   SMSG_SPELL_PERIODIC_AURA_LOG                   0x0CF2  ACTIVE
- *   SMSG_ENCHANTMENTLOG                            0x12A3  DORMANT 
- *   SMSG_PROCRESIST                                0x12BE  DORMANT 
+ *   SMSG_ENCHANTMENTLOG                            0x12A3  DORMANT
+ *   SMSG_PROCRESIST                                0x12BE  DORMANT
  *   SMSG_DESTRUCTIBLE_BUILDING_DAMAGE              0x14BF  DORMANT  [low-conf]
  *
  *  -- UnitCombat_C.cpp (7) --
  *   SMSG_ATTACKERSTATEUPDATE                       0x06AA  ACTIVE
- *   SMSG_UNKNOWN_0x0C9E                            0x0C9E  DOC     
- *   SMSG_ENVIRONMENTALDAMAGELOG                    0x0DF1  DORMANT 
+ *   SMSG_UNKNOWN_0x0C9E                            0x0C9E  DOC
+ *   SMSG_ENVIRONMENTALDAMAGELOG                    0x0DF1  DORMANT
  *   SMSG_ATTACKSWING_ERROR                         0x11E1  ACTIVE   [low-conf]
  *   SMSG_ATTACKSTOP                                0x12AF  ACTIVE
- *   SMSG_COMBAT_EVENT_FAILED                       0x18C3  DORMANT 
+ *   SMSG_COMBAT_EVENT_FAILED                       0x18C3  DORMANT
  *   SMSG_ATTACKSTART                               0x1A9E  ACTIVE
  *
  *  -- Unit_C.cpp (112) --
- *   SMSG_MOUNTSPECIAL_ANIM                         0x003A  DORMANT 
- *   SMSG_SPLINE_MOVE_SET_SWIM_BACK_SPEED           0x0046  ACTIVE 
+ *   SMSG_MOUNTSPECIAL_ANIM                         0x003A  DORMANT
+ *   SMSG_SPLINE_MOVE_SET_SWIM_BACK_SPEED           0x0046  ACTIVE
  *   SMSG_MOVE_UPDATE_WALK_SPEED                    0x0047  DORMANT
- *   SMSG_COMPOUND_MOVE                             0x0061  DORMANT 
- *   SMSG_FLIGHT_SPLINE_SYNC                        0x0063  DORMANT 
- *   SMSG_MOVE_SET_TURN_RATE                        0x0069  DORMANT 
- *   SMSG_UNKNOWN_0x006B                            0x006B  DOC     
+ *   SMSG_COMPOUND_MOVE                             0x0061  DORMANT
+ *   SMSG_FLIGHT_SPLINE_SYNC                        0x0063  DORMANT
+ *   SMSG_MOVE_SET_TURN_RATE                        0x0069  ACTIVE
+ *   SMSG_UNKNOWN_0x006B                            0x006B  DOC
  *   SMSG_MOVE_SET_FLIGHT_SPEED                     0x006E  ACTIVE
  *   SMSG_AURA_UPDATE                               0x0072  ACTIVE
  *   SMSG_MOVE_UPDATE_FLIGHT_SPEED                  0x00E1  DORMANT
- *   SMSG_MOVE_UNSET_CAN_FLY                        0x0162  DORMANT 
- *   SMSG_SPLINE_MOVE_UNROOT                        0x01E1  DORMANT 
+ *   SMSG_MOVE_UNSET_CAN_FLY                        0x0162  DORMANT
+ *   SMSG_SPLINE_MOVE_UNROOT                        0x01E1  DORMANT
  *   SMSG_MOVE_UPDATE_SWIM_SPEED                    0x01E2  DORMANT
- *   SMSG_UNKNOWN_0x023B                            0x023B  DOC     
- *   SMSG_MOVE_SET_COLLISION_HGT                    0x0250  DORMANT 
- *   SMSG_MOVE_UPDATE_KNOCK_BACK                    0x0251  DORMANT 
- *   SMSG_SPLINE_MOVE_SET_HOVER                     0x0258  DORMANT 
+ *   SMSG_UNKNOWN_0x023B                            0x023B  DOC
+ *   SMSG_MOVE_SET_COLLISION_HGT                    0x0250  DORMANT
+ *   SMSG_MOVE_UPDATE_KNOCK_BACK                    0x0251  DORMANT
+ *   SMSG_SPLINE_MOVE_SET_HOVER                     0x0258  DORMANT
  *   SMSG_MOVE_UPDATE_SWIM_BACK_SPEED               0x025A  DORMANT
- *   SMSG_UNKNOWN_0x02BB                            0x02BB  DOC     
- *   SMSG_MOVE_UNSET_HOVER                          0x02D3  DORMANT 
+ *   SMSG_UNKNOWN_0x02BB                            0x02BB  DOC
+ *   SMSG_MOVE_UNSET_HOVER                          0x02D3  DORMANT
  *   SMSG_SPLINE_MOVE_SET_RUN_SPEED                 0x02F1  ACTIVE
- *   SMSG_MOVE_SET_FLIGHT_BACK_SPEED                0x0319  DORMANT 
+ *   SMSG_MOVE_SET_FLIGHT_BACK_SPEED                0x0319  ACTIVE
  *   SMSG_MOVE_REMOVE_MOVEMENT_FORCE                0x0341  DORMANT
- *   SMSG_MOVE_UPDATE_FLIGHT_BACK_SPEED             0x036A  DOC     
- *   SMSG_PLAY_ONE_SHOT_ANIM_KIT                    0x043E  DORMANT 
+ *   SMSG_MOVE_UPDATE_FLIGHT_BACK_SPEED             0x036A  DOC
+ *   SMSG_PLAY_ONE_SHOT_ANIM_KIT                    0x043E  DORMANT
  *   SMSG_SPELL_COOLDOWN                            0x0452  ACTIVE
  *   SMSG_MOVE_SET_WALK_SPEED                       0x0469  ACTIVE
  *   SMSG_MIRROR_IMAGE_CREATURE_DATA                0x04D0  DORMANT
  *   SMSG_MIRROR_IMAGE_COMPONENTED_DATA             0x04D9  DORMANT
- *   SMSG_MOVE_KNOCK_BACK                           0x0562  DORMANT 
- *   SMSG_PLAY_SPELL_VISUAL                         0x061E  DORMANT 
+ *   SMSG_MOVE_KNOCK_BACK                           0x0562  DORMANT
+ *   SMSG_PLAY_SPELL_VISUAL                         0x061E  DORMANT
  *   SMSG_THREAT_UPDATE                             0x0632  ACTIVE   [high-conf]
  *   SMSG_AI_REACTION                               0x06AF  ACTIVE
- *   SMSG_SPLINE_MOVE_ROOT                          0x0728  DORMANT 
+ *   SMSG_SPLINE_MOVE_ROOT                          0x0728  DORMANT
  *   SMSG_MOVE_SET_SWIM_SPEED                       0x0817  ACTIVE
- *   SMSG_SPLINE_MOVE_SET_TURN_RATE                 0x0832  ACTIVE 
- *   SMSG_SPLINE_MOVE_GRAVITY_DISABLE               0x0845  DORMANT 
+ *   SMSG_SPLINE_MOVE_SET_TURN_RATE                 0x0832  ACTIVE
+ *   SMSG_SPLINE_MOVE_GRAVITY_DISABLE               0x0845  DORMANT
  *   SMSG_MOVE_SET_VEHICLE_REC_ID                   0x0861  DORMANT
- *   SMSG_SPLINE_MOVE_GRAVITY_ENABLE                0x0865  DORMANT 
- *   SMSG_MOVE_UNSET_CAN_TRANSITION_BETWEEN_SWIM_AND_FLY 0x0868  DORMANT 
- *   SMSG_MOVE_LAND_WALK                            0x086A  DORMANT 
+ *   SMSG_SPLINE_MOVE_GRAVITY_ENABLE                0x0865  DORMANT
+ *   SMSG_MOVE_UNSET_CAN_TRANSITION_BETWEEN_SWIM_AND_FLY 0x0868  DORMANT
+ *   SMSG_MOVE_LAND_WALK                            0x086A  DORMANT
  *   SMSG_MOVE_UPDATE_RUN_BACK_SPEED                0x08A3  DORMANT
  *   SMSG_SPLINE_MOVE_SET_WALK_SPEED                0x08B2  ACTIVE
- *   SMSG_MOVE_NORMAL_FALL                          0x08E0  DORMANT 
- *   SMSG_MOVE_SET_SWIM_BACK_SPEED                  0x0962  DORMANT 
- *   SMSG_MOVE_UPDATE_PITCH_RATE                    0x09E2  DOC     
- *   SMSG_UNKNOWN_0x0A02                            0x0A02  DOC     
- *   SMSG_UNKNOWN_0x0A03                            0x0A03  DOC     
- *   SMSG_MOVE_GRAVITY_ENABLE                       0x0A27  DORMANT 
+ *   SMSG_MOVE_NORMAL_FALL                          0x08E0  DORMANT
+ *   SMSG_MOVE_SET_SWIM_BACK_SPEED                  0x0962  ACTIVE
+ *   SMSG_MOVE_UPDATE_PITCH_RATE                    0x09E2  DOC
+ *   SMSG_UNKNOWN_0x0A02                            0x0A02  DOC
+ *   SMSG_UNKNOWN_0x0A03                            0x0A03  DOC
+ *   SMSG_MOVE_GRAVITY_ENABLE                       0x0A27  DORMANT
  *   SMSG_MOVE_SET_RUN_BACK_SPEED                   0x0A83  ACTIVE
- *   SMSG_SPLINE_MOVE_SET_PITCH_RATE                0x0AB3  ACTIVE 
+ *   SMSG_SPLINE_MOVE_SET_PITCH_RATE                0x0AB3  ACTIVE
  *   SMSG_MOVE_UPDATE_APPLY_MOVEMENT_FORCE          0x0AB6  DORMANT
  *   SMSG_SPLINE_MOVE_SET_NORMAL_FALL               0x0B08  ACTIVE
- *   SMSG_SPLINE_MOVE_SET_RUN_MODE                  0x0B18  DORMANT 
- *   SMSG_SPLINE_MOVE_SET_FLIGHT_BACK_SPEED         0x0B28  ACTIVE 
+ *   SMSG_SPLINE_MOVE_SET_RUN_MODE                  0x0B18  DORMANT
+ *   SMSG_SPLINE_MOVE_SET_FLIGHT_BACK_SPEED         0x0B28  ACTIVE
  *   SMSG_MOVE_TELEPORT                             0x0B39  ACTIVE
- *   SMSG_MOVE_FEATHER_FALL                         0x0C60  DORMANT 
+ *   SMSG_MOVE_FEATHER_FALL                         0x0C60  DORMANT
  *   SMSG_MOVE_SET_ACTIVE_MOVER                     0x0C6D  ACTIVE
  *   SMSG_SET_MOVEMENT_ANIM_KIT                     0x0CAA  DORMANT
- *   SMSG_SPLINE_MOVE_UNSET_HOVER                   0x0CE1  DORMANT 
- *   SMSG_MOVE_UNSET_CAN_TURN_WHILE_FALLING         0x0D61  DOC     
+ *   SMSG_SPLINE_MOVE_UNSET_HOVER                   0x0CE1  DORMANT
+ *   SMSG_MOVE_UNSET_CAN_TURN_WHILE_FALLING         0x0D61  DOC
  *   SMSG_MOVE_UPDATE_TURN_RATE                     0x0D62  DORMANT
- *   SMSG_SPLINE_MOVE_UNSET_FLYING                  0x0DE2  DORMANT 
+ *   SMSG_SPLINE_MOVE_UNSET_FLYING                  0x0DE2  DORMANT
  *   SMSG_DISMOUNT                                  0x0E3A  ACTIVE   [high-conf]
- *   SMSG_SPLINE_MOVE_START_SWIM                    0x0F29  DORMANT 
- *   SMSG_UNKNOWN_0x100B                            0x100B  DOC     
+ *   SMSG_SPLINE_MOVE_START_SWIM                    0x0F29  DORMANT
+ *   SMSG_UNKNOWN_0x100B                            0x100B  DOC
  *   SMSG_CLIENT_CONTROL_UPDATE                     0x1043  ACTIVE
- *   SMSG_SPLINE_MOVE_SET_FLYING                    0x1046  DORMANT 
+ *   SMSG_SPLINE_MOVE_SET_FLYING                    0x1046  DORMANT
  *   SMSG_MOVE_SET_CAN_TURN_WHILE_FALLING           0x1065  DORMANT
  *   SMSG_POWER_UPDATE                              0x109F  ACTIVE
  *   SMSG_MOVE_UPDATE_REMOVE_MOVEMENT_FORCE         0x1464  DORMANT
- *   SMSG_HEALTH_UPDATE                             0x148B  DORMANT 
- *   SMSG_SET_VEHICLE_REC_ID                        0x149F  DORMANT 
+ *   SMSG_HEALTH_UPDATE                             0x148B  DORMANT
+ *   SMSG_SET_VEHICLE_REC_ID                        0x149F  DORMANT
  *   SMSG_HIGHEST_THREAT_UPDATE                     0x14AE  ACTIVE   [high-conf]
- *   SMSG_UNKNOWN_0x1553                            0x1553  DOC     
+ *   SMSG_UNKNOWN_0x1553                            0x1553  DOC
  *   SMSG_MOVE_UPDATE_RUN_SPEED                     0x158E  DORMANT
- *   SMSG_MOVE_GRAVITY_DISABLE                      0x159F  DORMANT 
- *   SMSG_MOVE_UPDATE_TELEPORT                      0x15A9  DOC     
- *   SMSG_FORCE_MOVE_ROOT                           0x15AE  DORMANT 
+ *   SMSG_MOVE_GRAVITY_DISABLE                      0x159F  DORMANT
+ *   SMSG_MOVE_UPDATE_TELEPORT                      0x15A9  DOC
+ *   SMSG_FORCE_MOVE_ROOT                           0x15AE  DORMANT
  *   SMSG_MOVE_COLLISION_DISABLE                    0x15B8  DORMANT
  *   SMSG_PET_ACTION_SOUND                          0x15E2  ACTIVE
- *   SMSG_MOVE_SET_CAN_FLY                          0x178D  DORMANT 
- *   SMSG_SPLINE_MOVE_STOP_SWIM                     0x1798  DORMANT 
- *   SMSG_MOVE_SET_PITCH_RATE                       0x17AB  DORMANT 
- *   SMSG_MOVE_SET_HOVER                            0x1802  DORMANT 
+ *   SMSG_MOVE_SET_CAN_FLY                          0x178D  DORMANT
+ *   SMSG_SPLINE_MOVE_STOP_SWIM                     0x1798  DORMANT
+ *   SMSG_MOVE_SET_PITCH_RATE                       0x17AB  ACTIVE
+ *   SMSG_MOVE_SET_HOVER                            0x1802  DORMANT
  *   SMSG_THREAT_CLEAR                              0x180B  ACTIVE   [high-conf]
  *   SMSG_MOVE_UPDATE_COLLISION_HEIGHT              0x1812  DORMANT
- *   SMSG_UNKNOWN_0x181B                            0x181B  DOC     
+ *   SMSG_UNKNOWN_0x181B                            0x181B  DOC
  *   SMSG_SPLINE_MOVE_SET_WATER_WALK                0x1823  ACTIVE
  *   SMSG_MOVE_COLLISION_ENABLE                     0x1826  DORMANT
  *   SMSG_MOVE_SET_RUN_SPEED                        0x184C  ACTIVE
- *   SMSG_SPLINE_MOVE_SET_WALK_MODE                 0x1865  DORMANT 
- *   SMSG_UNKNOWN_0x186F                            0x186F  DOC     
+ *   SMSG_SPLINE_MOVE_SET_WALK_MODE                 0x1865  DORMANT
+ *   SMSG_UNKNOWN_0x186F                            0x186F  DOC
  *   SMSG_SPLINE_MOVE_SET_FEATHER_FALL              0x1893  ACTIVE
  *   SMSG_SPLINE_MOVE_SET_LAND_WALK                 0x18B6  ACTIVE
  *   SMSG_THREAT_REMOVE                             0x1960  ACTIVE   [high-conf]
  *   SMSG_PRE_RESURRECT                             0x19C0  ACTIVE   [high-conf]
  *   SMSG_MONSTER_MOVE                              0x1A07  ACTIVE
  *   SMSG_PLAYER_MOVE                               0x1A32  ACTIVE
- *   SMSG_PET_DISMISS_SOUND                         0x1ABB  DORMANT 
- *   SMSG_UNKNOWN_0x1C0E                            0x1C0E  DOC     
+ *   SMSG_PET_DISMISS_SOUND                         0x1ABB  DORMANT
+ *   SMSG_UNKNOWN_0x1C0E                            0x1C0E  DOC
  *   SMSG_STANDSTATE_UPDATE                         0x1C12  ACTIVE
- *   SMSG_LOOT_LIST                                 0x1C3F  DORMANT 
+ *   SMSG_LOOT_LIST                                 0x1C3F  DORMANT
  *   SMSG_SPLINE_MOVE_SET_SWIM_SPEED                0x1D8E  ACTIVE
  *   SMSG_SPLINE_MOVE_SET_FLIGHT_SPEED              0x1DAB  ACTIVE
  *   SMSG_MOVE_APPLY_MOVEMENT_FORCE                 0x1DBE  DORMANT
  *   SMSG_CANCEL_AUTO_REPEAT                        0x1E0F  ACTIVE   [high-conf]  direct packed-GUID reader and Unit_C auto-repeat-clear terminal; name reference-consensus
- *   SMSG_UNKNOWN_0x1E12                            0x1E12  DOC     
- *   SMSG_UNKNOWN_0x1E9F                            0x1E9F  DOC     
- *   SMSG_MOVE_WATER_WALK                           0x1F9A  DORMANT 
+ *   SMSG_UNKNOWN_0x1E12                            0x1E12  DOC
+ *   SMSG_UNKNOWN_0x1E9F                            0x1E9F  DOC
+ *   SMSG_MOVE_WATER_WALK                           0x1F9A  DORMANT
  *   SMSG_SPLINE_MOVE_SET_RUN_BACK_SPEED            0x1F9F  ACTIVE
- *   SMSG_FORCE_MOVE_UNROOT                         0x1FAE  DORMANT 
+ *   SMSG_FORCE_MOVE_UNROOT                         0x1FAE  DORMANT
  *
  *  -- VignetteInfo.cpp (2) --
  *   SMSG_UNKNOWN_0x088F                            0x088F  DOC      [low-conf]
@@ -1116,7 +1116,7 @@ typedef uint16_t uint16;
  *  -- WardenClient.cpp (7) --
  *   SMSG_LOGIN_SETTIMESPEED                        0x082B  ACTIVE   [low-conf]
  *   SMSG_GAMETIME_SET                              0x0A0F  DORMANT  [low-conf]
- *   SMSG_WARDEN_DATA                               0x0C0A  DORMANT 
+ *   SMSG_WARDEN_DATA                               0x0C0A  DORMANT
  *   SMSG_GAMETIME_UPDATE                           0x0E1B  DORMANT  [low-conf]
  *   SMSG_UNKNOWN_0x1042                            0x1042  DOC      [low-conf]
  *   SMSG_SET_TIME_ZONE_INFORMATION                 0x19C1  ACTIVE   [low-conf]
@@ -1134,16 +1134,16 @@ typedef uint16_t uint16;
  *   SMSG_BATTLE_PAY_DELIVERY_STARTED               0x1E32  DORMANT  [unattributed]
  *
  *  -- login/auth message layer (12) --
- *   SMSG_CLIENTCACHE_VERSION                       0x002A  ACTIVE  
+ *   SMSG_CLIENTCACHE_VERSION                       0x002A  ACTIVE
  *   SMSG_LOGOUT_RESPONSE                           0x008F  ACTIVE   [medium-conf]
  *   SMSG_WAIT_QUEUE_FINISH                         0x060E  DORMANT  [name: binary-proven]
  *   SMSG_LOGOUT_CANCEL_ACK                         0x0AAF  ACTIVE   [medium-conf]
- *   SMSG_AUTH_RESPONSE                             0x0ABA  ACTIVE  
+ *   SMSG_AUTH_RESPONSE                             0x0ABA  ACTIVE
  *   SMSG_WAIT_QUEUE_UPDATE                         0x0C2F  DORMANT  [name: binary-proven]
  *   SMSG_CHAR_DELETE                               0x0C9F  ACTIVE   [medium-conf]
- *   SMSG_CHAR_ENUM                                 0x11C3  ACTIVE  
+ *   SMSG_CHAR_ENUM                                 0x11C3  ACTIVE
  *   SMSG_LOGOUT_COMPLETE                           0x142F  ACTIVE   [medium-conf]
- *   SMSG_ADDON_INFO                                0x160A  ACTIVE  
+ *   SMSG_ADDON_INFO                                0x160A  ACTIVE
  *   SMSG_CHARACTER_LOGIN_FAILED                    0x1A0B  ACTIVE   [medium-conf]
  *   SMSG_CHAR_CREATE                               0x1CAA  ACTIVE   [medium-conf]
  *
@@ -1306,600 +1306,600 @@ typedef uint16_t uint16;
  * ==== CMSG (595) ====
  *
  *  -- client-send (595) --
- *   CMSG_SET_ACHIEVEMENTS_HIDDEN                   0x0002  DOC     
- *   CMSG_CHANNEL_MUTE                              0x000A  DORMANT 
- *   CMSG_PING                                      0x0012  ACTIVE  
+ *   CMSG_SET_ACHIEVEMENTS_HIDDEN                   0x0002  DOC
+ *   CMSG_CHANNEL_MUTE                              0x000A  DORMANT
+ *   CMSG_PING                                      0x0012  ACTIVE
  *   CMSG_UNACCEPT_TRADE                            0x0023  ACTIVE
  *   CMSG_DESTROY_ITEM                              0x0026  ACTIVE
- *   CMSG_NEUTRAL_PLAYER_SELECT_FACTION             0x0027  DOC     
+ *   CMSG_NEUTRAL_PLAYER_SELECT_FACTION             0x0027  DOC
  *   CMSG_MESSAGECHAT_DND                           0x002E  ACTIVE
  *   CMSG_VIOLENCE_LEVEL                            0x0040  ACTIVE
  *   CMSG_TIME_SYNC_RESPONSE_FAILED                 0x0058  ACTIVE
- *   CMSG_UNKNOWN_0x0060                            0x0060  DOC     
- *   CMSG_REALM_SPLIT                               0x0062  ACTIVE  
- *   CMSG_UPDATE_ACCOUNT_DATA                       0x0068  ACTIVE  
- *   CMSG_UNKNOWN_0x0069                            0x0069  DOC     
+ *   CMSG_UNKNOWN_0x0060                            0x0060  DOC
+ *   CMSG_REALM_SPLIT                               0x0062  ACTIVE
+ *   CMSG_UPDATE_ACCOUNT_DATA                       0x0068  ACTIVE
+ *   CMSG_UNKNOWN_0x0069                            0x0069  DOC
  *   CMSG_LFD_LOCK_INFO_REQUEST                     0x006B  ACTIVE   server-binding=CMSG_LFG_LOCK_INFO_REQUEST
- *   CMSG_UNKNOWN_0x0071                            0x0071  DOC     
+ *   CMSG_UNKNOWN_0x0071                            0x0071  DOC
  *   CMSG_MOVE_TELEPORT_ACK                         0x0078  ACTIVE
- *   CMSG_MOVE_STOP_PITCH                           0x007A  DORMANT 
- *   CMSG_MOUNTSPECIAL_ANIM                         0x0082  DORMANT 
- *   CMSG_SCENE_COMPLETED                           0x0087  DOC     
+ *   CMSG_MOVE_STOP_PITCH                           0x007A  DORMANT
+ *   CMSG_MOUNTSPECIAL_ANIM                         0x0082  DORMANT
+ *   CMSG_SCENE_COMPLETED                           0x0087  DOC
  *   CMSG_MESSAGECHAT_ADDON_RAID                    0x009A  ACTIVE
  *   CMSG_CLEAR_TRADE_ITEM                          0x00A7  ACTIVE
- *   CMSG_CHANNEL_MODERATOR                         0x00AE  DORMANT 
- *   CMSG_CHANNEL_OWNER                             0x00AF  DORMANT 
- *   CMSG_AUTH_SESSION                              0x00B2  ACTIVE  
- *   CMSG_UNKNOWN_0x00B3                            0x00B3  DOC     
+ *   CMSG_CHANNEL_MODERATOR                         0x00AE  DORMANT
+ *   CMSG_CHANNEL_OWNER                             0x00AF  DORMANT
+ *   CMSG_AUTH_SESSION                              0x00B2  ACTIVE
+ *   CMSG_UNKNOWN_0x00B3                            0x00B3  DOC
  *   CMSG_MESSAGECHAT_CHANNEL                       0x00BB  ACTIVE
- *   CMSG_MOVE_START_PITCH_UP                       0x00D8  DORMANT 
- *   CMSG_MOVE_FALL_RESET                           0x00D9  DORMANT 
- *   CMSG_FORCE_WALK_SPEED_CHANGE_ACK               0x00DB  DORMANT 
- *   CMSG_CHAR_ENUM                                 0x00E0  ACTIVE  
+ *   CMSG_MOVE_START_PITCH_UP                       0x00D8  DORMANT
+ *   CMSG_MOVE_FALL_RESET                           0x00D9  DORMANT
+ *   CMSG_FORCE_WALK_SPEED_CHANGE_ACK               0x00DB  DORMANT
+ *   CMSG_CHAR_ENUM                                 0x00E0  ACTIVE
  *   CMSG_UNKNOWN_0x00E3                            0x00E3  ACTIVE   server-binding=CMSG_LFG_LFR_LEAVE
- *   CMSG_UNKNOWN_0x00F0                            0x00F0  DOC     
- *   CMSG_MOVE_KNOCK_BACK_ACK                       0x00F2  DORMANT 
- *   CMSG_ITEM_TEXT_QUERY                           0x0123  DORMANT 
- *   CMSG_OPENING_CINEMATIC                         0x0130  DORMANT 
- *   CMSG_QUERY_VOID_STORAGE                        0x0140  DOC     
- *   CMSG_REQUEST_VEHICLE_NEXT_SEAT                 0x0141  DORMANT 
+ *   CMSG_UNKNOWN_0x00F0                            0x00F0  DOC
+ *   CMSG_MOVE_KNOCK_BACK_ACK                       0x00F2  DORMANT
+ *   CMSG_ITEM_TEXT_QUERY                           0x0123  DORMANT
+ *   CMSG_OPENING_CINEMATIC                         0x0130  DORMANT
+ *   CMSG_QUERY_VOID_STORAGE                        0x0140  DOC
+ *   CMSG_REQUEST_VEHICLE_NEXT_SEAT                 0x0141  DORMANT
  *   CMSG_MOVE_TIME_SKIPPED                         0x0150  ACTIVE
- *   CMSG_FORCE_RUN_BACK_SPEED_CHANGE_ACK           0x0158  DORMANT 
- *   CMSG_UNKNOWN_0x0160                            0x0160  DOC     
- *   CMSG_BATTLE_PET_SET_BATTLE_SLOT                0x0163  DOC     
+ *   CMSG_FORCE_RUN_BACK_SPEED_CHANGE_ACK           0x0158  DORMANT
+ *   CMSG_UNKNOWN_0x0160                            0x0160  DOC
+ *   CMSG_BATTLE_PET_SET_BATTLE_SLOT                0x0163  DOC
  *   CMSG_MOVE_STOP_STRAFE                          0x0171  ACTIVE
- *   CMSG_FORCE_PITCH_RATE_CHANGE_ACK               0x0172  DORMANT 
- *   CMSG_UNKNOWN_0x017A                            0x017A  DOC     
- *   CMSG_UNKNOWN_0x01C0                            0x01C0  DOC     
+ *   CMSG_FORCE_PITCH_RATE_CHANGE_ACK               0x0172  DORMANT
+ *   CMSG_UNKNOWN_0x017A                            0x017A  DOC
+ *   CMSG_UNKNOWN_0x01C0                            0x01C0  DOC
  *   CMSG_MOVE_START_TURN_LEFT                      0x01D0  ACTIVE
- *   CMSG_MOVE_START_DESCEND                        0x01D1  DORMANT 
+ *   CMSG_MOVE_START_DESCEND                        0x01D1  DORMANT
  *   CMSG_TIME_SYNC_RESP                            0x01DB  ACTIVE
- *   CMSG_LFG_LEAVE                                 0x01E0  DORMANT 
- *   CMSG_SET_EVERYONE_IS_ASSISTANT                 0x01E1  DOC     
- *   CMSG_CALENDAR_EVENT_SIGNUP                     0x01E3  DORMANT 
- *   CMSG_MOVE_SET_FLY                              0x01F1  DORMANT 
+ *   CMSG_LFG_LEAVE                                 0x01E0  DORMANT
+ *   CMSG_SET_EVERYONE_IS_ASSISTANT                 0x01E1  DOC
+ *   CMSG_CALENDAR_EVENT_SIGNUP                     0x01E3  DORMANT
+ *   CMSG_MOVE_SET_FLY                              0x01F1  DORMANT
  *   MSG_MOVE_HEARTBEAT                             0x01F2  ACTIVE
  *   CMSG_MOVE_START_STRAFE_LEFT                    0x01F8  ACTIVE
  *   CMSG_CAST_SPELL                                0x0206  ACTIVE
- *   CMSG_CHANNEL_UNMUTE                            0x022A  DORMANT 
- *   CMSG_MAIL_MARK_AS_READ                         0x0241  DORMANT 
- *   CMSG_SET_LFG_BONUS_FACTION_ID                  0x0247  DOC     
+ *   CMSG_CHANNEL_UNMUTE                            0x022A  DORMANT
+ *   CMSG_MAIL_MARK_AS_READ                         0x0241  DORMANT
+ *   CMSG_SET_LFG_BONUS_FACTION_ID                  0x0247  DOC
  *   CMSG_SETSHEATHED                               0x0249  ACTIVE
- *   CMSG_CANCEL_TEMP_ENCHANTMENT                   0x024B  DORMANT 
- *   CMSG_GUILD_BANK_BUY_TAB                        0x0251  DORMANT 
- *   CMSG_PETITION_QUERY                            0x0255  DORMANT 
+ *   CMSG_CANCEL_TEMP_ENCHANTMENT                   0x024B  DORMANT
+ *   CMSG_GUILD_BANK_BUY_TAB                        0x0251  DORMANT
+ *   CMSG_PETITION_QUERY                            0x0255  DORMANT
  *   CMSG_LEAVE_BATTLEFIELD                         0x0257  ACTIVE
- *   CMSG_AUCTION_REMOVE_ITEM                       0x0259  DORMANT 
+ *   CMSG_AUCTION_REMOVE_ITEM                       0x0259  DORMANT
  *   CMSG_PET_ACTION                                0x025B  ACTIVE
  *   CMSG_AUTOEQUIP_ITEM                            0x025F  ACTIVE
- *   CMSG_KEYBOUND_OVERRIDE                         0x0264  DOC     
- *   CMSG_ZONEUPDATE                                0x0265  DORMANT 
+ *   CMSG_KEYBOUND_OVERRIDE                         0x0264  DOC
+ *   CMSG_ZONEUPDATE                                0x0265  DORMANT
  *   CMSG_INITIATE_TRADE                            0x0267  ACTIVE
- *   CMSG_UNLEARN_SKILL                             0x0268  DORMANT 
- *   CMSG_UNKNOWN_0x0274                            0x0274  DOC     
+ *   CMSG_UNLEARN_SKILL                             0x0268  DORMANT
+ *   CMSG_UNKNOWN_0x0274                            0x0274  DOC
  *   CMSG_CONFIRM_RESPEC_WIPE                       0x0275  ACTIVE
- *   CMSG_IGNORE_TRADE                              0x0276  DORMANT 
- *   CMSG_RIDE_VEHICLE_INTERACT                     0x0277  DORMANT 
- *   CMSG_SET_FACTION_ATWAR                         0x027B  DORMANT 
+ *   CMSG_IGNORE_TRADE                              0x0276  DORMANT
+ *   CMSG_RIDE_VEHICLE_INTERACT                     0x0277  DORMANT
+ *   CMSG_SET_FACTION_ATWAR                         0x027B  DORMANT
  *   CMSG_NPC_TEXT_QUERY                            0x0287  ACTIVE   [high-conf]
  *   CMSG_MESSAGECHAT_ADDON_PARTY                   0x028E  ACTIVE
- *   CMSG_SUSPEND_TOKEN_RESPONSE                    0x0292  DOC     
+ *   CMSG_SUSPEND_TOKEN_RESPONSE                    0x0292  DOC
  *   CMSG_UNREGISTER_ALL_ADDON_PREFIXES             0x029F  ACTIVE
- *   CMSG_GET_MIRRORIMAGE_DATA                      0x02A3  DORMANT 
- *   CMSG_LEARN_TALENT                              0x02A7  DORMANT 
- *   CMSG_REPAIR_ITEM                               0x02C1  DORMANT 
- *   CMSG_SCENE_TRIGGER_EVENT                       0x02C4  DOC     
- *   CMSG_SET_PVP                                   0x02C5  DOC     
- *   CMSG_PET_BATTLE_REQUEST_PVP                    0x02C7  DOC     
+ *   CMSG_GET_MIRRORIMAGE_DATA                      0x02A3  DORMANT
+ *   CMSG_LEARN_TALENT                              0x02A7  DORMANT
+ *   CMSG_REPAIR_ITEM                               0x02C1  DORMANT
+ *   CMSG_SCENE_TRIGGER_EVENT                       0x02C4  DOC
+ *   CMSG_SET_PVP                                   0x02C5  DOC
+ *   CMSG_PET_BATTLE_REQUEST_PVP                    0x02C7  DOC
  *   CMSG_LIST_PETS                                 0x02CA  ACTIVE   server-binding=CMSG_REQUEST_STABLED_PETS
- *   CMSG_SOCKET_GEMS                               0x02CB  DORMANT 
- *   CMSG_AUTOSTORE_BANK_ITEM                       0x02CF  DORMANT 
- *   CMSG_BATTLEMASTER_JOIN_ARENA                   0x02D2  DORMANT 
+ *   CMSG_SOCKET_GEMS                               0x02CB  DORMANT
+ *   CMSG_AUTOSTORE_BANK_ITEM                       0x02CF  DORMANT
+ *   CMSG_BATTLEMASTER_JOIN_ARENA                   0x02D2  DORMANT
  *   CMSG_QUEST_QUERY                               0x02D5  ACTIVE   [high-conf]
- *   CMSG_UNKNOWN_0x02D6                            0x02D6  DOC     
+ *   CMSG_UNKNOWN_0x02D6                            0x02D6  DOC
  *   CMSG_LIST_INVENTORY                            0x02D8  ACTIVE
- *   CMSG_AUCTION_LIST_PENDING_SALES                0x02DA  DORMANT 
+ *   CMSG_AUCTION_LIST_PENDING_SALES                0x02DA  DORMANT
  *   CMSG_QUESTGIVER_HELLO                          0x02DB  ACTIVE   [high-conf]
- *   CMSG_WRAP_ITEM                                 0x02DF  DORMANT 
- *   CMSG_TAXINODE_STATUS_QUERY                     0x02E1  DORMANT 
+ *   CMSG_WRAP_ITEM                                 0x02DF  DORMANT
+ *   CMSG_TAXINODE_STATUS_QUERY                     0x02E1  DORMANT
  *   CMSG_BUY_ITEM                                  0x02E2  ACTIVE
- *   CMSG_TAXIQUERYAVAILABLENODES                   0x02E3  DORMANT 
+ *   CMSG_TAXIQUERYAVAILABLENODES                   0x02E3  DORMANT
  *   CMSG_ATTACKSWING                               0x02E7  ACTIVE
- *   CMSG_EQUIPMENT_SET_DELETE                      0x02E8  DORMANT 
- *   CMSG_BANKER_ACTIVATE                           0x02E9  DORMANT 
- *   CMSG_AUCTION_LIST_ITEMS                        0x02EA  DORMANT 
- *   CMSG_AUCTION_SELL_ITEM                         0x02EB  DORMANT 
+ *   CMSG_EQUIPMENT_SET_DELETE                      0x02E8  DORMANT
+ *   CMSG_BANKER_ACTIVATE                           0x02E9  DORMANT
+ *   CMSG_AUCTION_LIST_ITEMS                        0x02EA  DORMANT
+ *   CMSG_AUCTION_SELL_ITEM                         0x02EB  DORMANT
  *   CMSG_SPLIT_ITEM                                0x02EC  ACTIVE
  *   CMSG_QUESTGIVER_STATUS_MULTIPLE_QUERY          0x02F1  ACTIVE   [high-conf]
- *   CMSG_SHOWING_CLOAK                             0x02F2  DORMANT 
+ *   CMSG_SHOWING_CLOAK                             0x02F2  DORMANT
  *   CMSG_LOOT_MONEY                                0x02F6  ACTIVE
- *   CMSG_ACCEPT_LEVEL_GRANT                        0x02FB  DORMANT 
+ *   CMSG_ACCEPT_LEVEL_GRANT                        0x02FB  DORMANT
  *   CMSG_TUTORIAL_RESET                            0x0307  ACTIVE
  *   CMSG_CALENDAR_GET_EVENT                        0x030C  ACTIVE
- *   CMSG_SUBMIT_COMPLAIN                           0x030D  DOC     
- *   CMSG_COMPLAIN                                  0x0319  DORMANT 
- *   CMSG_READY_FOR_ACCOUNT_DATA_TIMES              0x031C  ACTIVE  
- *   CMSG_UNKNOWN_0x031D                            0x031D  DOC     
+ *   CMSG_SUBMIT_COMPLAIN                           0x030D  DOC
+ *   CMSG_COMPLAIN                                  0x0319  DORMANT
+ *   CMSG_READY_FOR_ACCOUNT_DATA_TIMES              0x031C  ACTIVE
+ *   CMSG_UNKNOWN_0x031D                            0x031D  DOC
  *   CMSG_NAME_QUERY                                0x0328  ACTIVE
- *   CMSG_CHAR_FACTION_CHANGE                       0x0329  DORMANT 
- *   CMSG_GROUP_RAID_CONVERT                        0x032C  DORMANT 
+ *   CMSG_CHAR_FACTION_CHANGE                       0x0329  DORMANT
+ *   CMSG_GROUP_RAID_CONVERT                        0x032C  DORMANT
  *   CMSG_LFG_GET_STATUS                            0x032D  ACTIVE
- *   CMSG_GM_RESPONSE_RESOLVE                       0x033D  DOC     
+ *   CMSG_GM_RESPONSE_RESOLVE                       0x033D  DOC
  *   CMSG_SPIRIT_HEALER_ACTIVATE                    0x0340  DORMANT
- *   CMSG_BATTLEFIELD_MGR_EXIT_REQUEST              0x0343  DOC     
+ *   CMSG_BATTLEFIELD_MGR_EXIT_REQUEST              0x0343  DOC
  *   CMSG_ATTACKSTOP                                0x0345  ACTIVE
- *   CMSG_TRAINER_LIST                              0x034B  DORMANT 
- *   CMSG_TRAINER_BUY_SPELL                         0x0352  DORMANT 
+ *   CMSG_TRAINER_LIST                              0x034B  DORMANT
+ *   CMSG_TRAINER_BUY_SPELL                         0x0352  DORMANT
  *   CMSG_AUTOSTORE_LOOT_ITEM                       0x0354  ACTIVE
  *   CMSG_SWAP_ITEM                                 0x035D  ACTIVE
- *   CMSG_SELF_RES                                  0x0360  DORMANT 
- *   CMSG_AUCTION_LIST_OWNER_ITEMS                  0x0361  DORMANT 
+ *   CMSG_SELF_RES                                  0x0360  DORMANT
+ *   CMSG_AUCTION_LIST_OWNER_ITEMS                  0x0361  DORMANT
  *   CMSG_REQUEST_CONQUEST_FORMULA_CONSTANTS        0x0365  ACTIVE
  *   CMSG_QUESTGIVER_STATUS_QUERY                   0x036A  ACTIVE
- *   CMSG_USE_EQUIPMENT_SET                         0x036E  DORMANT 
- *   CMSG_AUTOEQUIP_ITEM_SLOT                       0x036F  DORMANT 
- *   CMSG_GUILD_BANKER_ACTIVATE                     0x0372  DORMANT 
- *   CMSG_QUERY_INSPECT_ACHIEVEMENTS                0x0373  DORMANT 
- *   CMSG_USED_FOLLOW                               0x0374  DOC     
- *   CMSG_REQUEST_PVP_REWARDS                       0x0375  DORMANT 
- *   CMSG_PET_BATTLE_REQUEST_UPDATE                 0x0377  DOC     
+ *   CMSG_USE_EQUIPMENT_SET                         0x036E  DORMANT
+ *   CMSG_AUTOEQUIP_ITEM_SLOT                       0x036F  DORMANT
+ *   CMSG_GUILD_BANKER_ACTIVATE                     0x0372  DORMANT
+ *   CMSG_QUERY_INSPECT_ACHIEVEMENTS                0x0373  DORMANT
+ *   CMSG_USED_FOLLOW                               0x0374  DOC
+ *   CMSG_REQUEST_PVP_REWARDS                       0x0375  DORMANT
+ *   CMSG_PET_BATTLE_REQUEST_UPDATE                 0x0377  DOC
  *   CMSG_QUESTGIVER_REQUEST_REWARD                 0x0378  ACTIVE
  *   CMSG_AUCTION_HELLO                             0x0379  ACTIVE
- *   CMSG_PETITION_SHOWLIST                         0x037B  DORMANT 
- *   CMSG_REQUEST_VEHICLE_PREV_SEAT                 0x03C4  DORMANT 
+ *   CMSG_PETITION_SHOWLIST                         0x037B  DORMANT
+ *   CMSG_REQUEST_VEHICLE_PREV_SEAT                 0x03C4  DORMANT
  *   CMSG_SET_TITLE                                 0x03C7  ACTIVE
- *   CMSG_AUCTION_PLACE_BID                         0x03C8  DORMANT 
- *   CMSG_ACTIVATETAXI                              0x03C9  DORMANT 
+ *   CMSG_AUCTION_PLACE_BID                         0x03C8  DORMANT
+ *   CMSG_ACTIVATETAXI                              0x03C9  DORMANT
  *   CMSG_PUSHQUESTTOPARTY                          0x03D2  ACTIVE
  *   CMSG_RECLAIM_CORPSE                            0x03D3  DORMANT
  *   CMSG_SET_TRADE_ITEM                            0x03D5  ACTIVE
  *   CMSG_SWAP_INV_ITEM                             0x03DF  ACTIVE
- *   CMSG_DUEL_RESPONSE                             0x03E2  DOC     
+ *   CMSG_DUEL_RESPONSE                             0x03E2  DOC
  *   CMSG_SET_CURRENCY_FLAGS                        0x03E4  ACTIVE
  *   CMSG_STANDSTATECHANGE                          0x03E6  ACTIVE
- *   CMSG_AREA_SPIRIT_HEALER_QUERY                  0x03F1  DORMANT 
+ *   CMSG_AREA_SPIRIT_HEALER_QUERY                  0x03F1  DORMANT
  *   CMSG_PLAYED_TIME                               0x03F6  ACTIVE
  *   CMSG_ADDON_REGISTERED_PREFIXES                 0x040E  ACTIVE
- *   CMSG_CHANNEL_UNMODERATOR                       0x041E  DORMANT 
- *   CMSG_LEAVE_CHANNEL                             0x042A  DORMANT 
- *   CMSG_UNLOCK_VOID_STORAGE                       0x0444  DOC     
- *   CMSG_CHOICE_RESPONSE                           0x0447  DOC     
- *   CMSG_PET_CAST_SPELL                            0x044D  DORMANT 
+ *   CMSG_CHANNEL_UNMODERATOR                       0x041E  DORMANT
+ *   CMSG_LEAVE_CHANNEL                             0x042A  DORMANT
+ *   CMSG_UNLOCK_VOID_STORAGE                       0x0444  DOC
+ *   CMSG_CHOICE_RESPONSE                           0x0447  DOC
+ *   CMSG_PET_CAST_SPELL                            0x044D  DORMANT
  *   CMSG_QUERY_COUNTDOWN_TIMER                     0x044E  ACTIVE
- *   CMSG_UNKNOWN_0x0462                            0x0462  DOC     
- *   CMSG_LFG_JOIN                                  0x046B  DORMANT 
- *   CMSG_QUERY_GUILD_RECIPES                       0x0478  DORMANT 
- *   CMSG_GUILD_ADD_RANK                            0x047A  DORMANT 
+ *   CMSG_UNKNOWN_0x0462                            0x0462  DOC
+ *   CMSG_LFG_JOIN                                  0x046B  DORMANT
+ *   CMSG_QUERY_GUILD_RECIPES                       0x0478  DORMANT
+ *   CMSG_GUILD_ADD_RANK                            0x047A  DORMANT
  *   CMSG_CHAT_IGNORED                              0x048A  ACTIVE
- *   CMSG_UNKNOWN_0x049B                            0x049B  DOC     
+ *   CMSG_UNKNOWN_0x049B                            0x049B  DOC
  *   CMSG_MESSAGECHAT_YELL                          0x04AA  ACTIVE
- *   CMSG_GUILD_NEWS_UPDATE_STICKY                  0x04D1  DOC     
- *   CMSG_GUILD_LEAVE                               0x04D8  DORMANT 
- *   CMSG_GUILD_BANK_NOTE                           0x04D9  DOC     
- *   CMSG_UNKNOWN_0x04DB                            0x04DB  DOC     
- *   CMSG_CHAR_DELETE                               0x04E2  ACTIVE  
- *   CMSG_CALENDAR_GUILD_FILTER                     0x04E3  DORMANT 
- *   CMSG_QUERY_GUILD_MEMBER_RECIPES                0x04F0  DORMANT 
- *   CMSG_QUERY_GUILD_BANK_TEXT                     0x0550  DORMANT 
- *   CMSG_LF_GUILD_GET_APPLICATIONS                 0x0558  DOC     
- *   CMSG_GUILD_PROMOTE                             0x0571  DORMANT 
- *   CMSG_LF_GUILD_GET_RECRUITS                     0x057A  DOC     
- *   CMSG_SET_RAID_DIFFICULTY                       0x0591  DOC     
- *   CMSG_GUILD_ASSIGN_MEMBER_RANK                  0x05D0  DOC     
- *   CMSG_GUILD_SET_NOTE                            0x05DA  DORMANT 
- *   CMSG_BATTLE_PET_REQUEST_JOURNAL_LOCK           0x05E1  DOC     
- *   CMSG_QUERY_GUILD_XP                            0x05F8  DOC     
+ *   CMSG_GUILD_NEWS_UPDATE_STICKY                  0x04D1  DOC
+ *   CMSG_GUILD_LEAVE                               0x04D8  DORMANT
+ *   CMSG_GUILD_BANK_NOTE                           0x04D9  DOC
+ *   CMSG_UNKNOWN_0x04DB                            0x04DB  DOC
+ *   CMSG_CHAR_DELETE                               0x04E2  ACTIVE
+ *   CMSG_CALENDAR_GUILD_FILTER                     0x04E3  DORMANT
+ *   CMSG_QUERY_GUILD_MEMBER_RECIPES                0x04F0  DORMANT
+ *   CMSG_QUERY_GUILD_BANK_TEXT                     0x0550  DORMANT
+ *   CMSG_LF_GUILD_GET_APPLICATIONS                 0x0558  DOC
+ *   CMSG_GUILD_PROMOTE                             0x0571  DORMANT
+ *   CMSG_LF_GUILD_GET_RECRUITS                     0x057A  DOC
+ *   CMSG_SET_RAID_DIFFICULTY                       0x0591  DOC
+ *   CMSG_GUILD_ASSIGN_MEMBER_RANK                  0x05D0  DOC
+ *   CMSG_GUILD_SET_NOTE                            0x05DA  DORMANT
+ *   CMSG_BATTLE_PET_REQUEST_JOURNAL_LOCK           0x05E1  DOC
+ *   CMSG_QUERY_GUILD_XP                            0x05F8  DOC
  *   CMSG_QUERY_TIME                                0x0640  ACTIVE
  *   CMSG_UNKNOWN_0x0643                            0x0643  ACTIVE   server-binding=CMSG_LOGOUT_REQUEST
- *   CMSG_TOGGLE_PVP                                0x0644  DORMANT 
- *   CMSG_SET_FACTION_NOTATWAR                      0x064B  DOC     
- *   CMSG_SWAP_VOID_ITEM                            0x0655  DOC     
- *   CMSG_UNKNOWN_0x0656                            0x0656  DOC     
+ *   CMSG_TOGGLE_PVP                                0x0644  DORMANT
+ *   CMSG_SET_FACTION_NOTATWAR                      0x064B  DOC
+ *   CMSG_SWAP_VOID_ITEM                            0x0655  DOC
+ *   CMSG_UNKNOWN_0x0656                            0x0656  DOC
  *   CMSG_QUESTGIVER_COMPLETE_QUEST                 0x0659  ACTIVE
- *   CMSG_PET_STOP_ATTACK                           0x065B  DORMANT 
+ *   CMSG_PET_STOP_ATTACK                           0x065B  DORMANT
  *   CMSG_BUYBACK_ITEM                              0x0661  ACTIVE
- *   CMSG_GRANT_LEVEL                               0x0662  DORMANT 
- *   CMSG_SAVE_EQUIPMENT_SET                        0x0669  DORMANT 
- *   CMSG_AUTOBANK_ITEM                             0x066D  DORMANT 
+ *   CMSG_GRANT_LEVEL                               0x0662  DORMANT
+ *   CMSG_SAVE_EQUIPMENT_SET                        0x0669  DORMANT
+ *   CMSG_AUTOBANK_ITEM                             0x066D  DORMANT
  *   CMSG_SET_ACTIONBAR_TOGGLES                     0x0672  ACTIVE
- *   CMSG_TURN_IN_PETITION                          0x0673  DORMANT 
- *   CMSG_BATTLEMASTER_JOIN_RATED                   0x0674  DORMANT 
- *   CMSG_BATTLE_PET_UPDATE_NOTIFY                  0x0675  DOC     
- *   CMSG_SPELLCLICK                                0x067A  DORMANT 
+ *   CMSG_TURN_IN_PETITION                          0x0673  DORMANT
+ *   CMSG_BATTLEMASTER_JOIN_RATED                   0x0674  DORMANT
+ *   CMSG_BATTLE_PET_UPDATE_NOTIFY                  0x0675  DOC
+ *   CMSG_SPELLCLICK                                0x067A  DORMANT
  *   CMSG_AUTOSTORE_BAG_ITEM                        0x067C  ACTIVE
- *   CMSG_CHANNEL_ANNOUNCEMENTS                     0x06AF  DORMANT 
+ *   CMSG_CHANNEL_ANNOUNCEMENTS                     0x06AF  DORMANT
  *   CMSG_LOGOUT_CANCEL                             0x06C1  ACTIVE
- *   CMSG_QUERY_GUILD_REWARDS                       0x06C4  DOC     
- *   CMSG_BATTLE_PET_WILD_REQUEST                   0x06C5  DOC     
- *   CMSG_SET_PRIMARY_TALENT_TREE                   0x06C6  DOC     
+ *   CMSG_QUERY_GUILD_REWARDS                       0x06C4  DOC
+ *   CMSG_BATTLE_PET_WILD_REQUEST                   0x06C5  DOC
+ *   CMSG_SET_PRIMARY_TALENT_TREE                   0x06C6  DOC
  *   CMSG_SET_WATCHED_FACTION                       0x06C9  ACTIVE
- *   CMSG_GUILD_AUTO_DECLINE                        0x06CB  DORMANT 
+ *   CMSG_GUILD_AUTO_DECLINE                        0x06CB  DORMANT
  *   CMSG_QUESTGIVER_ACCEPT_QUEST                   0x06D1  ACTIVE   [high-conf]
- *   CMSG_JOIN_PET_BATTLE_QUEUE                     0x06D4  DOC     
- *   CMSG_ON_MISSILE_TRAJECTORY_COLLISION           0x06D6  DORMANT 
- *   CMSG_TRANSMOGRIFY_ITEMS                        0x06D7  DOC     
+ *   CMSG_JOIN_PET_BATTLE_QUEUE                     0x06D4  DOC
+ *   CMSG_ON_MISSILE_TRAJECTORY_COLLISION           0x06D6  DORMANT
+ *   CMSG_TRANSMOGRIFY_ITEMS                        0x06D7  DOC
  *   CMSG_GAMEOBJ_USE                               0x06D8  ACTIVE   [high-conf]
  *   CMSG_GAMEOBJ_REPORT_USE                        0x06D9  ACTIVE   [high-conf]
- *   CMSG_PETITION_SIGN                             0x06DA  DORMANT 
- *   CMSG_OPT_OUT_OF_LOOT                           0x06E0  DORMANT 
+ *   CMSG_PETITION_SIGN                             0x06DA  DORMANT
+ *   CMSG_OPT_OUT_OF_LOOT                           0x06E0  DORMANT
  *   CMSG_REQUEST_CEMETERY_LIST                     0x06E4  ACTIVE
- *   CMSG_SAVE_CUF_PROFILES                         0x06E6  DOC     
- *   CMSG_CONTROLLER_EJECT_PASSENGER                0x06E7  DORMANT 
- *   CMSG_PET_SPELL_AUTOCAST                        0x06F0  DORMANT 
+ *   CMSG_SAVE_CUF_PROFILES                         0x06E6  DOC
+ *   CMSG_CONTROLLER_EJECT_PASSENGER                0x06E7  DORMANT
+ *   CMSG_PET_SPELL_AUTOCAST                        0x06F0  DORMANT
  *   CMSG_REQUEST_FORCED_REACTIONS                  0x06F5  ACTIVE
- *   CMSG_REPORT_PVP_AFK                            0x06F9  DORMANT 
- *   CMSG_MAIL_TAKE_MONEY                           0x06FA  DORMANT 
- *   CMSG_ACTIVATETAXIEXPRESS                       0x06FB  DORMANT 
- *   CMSG_CALENDAR_EVENT_MODERATOR_STATUS           0x0708  DORMANT 
- *   CMSG_UNKNOWN_0x0719                            0x0719  DOC     
- *   CMSG_GROUP_INVITE                              0x072D  DORMANT 
- *   CMSG_DEL_IGNORE                                0x0737  DORMANT 
- *   CMSG_GMSURVEY_SUBMIT                           0x073C  DORMANT 
- *   CMSG_UNKNOWN_0x073D                            0x073D  DOC     
+ *   CMSG_REPORT_PVP_AFK                            0x06F9  DORMANT
+ *   CMSG_MAIL_TAKE_MONEY                           0x06FA  DORMANT
+ *   CMSG_ACTIVATETAXIEXPRESS                       0x06FB  DORMANT
+ *   CMSG_CALENDAR_EVENT_MODERATOR_STATUS           0x0708  DORMANT
+ *   CMSG_UNKNOWN_0x0719                            0x0719  DOC
+ *   CMSG_GROUP_INVITE                              0x072D  DORMANT
+ *   CMSG_DEL_IGNORE                                0x0737  DORMANT
+ *   CMSG_GMSURVEY_SUBMIT                           0x073C  DORMANT
+ *   CMSG_UNKNOWN_0x073D                            0x073D  DOC
  *   CMSG_SET_SELECTION                             0x0740  ACTIVE
- *   CMSG_ENABLETAXI                                0x0741  DORMANT 
- *   CMSG_UNKNOWN_0x0743                            0x0743  DOC     
+ *   CMSG_ENABLETAXI                                0x0741  DORMANT
+ *   CMSG_UNKNOWN_0x0743                            0x0743  DOC
  *   CMSG_MOVE_SET_RUN_MODE                         0x0748  ACTIVE   server-binding=CMSG_GOSSIP_SELECT_OPTION
- *   CMSG_ITEM_PURCHASE_REFUND                      0x074B  DORMANT 
- *   CMSG_BLACKMARKET_HELLO                         0x075A  DOC     
- *   CMSG_SET_TAXI_BENCHMARK_MODE                   0x0762  DORMANT 
- *   CMSG_BATTLEMASTER_JOIN                         0x0769  DORMANT 
- *   CMSG_GUILD_BANK_DEPOSIT_MONEY                  0x0770  DORMANT 
- *   CMSG_SET_FACTION_INACTIVE                      0x0778  DORMANT 
+ *   CMSG_ITEM_PURCHASE_REFUND                      0x074B  DORMANT
+ *   CMSG_BLACKMARKET_HELLO                         0x075A  DOC
+ *   CMSG_SET_TAXI_BENCHMARK_MODE                   0x0762  DORMANT
+ *   CMSG_BATTLEMASTER_JOIN                         0x0769  DORMANT
+ *   CMSG_GUILD_BANK_DEPOSIT_MONEY                  0x0770  DORMANT
+ *   CMSG_SET_FACTION_INACTIVE                      0x0778  DORMANT
  *   CMSG_QUESTLOG_REMOVE_QUEST                     0x0779  ACTIVE
- *   CMSG_GET_MAIL_LIST                             0x077A  DORMANT 
+ *   CMSG_GET_MAIL_LIST                             0x077A  DORMANT
  *   CMSG_MAIL_QUERY_NEXT_TIME                      0x077B  ACTIVE
- *   CMSG_GUILD_BANK_UPDATE_TAB                     0x07C2  DORMANT 
+ *   CMSG_GUILD_BANK_UPDATE_TAB                     0x07C2  DORMANT
  *   CMSG_QUESTGIVER_CHOOSE_REWARD                  0x07CB  ACTIVE
- *   CMSG_PET_ABANDON                               0x07D0  DORMANT 
+ *   CMSG_PET_ABANDON                               0x07D0  DORMANT
  *   CMSG_TEXT_EMOTE                                0x07E9  ACTIVE
- *   CMSG_GUILD_BANK_WITHDRAW_MONEY                 0x07EA  DORMANT 
- *   CMSG_UNKNOWN_0x07EB                            0x07EB  DOC     
+ *   CMSG_GUILD_BANK_WITHDRAW_MONEY                 0x07EA  DORMANT
+ *   CMSG_UNKNOWN_0x07EB                            0x07EB  DOC
  *   CMSG_ALTER_APPEARANCE                          0x07F0  ACTIVE
  *   CMSG_REQUEST_PARTY_MEMBER_STATS                0x0806  ACTIVE
- *   CMSG_BATTLE_PAY_CONFIRM_PURCHASE_RESPONSE      0x0812  DOC     
+ *   CMSG_BATTLE_PAY_CONFIRM_PURCHASE_RESPONSE      0x0812  DOC
  *   CMSG_CALENDAR_GET_NUM_PENDING                  0x0813  ACTIVE
  *   CMSG_DO_READY_CHECK                            0x0817  ACTIVE
- *   CMSG_CHANNEL_UNBAN                             0x081F  DORMANT 
+ *   CMSG_CHANNEL_UNBAN                             0x081F  DORMANT
  *   CMSG_REQUEST_RATED_BG_STATS                    0x0826  ACTIVE
  *   CMSG_MINIMAP_PING                              0x0837  ACTIVE
  *   CMSG_MESSAGECHAT_RAID                          0x083E  ACTIVE
  *   CMSG_LOOT_RELEASE                              0x0840  ACTIVE
  *   CMSG_CREATURE_QUERY                            0x0842  ACTIVE
- *   CMSG_MOVE_HOVER_ACK                            0x0858  DORMANT 
- *   CMSG_SUBMIT_BUG                                0x0861  DOC     
+ *   CMSG_MOVE_HOVER_ACK                            0x0858  DORMANT
+ *   CMSG_SUBMIT_BUG                                0x0861  DOC
  *   CMSG_GUILD_INVITE                              0x0869  ACTIVE   [high-conf]  live 18414 capture: 9-bit name length plus raw name
- *   CMSG_UNKNOWN_0x0870                            0x0870  DOC     
- *   CMSG_MOVE_SET_CAN_TURN_WHILE_FALLING_ACK       0x0873  DOC     
- *   CMSG_UNKNOWN_0x087A                            0x087A  DOC     
- *   CMSG_INSPECT_RATED_BG_STATS                    0x0882  DORMANT 
+ *   CMSG_UNKNOWN_0x0870                            0x0870  DOC
+ *   CMSG_MOVE_SET_CAN_TURN_WHILE_FALLING_ACK       0x0873  DOC
+ *   CMSG_UNKNOWN_0x087A                            0x087A  DOC
+ *   CMSG_INSPECT_RATED_BG_STATS                    0x0882  DORMANT
  *   CMSG_RAID_TARGET_UPDATE                        0x0886  ACTIVE
- *   CMSG_UNKNOWN_0x0896                            0x0896  DOC     
- *   CMSG_LFG_SET_ROLES                             0x08A2  DORMANT 
- *   CMSG_RANDOM_ROLL                               0x08A3  DOC     
- *   CMSG_REORDER_CHARACTERS                        0x08A7  DORMANT 
+ *   CMSG_UNKNOWN_0x0896                            0x0896  DOC
+ *   CMSG_LFG_SET_ROLES                             0x08A2  DORMANT
+ *   CMSG_RANDOM_ROLL                               0x08A3  DOC
+ *   CMSG_REORDER_CHARACTERS                        0x08A7  DORMANT
  *   CMSG_MESSAGECHAT_ADDON_INSTANCE                0x08AF  ACTIVE
- *   CMSG_BATTLEFIELD_MANAGER_EXIT_REQUEST          0x08B3  DORMANT 
- *   CMSG_CHANNEL_BAN                               0x08BF  DORMANT 
- *   CMSG_CANCEL_CHANNELLING                        0x08C0  DORMANT 
- *   CMSG_LEAVE_PET_BATTLE_QUEUE                    0x08C1  DOC     
- *   CMSG_MOVE_FEATHER_FALL_ACK                     0x08D0  DORMANT 
- *   CMSG_UNKNOWN_0x08D1                            0x08D1  DOC     
- *   CMSG_MOVE_APPLY_MOVEMENT_FORCE_ACK             0x08D3  DOC     
- *   CMSG_MOVE_START_PITCH_DOWN                     0x08D8  DORMANT 
- *   CMSG_UNKNOWN_0x08E1                            0x08E1  DOC     
- *   CMSG_UNKNOWN_0x08E2                            0x08E2  DOC     
- *   CMSG_BATTLE_CHAR_BOOST                         0x08E3  DOC     
+ *   CMSG_BATTLEFIELD_MANAGER_EXIT_REQUEST          0x08B3  DORMANT
+ *   CMSG_CHANNEL_BAN                               0x08BF  DORMANT
+ *   CMSG_CANCEL_CHANNELLING                        0x08C0  DORMANT
+ *   CMSG_LEAVE_PET_BATTLE_QUEUE                    0x08C1  DOC
+ *   CMSG_MOVE_FEATHER_FALL_ACK                     0x08D0  DORMANT
+ *   CMSG_UNKNOWN_0x08D1                            0x08D1  DOC
+ *   CMSG_MOVE_APPLY_MOVEMENT_FORCE_ACK             0x08D3  DOC
+ *   CMSG_MOVE_START_PITCH_DOWN                     0x08D8  DORMANT
+ *   CMSG_UNKNOWN_0x08E1                            0x08E1  DOC
+ *   CMSG_UNKNOWN_0x08E2                            0x08E2  DOC
+ *   CMSG_BATTLE_CHAR_BOOST                         0x08E3  DOC
  *   CMSG_MOVE_STOP                                 0x08F1  ACTIVE
- *   CMSG_CHANGE_SEATS_ON_CONTROLLED_VEHICLE        0x08F8  DORMANT 
+ *   CMSG_CHANGE_SEATS_ON_CONTROLLED_VEHICLE        0x08F8  DORMANT
  *   CMSG_MOVE_FALL_LAND                            0x08FA  ACTIVE
- *   CMSG_SET_CONTACT_NOTES                         0x0937  DORMANT 
- *   CMSG_UNKNOWN_0x0942                            0x0942  DOC     
- *   CMSG_MOVE_STOP_SWIM                            0x0950  DORMANT 
+ *   CMSG_SET_CONTACT_NOTES                         0x0937  DORMANT
+ *   CMSG_UNKNOWN_0x0942                            0x0942  DOC
+ *   CMSG_MOVE_STOP_SWIM                            0x0950  DORMANT
  *   CMSG_MOVE_START_FORWARD                        0x095A  ACTIVE
- *   CMSG_CALENDAR_EVENT_REMOVE_INVITE              0x0962  DORMANT 
- *   CMSG_CHAR_RENAME                               0x0963  DORMANT 
- *   CMSG_UNKNOWN_0x0973                            0x0973  DOC     
- *   CMSG_UNKNOWN_0x0979                            0x0979  DOC     
- *   CMSG_ADD_FRIEND                                0x09A6  DORMANT 
- *   CMSG_MOVE_GRAVITY_DISABLE_ACK                  0x09D3  DORMANT 
+ *   CMSG_CALENDAR_EVENT_REMOVE_INVITE              0x0962  DORMANT
+ *   CMSG_CHAR_RENAME                               0x0963  DORMANT
+ *   CMSG_UNKNOWN_0x0973                            0x0973  DOC
+ *   CMSG_UNKNOWN_0x0979                            0x0979  DOC
+ *   CMSG_ADD_FRIEND                                0x09A6  DORMANT
+ *   CMSG_MOVE_GRAVITY_DISABLE_ACK                  0x09D3  DORMANT
  *   CMSG_MOVE_START_BACKWARD                       0x09D8  ACTIVE
- *   CMSG_FORCE_FLIGHT_SPEED_CHANGE_ACK             0x09DA  DORMANT 
- *   CMSG_MOVE_CHNG_TRANSPORT                       0x09DB  DORMANT 
- *   CMSG_BUG                                       0x09E1  DORMANT 
- *   CMSG_SET_PLAYER_DECLINED_NAMES                 0x09E2  DORMANT 
- *   CMSG_UNKNOWN_0x09E3                            0x09E3  DOC     
+ *   CMSG_FORCE_FLIGHT_SPEED_CHANGE_ACK             0x09DA  DORMANT
+ *   CMSG_MOVE_CHNG_TRANSPORT                       0x09DB  DORMANT
+ *   CMSG_BUG                                       0x09E1  DORMANT
+ *   CMSG_SET_PLAYER_DECLINED_NAMES                 0x09E2  DORMANT
+ *   CMSG_UNKNOWN_0x09E3                            0x09E3  DOC
  *   CMSG_SET_ACTIVE_MOVER                          0x09F0  ACTIVE
- *   CMSG_DISMISS_CONTROLLED_VEHICLE                0x09FA  DORMANT 
- *   CMSG_MOVE_SET_COLLISION_HGT_ACK                0x09FB  DORMANT 
- *   CMSG_SUGGESTION_SUBMIT                         0x0A12  DOC     
+ *   CMSG_DISMISS_CONTROLLED_VEHICLE                0x09FA  DORMANT
+ *   CMSG_MOVE_SET_COLLISION_HGT_ACK                0x09FB  DORMANT
+ *   CMSG_SUGGESTION_SUBMIT                         0x0A12  DOC
  *   CMSG_CHAR_CUSTOMIZE                            0x0A13  ACTIVE
  *   CMSG_CORPSE_MAP_POSITION_QUERY                 0x0A16  ACTIVE
- *   CMSG_CHANNEL_PASSWORD                          0x0A1E  DORMANT 
- *   CMSG_REQUEST_PVP_OPTIONS_ENABLED               0x0A22  DORMANT 
+ *   CMSG_CHANNEL_PASSWORD                          0x0A1E  DORMANT
+ *   CMSG_REQUEST_PVP_OPTIONS_ENABLED               0x0A22  DORMANT
  *   CMSG_BATTLE_PET_REQUEST_JOURNAL                0x0A23  ACTIVE
- *   CMSG_GMTICKET_UPDATETEXT                       0x0A26  DORMANT 
- *   CMSG_PET_RENAME                                0x0A32  DORMANT 
- *   CMSG_SUMMON_RESPONSE                           0x0A33  DORMANT 
- *   CMSG_CALENDAR_ADD_EVENT                        0x0A37  DORMANT 
+ *   CMSG_GMTICKET_UPDATETEXT                       0x0A26  DORMANT
+ *   CMSG_PET_RENAME                                0x0A32  DORMANT
+ *   CMSG_SUMMON_RESPONSE                           0x0A33  DORMANT
+ *   CMSG_CALENDAR_ADD_EVENT                        0x0A37  DORMANT
  *   CMSG_GMTICKET_SYSTEMSTATUS                     0x0A82  ACTIVE
  *   CMSG_REQUEST_RAID_INFO                         0x0A87  ACTIVE
- *   CMSG_UNKNOWN_0x0A8F                            0x0A8F  DOC     
- *   CMSG_BATTLEFIELD_MANAGER_QUEUE_INVITE_RESPONSE 0x0A97  DORMANT 
+ *   CMSG_UNKNOWN_0x0A8F                            0x0A8F  DOC
+ *   CMSG_BATTLEFIELD_MANAGER_QUEUE_INVITE_RESPONSE 0x0A97  DORMANT
  *   CMSG_MESSAGECHAT_SAY                           0x0A9A  ACTIVE
- *   CMSG_UNKNOWN_0x0AB2                            0x0AB2  DOC     
- *   CMSG_UNKNOWN_0x0AB6                            0x0AB6  DOC     
- *   CMSG_UNKNOWN_0x0ABA                            0x0ABA  DOC     
+ *   CMSG_UNKNOWN_0x0AB2                            0x0AB2  DOC
+ *   CMSG_UNKNOWN_0x0AB6                            0x0AB6  DOC
+ *   CMSG_UNKNOWN_0x0ABA                            0x0ABA  DOC
  *   CMSG_MESSAGECHAT_OFFICER                       0x0ABF  ACTIVE
  *   CMSG_RESURRECT_RESPONSE                        0x0B0C  DORMANT
  *   CMSG_GENERATE_RANDOM_CHARACTER_NAME            0x0B1C  ACTIVE
- *   CMSG_BATTLE_PAY_ACK_FAILED_RESPONSE            0x0B38  DOC     
- *   CMSG_CONTACT_LIST                              0x0BB4  DORMANT 
+ *   CMSG_BATTLE_PAY_ACK_FAILED_RESPONSE            0x0B38  DOC
+ *   CMSG_CONTACT_LIST                              0x0BB4  DORMANT
  *   CMSG_CHANNEL_LIST                              0x0C1B  ACTIVE
- *   CMSG_UNKNOWN_0x0C1F                            0x0C1F  DOC     
- *   CMSG_SET_TRADE_CURRENCY                        0x0C44  DOC     
- *   CMSG_REFORGE_ITEM                              0x0C4F  DORMANT 
- *   CMSG_CALENDAR_REMOVE_EVENT                     0x0C61  DORMANT 
- *   CMSG_UNKNOWN_0x0C62                            0x0C62  DOC     
- *   CMSG_LF_GUILD_ADD_APPLICATION                  0x0C63  DOC     
- *   CMSG_SET_SAVED_INSTANCE_EXTEND                 0x0C68  DORMANT 
+ *   CMSG_UNKNOWN_0x0C1F                            0x0C1F  DOC
+ *   CMSG_SET_TRADE_CURRENCY                        0x0C44  DOC
+ *   CMSG_REFORGE_ITEM                              0x0C4F  DORMANT
+ *   CMSG_CALENDAR_REMOVE_EVENT                     0x0C61  DORMANT
+ *   CMSG_UNKNOWN_0x0C62                            0x0C62  DOC
+ *   CMSG_LF_GUILD_ADD_APPLICATION                  0x0C63  DOC
+ *   CMSG_SET_SAVED_INSTANCE_EXTEND                 0x0C68  DORMANT
  *   CMSG_RESET_INSTANCES                           0x0C69  DORMANT
- *   CMSG_GUILD_INFO_TEXT                           0x0C70  DORMANT 
- *   CMSG_UNKNOWN_0x0C79                            0x0C79  DOC     
- *   CMSG_GUILD_SET_RANK                            0x0C7A  DORMANT 
+ *   CMSG_GUILD_INFO_TEXT                           0x0C70  DORMANT
+ *   CMSG_UNKNOWN_0x0C79                            0x0C79  DOC
+ *   CMSG_GUILD_SET_RANK                            0x0C7A  DORMANT
  *   CMSG_MESSAGECHAT_GUILD                         0x0CAE  ACTIVE
- *   CMSG_GUILD_REPLACE_GUILD_MASTER                0x0CD0  DOC     
- *   CMSG_GUILD_SWITCH_RANK                         0x0CD1  DORMANT 
- *   CMSG_GUILD_BANK_LOG_QUERY                      0x0CD3  DORMANT 
- *   CMSG_GUILD_REMOVE                              0x0CD8  DORMANT 
- *   CMSG_GROUP_UNINVITE_GUID                       0x0CE1  DORMANT 
- *   CMSG_GUILD_SET_ACHIEVEMENT_TRACKING            0x0CF0  DOC     
- *   CMSG_QUERY_GUILD_MEMBERS_FOR_RECIPE            0x0CFA  DORMANT 
- *   CMSG_READ_ITEM                                 0x0D00  DORMANT 
- *   CMSG_ADD_IGNORE                                0x0D20  DORMANT 
+ *   CMSG_GUILD_REPLACE_GUILD_MASTER                0x0CD0  DOC
+ *   CMSG_GUILD_SWITCH_RANK                         0x0CD1  DORMANT
+ *   CMSG_GUILD_BANK_LOG_QUERY                      0x0CD3  DORMANT
+ *   CMSG_GUILD_REMOVE                              0x0CD8  DORMANT
+ *   CMSG_GROUP_UNINVITE_GUID                       0x0CE1  DORMANT
+ *   CMSG_GUILD_SET_ACHIEVEMENT_TRACKING            0x0CF0  DOC
+ *   CMSG_QUERY_GUILD_MEMBERS_FOR_RECIPE            0x0CFA  DORMANT
+ *   CMSG_READ_ITEM                                 0x0D00  DORMANT
+ *   CMSG_ADD_IGNORE                                0x0D20  DORMANT
  *   CMSG_GUILD_QUERY_RANKS                         0x0D50  ACTIVE
- *   CMSG_GROUP_INVITE_RESPONSE                     0x0D61  DORMANT 
- *   CMSG_GUILD_DISBAND                             0x0D73  DORMANT 
- *   CMSG_GUILD_DEL_RANK                            0x0D79  DORMANT 
- *   CMSG_BATTLE_PAY_GET_PRODUCT_LIST               0x0DE0  DOC     
- *   CMSG_LOOT_METHOD                               0x0DE1  DORMANT 
- *   CMSG_CHANNEL_KICK                              0x0E0B  DORMANT 
- *   CMSG_UNKNOWN_0x0E0E                            0x0E0E  DOC     
+ *   CMSG_GROUP_INVITE_RESPONSE                     0x0D61  DORMANT
+ *   CMSG_GUILD_DISBAND                             0x0D73  DORMANT
+ *   CMSG_GUILD_DEL_RANK                            0x0D79  DORMANT
+ *   CMSG_BATTLE_PAY_GET_PRODUCT_LIST               0x0DE0  DOC
+ *   CMSG_LOOT_METHOD                               0x0DE1  DORMANT
+ *   CMSG_CHANNEL_KICK                              0x0E0B  DORMANT
+ *   CMSG_UNKNOWN_0x0E0E                            0x0E0E  DOC
  *   CMSG_MESSAGECHAT_ADDON_GUILD                   0x0E3B  ACTIVE
  *   CMSG_MESSAGECHAT_AFK                           0x0EAB  ACTIVE
  *   CMSG_MESSAGECHAT_ADDON_WHISPER                 0x0EBB  ACTIVE
- *   CMSG_CHAR_CREATE                               0x0F1D  ACTIVE  
+ *   CMSG_CHAR_CREATE                               0x0F1D  ACTIVE
  *   CMSG_TUTORIAL_CLEAR                            0x0F23  ACTIVE
- *   CMSG_AUTH_CONTINUED_SESSION                    0x0F49  DORMANT 
+ *   CMSG_AUTH_CONTINUED_SESSION                    0x0F49  DORMANT
  *   CMSG_PAGE_TEXT_QUERY                           0x1022  ACTIVE   [high-conf]
  *   CMSG_MESSAGECHAT_EMOTE                         0x103E  ACTIVE
- *   CMSG_ITEM_UPGRADE                              0x1042  DOC     
+ *   CMSG_ITEM_UPGRADE                              0x1042  DOC
  *   CMSG_MOVE_SET_FACING                           0x1050  ACTIVE
- *   CMSG_FORCE_MOVE_UNROOT_ACK                     0x1051  DORMANT 
- *   CMSG_MOVE_SET_CAN_FLY_ACK                      0x1052  DORMANT 
+ *   CMSG_FORCE_MOVE_UNROOT_ACK                     0x1051  DORMANT
+ *   CMSG_MOVE_SET_CAN_FLY_ACK                      0x1052  DORMANT
  *   CMSG_MOVE_START_STRAFE_RIGHT                   0x1058  ACTIVE
- *   CMSG_UNKNOWN_0x105A                            0x105A  DOC     
- *   CMSG_FORCE_FLIGHT_BACK_SPEED_CHANGE_ACK        0x105B  DORMANT 
- *   CMSG_OBJECT_UPDATE_FAILED                      0x1061  DORMANT 
- *   CMSG_PET_BATTLE_FINAL_NOTIFY                   0x1063  DOC     
- *   CMSG_FORCE_MOVE_ROOT_ACK                       0x107A  DORMANT 
+ *   CMSG_UNKNOWN_0x105A                            0x105A  DOC
+ *   CMSG_FORCE_FLIGHT_BACK_SPEED_CHANGE_ACK        0x105B  DORMANT
+ *   CMSG_OBJECT_UPDATE_FAILED                      0x1061  DORMANT
+ *   CMSG_PET_BATTLE_FINAL_NOTIFY                   0x1063  DOC
+ *   CMSG_FORCE_MOVE_ROOT_ACK                       0x107A  DORMANT
  *   CMSG_MOVE_START_TURN_RIGHT                     0x107B  ACTIVE
- *   CMSG_SCENE_PLAYBACK_CANCELED                   0x1087  DOC     
- *   CMSG_QUEUED_MESSAGES_END                       0x1093  DOC     
+ *   CMSG_SCENE_PLAYBACK_CANCELED                   0x1087  DOC
+ *   CMSG_QUEUED_MESSAGES_END                       0x1093  DOC
  *   CMSG_MESSAGECHAT_PARTY                         0x109A  ACTIVE
- *   CMSG_UNKNOWN_0x10A2                            0x10A2  DOC     
- *   CMSG_SET_PET_SLOT                              0x10A7  DORMANT 
- *   CMSG_CHANNEL_INVITE                            0x10AB  DORMANT 
- *   CMSG_UNKNOWN_0x10AE                            0x10AE  DOC     
- *   CMSG_LOG_DISCONNECT                            0x10B3  ACTIVE  
- *   CMSG_RESET_FACTION_CHEAT                       0x10B6  DORMANT 
- *   CMSG_UNKNOWN_0x10BB                            0x10BB  DOC     
+ *   CMSG_UNKNOWN_0x10A2                            0x10A2  DOC
+ *   CMSG_SET_PET_SLOT                              0x10A7  DORMANT
+ *   CMSG_CHANNEL_INVITE                            0x10AB  DORMANT
+ *   CMSG_UNKNOWN_0x10AE                            0x10AE  DOC
+ *   CMSG_LOG_DISCONNECT                            0x10B3  ACTIVE
+ *   CMSG_RESET_FACTION_CHEAT                       0x10B6  DORMANT
+ *   CMSG_UNKNOWN_0x10BB                            0x10BB  DOC
  *   CMSG_QUEST_POI_QUERY                           0x10C2  ACTIVE
- *   CMSG_GUILD_REQUEST_PARTY_STATE                 0x10C3  DOC     
- *   CMSG_FORCE_SWIM_BACK_SPEED_CHANGE_ACK          0x10D1  DORMANT 
+ *   CMSG_GUILD_REQUEST_PARTY_STATE                 0x10C3  DOC
+ *   CMSG_FORCE_SWIM_BACK_SPEED_CHANGE_ACK          0x10D1  DORMANT
  *   MSG_MOVE_SET_SWIM_SPEED_CHEAT                  0x10D3  ACTIVE   server-binding=CMSG_TIME_SYNC_RESPONSE_DROPPED
- *   CMSG_MOVE_REMOVE_MOVEMENT_FORCE_ACK            0x10DB  DOC     
+ *   CMSG_MOVE_REMOVE_MOVEMENT_FORCE_ACK            0x10DB  DOC
  *   CMSG_UNKNOWN_0x10E3                            0x10E3  DOC      cand CMSG_CANCEL_MOUNT_AURA bound to 0x1552
- *   CMSG_MOVE_WATER_WALK_ACK                       0x10F2  DORMANT 
- *   CMSG_FORCE_RUN_SPEED_CHANGE_ACK                0x10F3  DORMANT 
- *   CMSG_DEL_FRIEND                                0x1103  DORMANT 
+ *   CMSG_MOVE_WATER_WALK_ACK                       0x10F2  DORMANT
+ *   CMSG_FORCE_RUN_SPEED_CHANGE_ACK                0x10F3  DORMANT
+ *   CMSG_DEL_FRIEND                                0x1103  DORMANT
  *   CMSG_NEXT_CINEMATIC_CAMERA                     0x1124  ACTIVE
- *   CMSG_REQUEST_VEHICLE_SWITCH_SEAT               0x1143  DORMANT 
+ *   CMSG_REQUEST_VEHICLE_SWITCH_SEAT               0x1143  DORMANT
  *   CMSG_MOVE_JUMP                                 0x1153  ACTIVE
- *   CMSG_MOVE_STOP_ASCEND                          0x115A  DORMANT 
+ *   CMSG_MOVE_STOP_ASCEND                          0x115A  DORMANT
  *   CMSG_DISCARDED_TIME_SYNC_ACKS                  0x115B  ACTIVE
- *   CMSG_UNKNOWN_0x1160                            0x1160  DOC     
+ *   CMSG_UNKNOWN_0x1160                            0x1160  DOC
  *   CMSG_MOVE_STOP_TURN                            0x1170  ACTIVE
  *   CMSG_TABARD_VENDOR_ACTIVATE                    0x11C3  ACTIVE
- *   CMSG_MOVE_GRAVITY_ENABLE_ACK                   0x11D8  DORMANT 
- *   CMSG_MOVE_SPLINE_DONE                          0x11D9  DORMANT 
- *   CMSG_MOVE_SET_CAN_TRANSITION_BETWEEN_SWIM_AND_FLY_ACK 0x11DB  DORMANT 
- *   CMSG_MOVE_START_ASCEND                         0x11FA  DORMANT 
+ *   CMSG_MOVE_GRAVITY_ENABLE_ACK                   0x11D8  DORMANT
+ *   CMSG_MOVE_SPLINE_DONE                          0x11D9  DORMANT
+ *   CMSG_MOVE_SET_CAN_TRANSITION_BETWEEN_SWIM_AND_FLY_ACK 0x11DB  DORMANT
+ *   CMSG_MOVE_START_ASCEND                         0x11FA  DORMANT
  *   CMSG_REQUEST_CATEGORY_COOLDOWNS                0x1203  ACTIVE   [high-conf]
- *   CMSG_UNKNOWN_0x1207                            0x1207  DOC     
+ *   CMSG_UNKNOWN_0x1207                            0x1207  DOC
  *   CMSG_MESSAGECHAT_WHISPER                       0x123E  ACTIVE
  *   CMSG_BINDER_ACTIVATE                           0x1248  ACTIVE
  *   CMSG_QUEST_CONFIRM_ACCEPT                      0x124B  ACTIVE
- *   CMSG_GET_ITEM_PURCHASE_DATA                    0x1258  DORMANT 
+ *   CMSG_GET_ITEM_PURCHASE_DATA                    0x1258  DORMANT
  *   CMSG_INSPECT                                   0x1259  ACTIVE
- *   CMSG_SET_LOOT_SPECIALIZATION                   0x1260  DOC     
- *   CMSG_TOTEM_DESTROYED                           0x1263  DORMANT 
+ *   CMSG_SET_LOOT_SPECIALIZATION                   0x1260  DOC
+ *   CMSG_TOTEM_DESTROYED                           0x1263  DORMANT
  *   CMSG_SHOWING_HELM                              0x126B  ACTIVE
- *   CMSG_MAIL_CREATE_TEXT_ITEM                     0x1270  DORMANT 
- *   CMSG_CANCEL_AUTO_REPEAT_SPELL                  0x1272  DORMANT 
- *   CMSG_PETITION_DECLINE                          0x1279  DOC     
- *   CMSG_BLACKMARKET_REQUEST_ITEMS                 0x127A  DOC     
- *   CMSG_BATTLEFIELD_MGR_QUEUE_REQUEST             0x1283  DORMANT 
- *   CMSG_UNKNOWN_0x129B                            0x129B  DOC     
- *   CMSG_ENABLE_NAGLE                              0x12B3  DORMANT 
- *   CMSG_INSTANCE_LOCK_RESPONSE                    0x12C0  DORMANT 
- *   CMSG_BLACKMARKET_BID                           0x12C8  DOC     
- *   CMSG_AUCTION_LIST_BIDDER_ITEMS                 0x12D0  DORMANT 
- *   CMSG_AREA_SPIRIT_HEALER_QUEUE                  0x12D8  DORMANT 
- *   CMSG_PETITION_BUY                              0x12D9  DORMANT 
- *   CMSG_PET_CANCEL_AURA                           0x12DA  DORMANT 
- *   CMSG_DISMISS_CRITTER                           0x12DB  DORMANT 
- *   CMSG_PET_SET_ACTION                            0x12E9  DORMANT 
- *   CMSG_RETURN_TO_GRAVEYARD                       0x12EA  DORMANT 
+ *   CMSG_MAIL_CREATE_TEXT_ITEM                     0x1270  DORMANT
+ *   CMSG_CANCEL_AUTO_REPEAT_SPELL                  0x1272  DORMANT
+ *   CMSG_PETITION_DECLINE                          0x1279  DOC
+ *   CMSG_BLACKMARKET_REQUEST_ITEMS                 0x127A  DOC
+ *   CMSG_BATTLEFIELD_MGR_QUEUE_REQUEST             0x1283  DORMANT
+ *   CMSG_UNKNOWN_0x129B                            0x129B  DOC
+ *   CMSG_ENABLE_NAGLE                              0x12B3  DORMANT
+ *   CMSG_INSTANCE_LOCK_RESPONSE                    0x12C0  DORMANT
+ *   CMSG_BLACKMARKET_BID                           0x12C8  DOC
+ *   CMSG_AUCTION_LIST_BIDDER_ITEMS                 0x12D0  DORMANT
+ *   CMSG_AREA_SPIRIT_HEALER_QUEUE                  0x12D8  DORMANT
+ *   CMSG_PETITION_BUY                              0x12D9  DORMANT
+ *   CMSG_PET_CANCEL_AURA                           0x12DA  DORMANT
+ *   CMSG_DISMISS_CRITTER                           0x12DB  DORMANT
+ *   CMSG_PET_SET_ACTION                            0x12E9  DORMANT
+ *   CMSG_RETURN_TO_GRAVEYARD                       0x12EA  DORMANT
  *   CMSG_QUESTGIVER_QUERY_QUEST                    0x12F0  ACTIVE   [high-conf]
- *   CMSG_BUY_BANK_SLOT                             0x12F2  DORMANT 
+ *   CMSG_BUY_BANK_SLOT                             0x12F2  DORMANT
  *   CMSG_GOSSIP_HELLO                              0x12F3  ACTIVE
  *   CMSG_FAR_SIGHT                                 0x1341  ACTIVE
  *   CMSG_LOGOUT_REQUEST                            0x1349  ACTIVE   server-binding=CMSG_LOGOUT_REQUEST_IDLE
  *   CMSG_REPOP_REQUEST                             0x134A  ACTIVE
  *   CMSG_SELL_ITEM                                 0x1358  ACTIVE
  *   CMSG_REQUEST_PET_INFO                          0x135B  ACTIVE
- *   CMSG_COMPLETE_MOVIE                            0x1362  DORMANT 
- *   CMSG_GUILD_BANK_SWAP_ITEMS                     0x136A  DORMANT 
- *   CMSG_PETITION_SHOW_SIGNATURES                  0x136B  DORMANT 
+ *   CMSG_COMPLETE_MOVIE                            0x1362  DORMANT
+ *   CMSG_GUILD_BANK_SWAP_ITEMS                     0x136A  DORMANT
+ *   CMSG_PETITION_SHOW_SIGNATURES                  0x136B  DORMANT
  *   CMSG_QUEST_PUSH_RESULT                         0x1370  ACTIVE
- *   CMSG_MAIL_TAKE_ITEM                            0x1371  DORMANT 
- *   CMSG_LFG_GET_PARTY_INFO                        0x1372  DORMANT 
- *   CMSG_BATTLEFIELD_PORT                          0x1379  DORMANT 
- *   CMSG_UNKNOWN_0x140A                            0x140A  DOC     
- *   CMSG_CHANNEL_SET_OWNER                         0x141A  DORMANT 
- *   CMSG_VOID_STORAGE_TRANSFER                     0x1440  DOC     
- *   CMSG_CLEAR_RAID_MARKER                         0x1443  DORMANT 
- *   CMSG_UNKNOWN_0x1446                            0x1446  DOC     
+ *   CMSG_MAIL_TAKE_ITEM                            0x1371  DORMANT
+ *   CMSG_LFG_GET_PARTY_INFO                        0x1372  DORMANT
+ *   CMSG_BATTLEFIELD_PORT                          0x1379  DORMANT
+ *   CMSG_UNKNOWN_0x140A                            0x140A  DOC
+ *   CMSG_CHANNEL_SET_OWNER                         0x141A  DORMANT
+ *   CMSG_VOID_STORAGE_TRANSFER                     0x1440  DOC
+ *   CMSG_CLEAR_RAID_MARKER                         0x1443  DORMANT
+ *   CMSG_UNKNOWN_0x1446                            0x1446  DOC
  *   CMSG_ACCEPT_TRADE                              0x144D  DORMANT
- *   CMSG_LF_GUILD_POST_REQUEST                     0x1450  DORMANT 
- *   CMSG_GET_CHALLENGE_MODE_REWARDS                0x1452  DOC     
+ *   CMSG_LF_GUILD_POST_REQUEST                     0x1450  DORMANT
+ *   CMSG_GET_CHALLENGE_MODE_REWARDS                0x1452  DOC
  *   CMSG_GUILD_ROSTER                              0x1459  ACTIVE
  *   CMSG_GUILD_PERMISSIONS                         0x145A  ACTIVE
  *   CMSG_GAMEOBJECT_QUERY                          0x1461  ACTIVE
- *   CMSG_LEARN_PET_SPECIALIZATION_GROUP            0x1463  DOC     
- *   CMSG_GUILD_ACHIEVEMENT_MEMBERS                 0x1470  DORMANT 
- *   CMSG_GUILD_MOTD                                0x1473  DORMANT 
- *   CMSG_GUILD_REQUEST_CHALLENGE_UPDATE            0x147A  DOC     
- *   CMSG_GUILD_DECLINE                             0x147B  DORMANT 
+ *   CMSG_LEARN_PET_SPECIALIZATION_GROUP            0x1463  DOC
+ *   CMSG_GUILD_ACHIEVEMENT_MEMBERS                 0x1470  DORMANT
+ *   CMSG_GUILD_MOTD                                0x1473  DORMANT
+ *   CMSG_GUILD_REQUEST_CHALLENGE_UPDATE            0x147A  DOC
+ *   CMSG_GUILD_DECLINE                             0x147B  DORMANT
  *   CMSG_JOIN_CHANNEL                              0x148E  ACTIVE
- *   CMSG_PVP_LOG_DATA                              0x14C2  DORMANT 
- *   CMSG_UNKNOWN_0x14D1                            0x14D1  DOC     
+ *   CMSG_PVP_LOG_DATA                              0x14C2  DORMANT
+ *   CMSG_UNKNOWN_0x14D1                            0x14D1  DOC
  *   CMSG_GUILD_BANK_MONEY_WITHDRAWN                0x14DB  ACTIVE
- *   CMSG_BUSY_TRADE                                0x14E0  DORMANT 
- *   CMSG_MAIL_DELETE                               0x14E2  DORMANT 
+ *   CMSG_BUSY_TRADE                                0x14E0  DORMANT
+ *   CMSG_MAIL_DELETE                               0x14E2  DORMANT
  *   CMSG_SET_TRADE_GOLD                            0x14E3  ACTIVE
- *   CMSG_LF_GUILD_DECLINE_RECRUIT                  0x14F3  DOC     
- *   CMSG_BATTLE_PET_LEARN                          0x1540  DOC     
- *   CMSG_CANCEL_MOUNT_AURA                         0x1552  DORMANT 
- *   CMSG_GUILD_DEMOTE                              0x1553  DORMANT 
- *   CMSG_CAGE_BATTLE_PET                           0x1561  DOC     
- *   CMSG_UNKNOWN_0x1570                            0x1570  DOC     
+ *   CMSG_LF_GUILD_DECLINE_RECRUIT                  0x14F3  DOC
+ *   CMSG_BATTLE_PET_LEARN                          0x1540  DOC
+ *   CMSG_CANCEL_MOUNT_AURA                         0x1552  DORMANT
+ *   CMSG_GUILD_DEMOTE                              0x1553  DORMANT
+ *   CMSG_CAGE_BATTLE_PET                           0x1561  DOC
+ *   CMSG_UNKNOWN_0x1570                            0x1570  DOC
  *   CMSG_RAID_READY_CHECK_CONFIRM                  0x158B  ACTIVE
  *   CMSG_REQUEST_HOTFIX                            0x158D  ACTIVE
- *   CMSG_PLAYER_LOGIN                              0x158F  ACTIVE  
- *   CMSG_LF_GUILD_BROWSE                           0x159A  DOC     
+ *   CMSG_PLAYER_LOGIN                              0x158F  ACTIVE
+ *   CMSG_LF_GUILD_BROWSE                           0x159A  DOC
  *   CMSG_GM_UPDATE_TICKET_STATUS                   0x15A8  ACTIVE
  *   CMSG_VOICE_SESSION_ENABLE                      0x15A9  ACTIVE
- *   CMSG_UNKNOWN_0x15AA                            0x15AA  DOC     
+ *   CMSG_UNKNOWN_0x15AA                            0x15AA  DOC
  *   CMSG_UI_TIME_REQUEST                           0x15AB  ACTIVE
- *   CMSG_UNKNOWN_0x15AF                            0x15AF  DOC     
- *   CMSG_UNKNOWN_0x15BA                            0x15BA  DOC     
- *   CMSG_GROUP_SET_LEADER                          0x15BB  DORMANT 
- *   CMSG_OFFER_PETITION                            0x15BE  DORMANT 
+ *   CMSG_UNKNOWN_0x15AF                            0x15AF  DOC
+ *   CMSG_UNKNOWN_0x15BA                            0x15BA  DOC
+ *   CMSG_GROUP_SET_LEADER                          0x15BB  DORMANT
+ *   CMSG_OFFER_PETITION                            0x15BE  DORMANT
  *   CMSG_LOOT_ROLL                                 0x15C2  ACTIVE
- *   CMSG_GUILD_EVENT_LOG_QUERY                     0x15D9  DORMANT 
- *   CMSG_CHALLENGE_MODE_REQUEST_LEADERS            0x15DB  DOC     
- *   CMSG_REQUEST_RESEARCH_HISTORY                  0x15E2  DOC     
- *   CMSG_UNKNOWN_0x160F                            0x160F  DOC     
+ *   CMSG_GUILD_EVENT_LOG_QUERY                     0x15D9  DORMANT
+ *   CMSG_CHALLENGE_MODE_REQUEST_LEADERS            0x15DB  DOC
+ *   CMSG_REQUEST_RESEARCH_HISTORY                  0x15E2  DOC
+ *   CMSG_UNKNOWN_0x160F                            0x160F  DOC
  *   CMSG_MESSAGECHAT_INSTANCE                      0x162A  ACTIVE
  *   CMSG_MESSAGECHAT_RAID_WARNING                  0x16AB  ACTIVE
- *   CMSG_UNKNOWN_0x1788                            0x1788  DOC     
- *   CMSG_UNKNOWN_0x1789                            0x1789  DOC     
+ *   CMSG_UNKNOWN_0x1788                            0x1788  DOC
+ *   CMSG_UNKNOWN_0x1789                            0x1789  DOC
  *   CMSG_GROUP_REQUEST_JOIN_UPDATES                0x178A  ACTIVE
- *   CMSG_UNKNOWN_0x178C                            0x178C  DOC     
- *   CMSG_GROUP_DISBAND                             0x1798  DORMANT 
- *   CMSG_GROUP_CHANGE_SUB_GROUP                    0x1799  DORMANT 
- *   CMSG_UNKNOWN_0x179D                            0x179D  DOC     
- *   CMSG_SHOW_TRADE_SKILL                          0x179F  DOC     
- *   CMSG_UNKNOWN_0x17AA                            0x17AA  DOC     
- *   CMSG_BATTLE_PET_SET_FLAGS                      0x17AC  DOC     
- *   CMSG_PET_BATTLE_INPUT                          0x17BA  DOC     
- *   CMSG_LFG_BOOT_PLAYER_VOTE                      0x17BE  DORMANT 
- *   CMSG_SET_PARTY_ASSIGNMENT                      0x1802  DOC     
- *   CMSG_BATTLEFIELD_MANAGER_ENTRY_INVITE_RESPONSE 0x1806  DORMANT 
+ *   CMSG_UNKNOWN_0x178C                            0x178C  DOC
+ *   CMSG_GROUP_DISBAND                             0x1798  DORMANT
+ *   CMSG_GROUP_CHANGE_SUB_GROUP                    0x1799  DORMANT
+ *   CMSG_UNKNOWN_0x179D                            0x179D  DOC
+ *   CMSG_SHOW_TRADE_SKILL                          0x179F  DOC
+ *   CMSG_UNKNOWN_0x17AA                            0x17AA  DOC
+ *   CMSG_BATTLE_PET_SET_FLAGS                      0x17AC  DOC
+ *   CMSG_PET_BATTLE_INPUT                          0x17BA  DOC
+ *   CMSG_LFG_BOOT_PLAYER_VOTE                      0x17BE  DORMANT
+ *   CMSG_SET_PARTY_ASSIGNMENT                      0x1802  DOC
+ *   CMSG_BATTLEFIELD_MANAGER_ENTRY_INVITE_RESPONSE 0x1806  DORMANT
  *   CMSG_MESSAGECHAT_ADDON_OFFICER                 0x180B  ACTIVE
- *   CMSG_WARDEN_DATA                               0x1816  DORMANT 
- *   CMSG_UNLEARN_SPECIALIZATION                    0x1841  DORMANT 
+ *   CMSG_WARDEN_DATA                               0x1816  DORMANT
+ *   CMSG_UNLEARN_SPECIALIZATION                    0x1841  DORMANT
  *   CMSG_FORCE_SWIM_SPEED_CHANGE_ACK               0x1853  ACTIVE
- *   CMSG_MOVE_START_SWIM                           0x1858  DORMANT 
- *   CMSG_FORCE_TURN_RATE_CHANGE_ACK                0x185A  DORMANT 
- *   CMSG_SET_VEHICLE_REC_ID_ACK                    0x185B  DORMANT 
- *   CMSG_CANCEL_AURA                               0x1861  DORMANT 
- *   CMSG_GROUP_INITIATE_ROLE_POLL                  0x1882  DOC     
- *   CMSG_BATTLE_PAY_START_PURCHASE                 0x1886  DOC     
- *   CMSG_BATTLE_PET_MODIFY_NAME                    0x1887  DOC     
- *   CMSG_BATTLE_PET_SUMMON_COMPANION               0x1896  DOC     
- *   CMSG_GROUP_ASSISTANT_LEADER                    0x1897  DORMANT 
+ *   CMSG_MOVE_START_SWIM                           0x1858  DORMANT
+ *   CMSG_FORCE_TURN_RATE_CHANGE_ACK                0x185A  DORMANT
+ *   CMSG_SET_VEHICLE_REC_ID_ACK                    0x185B  DORMANT
+ *   CMSG_CANCEL_AURA                               0x1861  DORMANT
+ *   CMSG_GROUP_INITIATE_ROLE_POLL                  0x1882  DOC
+ *   CMSG_BATTLE_PAY_START_PURCHASE                 0x1886  DOC
+ *   CMSG_BATTLE_PET_MODIFY_NAME                    0x1887  DOC
+ *   CMSG_BATTLE_PET_SUMMON_COMPANION               0x1896  DOC
+ *   CMSG_GROUP_ASSISTANT_LEADER                    0x1897  DORMANT
  *   CMSG_GUILD_ACCEPT                              0x18A2  ACTIVE
- *   CMSG_WHO                                       0x18A3  DORMANT 
+ *   CMSG_WHO                                       0x18A3  DORMANT
  *   CMSG_BATTLE_PAY_GET_PURCHASE_LIST              0x18B2  ACTIVE
- *   CMSG_BATTLE_PET_DELETE_PET                     0x18B6  DOC     
- *   CMSG_CANCEL_CAST                               0x18C0  DORMANT 
+ *   CMSG_BATTLE_PET_DELETE_PET                     0x18B6  DOC
+ *   CMSG_CANCEL_CAST                               0x18C0  DORMANT
  *   CMSG_EMOTE                                     0x1924  ACTIVE
  *   CMSG_CANCEL_TRADE                              0x1941  ACTIVE
- *   CMSG_PET_BATTLE_QUEUE_PROPOSE_MATCH_RESULT     0x19C2  DOC     
- *   CMSG_INSPECT_HONOR_STATS                       0x19C3  DORMANT 
- *   CMSG_UNKNOWN_0x19E3                            0x19E3  DOC     
- *   CMSG_PET_BATTLE_SET_FRONT_PET                  0x1A07  DOC     
+ *   CMSG_PET_BATTLE_QUEUE_PROPOSE_MATCH_RESULT     0x19C2  DOC
+ *   CMSG_INSPECT_HONOR_STATS                       0x19C3  DORMANT
+ *   CMSG_UNKNOWN_0x19E3                            0x19E3  DOC
+ *   CMSG_PET_BATTLE_SET_FRONT_PET                  0x1A07  DOC
  *   CMSG_QUERY_REALM_NAME                          0x1A16  ACTIVE   server-binding=CMSG_REALM_NAME_QUERY
- *   CMSG_QUERY_SCENARIO_POI                        0x1A22  DOC     
- *   CMSG_GMTICKET_DELETETICKET                     0x1A23  DORMANT 
- *   CMSG_DUEL_PROPOSED                             0x1A26  DOC     
- *   CMSG_SET_DUNGEON_DIFFICULTY                    0x1A36  DOC     
- *   CMSG_UNKNOWN_0x1A37                            0x1A37  DOC     
- *   CMSG_GUILD_SET_GUILD_MASTER                    0x1A83  DOC     
+ *   CMSG_QUERY_SCENARIO_POI                        0x1A22  DOC
+ *   CMSG_GMTICKET_DELETETICKET                     0x1A23  DORMANT
+ *   CMSG_DUEL_PROPOSED                             0x1A26  DOC
+ *   CMSG_SET_DUNGEON_DIFFICULTY                    0x1A36  DOC
+ *   CMSG_UNKNOWN_0x1A37                            0x1A37  DOC
+ *   CMSG_GUILD_SET_GUILD_MASTER                    0x1A83  DOC
  *   CMSG_GMTICKET_CREATE                           0x1A86  ACTIVE
- *   CMSG_KEEP_ALIVE                                0x1A87  ACTIVE  
- *   CMSG_GROUP_SET_ROLES                           0x1A92  DOC     
- *   CMSG_CALENDAR_COPY_EVENT                       0x1A97  DORMANT 
+ *   CMSG_KEEP_ALIVE                                0x1A87  ACTIVE
+ *   CMSG_GROUP_SET_ROLES                           0x1A92  DOC
+ *   CMSG_CALENDAR_COPY_EVENT                       0x1A97  DORMANT
  *   CMSG_UNKNOWN_0x1AA2                            0x1AA2  ACTIVE   server-binding=CMSG_LFG_LFR_JOIN
- *   CMSG_LFG_TELEPORT                              0x1AA6  DORMANT 
- *   CMSG_UNKNOWN_0x1AA7                            0x1AA7  DOC     
- *   CMSG_CALENDAR_EVENT_STATUS                     0x1AB3  DORMANT 
+ *   CMSG_LFG_TELEPORT                              0x1AA6  DORMANT
+ *   CMSG_UNKNOWN_0x1AA7                            0x1AA7  DOC
+ *   CMSG_CALENDAR_EVENT_STATUS                     0x1AB3  DORMANT
  *   CMSG_GUILD_QUERY                               0x1AB6  ACTIVE
- *   CMSG_BATTLEFIELD_LIST                          0x1C41  DORMANT 
+ *   CMSG_BATTLEFIELD_LIST                          0x1C41  DORMANT
  *   CMSG_AREATRIGGER                               0x1C44  ACTIVE   [high-conf]
- *   CMSG_PET_BATTLE_QUIT_NOTIFY                    0x1C45  DOC     
- *   CMSG_LF_GUILD_REMOVE_APPLICATION               0x1C53  DOC     
- *   CMSG_GUILD_QUERY_NEWS                          0x1C58  DOC     
- *   CMSG_CHALLENGE_MODE_REQUEST_MAP_STATS          0x1C5A  DOC     
+ *   CMSG_PET_BATTLE_QUIT_NOTIFY                    0x1C45  DOC
+ *   CMSG_LF_GUILD_REMOVE_APPLICATION               0x1C53  DOC
+ *   CMSG_GUILD_QUERY_NEWS                          0x1C58  DOC
+ *   CMSG_CHALLENGE_MODE_REQUEST_MAP_STATS          0x1C5A  DOC
  *   CMSG_PET_NAME_QUERY                            0x1C62  ACTIVE
- *   CMSG_UNKNOWN_0x1C63                            0x1C63  DOC     
- *   CMSG_USE_ITEM                                  0x1CC1  DORMANT 
- *   CMSG_BATTLE_PET_QUERY_NAME                     0x1CE0  DOC     
+ *   CMSG_UNKNOWN_0x1C63                            0x1C63  DOC
+ *   CMSG_USE_ITEM                                  0x1CC1  DORMANT
+ *   CMSG_BATTLE_PET_QUERY_NAME                     0x1CE0  DOC
  *   CMSG_LOOT                                      0x1CE2  ACTIVE
  *   CMSG_BEGIN_TRADE                               0x1CE3  ACTIVE
- *   CMSG_OPEN_ITEM                                 0x1D10  DORMANT 
+ *   CMSG_OPEN_ITEM                                 0x1D10  DORMANT
  *   CMSG_SAVE_GUILD_EMBLEM                         0x1D60  ACTIVE
- *   CMSG_RESET_CHALLENGE_MODE                      0x1D61  DOC     
- *   CMSG_REQUEST_ACCOUNT_DATA                      0x1D8A  ACTIVE  
- *   CMSG_UPDATE_CLIENT_SETTINGS                    0x1D8D  DOC     
- *   CMSG_CALENDAR_EVENT_INVITE                     0x1D8E  DORMANT 
- *   CMSG_UNKNOWN_0x1D9B                            0x1D9B  DOC     
- *   CMSG_LFG_PROPOSAL_RESPONSE                     0x1D9D  DORMANT 
- *   CMSG_LF_GUILD_SET_GUILD_POST                   0x1D9F  DOC     
+ *   CMSG_RESET_CHALLENGE_MODE                      0x1D61  DOC
+ *   CMSG_REQUEST_ACCOUNT_DATA                      0x1D8A  ACTIVE
+ *   CMSG_UPDATE_CLIENT_SETTINGS                    0x1D8D  DOC
+ *   CMSG_CALENDAR_EVENT_INVITE                     0x1D8E  DORMANT
+ *   CMSG_UNKNOWN_0x1D9B                            0x1D9B  DOC
+ *   CMSG_LFG_PROPOSAL_RESPONSE                     0x1D9D  DORMANT
+ *   CMSG_LF_GUILD_SET_GUILD_POST                   0x1D9F  DOC
  *   CMSG_QUEST_NPC_QUERY                           0x1DAE  ACTIVE
- *   CMSG_UNKNOWN_0x1DB9                            0x1DB9  DOC     
- *   CMSG_SEND_MAIL                                 0x1DBA  DORMANT 
+ *   CMSG_UNKNOWN_0x1DB9                            0x1DB9  DOC
+ *   CMSG_SEND_MAIL                                 0x1DBA  DORMANT
  *   CMSG_LOAD_SCREEN                               0x1DBD  ACTIVE
  *   CMSG_REQUEST_VEHICLE_EXIT                      0x1DC3  ACTIVE
- *   CMSG_CANCEL_MOD_SPEED_NO_CONTROL_AURAS         0x1DE0  DOC     
- *   CMSG_LOOT_MASTER_GIVE                          0x1DE1  DORMANT 
+ *   CMSG_CANCEL_MOD_SPEED_NO_CONTROL_AURAS         0x1DE0  DOC
+ *   CMSG_LOOT_MASTER_GIVE                          0x1DE1  DORMANT
  *   CMSG_COMPLETE_CINEMATIC                        0x1F34  ACTIVE
- *   CMSG_UNKNOWN_0x1F88                            0x1F88  DOC     
+ *   CMSG_UNKNOWN_0x1F88                            0x1F88  DOC
  *   CMSG_GMTICKET_GETTICKET                        0x1F89  ACTIVE
- *   CMSG_SET_ACTION_BUTTON                         0x1F8C  DORMANT 
- *   CMSG_CALENDAR_UPDATE_EVENT                     0x1F8D  DORMANT 
- *   CMSG_CHANGEPLAYER_DIFFICULTY                   0x1F8E  DORMANT 
- *   CMSG_CALENDAR_COMPLAIN                         0x1F8F  DORMANT 
- *   CMSG_PETITION_RENAME                           0x1F9A  DOC     
+ *   CMSG_SET_ACTION_BUTTON                         0x1F8C  DORMANT
+ *   CMSG_CALENDAR_UPDATE_EVENT                     0x1F8D  DORMANT
+ *   CMSG_CHANGEPLAYER_DIFFICULTY                   0x1F8E  DORMANT
+ *   CMSG_CALENDAR_COMPLAIN                         0x1F8F  DORMANT
+ *   CMSG_PETITION_RENAME                           0x1F9A  DOC
  *   CMSG_BATTLEFIELD_STATUS                        0x1F9E  ACTIVE
  *   CMSG_CALENDAR_GET_CALENDAR                     0x1F9F  ACTIVE
- *   CMSG_MAIL_RETURN_TO_SENDER                     0x1FA8  DORMANT 
- *   CMSG_UNKNOWN_0x1FAD                            0x1FAD  ACTIVE   server-binding=MSG_MOVE_WORLDPORT_ACK     
- *   CMSG_CALENDAR_EVENT_RSVP                       0x1FB8  DORMANT 
- *   CMSG_UNKNOWN_0x1FB9                            0x1FB9  DOC     
+ *   CMSG_MAIL_RETURN_TO_SENDER                     0x1FA8  DORMANT
+ *   CMSG_UNKNOWN_0x1FAD                            0x1FAD  ACTIVE   server-binding=MSG_MOVE_WORLDPORT_ACK
+ *   CMSG_CALENDAR_EVENT_RSVP                       0x1FB8  DORMANT
+ *   CMSG_UNKNOWN_0x1FB9                            0x1FB9  DOC
  *   CMSG_CORPSE_TRANSPORT_QUERY                    0x1FBE  ACTIVE   server-binding=CMSG_CORPSE_QUERY
  */
 

@@ -30,6 +30,11 @@
 #include "AccountMgr.h"
 #include "SQLStorages.h"
 
+// Base movement-speed table; defined in Unit.cpp, as UnitSpeed.cpp also declares
+// it. Needed to turn this command's absolute speed into the rate SetSpeedRate
+// takes.
+extern float baseMoveSpeed[MAX_MOVE_TYPE];
+
 /**
  * @file PlayerStatsMods.cpp
  * @brief Cohesion split of PlayerCommands.cpp -- player stat/property modify GM commands: HP/mana/energy/rage/runic/holy-power, speed/swim/fly/scale, mount, money, drunk, reputation, gender and currency. Same ChatHandler class; no behaviour change. CMake file(GLOB) picks this file up automatically; Chat.h is unchanged.
@@ -911,33 +916,28 @@ bool ChatHandler::HandleModifyMountCommand(char* args)
     chr->SetUInt32Value(UNIT_FIELD_FLAGS, UNIT_FLAG_PVP);
     chr->Mount(mId);
 
-    // The legacy SMSG_FORCE_RUN_SPEED_CHANGE body that stood here was pack-GUID,
-    // counter, a 2.1.0-era uint8 and the speed. That opcode is dormant at 18414
-    // and never cleared the send gate, so the run-speed half of this command was
-    // silently discarded; only the swim speed took effect.
+    // This used to build its own speed packets. Three things went wrong with
+    // that, and going through Unit::SetSpeedRate fixes all of them at once.
     //
-    // Each speed also needs BOTH halves, split the way Unit::SetSpeedRate splits
-    // them. The direct packet addresses the mover, carries a counter, and goes to
-    // that one session; observers get the spline form, which has a different
-    // reader and no counter. Broadcasting the direct body to observers, as this
-    // did, sends them a packet that is not theirs to act on.
-    uint64 const moverGuid = chr->GetObjectGuid().GetRawValue();
-
-    WorldPacket data(SMSG_MOVE_SET_RUN_SPEED, 1 + 8 + 4 + 4);
-    MopCompactPackets::BuildMoveSetRunSpeed(data, moverGuid, 0, speed);
-    chr->GetSession()->SendPacket(&data);
-
-    data.Initialize(SMSG_SPLINE_MOVE_SET_RUN_SPEED, 1 + 8 + 4);
-    MopCompactPackets::BuildSplineMoveSetRunSpeed(data, moverGuid, speed);
-    chr->SendMessageToSet(&data, false);
-
-    data.Initialize(SMSG_MOVE_SET_SWIM_SPEED, 1 + 8 + 4 + 4);
-    MopCompactPackets::BuildMoveSetSwimSpeed(data, moverGuid, 0, speed);
-    chr->GetSession()->SendPacket(&data);
-
-    data.Initialize(SMSG_SPLINE_MOVE_SET_SWIM_SPEED, 1 + 8 + 4);
-    MopCompactPackets::BuildSplineMoveSetSwimSpeed(data, moverGuid, speed);
-    chr->SendMessageToSet(&data, false);
+    // The old body was the legacy SMSG_FORCE_RUN_SPEED_CHANGE, dormant at 18414
+    // and never past the send gate, so the run half was silently discarded.
+    //
+    // Hand-built sends also went to the wrong audience: a direct SMSG_MOVE_SET_*
+    // addresses the mover and belongs to that one session, while observers take
+    // the spline form, which has its own reader and no counter.
+    //
+    // Worst, sending by hand left the server's own state untouched. SetSpeedRate
+    // updates m_speed_rate and bumps m_forced_speed_changes, which is how
+    // HandleForceSpeedChangeAck knows to expect the acknowledgement. Without it
+    // the client applied the new speed, acknowledged it, and the handler compared
+    // that against an unchanged server speed, found the client faster, and KICKED
+    // THE PLAYER for cheating.
+    //
+    // The command's argument is an ABSOLUTE speed and SetSpeedRate takes a rate,
+    // so convert per movement type: GetSpeed is m_speed_rate * baseMoveSpeed.
+    // ignoreChange forces the send even when the rate is already at that value.
+    chr->SetSpeedRate(MOVE_RUN, speed / baseMoveSpeed[MOVE_RUN], true, true);
+    chr->SetSpeedRate(MOVE_SWIM, speed / baseMoveSpeed[MOVE_SWIM], true, true);
 
     return true;
 }

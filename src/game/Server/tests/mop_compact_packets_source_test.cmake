@@ -445,23 +445,20 @@ endif()
 if(player_stats_mods MATCHES "(WorldPacket[ \t]+[A-Za-z_][A-Za-z0-9_]*[ \t]*\\([ \t]*|Initialize[ \t]*\\([ \t]*)SMSG_FORCE_[A-Z_]+_CHANGE")
     message(FATAL_ERROR "legacy SMSG_FORCE_*_CHANGE construction remains in the stat-mod commands")
 endif()
-foreach(source_text IN ITEMS "${unit_speed}" "${player_stats_mods}")
-    if(NOT source_text MATCHES "MopCompactPackets::BuildMoveSetRunSpeed")
-        message(FATAL_ERROR "run-speed sender bypasses the shared 5.4.8 serializer")
-    endif()
-endforeach()
-# A direct SMSG_MOVE_SET_* body addresses the mover and must reach that session
-# alone; observers take the spline form, which has its own reader and no counter.
-# Broadcasting the direct body hands observers a packet that is not theirs.
-if(player_stats_mods MATCHES "BuildMoveSetRunSpeed[^;]*;[ \t\r\n]*[A-Za-z_>:.-]*SendMessageToSet")
-    message(FATAL_ERROR "direct run-speed body is broadcast to observers instead of the mover's session")
+if(NOT unit_speed MATCHES "MopCompactPackets::BuildMoveSetRunSpeed")
+    message(FATAL_ERROR "run-speed sender bypasses the shared 5.4.8 serializer")
 endif()
-if(player_stats_mods MATCHES "BuildMoveSetSwimSpeed[^;]*;[ \t\r\n]*[A-Za-z_>:.-]*SendMessageToSet")
-    message(FATAL_ERROR "direct swim-speed body is broadcast to observers instead of the mover's session")
+# Speed commands must delegate to Unit::SetSpeedRate rather than building packets.
+# Hand-built sends miss three things at once: the direct body goes to the wrong
+# audience, m_speed_rate is never updated, and m_forced_speed_changes is never
+# bumped -- so HandleForceSpeedChangeAck sees an unexpected acknowledgement,
+# compares it against a stale server speed and kicks the player for cheating.
+if(player_stats_mods MATCHES "MopCompactPackets::Build(Spline)?MoveSet")
+    message(FATAL_ERROR "a stat-mod command builds a speed packet by hand instead of using SetSpeedRate")
 endif()
-foreach(spline_builder IN ITEMS BuildSplineMoveSetRunSpeed BuildSplineMoveSetSwimSpeed)
-    if(NOT player_stats_mods MATCHES "MopCompactPackets::${spline_builder}")
-        message(FATAL_ERROR "mount command changes speed without telling observers via ${spline_builder}")
+foreach(move_type IN ITEMS MOVE_RUN MOVE_SWIM)
+    if(NOT player_stats_mods MATCHES "SetSpeedRate\\([ \t]*${move_type}[ \t]*,")
+        message(FATAL_ERROR "mount command no longer sets ${move_type} through the stateful speed path")
     endif()
 endforeach()
 if(group_handler MATCHES "WorldPacket[ \t]+data\\(MSG_RANDOM_ROLL")
@@ -486,11 +483,12 @@ if(character_handler MATCHES "//[ \t]*pCurrChar->SendDungeonDifficulty\\(false\\
     message(FATAL_ERROR "5.4.8 login dungeon-difficulty send remains suppressed")
 endif()
 
-foreach(source_text IN ITEMS "${unit_speed}" "${player_stats_mods}")
-    if(NOT source_text MATCHES "MopCompactPackets::BuildMoveSetSwimSpeed")
-        message(FATAL_ERROR "swim-speed sender bypasses the shared 5.4.8 serializer")
-    endif()
-endforeach()
+# Scoped to the shared speed path only. The stat-mod commands are required NOT
+# to build these bodies at all -- see the SetSpeedRate delegation rule above --
+# so demanding the builder appear there would reject the correct shape.
+if(NOT unit_speed MATCHES "MopCompactPackets::BuildMoveSetSwimSpeed")
+    message(FATAL_ERROR "swim-speed sender bypasses the shared 5.4.8 serializer")
+endif()
 
 foreach(server_name IN ITEMS
         SMSG_ATTACKSWING_ERROR

@@ -443,9 +443,9 @@ static void test_spline_speed_family_matches_retail_bodies()
 /// The mask is 0xFF in every case here, so this test pins no mask position at
 /// all. Mask order is covered separately, below.
 ///
-/// The last four have no retail body at all and are reader-derived only, so
-/// this and the mask-order test are their whole coverage. They stay dormant
-/// until a capture exists.
+/// The last four have no observed body at all and are reader-derived only, so
+/// this and the mask-order test are their whole coverage. They are admitted
+/// nonetheless, on binary proof.
 static void test_spline_speed_family_full_interleaves_reader_derived()
 {
     uint64 const guid = 0x0123456789ABCDEFull;  // guid[7]^1 is 0x00, not absent
@@ -559,6 +559,89 @@ static void CheckSplineMaskOrder(char const* what, uint16 opcode, size_t maskOff
             ++g_fail;
         }
     }
+}
+
+/// The same probe for the DIRECT speed builders, which carry a counter and so
+/// need their own signature. Four of these were held back from the send gate
+/// while their spline counterparts were admitted, which left observers told of a
+/// speed change that the mover's own client never heard about. Pinning mask
+/// order here is what makes closing that gap safe.
+static void CheckDirectMaskOrder(char const* what, uint16 opcode, size_t maskOffset,
+    void (*build)(WorldPacket&, uint64, uint32, float), uint8 const (&expected)[8])
+{
+    uint8 recovered[8];
+    for (uint8 slot = 0; slot < 8; ++slot)
+    {
+        recovered[slot] = 0xFF;
+    }
+
+    for (uint8 slot = 0; slot < 8; ++slot)
+    {
+        uint64 const guid = 0x0123456789ABCDEFull & ~(uint64(0xFF) << (8 * slot));
+        WorldPacket packet(opcode, 17);
+        build(packet, guid, 0x12345678u, 1.0f);
+
+        uint8 const mask = packet.contents()[maskOffset];
+        uint8 const cleared = uint8(0xFF ^ mask);
+        if (cleared == 0 || (cleared & uint8(cleared - 1)) != 0)
+        {
+            std::fprintf(stderr, "FAIL %s: zeroing guid[%u] gave mask 0x%02X, wanted one clear bit\n",
+                         what, unsigned(slot), mask);
+            ++g_fail;
+            continue;
+        }
+
+        uint8 position = 0;
+        while (uint8(0x80 >> position) != cleared)
+        {
+            ++position;
+        }
+        recovered[position] = slot;
+    }
+
+    for (uint8 position = 0; position < 8; ++position)
+    {
+        if (recovered[position] != expected[position])
+        {
+            std::fprintf(stderr, "FAIL %s: mask bit %u is guid[%u], wanted guid[%u]\n",
+                         what, unsigned(position), unsigned(recovered[position]),
+                         unsigned(expected[position]));
+            ++g_fail;
+        }
+    }
+}
+
+static void test_direct_speed_family_mask_order()
+{
+    uint8 const run[8]        = { 1, 7, 4, 2, 5, 3, 6, 0 };
+    uint8 const swim[8]       = { 5, 0, 6, 3, 7, 2, 4, 1 };
+    uint8 const walk[8]       = { 6, 7, 3, 1, 2, 0, 4, 5 };
+    uint8 const runBack[8]    = { 7, 1, 0, 2, 4, 3, 6, 5 };
+    uint8 const swimBack[8]   = { 5, 0, 4, 2, 1, 3, 6, 7 };
+    uint8 const turnRate[8]   = { 6, 5, 1, 4, 0, 7, 3, 2 };
+    uint8 const flight[8]     = { 6, 5, 0, 4, 1, 7, 3, 2 };
+    uint8 const flightBack[8] = { 2, 7, 6, 4, 0, 1, 5, 3 };
+    uint8 const pitchRate[8]  = { 7, 5, 4, 1, 6, 3, 2, 0 };
+
+    CheckDirectMaskOrder("run", SMSG_MOVE_SET_RUN_SPEED, 0,
+        &MopCompactPackets::BuildMoveSetRunSpeed, run);
+    CheckDirectMaskOrder("swim", SMSG_MOVE_SET_SWIM_SPEED, 0,
+        &MopCompactPackets::BuildMoveSetSwimSpeed, swim);
+    CheckDirectMaskOrder("walk", SMSG_MOVE_SET_WALK_SPEED, 0,
+        &MopCompactPackets::BuildMoveSetWalkSpeed, walk);
+    CheckDirectMaskOrder("run back", SMSG_MOVE_SET_RUN_BACK_SPEED, 0,
+        &MopCompactPackets::BuildMoveSetRunBackSpeed, runBack);
+    CheckDirectMaskOrder("swim back", SMSG_MOVE_SET_SWIM_BACK_SPEED, 0,
+        &MopCompactPackets::BuildMoveSetSwimBackSpeed, swimBack);
+    CheckDirectMaskOrder("turn rate", SMSG_MOVE_SET_TURN_RATE, 0,
+        &MopCompactPackets::BuildMoveSetTurnRate, turnRate);
+    // Flight reads the speed and the counter BEFORE the mask byte.
+    CheckDirectMaskOrder("flight", SMSG_MOVE_SET_FLIGHT_SPEED, 8,
+        &MopCompactPackets::BuildMoveSetFlightSpeed, flight);
+    CheckDirectMaskOrder("flight back", SMSG_MOVE_SET_FLIGHT_BACK_SPEED, 0,
+        &MopCompactPackets::BuildMoveSetFlightBackSpeed, flightBack);
+    CheckDirectMaskOrder("pitch rate", SMSG_MOVE_SET_PITCH_RATE, 0,
+        &MopCompactPackets::BuildMoveSetPitchRate, pitchRate);
 }
 
 static void test_spline_speed_family_mask_order()
@@ -1329,6 +1412,7 @@ int main(int /*argc*/, char** /*argv*/)
     test_spline_run_speed_matches_retail_body();
     test_spline_speed_family_matches_retail_bodies();
     test_spline_speed_family_full_interleaves_reader_derived();
+    test_direct_speed_family_mask_order();
     test_spline_speed_family_mask_order();
     test_pet_action_matches_retail_bodies();
     test_pet_name_query_matches_retail_bodies();
