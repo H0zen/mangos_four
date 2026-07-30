@@ -1189,4 +1189,66 @@ void InitializeOpcodes()
     // independently confirms the 18414 client sends it. It stays dormant on that
     // ground alone.
     DefC(CMSG_SHOWING_HELM, "CMSG_SHOWING_HELM", STATUS_LOGGEDIN, PROCESS_THREADUNSAFE, &WorldSession::HandleShowingHelmOpcode);
+
+    // CMSG_CONTACT_LIST (0x0BB4, 4,122 observed) is deliberately NOT registered,
+    // and this note exists because it looks safe and is not.
+    //
+    // Its inbound side is one uint32 whose width matches every observed
+    // four-byte body. The reply is what blocks it: registering the CMSG makes
+    // HandleContactListOpcode call PlayerSocial::SendSocialList for a player who
+    // IS in world, which builds SMSG_CONTACT_LIST (0x1F22) from a serializer
+    // that is missing two fields.
+    //
+    // Two gates therefore stand between here and a visible defect, and both
+    // matter. SMSG_CONTACT_LIST is also absent from IsEnterWorldConverted, so
+    // even once built the reply is dropped in-world. Neither gate on its own is
+    // the reason to stay dormant: the reason is that the body is wrong.
+    //
+    // Note the login path does NOT build this packet. Player::
+    // SendInitialPacketsBeforeAddToMap calls SendSocialList before Map::Add, and
+    // SendSocialList resolves its player through ObjectAccessor::FindPlayer with
+    // inWorld=true, so at that point it returns early and writes nothing.
+    //
+    // The trap for anyone checking it is that the empty case agrees byte for
+    // byte. Retail's empty list is 07 00 00 00 00 00 00 00, exactly the
+    // uint32(7) + uint32(0) header SendSocialList writes, so a check that stops
+    // at "sizes and header match" passes. A populated list does not agree:
+    //
+    //   07 00 00 00  02 00 00 00                          flags 7, count 2
+    //   68 D1 19 07 00 00 00 06  19 00 01 03 16 00 06 03  04 00 00 00 00
+    //   E5 FE 23 07 00 00 00 06  19 00 01 03 16 00 06 03  02 00 00 00 00
+    //
+    // The client's reader is sub_A6AAB5 (0x00A6AAB5, asserts "FriendList.cpp"),
+    // and it is entirely byte-aligned -- this packet carries no bit-packing:
+    //
+    //   uint32  listFlags                  1 friends, 2 ignore, 4 mute present
+    //   uint32  count
+    //   count * {
+    //       uint64  guid                   raw LE, not packed, not XOR'd
+    //       uint32  realmAddrA             0x03010019 in both entries above
+    //       uint32  realmAddrB             0x03060016 in both
+    //       uint32  typeFlags              1 friend, 2 ignored, 4 muted
+    //       cstring note                   NUL-terminated, <= 512
+    //       if (typeFlags & 1) {
+    //           uint8 status               0 = offline
+    //           if (status) { uint32 areaId; uint32 level; uint32 classId; }
+    //       }
+    //   }
+    //
+    // So 21 bytes is not a property of the packet -- it is one entry with the
+    // friend bit clear and an empty note. A friend entry is 22 offline and 34
+    // online. Corpus entries of 8, 30, 42, 50 and 100 bytes all consume exactly.
+    //
+    // Our delta is precisely two uint32s: SendSocialList writes no counterpart
+    // for either realm address. Reading the retail entry above under the field
+    // sequence SendSocialList writes therefore loses alignment immediately after
+    // the GUID -- 0x03010019 lands where the type flags are expected, 0x16
+    // begins the note, and a level of 4,276,420,608 comes out -- running on into
+    // the following entry. Everything else it writes, the raw GUID, the uint32
+    // type flags, the NUL-terminated note, the status byte and the online-only
+    // area/level/class triple in that order, is 18414-correct.
+    //
+    // It returns once SendSocialList carries the two realm addresses, populated
+    // cases have byte-exact fixtures, and SMSG_CONTACT_LIST is admitted to
+    // IsEnterWorldConverted.
 }

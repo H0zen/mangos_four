@@ -171,6 +171,24 @@ void PlayerSocial::SetFriendNote(ObjectGuid friend_guid, std::string note)
     m_playerSocialMap[friend_guid.GetCounter()].Note = note;
 }
 
+/// KNOWN DEFECT, 18414: each entry is missing two uint32 realm-address fields
+/// between the GUID and the type flags. The client's reader (sub_A6AAB5 at
+/// 0x00A6AAB5) takes guid, realmAddrA, realmAddrB, typeFlags, NUL-terminated
+/// note, and only then -- if the friend bit is set -- a status byte plus an
+/// online-only area/level/class triple. Everything below except those two
+/// missing fields is 18414-correct, but without them the client loses alignment
+/// immediately after the GUID.
+///
+/// Nothing builds this today. The login call from
+/// Player::SendInitialPacketsBeforeAddToMap runs before Map::Add, and the lookup
+/// below goes through ObjectAccessor::FindPlayer with inWorld=true, so it
+/// returns early there. The in-world path is reached only by registering
+/// CMSG_CONTACT_LIST, which is why that opcode stays dormant; and even then
+/// SMSG_CONTACT_LIST is not admitted by IsEnterWorldConverted, so the reply
+/// would be dropped. Fix the two missing fields before either gate is opened.
+///
+/// The full layout and the corpus bytes are recorded in Opcodes.cpp beside the
+/// CMSG_CONTACT_LIST dormancy note.
 void PlayerSocial::SendSocialList()
 {
     Player* plr = sObjectMgr.GetPlayer(ObjectGuid(HIGHGUID_PLAYER, m_playerLowGuid));
