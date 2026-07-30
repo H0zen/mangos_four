@@ -242,13 +242,18 @@ if(HOVER_MOVER EQUAL -1 OR HOVER_OBS_ON EQUAL -1 OR HOVER_OBS_OFF EQUAL -1)
 endif()
 
 # The inherited orders decoded none of the 51 real bodies to a plausible GUID.
+# BOTH branches, not just SET. SET and UNSET have different mask orders, byte
+# orders and scalar positions, so checking one proves nothing about the other --
+# a reviewer found this guard accepting a wrong UNSET branch.
 string(FIND "${UNIT_SOURCE_EARLY}" "MopCompactPackets::BuildMoveSetHover(" HOVER_BUILDER)
-if(HOVER_BUILDER EQUAL -1)
-    message(FATAL_ERROR "Unit::BuildMoveHoverPacket must use the reader-derived builders")
+string(FIND "${UNIT_SOURCE_EARLY}" "MopCompactPackets::BuildMoveUnsetHover(" HOVER_BUILDER_OFF)
+if(HOVER_BUILDER EQUAL -1 OR HOVER_BUILDER_OFF EQUAL -1)
+    message(FATAL_ERROR "Unit::BuildMoveHoverPacket must use the reader-derived builders, both branches")
 endif()
 string(FIND "${CREATURE_SOURCE}" "MopCompactPackets::BuildSplineMoveSetHover(" CR_HOVER)
-if(CR_HOVER EQUAL -1)
-    message(FATAL_ERROR "Creature::SetHover must use the reader-derived spline builder")
+string(FIND "${CREATURE_SOURCE}" "MopCompactPackets::BuildSplineMoveUnsetHover(" CR_HOVER_OFF)
+if(CR_HOVER EQUAL -1 OR CR_HOVER_OFF EQUAL -1)
+    message(FATAL_ERROR "Creature::SetHover must use the reader-derived spline builders, both branches")
 endif()
 
 # --- Player::SetRoot must not broadcast the mover packet --------------------
@@ -282,8 +287,9 @@ if(ROOT_OBS_ON EQUAL -1 OR ROOT_OBS_OFF EQUAL -1)
 endif()
 
 string(FIND "${UNIT_SOURCE_EARLY}" "MopCompactPackets::BuildForceMoveRoot(" ROOT_BUILDER)
-if(ROOT_BUILDER EQUAL -1)
-    message(FATAL_ERROR "Unit::BuildForceMoveRootPacket must use the reader-derived builders")
+string(FIND "${UNIT_SOURCE_EARLY}" "MopCompactPackets::BuildForceMoveUnroot(" ROOT_BUILDER_OFF)
+if(ROOT_BUILDER EQUAL -1 OR ROOT_BUILDER_OFF EQUAL -1)
+    message(FATAL_ERROR "Unit::BuildForceMoveRootPacket must use the reader-derived builders, both branches")
 endif()
 
 # --- Creature::SetCanFly is the same pair seen from the other side ----------

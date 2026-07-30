@@ -1477,9 +1477,12 @@ static void test_move_set_can_fly_ack_retail_bodies()
         packet >> info;
 
         // Exact consumption is necessary but not sufficient -- every leading
-        // scalar is four bytes wide. The GUID is what discriminates: it is
-        // reassembled from a scattered bit order AND a scattered byte order, so
-        // a wrong layout cannot land on the right value by accident.
+        // scalar is four bytes wide. The GUID discriminates most of the layout,
+        // being reassembled from a scattered bit order AND a scattered byte
+        // order. But not all of it: GUID bytes 4 and 5 are absent from all four
+        // of these movers, so swapping their mask and order positions stays
+        // invisible here. That part rests on the client writer alone, which is
+        // the honest boundary of what these fixtures prove.
         CHECK(packet.rpos() == packet.size());
         CHECK(info.GetGuid().GetRawValue() == c.guid);
         CHECK(uint32(info.GetMovementFlags()) == c.flags);
@@ -1550,8 +1553,9 @@ static void test_hover_family_retail_bodies()
         }
     }
 
-    // The observer halves, on three different high-GUID classes so the presence
-    // masks genuinely differ: UNIT, VEHICLE and PET.
+    // The observer halves. Two high-GUID classes for SET and a third mask for
+    // UNSET, so the presence masks genuinely differ rather than repeating one
+    // shape.
     struct SplineCase { uint64 guid; uint8 const* body; size_t size; };
     static uint8 const splineUnit[]    = { 0xE6, 0xF0, 0x02, 0x30, 0x17, 0xD8 };
     static uint8 const splineVehicle[] = { 0xCE, 0xF0, 0x7B, 0x51, 0xF3, 0x35 };
@@ -1569,6 +1573,38 @@ static void test_hover_family_retail_bodies()
         {
             CHECK(std::memcmp(packet.contents(), c.body, c.size) == 0);
         }
+    }
+
+    // UNSET has its own mask AND byte order -- pinning only SET would let a
+    // wrong or copy-pasted UNSET branch through, which is exactly what a
+    // reviewer found this test allowing.
+    static uint8 const splineUnsetUnit[] = { 0x7C, 0x17, 0x02, 0x30, 0xF0, 0xD8 };
+    static uint8 const splineUnsetOther[] = { 0x3D, 0xF7, 0x31, 0xF0, 0x3A, 0x44 };
+
+    SplineCase const splineUnsets[] = {
+        { UINT64_C(0xF13116D900000300), splineUnsetUnit,  sizeof(splineUnsetUnit) },
+        { UINT64_C(0xF130F63B00000045), splineUnsetOther, sizeof(splineUnsetOther) },
+    };
+    for (SplineCase const& c : splineUnsets)
+    {
+        WorldPacket packet(SMSG_SPLINE_MOVE_UNSET_HOVER, 9);
+        MopCompactPackets::BuildSplineMoveUnsetHover(packet, c.guid);
+        CHECK(packet.size() == c.size);
+        if (packet.size() == c.size)
+        {
+            CHECK(std::memcmp(packet.contents(), c.body, c.size) == 0);
+        }
+    }
+
+    // Same GUID, same length, different bodies: SET and UNSET do not share a
+    // layout, so a copy-paste between them cannot hide.
+    {
+        WorldPacket set(SMSG_SPLINE_MOVE_SET_HOVER, 9);
+        MopCompactPackets::BuildSplineMoveSetHover(set, UINT64_C(0xF13116D900000300));
+        WorldPacket unset(SMSG_SPLINE_MOVE_UNSET_HOVER, 9);
+        MopCompactPackets::BuildSplineMoveUnsetHover(unset, UINT64_C(0xF13116D900000300));
+        CHECK(set.size() == unset.size());
+        CHECK(std::memcmp(set.contents(), unset.contents(), set.size()) != 0);
     }
 }
 

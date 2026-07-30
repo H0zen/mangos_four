@@ -2,6 +2,7 @@ file(READ "${SOURCE_ROOT}/src/game/movement/MovementStructures.h" movement_struc
 file(READ "${SOURCE_ROOT}/src/game/Object/Unit.h" unit_header)
 file(READ "${SOURCE_ROOT}/src/game/Object/Unit.cpp" unit_source)
 file(READ "${SOURCE_ROOT}/src/game/Object/UnitSpeed.cpp" unit_speed_source)
+file(READ "${SOURCE_ROOT}/src/game/WorldHandlers/SpellAuraControl.cpp" spell_aura_control_source)
 file(READ "${SOURCE_ROOT}/src/game/Object/CreatureMovement.cpp" creature_movement_source)
 file(READ "${SOURCE_ROOT}/src/game/movement/MovementInfo.cpp" movement_codec)
 file(READ "${SOURCE_ROOT}/src/game/Server/Opcodes.cpp" opcode_registry)
@@ -12,7 +13,10 @@ file(READ "${SOURCE_ROOT}/src/game/movement/packet_builder.cpp" spline_packet_so
 file(READ "${SOURCE_ROOT}/src/game/movement/MoveSplineInit.cpp" spline_init_source)
 file(READ "${SOURCE_ROOT}/src/game/Server/WorldSession.cpp" world_session_source)
 
-if(MUTATION STREQUAL "speed_correction_is_noop")
+if(MUTATION STREQUAL "drop_back_speed_snare_calls")
+    string(REPLACE "    target->UpdateSpeed(MOVE_RUN_BACK, true);" ""
+        spell_aura_control_source "${spell_aura_control_source}")
+elseif(MUTATION STREQUAL "speed_correction_is_noop")
     string(REPLACE "_player->SetSpeedRate(move_type, _player->GetSpeedRate(move_type), true, true);"
         "_player->SetSpeedRate(move_type, _player->GetSpeedRate(move_type), true);"
         movement_handler "${movement_handler}")
@@ -498,4 +502,58 @@ if(correction_is_real EQUAL -1)
     message(FATAL_ERROR
         "the speed-mismatch correction must pass ignoreChange=true, or it resends "
         "nothing and the mismatch repeats for the life of the session")
+endif()
+
+# --- The snare must actually ask for the back speeds ------------------------
+#
+# Removing the early returns only made back speeds COMPUTABLE. Nothing computed
+# them: the snare handler recalculated RUN, SWIM and FLIGHT only, and the sole
+# caller passing a back type was the GM command. The first version of this guard
+# checked only that the early returns were gone, which a reviewer correctly
+# pointed out would stay green with the call sites deleted -- proving the
+# capability exists while the behaviour does not.
+
+string(FIND "${spell_aura_control_source}" "void Aura::HandleAuraModDecreaseSpeed" snare_start)
+if(snare_start EQUAL -1)
+    message(FATAL_ERROR "Could not locate Aura::HandleAuraModDecreaseSpeed")
+endif()
+string(LENGTH "${spell_aura_control_source}" spell_aura_length)
+math(EXPR snare_room "${spell_aura_length} - ${snare_start}")
+if(snare_room GREATER 3000)
+    set(snare_room 3000)
+endif()
+string(SUBSTRING "${spell_aura_control_source}" ${snare_start} ${snare_room} snare_body)
+string(FIND "${snare_body}" "void Aura::HandleAuraModUseNormalSpeed" snare_end)
+if(NOT snare_end EQUAL -1)
+    string(SUBSTRING "${snare_body}" 0 ${snare_end} snare_body)
+endif()
+
+foreach(SNARED_TYPE MOVE_RUN_BACK MOVE_SWIM_BACK MOVE_FLIGHT_BACK)
+    string(FIND "${snare_body}" "UpdateSpeed(${SNARED_TYPE}, true)" snare_calls)
+    if(snare_calls EQUAL -1)
+        message(FATAL_ERROR
+            "Aura::HandleAuraModDecreaseSpeed must recalculate ${SNARED_TYPE} -- retail "
+            "snares back speeds (4.5 x 0.4 = 1.8 observed), and without this call the "
+            "capability exists but nothing ever uses it")
+    endif()
+endforeach()
+
+# --- The can-fly acknowledgement: registration and its security boundary ----
+#
+# Neither had regression coverage; removing either left the suite green.
+file(READ "${SOURCE_ROOT}/src/game/WorldHandlers/MiscHandler.cpp" misc_handler_source)
+
+string(FIND "${opcode_registry}" "DefC(CMSG_MOVE_SET_CAN_FLY_ACK" canfly_ack_registered)
+if(canfly_ack_registered EQUAL -1)
+    message(FATAL_ERROR
+        "CMSG_MOVE_SET_CAN_FLY_ACK must stay registered -- SMSG_MOVE_SET_CAN_FLY is "
+        "admitted, so the client sends this and an unregistered opcode is dropped")
+endif()
+
+string(FIND "${misc_handler_source}" "if (_player->GetMover() != _player)" canfly_ack_self_guard)
+if(canfly_ack_self_guard EQUAL -1)
+    message(FATAL_ERROR
+        "HandleMoveSetCanFlyAckOpcode must refuse non-self movers -- it imports the "
+        "client's whole movement-flag word, and on a vehicle or charmed creature those "
+        "flags reach creature pathfinding and the board/unboard state machine")
 endif()
