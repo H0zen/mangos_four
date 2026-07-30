@@ -469,8 +469,25 @@ void WorldSession::HandleForceSpeedChangeAckOpcodes(WorldPacket& recv_data)
     MovementInfo movementInfo;
     float  newspeed;
 
-    recv_data >> newspeed;
-    recv_data >> movementInfo;
+    // Only four of the nine acknowledgements LEAD with the speed. The other five
+    // carry it among the leading scalars in their own per-opcode order, so it
+    // arrives through the movement block as MSESpeedFloat instead. Reading a
+    // leading float from one of those would consume a coordinate and desync
+    // everything after it.
+    switch (opcode)
+    {
+        case CMSG_FORCE_RUN_BACK_SPEED_CHANGE_ACK:
+        case CMSG_FORCE_SWIM_SPEED_CHANGE_ACK:
+        case CMSG_FORCE_SWIM_BACK_SPEED_CHANGE_ACK:
+        case CMSG_FORCE_FLIGHT_BACK_SPEED_CHANGE_ACK:
+            recv_data >> newspeed;
+            recv_data >> movementInfo;
+            break;
+        default:
+            recv_data >> movementInfo;
+            newspeed = movementInfo.GetSpeedFloat();
+            break;
+    }
 
     // now can skip not our packet
     if (_player->GetObjectGuid() != movementInfo.GetGuid())

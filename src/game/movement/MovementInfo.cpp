@@ -319,6 +319,9 @@ void MovementInfo::Read(ByteBuffer& data, uint16 opcode)
             case MSEByteParam:
                  data >> byteParam;
                  break;
+            case MSESpeedFloat:
+                data >> speedFloat;
+                break;
             default:
                 MANGOS_ASSERT(false && "Wrong movement status element");
                 break;
@@ -593,6 +596,9 @@ void MovementInfo::Write(ByteBuffer& data, uint16 opcode) const
                 {
                     data << unknownUInt32;
                 }
+                break;
+            case MSESpeedFloat:
+                data << speedFloat;
                 break;
             default:
                 MANGOS_ASSERT(false && "Wrong movement status element");

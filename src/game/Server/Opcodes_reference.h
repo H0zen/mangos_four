@@ -175,9 +175,9 @@
  *   TOTAL SMSG rows                   925
  *
  * SUBSYSTEM CONFIDENCE: high=365, low=221, medium=182, none=157
- * STATUS TOTALS: ACTIVE=481, DOC=435, DORMANT=604
+ * STATUS TOTALS: ACTIVE=484, DOC=435, DORMANT=601
  *   SMSG: ACTIVE=286, DOC=271, DORMANT=368
- *   CMSG: ACTIVE=195, DOC=164, DORMANT=236
+ *   CMSG: ACTIVE=198, DOC=164, DORMANT=233
  */
 
 // CAVEATS -- read before trusting any single row:
@@ -1334,7 +1334,7 @@ typedef uint16_t uint16;
  *   CMSG_MESSAGECHAT_CHANNEL                       0x00BB  ACTIVE
  *   CMSG_MOVE_START_PITCH_UP                       0x00D8  DORMANT
  *   CMSG_MOVE_FALL_RESET                           0x00D9  DORMANT
- *   CMSG_FORCE_WALK_SPEED_CHANGE_ACK               0x00DB  DORMANT
+ *   CMSG_FORCE_WALK_SPEED_CHANGE_ACK               0x00DB  ACTIVE
  *   CMSG_CHAR_ENUM                                 0x00E0  ACTIVE
  *   CMSG_UNKNOWN_0x00E3                            0x00E3  ACTIVE   server-binding=CMSG_LFG_LFR_LEAVE
  *   CMSG_UNKNOWN_0x00F0                            0x00F0  DOC
@@ -1604,7 +1604,7 @@ typedef uint16_t uint16;
  *   CMSG_ADD_FRIEND                                0x09A6  DORMANT
  *   CMSG_MOVE_GRAVITY_DISABLE_ACK                  0x09D3  DORMANT
  *   CMSG_MOVE_START_BACKWARD                       0x09D8  ACTIVE
- *   CMSG_FORCE_FLIGHT_SPEED_CHANGE_ACK             0x09DA  DORMANT
+ *   CMSG_FORCE_FLIGHT_SPEED_CHANGE_ACK             0x09DA  ACTIVE
  *   CMSG_MOVE_CHNG_TRANSPORT                       0x09DB  DORMANT
  *   CMSG_BUG                                       0x09E1  DORMANT
  *   CMSG_SET_PLAYER_DECLINED_NAMES                 0x09E2  DORMANT
@@ -1701,7 +1701,7 @@ typedef uint16_t uint16;
  *   CMSG_MOVE_REMOVE_MOVEMENT_FORCE_ACK            0x10DB  DOC
  *   CMSG_UNKNOWN_0x10E3                            0x10E3  DOC      cand CMSG_CANCEL_MOUNT_AURA bound to 0x1552
  *   CMSG_MOVE_WATER_WALK_ACK                       0x10F2  DORMANT
- *   CMSG_FORCE_RUN_SPEED_CHANGE_ACK                0x10F3  DORMANT
+ *   CMSG_FORCE_RUN_SPEED_CHANGE_ACK                0x10F3  ACTIVE
  *   CMSG_DEL_FRIEND                                0x1103  DORMANT
  *   CMSG_NEXT_CINEMATIC_CAMERA                     0x1124  ACTIVE
  *   CMSG_REQUEST_VEHICLE_SWITCH_SEAT               0x1143  DORMANT

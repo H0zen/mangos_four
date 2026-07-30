@@ -49,8 +49,12 @@ elseif(MUTATION STREQUAL "force_swim_registration")
         "DefC_disabled(CMSG_FORCE_SWIM_SPEED_CHANGE_ACK, \"CMSG_FORCE_SWIM_SPEED_CHANGE_ACK\", STATUS_LOGGEDIN, PROCESS_THREADUNSAFE, &WorldSession::HandleForceSpeedChangeAckOpcodes);"
         opcode_registry "${opcode_registry}")
 elseif(MUTATION STREQUAL "force_swim_handler_order")
-    string(REPLACE "recv_data >> newspeed;\n    recv_data >> movementInfo;"
-        "recv_data >> movementInfo;\n    recv_data >> newspeed;"
+    # The speed-LEADING arm only. Four acknowledgements put the speed ahead of the
+    # movement block and five carry it inside, so the read order is now a
+    # per-opcode decision rather than a fixed one. Swapping it for the leading
+    # four must still be caught: it would swallow a coordinate and desync the rest.
+    string(REPLACE "            recv_data >> newspeed;\n            recv_data >> movementInfo;"
+        "            recv_data >> movementInfo;\n            recv_data >> newspeed;"
         movement_handler "${movement_handler}")
 elseif(MUTATION STREQUAL "output_metadata")
     string(REPLACE "DefS(SMSG_PLAYER_MOVE, \"SMSG_PLAYER_MOVE\");"

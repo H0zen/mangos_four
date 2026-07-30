@@ -1058,6 +1058,91 @@ static void test_move_knock_back_ack_retail_body()
     CHECK(info.GetPos()->z == 10.814133f);
 }
 
+/// The three acknowledgements whose speed is NOT first in the body.
+///
+/// Four of the nine lead with the speed and are read before the movement block.
+/// These three carry it among the leading scalars in their own per-opcode order,
+/// so it arrives through the block as MSESpeedFloat -- an element this tree did
+/// not have, which is the only reason they could not be expressed before.
+///
+/// That mattered beyond tidiness: while they were unregistered the speed
+/// anti-cheat never ran for walk, run or flight, because the check lives in the
+/// acknowledgement handler and the acknowledgement was being dropped. Run is the
+/// one a speed hack actually abuses.
+///
+/// Consuming exactly is the load-bearing assertion. Reading a leading float from
+/// one of these would swallow a coordinate and desync everything after it, which
+/// is precisely what the shared handler used to do.
+static void test_speed_embedded_acks_retail_bodies()
+{
+    {   // walk -- capture-000004 sequence 23271
+        static uint8 const body[] = {
+            0xF1, 0x01, 0x00, 0x00, 0x00, 0x00, 0xA0, 0x3F, 0x27, 0xE6, 0xC0, 0x45,
+            0x21, 0xC4, 0x0D, 0x45, 0xA6, 0xFA, 0xFA, 0x43, 0x6F, 0x00, 0x00, 0x00,
+            0x70, 0x10, 0x00, 0xC9, 0xE9, 0x05, 0x04, 0x3D, 0xA2, 0x3E, 0x1F, 0x00,
+            0x81, 0x09, 0x3C, 0x40
+        };
+        WorldPacket packet(CMSG_FORCE_WALK_SPEED_CHANGE_ACK, sizeof(body));
+        packet.append(body, sizeof(body));
+
+        MovementInfo info;
+        packet >> info;
+
+        CHECK(packet.rpos() == packet.size());
+        // The capture's float is not the exact decimal: 1.25 on the wire is
+        // 0x3FA00000, one ULP from the literal. Compare the bits.
+        float expectedSpeed;
+        uint32 const expectedSpeedBits = 0x3FA00000u;
+        std::memcpy(&expectedSpeed, &expectedSpeedBits, sizeof(expectedSpeed));
+        CHECK(info.GetSpeedFloat() == expectedSpeed);
+        CHECK(info.GetGuid().GetRawValue() == UINT64_C(0x04000000053CC8E8));
+    }
+    {   // run -- capture-000004 sequence 605
+        static uint8 const body[] = {
+            0x41, 0x00, 0x00, 0x00, 0xCD, 0xCC, 0x5E, 0x44, 0x8F, 0xD2, 0x08, 0x44,
+            0x29, 0x6F, 0x04, 0x46, 0x67, 0x66, 0xF6, 0x40, 0x40, 0xE3, 0x00, 0x00,
+            0x03, 0x90, 0x00, 0xE9, 0x3D, 0xC9, 0x04, 0x05, 0x94, 0x25, 0x6A, 0x40,
+            0xE3, 0x27, 0x0E, 0x00
+        };
+        WorldPacket packet(CMSG_FORCE_RUN_SPEED_CHANGE_ACK, sizeof(body));
+        packet.append(body, sizeof(body));
+
+        MovementInfo info;
+        packet >> info;
+
+        CHECK(packet.rpos() == packet.size());
+        // The capture's float is not the exact decimal: 7.7 on the wire is
+        // 0x40F66667, one ULP from the literal. Compare the bits.
+        float expectedSpeed;
+        uint32 const expectedSpeedBits = 0x40F66667u;
+        std::memcpy(&expectedSpeed, &expectedSpeedBits, sizeof(expectedSpeed));
+        CHECK(info.GetSpeedFloat() == expectedSpeed);
+        CHECK(info.GetGuid().GetRawValue() == UINT64_C(0x04000000053CC8E8));
+    }
+    {   // flight -- capture-000004 sequence 23270
+        static uint8 const body[] = {
+            0x21, 0xC4, 0x0D, 0x45, 0xF0, 0x01, 0x00, 0x00, 0x27, 0xE6, 0xC0, 0x45,
+            0xA6, 0xFA, 0xFA, 0x43, 0x67, 0x66, 0x76, 0x40, 0x41, 0x00, 0x00, 0x03,
+            0xA9, 0x90, 0x00, 0xC9, 0x04, 0x05, 0x3D, 0xE9, 0xA0, 0x3E, 0x1F, 0x00,
+            0x81, 0x09, 0x3C, 0x40
+        };
+        WorldPacket packet(CMSG_FORCE_FLIGHT_SPEED_CHANGE_ACK, sizeof(body));
+        packet.append(body, sizeof(body));
+
+        MovementInfo info;
+        packet >> info;
+
+        CHECK(packet.rpos() == packet.size());
+        // The capture's float is not the exact decimal: 3.85 on the wire is
+        // 0x40766667, one ULP from the literal. Compare the bits.
+        float expectedSpeed;
+        uint32 const expectedSpeedBits = 0x40766667u;
+        std::memcpy(&expectedSpeed, &expectedSpeedBits, sizeof(expectedSpeed));
+        CHECK(info.GetSpeedFloat() == expectedSpeed);
+        CHECK(info.GetGuid().GetRawValue() == UINT64_C(0x04000000053CC8E8));
+    }
+}
+
 int main(int, char**)
 {
     test_thirteen_inbound_fixtures_and_exact_relay();
@@ -1068,6 +1153,7 @@ int main(int, char**)
     test_force_run_back_speed_change_ack_retail_body();
     test_back_speed_change_ack_round_trips();
     test_move_knock_back_ack_retail_body();
+    test_speed_embedded_acks_retail_bodies();
     test_all_speed_ack_sequences_differ();
     test_speed_ack_sequences_are_distinct();
     test_spline_state_packets();

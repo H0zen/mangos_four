@@ -1281,6 +1281,14 @@ void InitializeOpcodes()
     // own writers and absence from the corpus is a gap in what was recorded.
     DefC(CMSG_FORCE_SWIM_BACK_SPEED_CHANGE_ACK, "CMSG_FORCE_SWIM_BACK_SPEED_CHANGE_ACK", STATUS_LOGGEDIN, PROCESS_THREADUNSAFE, &WorldSession::HandleForceSpeedChangeAckOpcodes);
     DefC(CMSG_FORCE_FLIGHT_BACK_SPEED_CHANGE_ACK, "CMSG_FORCE_FLIGHT_BACK_SPEED_CHANGE_ACK", STATUS_LOGGEDIN, PROCESS_THREADUNSAFE, &WorldSession::HandleForceSpeedChangeAckOpcodes);
+    // The three whose speed sits INSIDE the movement block rather than ahead of
+    // it. They needed a new MSESpeedFloat element to be expressible at all, and
+    // until they were registered the speed anti-cheat never ran for walk, run or
+    // flight -- run being the one a speed hack actually abuses. The remaining two,
+    // turn rate and pitch rate, have no observed bodies and are not registered.
+    DefC(CMSG_FORCE_WALK_SPEED_CHANGE_ACK, "CMSG_FORCE_WALK_SPEED_CHANGE_ACK", STATUS_LOGGEDIN, PROCESS_THREADUNSAFE, &WorldSession::HandleForceSpeedChangeAckOpcodes);
+    DefC(CMSG_FORCE_RUN_SPEED_CHANGE_ACK, "CMSG_FORCE_RUN_SPEED_CHANGE_ACK", STATUS_LOGGEDIN, PROCESS_THREADUNSAFE, &WorldSession::HandleForceSpeedChangeAckOpcodes);
+    DefC(CMSG_FORCE_FLIGHT_SPEED_CHANGE_ACK, "CMSG_FORCE_FLIGHT_SPEED_CHANGE_ACK", STATUS_LOGGEDIN, PROCESS_THREADUNSAFE, &WorldSession::HandleForceSpeedChangeAckOpcodes);
 
     // CMSG_SET_ACTION_BUTTON is HELD. Its body is proven -- the reader matches
     // the client's writer sub_669CAE element for element and its fixtures stand

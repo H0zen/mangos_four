@@ -2181,7 +2181,7 @@ class MovementInfo
         MovementInfo() : moveFlags(MOVEFLAG_NONE), moveFlags2(MOVEFLAG2_NONE), time(0),
             t_time(0), t_seat(-1), t_time2(0), t_time3(0), s_pitch(0.0f), fallTime(0), splineElevation(0.0f),
             unknownBit148(false), unknownBit149(false), unknownBit172(false), movementForceCount(0),
-            hasUnknownUInt32(false), unknownUInt32(0), byteParam(0) {}
+            hasUnknownUInt32(false), unknownUInt32(0), byteParam(0), speedFloat(0.0f) {}
 
         // Read/Write methods
         void Read(ByteBuffer& data, uint16 opcode);
@@ -2238,6 +2238,11 @@ class MovementInfo
         uint32 GetTransportTime2() const { return t_time2; }
         uint32 GetFallTime() const { return fallTime; }
         int8 GetByteParam() const { return byteParam; }
+        /// The forced speed carried INSIDE the movement block. Four of the nine
+        /// speed acknowledgements lead with the speed and are read before this
+        /// struct; the other five carry it among the leading scalars, in a
+        /// per-opcode order, so it has to come through the sequence instead.
+        float GetSpeedFloat() const { return speedFloat; }
         void ChangeOrientation(float o) { pos.o = o; }
         void ChangePosition(float x, float y, float z, float o) { pos.x = x; pos.y = y; pos.z = z; pos.o = o; }
         void UpdateTime(uint32 _time) { time = _time; }
@@ -2309,6 +2314,7 @@ class MovementInfo
         // status info
         StatusInfo si;
         int8 byteParam;
+        float speedFloat;
 };
 
 inline WorldPacket& operator<< (WorldPacket& buf, MovementInfo const& mi)
