@@ -5553,23 +5553,38 @@ class Unit : public WorldObject
         /**
          * @brief Next sequence number for a movement-state packet.
          *
-         * Every movement-state change that carries a uint32 -- can-fly, water
-         * walk, fall, hover, gravity, root -- stamps one of these. Retail 18414
-         * traffic shows the value incrementing per mover and being echoed back
-         * at offset 4 of the matching acknowledgement, so it is a sequence
-         * number the client tracks, not padding.
+         * Every movement-state change carrying a uint32 -- can-fly, water walk,
+         * fall, hover, gravity, root -- and every forced speed change stamps one
+         * of these. All fifteen used to send a literal 0.
          *
-         * Every call site here used to pass a literal 0, which is why this
-         * exists. Whether the client rejects a repeated value is not proven, but
-         * a constant is provably not what retail sends.
+         * What the client actually does with it, from the 18414 handler (which
+         * lives in an undefined-code bank, so it is visible in Wow.exe.lst and
+         * not in the decompile): it loads the value once and enqueues it. The
+         * only conditional in the whole handler is whether the mover GUID
+         * resolved. There is NO validation -- a repeated or zero counter is
+         * accepted, and the queue is ordered by timestamp, never by counter.
          *
-         * Counts from 1: the value is never 0 in observed traffic, and in the
-         * movement block a zero counter is encoded as absent, so 0 is a value
-         * worth not emitting.
+         * So this does not fix any client-visible behaviour, and it was wrong to
+         * suppose it might: a repeated counter was the leading explanation for
+         * ".gm fly works once then stops", and that explanation is dead.
          *
-         * The counter is per-Unit and shared across the families above -- the
-         * observed sequences skip values, because each mover's packets of every
-         * kind draw from one series.
+         * It is still worth doing for two reasons that are not cosmetic. The
+         * client echoes the value verbatim at offset 4 of the matching
+         * acknowledgement, so it is the only handle the server has for matching
+         * an ack to the command that caused it. And 0 is not a neutral value: the
+         * client uses counter == 0 to CLASSIFY a record as client-originated,
+         * because its own local entry points pass 0. A server sending 0 mislabels
+         * its own change as one the client made.
+         *
+         * Hence counting from 1. Corroborated independently: no captured body
+         * carries 0, the lowest observed is 4, and in the movement block a zero
+         * counter is encoded as absent.
+         *
+         * Per-Unit, not per-session or per-family: the record lives on the
+         * mover's own movement component, and retail shows one monotonic
+         * sequence per mover shared across all forced-movement families. That is
+         * why observed sequences skip values (66, 84, 108, 229, 249...) -- every
+         * kind of movement packet for that mover draws from the one series.
          */
         uint32 NextMovementCounter() { return ++m_movementCounter; }
         uint32 GetMovementCounter() const { return m_movementCounter; }

@@ -6902,7 +6902,9 @@ void Unit::SendCollisionHeightUpdate(float height)
         WorldPacket data(SMSG_MOVE_SET_COLLISION_HGT, GetPackGUID().size() + 4 + 4);
         data.WriteGuidMask<6, 1, 4, 7, 5, 2, 0, 3>(GetObjectGuid());
         data.WriteGuidBytes<6, 0, 4, 3, 5>(GetObjectGuid());
-        data << uint32(sWorld.GetGameTime());   // Packet counter
+        // Was sWorld.GetGameTime(), which is not a per-mover sequence at all --
+        // it is shared by every unit and unrelated to this mover's series.
+        data << uint32(NextMovementCounter());  // Packet counter
         data.WriteGuidBytes<1, 2, 7>(GetObjectGuid());
         data << ((Player*)this)->GetCollisionHeight(true);
         ((Player*)this)->GetSession()->SendPacket(&data);

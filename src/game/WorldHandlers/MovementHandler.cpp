@@ -688,7 +688,9 @@ void WorldSession::SendKnockBack(float angle, float horizontalSpeed, float verti
     data.WriteGuidMask<0, 3, 6, 7, 2, 5, 1, 4>(guid);
     data.WriteGuidBytes<1>(guid);
     data << float(vsin);                                // y direction
-    data << uint32(0);                                  // Sequence
+    // Not 0: the client reads counter == 0 as "this change originated here",
+    // because its own local entry points pass 0. Knockback is server-originated.
+    data << uint32(GetPlayer()->NextMovementCounter());  // Sequence
     data.WriteGuidBytes<6, 7>(guid);
     data << float(horizontalSpeed);                     // Horizontal speed
     data.WriteGuidBytes<4, 5, 3>(guid);

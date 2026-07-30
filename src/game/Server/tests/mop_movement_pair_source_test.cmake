@@ -57,6 +57,10 @@ elseif(MUTATION STREQUAL "speed_constant_counter")
 elseif(MUTATION STREQUAL "builder_discards_counter")
     string(REPLACE "*data << uint32(value);" "*data << uint32(0);"
         UNIT_SOURCE_EARLY "${UNIT_SOURCE_EARLY}")
+elseif(MUTATION STREQUAL "counter_getter_not_advancer")
+    string(REPLACE "BuildForceMoveRootPacket(&data, enable, NextMovementCounter());"
+        "BuildForceMoveRootPacket(&data, enable, GetMovementCounter());"
+        PLAYER_SOURCE "${PLAYER_SOURCE}")
 elseif(MUTATION STREQUAL "counter_does_not_advance")
     string(REPLACE "uint32 NextMovementCounter() { return ++m_movementCounter; }"
         "uint32 NextMovementCounter() { return m_movementCounter; }"
@@ -246,50 +250,69 @@ endforeach()
 
 message(STATUS "mop_movement_pair_source: can-fly, water-walk and fall send and admit both halves")
 
-# --- The movement counter must be a real sequence, not a constant ------------
+# --- The movement counter must be a real sequence ---------------------------
 #
-# Every one of these call sites passed a literal 0. Retail 18414 traffic shows
-# the value incrementing per mover and echoed back at offset 4 of the matching
-# acknowledgement, so a constant is provably not what the client is sent. Whether
-# it REJECTS a repeat is unproven; that is a reason to stop sending one, not a
-# reason to assume it is harmless.
+# Stated positively, not as "no digits". The first version of this guard rejected
+# decimal literals only, so GetMovementCounter(), a stale local, or a builder that
+# ignores its argument all passed -- a reviewer demonstrated the first two, and
+# the hover builder was a live instance of the third. Rejecting one wrong form is
+# not the same as requiring the right one.
+#
+# So: count the call sites, count the ones that call NextMovementCounter(), and
+# require the two to be equal. Anything else fails whatever shape it takes.
 
-string(REGEX MATCHALL "Build(Move|ForceMove)[A-Za-z]*Packet[(]&data, enable, [0-9]+[)]"
-    CONSTANT_COUNTERS "${PLAYER_SOURCE}")
-if(NOT CONSTANT_COUNTERS STREQUAL "")
+string(REGEX MATCHALL "Build[A-Za-z]*Packet[(]&data, enable, "
+    STATE_CALL_SITES "${PLAYER_SOURCE}")
+string(REGEX MATCHALL "Build[A-Za-z]*Packet[(]&data, enable, NextMovementCounter[(][)][)]"
+    STATE_CORRECT_SITES "${PLAYER_SOURCE}")
+list(LENGTH STATE_CALL_SITES STATE_CALL_COUNT)
+list(LENGTH STATE_CORRECT_SITES STATE_CORRECT_COUNT)
+if(STATE_CALL_COUNT EQUAL 0)
+    message(FATAL_ERROR "Found no movement-state senders at all -- the guard has drifted")
+endif()
+if(NOT STATE_CALL_COUNT EQUAL STATE_CORRECT_COUNT)
     message(FATAL_ERROR
-        "movement-state senders must pass NextMovementCounter(), not a constant: ${CONSTANT_COUNTERS}")
+        "movement-state senders: ${STATE_CORRECT_COUNT} of ${STATE_CALL_COUNT} pass "
+        "NextMovementCounter(). Every one must; a constant, a getter or a stale local "
+        "all send a sequence number the client has already seen")
 endif()
 
-# ...and the source must actually advance.
+# The speed family draws from the SAME series. That is why observed retail
+# sequences skip values: one mover's packets of every kind advance one counter.
+# Nine mover builders here; the nine SPLINE counterparts take no counter at all
+# and must not be given one.
+string(REGEX MATCHALL "BuildMoveSet[A-Za-z]+[(]data, guid.GetRawValue[(][)], "
+    SPEED_CALL_SITES "${UNIT_SPEED_SOURCE}")
+string(REGEX MATCHALL "BuildMoveSet[A-Za-z]+[(]data, guid.GetRawValue[(][)], NextMovementCounter[(][)], "
+    SPEED_CORRECT_SITES "${UNIT_SPEED_SOURCE}")
+list(LENGTH SPEED_CALL_SITES SPEED_CALL_COUNT)
+list(LENGTH SPEED_CORRECT_SITES SPEED_CORRECT_COUNT)
+if(SPEED_CALL_COUNT EQUAL 0)
+    message(FATAL_ERROR "Found no speed senders at all -- the guard has drifted")
+endif()
+if(NOT SPEED_CALL_COUNT EQUAL SPEED_CORRECT_COUNT)
+    message(FATAL_ERROR
+        "speed senders: ${SPEED_CORRECT_COUNT} of ${SPEED_CALL_COUNT} pass NextMovementCounter()")
+endif()
+
+
+
+# The source of the sequence must actually advance, and must not emit 0: the
+# movement block encodes a zero counter as absent, and no captured body carries
+# one -- the lowest observed is 4.
 string(FIND "${UNIT_HEADER}" "uint32 NextMovementCounter() { return ++m_movementCounter; }" COUNTER_ADVANCES)
 if(COUNTER_ADVANCES EQUAL -1)
     message(FATAL_ERROR
         "Unit::NextMovementCounter must pre-increment -- it must advance, and it must "
-        "not emit 0, which the movement block encodes as absent")
+        "not emit 0")
 endif()
 
-# The speed family draws from the SAME per-mover series. That is why observed
-# retail sequences skip values: a mover's packets of every kind share one
-# counter. Nine mover builders here; the nine SPLINE counterparts take no
-# counter at all and must not be given one.
-string(REGEX MATCHALL "BuildMoveSet[A-Za-z]+[(]data, guid.GetRawValue[(][)], [0-9]+,"
-    SPEED_CONSTANT_COUNTERS "${UNIT_SPEED_SOURCE}")
-if(NOT SPEED_CONSTANT_COUNTERS STREQUAL "")
-    message(FATAL_ERROR
-        "speed senders must pass NextMovementCounter(), not a constant: ${SPEED_CONSTANT_COUNTERS}")
-endif()
-
-# A sender advancing the counter is worthless if the BUILDER then discards it.
+# A sender advancing the counter is worthless if the BUILDER discards it.
 # BuildMoveHoverPacket serialized a literal 0 in both branches while taking a
-# value argument, so SetHover burned a sequence number and sent nothing. A
-# reviewer caught it; the call-site guard above could not, because it only proved
-# the argument was PASSED, never that it reached the wire.
+# value argument, so SetHover burned a sequence number and sent nothing.
 #
 # Checked per function, not file-wide: BuildSendPlayVisualPacket legitimately
-# writes uint32(0) as an unknown field and sits between two of these builders, so
-# a file-wide scan gives a false positive.
-
+# writes uint32(0) as an unknown field and sits between two of these builders.
 foreach(BUILDER
         BuildForceMoveRootPacket
         BuildMoveSetCanFlyPacket
@@ -312,7 +335,7 @@ foreach(BUILDER
     endif()
     string(SUBSTRING "${UNIT_SOURCE_EARLY}" ${BUILDER_BODY_START} ${BUILDER_ROOM} BUILDER_BODY)
 
-    # Stop at the next function so a neighbour's contents cannot satisfy or fail this one.
+    # Stop at the next function so a neighbour cannot satisfy or fail this one.
     string(FIND "${BUILDER_BODY}" "void Unit::" NEXT_FUNCTION)
     if(NOT NEXT_FUNCTION EQUAL -1)
         string(SUBSTRING "${BUILDER_BODY}" 0 ${NEXT_FUNCTION} BUILDER_BODY)
@@ -322,28 +345,11 @@ foreach(BUILDER
     if(NOT BUILDER_DISCARDS EQUAL -1)
         message(FATAL_ERROR
             "${BUILDER} serializes a literal 0 instead of its value argument -- "
-            "the caller advances the movement counter and the packet discards it")
+            "the caller advances the counter and the packet discards it")
     endif()
 
     string(FIND "${BUILDER_BODY}" "value" BUILDER_USES_VALUE)
     if(BUILDER_USES_VALUE EQUAL -1)
         message(FATAL_ERROR "${BUILDER} ignores its value argument entirely")
-    endif()
-endforeach()
-
-# Every sender that takes a counter must draw from it.
-foreach(SENDER SetRoot SetWaterWalk SetLevitate SetCanFly SetFeatherFall SetHover)
-    string(FIND "${PLAYER_SOURCE}" "void Player::${SENDER}(bool enable)" SENDER_START)
-    if(SENDER_START EQUAL -1)
-        message(FATAL_ERROR "Could not locate Player::${SENDER}")
-    endif()
-    math(EXPR SENDER_LEN "${PLAYER_LENGTH} - ${SENDER_START}")
-    if(SENDER_LEN GREATER 1600)
-        set(SENDER_LEN 1600)
-    endif()
-    string(SUBSTRING "${PLAYER_SOURCE}" ${SENDER_START} ${SENDER_LEN} SENDER_BODY)
-    string(FIND "${SENDER_BODY}" "NextMovementCounter()" SENDER_USES_COUNTER)
-    if(SENDER_USES_COUNTER EQUAL -1)
-        message(FATAL_ERROR "Player::${SENDER} must stamp a movement counter")
     endif()
 endforeach()
