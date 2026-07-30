@@ -20,6 +20,7 @@ file(READ "${SOURCE_ROOT}/src/game/Object/CreatureMovement.cpp" CREATURE_SOURCE)
 file(READ "${SOURCE_ROOT}/src/game/Server/WorldSession.cpp" SESSION_SOURCE)
 file(READ "${SOURCE_ROOT}/src/game/Object/Unit.h" UNIT_HEADER)
 file(READ "${SOURCE_ROOT}/src/game/Object/UnitSpeed.cpp" UNIT_SPEED_SOURCE)
+file(READ "${SOURCE_ROOT}/src/game/Object/Unit.cpp" UNIT_SOURCE_EARLY)
 
 if(MUTATION STREQUAL "drop_observer_half")
     string(REGEX REPLACE "SendMessageToSet[(]&spline, false[)];" ""
@@ -53,6 +54,9 @@ elseif(MUTATION STREQUAL "speed_constant_counter")
     string(REPLACE "MopCompactPackets::BuildMoveSetRunSpeed(data, guid.GetRawValue(), NextMovementCounter(), GetSpeed(mtype));"
         "MopCompactPackets::BuildMoveSetRunSpeed(data, guid.GetRawValue(), 0, GetSpeed(mtype));"
         UNIT_SPEED_SOURCE "${UNIT_SPEED_SOURCE}")
+elseif(MUTATION STREQUAL "builder_discards_counter")
+    string(REPLACE "*data << uint32(value);" "*data << uint32(0);"
+        UNIT_SOURCE_EARLY "${UNIT_SOURCE_EARLY}")
 elseif(MUTATION STREQUAL "counter_does_not_advance")
     string(REPLACE "uint32 NextMovementCounter() { return ++m_movementCounter; }"
         "uint32 NextMovementCounter() { return m_movementCounter; }"
@@ -275,6 +279,57 @@ if(NOT SPEED_CONSTANT_COUNTERS STREQUAL "")
     message(FATAL_ERROR
         "speed senders must pass NextMovementCounter(), not a constant: ${SPEED_CONSTANT_COUNTERS}")
 endif()
+
+# A sender advancing the counter is worthless if the BUILDER then discards it.
+# BuildMoveHoverPacket serialized a literal 0 in both branches while taking a
+# value argument, so SetHover burned a sequence number and sent nothing. A
+# reviewer caught it; the call-site guard above could not, because it only proved
+# the argument was PASSED, never that it reached the wire.
+#
+# Checked per function, not file-wide: BuildSendPlayVisualPacket legitimately
+# writes uint32(0) as an unknown field and sits between two of these builders, so
+# a file-wide scan gives a false positive.
+
+foreach(BUILDER
+        BuildForceMoveRootPacket
+        BuildMoveSetCanFlyPacket
+        BuildMoveWaterWalkPacket
+        BuildMoveFeatherFallPacket
+        BuildMoveHoverPacket
+        BuildMoveLevitatePacket)
+    set(SIGNATURE "void Unit::${BUILDER}(WorldPacket* data, bool apply, uint32 value)")
+    string(FIND "${UNIT_SOURCE_EARLY}" "${SIGNATURE}" BUILDER_START)
+    if(BUILDER_START EQUAL -1)
+        message(FATAL_ERROR "Could not locate ${SIGNATURE}")
+    endif()
+
+    string(LENGTH "${SIGNATURE}" SIGNATURE_LENGTH)
+    math(EXPR BUILDER_BODY_START "${BUILDER_START} + ${SIGNATURE_LENGTH}")
+    string(LENGTH "${UNIT_SOURCE_EARLY}" UNIT_EARLY_LENGTH)
+    math(EXPR BUILDER_ROOM "${UNIT_EARLY_LENGTH} - ${BUILDER_BODY_START}")
+    if(BUILDER_ROOM GREATER 1600)
+        set(BUILDER_ROOM 1600)
+    endif()
+    string(SUBSTRING "${UNIT_SOURCE_EARLY}" ${BUILDER_BODY_START} ${BUILDER_ROOM} BUILDER_BODY)
+
+    # Stop at the next function so a neighbour's contents cannot satisfy or fail this one.
+    string(FIND "${BUILDER_BODY}" "void Unit::" NEXT_FUNCTION)
+    if(NOT NEXT_FUNCTION EQUAL -1)
+        string(SUBSTRING "${BUILDER_BODY}" 0 ${NEXT_FUNCTION} BUILDER_BODY)
+    endif()
+
+    string(FIND "${BUILDER_BODY}" "uint32(0)" BUILDER_DISCARDS)
+    if(NOT BUILDER_DISCARDS EQUAL -1)
+        message(FATAL_ERROR
+            "${BUILDER} serializes a literal 0 instead of its value argument -- "
+            "the caller advances the movement counter and the packet discards it")
+    endif()
+
+    string(FIND "${BUILDER_BODY}" "value" BUILDER_USES_VALUE)
+    if(BUILDER_USES_VALUE EQUAL -1)
+        message(FATAL_ERROR "${BUILDER} ignores its value argument entirely")
+    endif()
+endforeach()
 
 # Every sender that takes a counter must draw from it.
 foreach(SENDER SetRoot SetWaterWalk SetLevitate SetCanFly SetFeatherFall SetHover)

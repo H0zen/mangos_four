@@ -6862,14 +6862,14 @@ void Unit::BuildMoveHoverPacket(WorldPacket* data, bool apply, uint32 value)
         data->Initialize(SMSG_MOVE_SET_HOVER, 8 + 4 + 1);
         data->WriteGuidMask<1, 4, 2, 3, 0, 5, 6, 7>(guid);
         data->WriteGuidBytes<5, 4, 1, 2, 3, 6, 0, 7>(guid);
-        *data << uint32(0);
+        *data << uint32(value);
     }
     else
     {
         data->Initialize(SMSG_MOVE_UNSET_HOVER, 8 + 4 + 1);
         data->WriteGuidMask<4, 6, 3, 1, 2, 7, 5, 0>(guid);
         data->WriteGuidBytes<4, 5, 3, 6, 7, 1, 2, 0>(guid);
-        *data << uint32(0);
+        *data << uint32(value);
     }
 }
 
