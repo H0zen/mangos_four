@@ -632,6 +632,30 @@ static void test_party_kill_log()
 
     // Distinct GUIDs, so a builder that wrote one of them into both slots cannot pass.
     CHECK(slotA != slotB);
+
+    // Sparse GUIDs, and the reason is specific: every byte of the two GUIDs above is nonzero, so
+    // all 16 mask bits are 1 and the mask is FF FF whatever order it is written in. The case above
+    // therefore constrains the BYTE order and the slot roles, but says nothing at all about
+    // kMaskOrder -- any permutation of the mask writes passes it.
+    //
+    // These two have disjoint nonzero positions (killer at byte 0, 2, 5; victim at 1, 4, 6), so the
+    // mask is 6 set bits in 16 specific places. Permute the mask order and presence lands on the
+    // wrong byte of the wrong slot, and neither GUID reconstructs.
+    {
+        uint64_t const sparseKiller = UINT64_C(0x00005C0000FF00A1);   // bytes 0, 2, 5 present
+        uint64_t const sparseVictim = UINT64_C(0x00B2003E00000C00);   // bytes 1, 4, 6 present
+
+        WorldPacket sparse;
+        MopCompactPackets::BuildPartyKillLog(sparse, ObjectGuid(sparseKiller), ObjectGuid(sparseVictim));
+        CHECK(sparse.GetOpcode() == SMSG_PARTYKILLLOG);
+        CHECK(sparse.size() == 8);                          // 2 mask bytes + 6 present bytes
+
+        uint64_t sparseA = 0;
+        uint64_t sparseB = 0;
+        DecodePartyKillLog(sparse, sparseA, sparseB);
+        CHECK(sparseB == sparseKiller);
+        CHECK(sparseA == sparseVictim);
+    }
 }
 
 static void test_duel_state_packets()
