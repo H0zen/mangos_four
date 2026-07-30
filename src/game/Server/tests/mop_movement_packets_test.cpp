@@ -1329,6 +1329,81 @@ static void test_water_and_land_walk_layouts_differ()
     CHECK(land.contents()[12] == uint8(0x60 ^ 1));  // GUID byte 5 of the test GUID, XOR 1
 }
 
+/// The fall mover halves, against real 18414 bodies.
+///
+/// The two put their counter in different places and neither matches the
+/// water-walk pair, so there is no family rule to fall back on -- each is its own
+/// reader. Normal fall is the awkward one: GUID bytes 3 and 2 come first, then
+/// the counter, then the rest, so the counter's byte OFFSET varies with how many
+/// of those two are present. A builder that hard-coded an offset would pass on
+/// some GUIDs and fail on others.
+static void test_fall_mover_retail_bodies()
+{
+    struct Case
+    {
+        OpcodesList opcode;
+        uint64 guid;
+        uint32 counter;
+        uint8 const* body;
+        size_t size;
+        char const* origin;
+    };
+
+    // SMSG_MOVE_FEATHER_FALL 0x0C60 -- reader sub_C8BE56. Counter first.
+    static uint8 const feather1[] = { 0x7A, 0x23, 0x00, 0x00, 0x00, 0xC9, 0xE9, 0x04, 0x3D, 0x05 };
+    static uint8 const feather2[] = { 0x7A, 0x72, 0x03, 0x00, 0x00, 0x63, 0x90, 0x07, 0x28, 0x05 };
+    // SMSG_MOVE_NORMAL_FALL 0x08E0 -- reader sub_C898EA. Counter in the middle.
+    static uint8 const normal1[] = { 0xD6, 0x04, 0x3D, 0x24, 0x00, 0x00, 0x00, 0xC9, 0x05, 0xE9 };
+    static uint8 const normal2[] = { 0xD6, 0x07, 0x28, 0x7B, 0x03, 0x00, 0x00, 0x63, 0x05, 0x90 };
+
+    Case const cases[] = {
+        { SMSG_MOVE_FEATHER_FALL, UINT64_C(0x04000000053CC8E8),  35, feather1, sizeof(feather1), "capture-000006/28387" },
+        { SMSG_MOVE_FEATHER_FALL, UINT64_C(0x0400000006296291), 882, feather2, sizeof(feather2), "capture-000187/65605" },
+        { SMSG_MOVE_NORMAL_FALL,  UINT64_C(0x04000000053CC8E8),  36, normal1,  sizeof(normal1),  "capture-000006/28676" },
+        { SMSG_MOVE_NORMAL_FALL,  UINT64_C(0x0400000006296291), 891, normal2,  sizeof(normal2),  "capture-000187/66015" },
+    };
+
+    for (Case const& c : cases)
+    {
+        WorldPacket packet(c.opcode, 13);
+        if (c.opcode == SMSG_MOVE_FEATHER_FALL)
+        {
+            MopCompactPackets::BuildMoveFeatherFall(packet, c.guid, c.counter);
+        }
+        else
+        {
+            MopCompactPackets::BuildMoveNormalFall(packet, c.guid, c.counter);
+        }
+
+        CHECK(packet.size() == c.size);
+        if (packet.size() != c.size) { continue; }
+        CHECK(std::memcmp(packet.contents(), c.body, c.size) == 0);
+    }
+}
+
+/// Normal fall's counter offset really is variable, which no captured body shows
+/// because they all share one mask. Two synthetic GUIDs differing only in whether
+/// byte 2 is zero must put the counter at different offsets.
+static void test_normal_fall_counter_offset_moves()
+{
+    // Byte 3 present, byte 2 present -> counter at 1 + 2 = 3.
+    WorldPacket both(SMSG_MOVE_NORMAL_FALL, 13);
+    MopCompactPackets::BuildMoveNormalFall(both, UINT64_C(0x0000000005030201), 0x11223344);
+    uint32 counterBoth;
+    std::memcpy(&counterBoth, both.contents() + 3, sizeof(counterBoth));
+    CHECK(counterBoth == 0x11223344u);
+
+    // Byte 2 zeroed -> only byte 3 precedes it -> counter at 1 + 1 = 2.
+    WorldPacket one(SMSG_MOVE_NORMAL_FALL, 13);
+    MopCompactPackets::BuildMoveNormalFall(one, UINT64_C(0x0000000005000201), 0x11223344);
+    uint32 counterOne;
+    std::memcpy(&counterOne, one.contents() + 2, sizeof(counterOne));
+    CHECK(counterOne == 0x11223344u);
+
+    // The two bodies differ in length by exactly the absent byte.
+    CHECK(both.size() == one.size() + 1);
+}
+
 int main(int, char**)
 {
     test_thirteen_inbound_fixtures_and_exact_relay();
@@ -1346,6 +1421,8 @@ int main(int, char**)
     test_spline_state_packets();
     test_water_walk_mover_retail_bodies();
     test_water_and_land_walk_layouts_differ();
+    test_fall_mover_retail_bodies();
+    test_normal_fall_counter_offset_moves();
     test_hostile_counts_rejected();
     test_opcode_values_are_framable();
     test_transport_stop_monster_move_fixture();

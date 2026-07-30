@@ -6843,17 +6843,12 @@ void Unit::BuildMoveFeatherFallPacket(WorldPacket* data, bool apply, uint32 valu
     if (apply)
     {
         data->Initialize(SMSG_MOVE_FEATHER_FALL, 1 + 4 + 8);
-        data->WriteGuidMask<3, 1, 7, 0, 4, 2, 5, 6>(guid);
-        data->WriteGuidBytes<5, 7, 2>(guid);
-        *data << uint32(value);
-        data->WriteGuidBytes<0, 3, 4, 1, 6>(guid);
+        MopCompactPackets::BuildMoveFeatherFall(*data, guid.GetRawValue(), value);
     }
     else
     {
         data->Initialize(SMSG_MOVE_NORMAL_FALL, 1 + 4 + 8);
-        *data << uint32(value);
-        data->WriteGuidMask<3, 0, 1, 5, 7, 4, 6, 2>(guid);
-        data->WriteGuidBytes<2, 7, 1, 4, 5, 0, 3, 6>(guid);
+        MopCompactPackets::BuildMoveNormalFall(*data, guid.GetRawValue(), value);
     }
 }
 

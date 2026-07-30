@@ -349,6 +349,11 @@ static bool IsEnterWorldConverted(uint16 opcode)
         // for the player and nothing for anyone watching.
         case SMSG_MOVE_WATER_WALK:                 // MopCompactPackets::BuildMoveWaterWalk
         case SMSG_MOVE_LAND_WALK:                  // MopCompactPackets::BuildMoveLandWalk
+        // Falling, admitted as a complete set. The observer halves were already
+        // here; both mover halves were wrong in every field and dropped, so
+        // feather fall changed nothing and normal fall never undid it.
+        case SMSG_MOVE_FEATHER_FALL:               // MopCompactPackets::BuildMoveFeatherFall
+        case SMSG_MOVE_NORMAL_FALL:                // MopCompactPackets::BuildMoveNormalFall
         case SMSG_SPLINE_MOVE_SET_NORMAL_FALL:     // MopMovementPackets::BuildSplineState
         case SMSG_SPLINE_MOVE_SET_WATER_WALK:      // MopMovementPackets::BuildSplineState
         case SMSG_SPLINE_MOVE_SET_FEATHER_FALL:    // MopMovementPackets::BuildSplineState

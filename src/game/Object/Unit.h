@@ -863,6 +863,38 @@ namespace MopCompactPackets
         out.WriteByteSeq(SwimSpeedGuidByte(moverGuid, 5));
     }
 
+    /// Falling, mover halves. Readers sub_C8BE56 (0x0C60) and sub_C898EA (0x08E0).
+    ///
+    /// These two put the counter in different places, and neither matches the
+    /// water-walk pair, so there is no family-wide rule to lean on. Feather fall
+    /// reads the counter immediately after the mask, before any GUID byte. Normal
+    /// fall reads GUID bytes 3 and 2 first, THEN the counter, then the rest --
+    /// which means the counter's byte offset is variable, depending on how many
+    /// of those two bytes are present.
+    inline void BuildMoveFeatherFall(WorldPacket& out, uint64 moverGuid, uint32 counter)
+    {
+        uint8 const maskOrder[] = { 4, 1, 7, 3, 0, 5, 2, 6 };
+        uint8 const byteOrder[] = { 1, 0, 5, 4, 6, 3, 2, 7 };
+
+        for (uint8 index : maskOrder) { out.WriteBit(SwimSpeedGuidByte(moverGuid, index) != 0); }
+        out.FlushBits();
+        out << uint32(counter);
+        for (uint8 index : byteOrder) { out.WriteByteSeq(SwimSpeedGuidByte(moverGuid, index)); }
+    }
+
+    inline void BuildMoveNormalFall(WorldPacket& out, uint64 moverGuid, uint32 counter)
+    {
+        uint8 const maskOrder[] = { 3, 1, 6, 0, 4, 7, 2, 5 };
+        uint8 const beforeCounter[] = { 3, 2 };
+        uint8 const afterCounter[] = { 1, 5, 4, 7, 0, 6 };
+
+        for (uint8 index : maskOrder) { out.WriteBit(SwimSpeedGuidByte(moverGuid, index) != 0); }
+        out.FlushBits();
+        for (uint8 index : beforeCounter) { out.WriteByteSeq(SwimSpeedGuidByte(moverGuid, index)); }
+        out << uint32(counter);
+        for (uint8 index : afterCounter) { out.WriteByteSeq(SwimSpeedGuidByte(moverGuid, index)); }
+    }
+
     /// The observer halves. No counter at all -- the mask and the bytes are the
     /// whole body. Landing these with the mover pair is the point: admitting one
     /// side alone is what left four other movement states telling everyone except

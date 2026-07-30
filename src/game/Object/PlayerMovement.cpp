@@ -194,9 +194,29 @@ void Player::SetCanFly(bool enable)
  */
 void Player::SetFeatherFall(bool enable)
 {
+    // This was the third variant of the pair defect: not a missing half, but the
+    // MOVER packet broadcast to everyone. SMSG_MOVE_FEATHER_FALL carries a
+    // movement counter and is addressed to the controlling session; observers
+    // receiving it are being handed an acknowledgement they cannot make. They
+    // need SMSG_SPLINE_MOVE_SET_FEATHER_FALL, which has no counter.
     WorldPacket data;
     BuildMoveFeatherFallPacket(&data, enable, 0);
-    SendMessageToSet(&data, true);
+    GetSession()->SendPacket(&data);
+
+    if (IsInWorld())
+    {
+        WorldPacket spline(enable ? SMSG_SPLINE_MOVE_SET_FEATHER_FALL : SMSG_SPLINE_MOVE_SET_NORMAL_FALL, 9);
+        if (enable)
+        {
+            MopCompactPackets::BuildSplineMoveSetFeatherFall(spline, GetObjectGuid());
+        }
+        else
+        {
+            MopCompactPackets::BuildSplineMoveSetNormalFall(spline, GetObjectGuid());
+        }
+
+        SendMessageToSet(&spline, false);
+    }
 
     // start fall from current height
     if (!enable)

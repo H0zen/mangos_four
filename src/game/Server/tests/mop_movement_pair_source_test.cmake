@@ -34,6 +34,15 @@ elseif(MUTATION STREQUAL "drop_waterwalk_observer")
 elseif(MUTATION STREQUAL "unadmitted_water_mover")
     string(REGEX REPLACE "case SMSG_MOVE_WATER_WALK:" ""
         SESSION_SOURCE "${SESSION_SOURCE}")
+elseif(MUTATION STREQUAL "feather_mover_to_observers")
+    string(REPLACE "BuildMoveFeatherFallPacket(&data, enable, 0);
+    GetSession()->SendPacket(&data);"
+        "BuildMoveFeatherFallPacket(&data, enable, 0);
+    SendMessageToSet(&data, true);"
+        PLAYER_SOURCE "${PLAYER_SOURCE}")
+elseif(MUTATION STREQUAL "unadmitted_feather_mover")
+    string(REGEX REPLACE "case SMSG_MOVE_FEATHER_FALL:" ""
+        SESSION_SOURCE "${SESSION_SOURCE}")
 elseif(MUTATION STREQUAL "unadmitted_spline")
     string(REGEX REPLACE "case SMSG_SPLINE_MOVE_SET_FLYING:" ""
         SESSION_SOURCE "${SESSION_SOURCE}")
@@ -117,6 +126,43 @@ if(NOT WW_LEGACY EQUAL -1)
     message(FATAL_ERROR "The inherited water-walk mask order is still present")
 endif()
 
+# --- Player::SetFeatherFall must send the right packet to each audience -----
+#
+# This one was not a missing half. It broadcast the MOVER packet to everyone with
+# SendMessageToSet(&data, true), handing observers a counter-bearing opcode they
+# cannot acknowledge.
+
+string(FIND "${PLAYER_SOURCE}" "void Player::SetFeatherFall(bool enable)" FF_START)
+if(FF_START EQUAL -1)
+    message(FATAL_ERROR "Could not locate Player::SetFeatherFall")
+endif()
+math(EXPR FF_REMAINING "${PLAYER_LENGTH} - ${FF_START}")
+if(FF_REMAINING GREATER 1600)
+    set(FF_REMAINING 1600)
+endif()
+string(SUBSTRING "${PLAYER_SOURCE}" ${FF_START} ${FF_REMAINING} FF_BODY)
+
+string(REGEX MATCH "BuildMoveFeatherFallPacket[(]&data, enable, 0[)];[ 	
+]*GetSession[(][)]->SendPacket[(]&data[)]"
+    FF_MOVER_DIRECT "${FF_BODY}")
+if(FF_MOVER_DIRECT STREQUAL "")
+    message(FATAL_ERROR
+        "Player::SetFeatherFall must send the mover packet to the session alone -- "
+        "broadcasting it hands observers an opcode addressed to a mover they are not")
+endif()
+
+string(FIND "${FF_BODY}" "BuildSplineMoveSetFeatherFall" FF_OBS_ON)
+string(FIND "${FF_BODY}" "BuildSplineMoveSetNormalFall" FF_OBS_OFF)
+if(FF_OBS_ON EQUAL -1 OR FF_OBS_OFF EQUAL -1)
+    message(FATAL_ERROR "Player::SetFeatherFall must tell observers with the spline pair")
+endif()
+
+string(FIND "${UNIT_SOURCE}" "MopCompactPackets::BuildMoveFeatherFall(" FF_BUILDER)
+string(FIND "${UNIT_SOURCE}" "MopCompactPackets::BuildMoveNormalFall(" NF_BUILDER)
+if(FF_BUILDER EQUAL -1 OR NF_BUILDER EQUAL -1)
+    message(FATAL_ERROR "Unit::BuildMoveFeatherFallPacket must use the reader-derived builders")
+endif()
+
 # --- Creature::SetCanFly is the same pair seen from the other side ----------
 
 string(FIND "${CREATURE_SOURCE}" "void Creature::SetCanFly(bool enable)" CR_CANFLY_START)
@@ -155,7 +201,11 @@ foreach(GATED
         SMSG_MOVE_WATER_WALK
         SMSG_MOVE_LAND_WALK
         SMSG_SPLINE_MOVE_SET_WATER_WALK
-        SMSG_SPLINE_MOVE_SET_LAND_WALK)
+        SMSG_SPLINE_MOVE_SET_LAND_WALK
+        SMSG_MOVE_FEATHER_FALL
+        SMSG_MOVE_NORMAL_FALL
+        SMSG_SPLINE_MOVE_SET_FEATHER_FALL
+        SMSG_SPLINE_MOVE_SET_NORMAL_FALL)
     string(FIND "${SESSION_SOURCE}" "case ${GATED}:" ADMITTED)
     if(ADMITTED EQUAL -1)
         message(FATAL_ERROR
@@ -164,4 +214,4 @@ foreach(GATED
     endif()
 endforeach()
 
-message(STATUS "mop_movement_pair_source: can-fly and water-walk send and admit both halves")
+message(STATUS "mop_movement_pair_source: can-fly, water-walk and fall send and admit both halves")
