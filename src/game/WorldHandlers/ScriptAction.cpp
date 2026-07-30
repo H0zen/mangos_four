@@ -33,6 +33,7 @@
  */
 
 #include "ScriptMgr.h"
+#include "ScriptActionFaultKey.h"
 
 #include <mutex>
 #include <set>
@@ -221,16 +222,19 @@ bool ScriptAction::GetScriptProcessTargets(WorldObject* pOrigSource, WorldObject
                 // the error while removing the flood: the first occurrence of
                 // each distinct fault reports in full, repeats stay silent.
                 //
-                // Keyed on the fault, not the call: script id, command and the
-                // buddy entry that could not be found. Two different broken rows
-                // still produce two errors.
+                // Keyed on the fault, not the call. Every stable field printed by
+                // the error participates, so two different broken rows still
+                // produce two errors while different searchers executing the same
+                // row do not restart the flood.
                 {
-                    uint64 const faultKey = (uint64(m_script->id) << 32)
-                                          ^ (uint64(m_script->command) << 16)
-                                          ^ uint64(m_script->buddyEntry);
+                    ScriptActionDetail::FaultKey const faultKey =
+                        ScriptActionDetail::MakeFaultKey(
+                            static_cast<uint32>(m_type), m_script->id,
+                            m_script->command, m_script->buddyEntry,
+                            m_script->searchRadiusOrGuid, m_script->data_flags);
 
                     static std::mutex reportedMutex;
-                    static std::set<uint64> reported;
+                    static std::set<ScriptActionDetail::FaultKey> reported;
 
                     bool firstReport = false;
                     {

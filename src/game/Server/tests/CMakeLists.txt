@@ -29,6 +29,12 @@ target_include_directories(mop_framing_test PRIVATE
 set_target_properties(mop_framing_test PROPERTIES CXX_STANDARD 17 CXX_STANDARD_REQUIRED ON)
 add_test(NAME mop_framing COMMAND mop_framing_test)
 
+add_executable(script_action_fault_key_test script_action_fault_key_test.cpp)
+target_include_directories(script_action_fault_key_test PRIVATE
+    ${CMAKE_SOURCE_DIR}/src/game/WorldHandlers)
+set_target_properties(script_action_fault_key_test PROPERTIES CXX_STANDARD 17 CXX_STANDARD_REQUIRED ON)
+add_test(NAME script_action_fault_key COMMAND script_action_fault_key_test)
+
 # MopAuthSession.cpp/MopAuthProof.cpp/MopSocketDrain.h relocated to src/proto/ alongside
 # MopWireCodec/MopFrameReader/MopHandshake (same move); MopAuthResponse.{h,cpp} stays
 # here in Server/ because its .cpp includes Opcodes.h/SharedDefines.h. Compiling the two
