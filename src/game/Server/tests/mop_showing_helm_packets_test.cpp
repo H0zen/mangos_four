@@ -68,6 +68,60 @@ static void test_repeat_requests_are_idempotent()
     CHECK((toggled & HIDE_HELM) != 0);
 }
 
+/// The bit is the flag BEFORE the toggle, so the server must apply its opposite.
+///
+/// The client routes are sub_40959D for the helm and sub_4095E0 for the cloak,
+/// identical but for the bit index:
+///     (PLAYER_FLAGS & 0x400) != 0  ->  the bit        (helm)
+///     (PLAYER_FLAGS & 0x800) != 0  ->  the bit        (cloak)
+/// There is no xor, not or setz on either path. An earlier reading here took the
+/// bit for the wanted end state and assigned it, which writes the flag to itself
+/// and leaves the item exactly where it was. Live testing found both toggles
+/// inert; the disassembly predicted it before the second was tried.
+static void test_toggle_applies_the_opposite_of_the_bit()
+{
+    const uint32 HIDE_HELM = 0x00000400;
+    const uint32 HIDE_CLOAK = 0x00000800;
+
+    // Showing, so the client reports 0 and wants it hidden.
+    uint32 flags = 0;
+    WorldPacket showing(CMSG_SHOWING_HELM, 1);
+    showing << uint8(0x00);
+    bool wasHidden = showing.ReadBit();
+    CHECK(wasHidden == false);
+    if (!wasHidden) { flags |= HIDE_HELM; } else { flags &= ~HIDE_HELM; }
+    CHECK((flags & HIDE_HELM) != 0);                        // it moved
+
+    // Hidden, so the client reports 1 and wants it shown again.
+    WorldPacket hidden(CMSG_SHOWING_HELM, 1);
+    hidden << uint8(0x80);
+    wasHidden = hidden.ReadBit();
+    CHECK(wasHidden == true);
+    if (!wasHidden) { flags |= HIDE_HELM; } else { flags &= ~HIDE_HELM; }
+    CHECK((flags & HIDE_HELM) == 0);                        // and back
+
+    // Assigning the bit as sent is what made it inert: the flag is written to
+    // the value it already had, so nothing changes however often it is sent.
+    uint32 inert = 0;
+    for (int i = 0; i < 3; ++i)
+    {
+        WorldPacket p(CMSG_SHOWING_HELM, 1);
+        p << uint8(0x00);                                   // reports "showing"
+        bool const bit = p.ReadBit();
+        if (bit) { inert |= HIDE_HELM; } else { inert &= ~HIDE_HELM; }
+    }
+    CHECK((inert & HIDE_HELM) == 0);                        // never moved
+
+    // The cloak takes the same path on its own bit.
+    uint32 cloakFlags = 0;
+    WorldPacket cloak(CMSG_SHOWING_CLOAK, 1);
+    cloak << uint8(0x00);
+    bool const cloakWasHidden = cloak.ReadBit();
+    if (!cloakWasHidden) { cloakFlags |= HIDE_CLOAK; } else { cloakFlags &= ~HIDE_CLOAK; }
+    CHECK((cloakFlags & HIDE_CLOAK) != 0);
+    CHECK((cloakFlags & HIDE_HELM) == 0);                   // and only its own
+}
+
 /// The cloak is the same one-bit shape, and its polarity is proven the same way
 /// rather than assumed from the helm: the client's toggle route sub_4095E0 reads
 /// PLAYER_FLAGS & 0x800 and serializes that boolean as the body's only bit. So a
@@ -108,6 +162,7 @@ int main(int /*argc*/, char** /*argv*/)
     test_showing_helm_opcode_value();
     test_showing_helm_bodies();
     test_repeat_requests_are_idempotent();
+    test_toggle_applies_the_opposite_of_the_bit();
     test_showing_cloak_opcode_value();
     test_showing_cloak_bodies();
     test_cloak_and_helm_flags_are_distinct();

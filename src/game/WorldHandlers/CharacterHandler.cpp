@@ -1411,17 +1411,21 @@ void WorldSession::HandleShowingHelmOpcode(WorldPacket& recv_data)
 {
     DEBUG_LOG("CMSG_SHOWING_HELM for %s", _player->GetName());
 
-    // 18414 sends one MSB-first bit stating the wanted end state, and the bit is
-    // the HIDE flag rather than a "showing" flag despite the opcode's name: the
-    // client's toggle route sub_40959D reads PLAYER_FLAGS & 0x400
-    // (PLAYER_FLAGS_HIDE_HELM) and serializes exactly that boolean as the
-    // packet's sole bit. So 0x80 means hide and 0x00 means show.
+    // The single MSB-first bit is the flag's value BEFORE the toggle, not the
+    // wanted end state. The client's route sub_40959D is
+    //     (PLAYER_FLAGS & 0x400) != 0  ->  the bit
+    // with no xor, not or setz anywhere: it reports what the flag currently is
+    // and asks the server for the opposite. Assigning the bit as sent therefore
+    // writes the flag to itself and the helm never moves, which is what an
+    // earlier version of this handler did.
     //
-    // Toggling instead of assigning inverted the helm for the rest of the
-    // session the first time client and server disagreed -- which any dropped or
-    // replayed request causes -- and it also left the byte entirely unread.
-    bool const hidden = recv_data.ReadBit();
-    _player->ApplyModFlag(PLAYER_FLAGS, PLAYER_FLAGS_HIDE_HELM, hidden);
+    // Inverting on receipt keeps the property that made assignment better than a
+    // toggle -- a dropped or replayed request cannot leave the flag stuck
+    // inverted for the session -- while actually changing it. It is also
+    // self-correcting: the client states its own view, so the server converges on
+    // the client's intent rather than compounding any disagreement.
+    bool const wasHidden = recv_data.ReadBit();
+    _player->ApplyModFlag(PLAYER_FLAGS, PLAYER_FLAGS_HIDE_HELM, !wasHidden);
 }
 
 /**
@@ -1433,14 +1437,10 @@ void WorldSession::HandleShowingCloakOpcode(WorldPacket& recv_data)
 {
     DEBUG_LOG("CMSG_SHOWING_CLOAK for %s", _player->GetName());
 
-    // Identical shape to the helm, and proven the same way rather than by
-    // symmetry: the client's toggle route sub_4095E0 reads PLAYER_FLAGS & 0x800
-    // (PLAYER_FLAGS_HIDE_CLOAK) and hands it to the same one-bit serializer.
-    //
-    // Registered on that binary proof. It was once held back because nothing
-    // independently showed the client sending it, but silence in what was
-    // recorded is not evidence the client stays silent, and dropping the request
-    // leaves the player unable to toggle their cloak at all.
-    bool const hidden = recv_data.ReadBit();
-    _player->ApplyModFlag(PLAYER_FLAGS, PLAYER_FLAGS_HIDE_CLOAK, hidden);
+    // Identical to the helm, and established the same way rather than by
+    // symmetry: sub_4095E0 is (PLAYER_FLAGS & 0x800) != 0 -> the bit, byte for
+    // byte the same shape as sub_40959D with only the bit index differing. So it
+    // too reports the CURRENT hide state and wants the opposite applied.
+    bool const wasHidden = recv_data.ReadBit();
+    _player->ApplyModFlag(PLAYER_FLAGS, PLAYER_FLAGS_HIDE_CLOAK, !wasHidden);
 }
