@@ -125,14 +125,29 @@ void Unit::UpdateSpeed(UnitMoveType mtype, bool forced, float ratio, bool ignore
             break;
         }
         case MOVE_RUN_BACK:
-            return;
+            // No aura raises a back speed, so nothing is selected here -- but
+            // falling through matters, because the SLOW below does apply and
+            // SetSpeedRate is the only thing that sends a packet.
+            //
+            // Retail proves it. In one tick, capture-000006 seq 74392-74396 for
+            // one mover: run 3.024 = 7.0 x 1.08 x 0.4, walk 1.0 = 2.5 x 0.4, and
+            // run-back 1.8 = 4.5 x 0.4. The snare reaches run-back; the mount
+            // bonus does not. Two more snares agree -- 3.15 = 4.5 x 0.7 and
+            // 2.25 = 4.5 x 0.5 -- each time the bare multiplier with no bonus.
+            // That is exactly what this function computes once it is allowed to
+            // continue, so the inherited "back speeds are constants" assumption
+            // is falsified by the wire.
+            break;
         case MOVE_SWIM:
         {
             main_speed_mod  = GetMaxPositiveAuraModifier(SPELL_AURA_MOD_INCREASE_SWIM_SPEED);
             break;
         }
         case MOVE_SWIM_BACK:
-            return;
+            // Same path. The direct evidence above is run-back; these two are
+            // the same computation over their own base, and the alternative --
+            // returning early -- is known wrong rather than merely unproven.
+            break;
         case MOVE_FLIGHT:
         {
             if (IsMounted()) // Use on mount auras
@@ -150,7 +165,7 @@ void Unit::UpdateSpeed(UnitMoveType mtype, bool forced, float ratio, bool ignore
             break;
         }
         case MOVE_FLIGHT_BACK:
-            return;
+            break;
         default:
             sLog.outError("Unit::UpdateSpeed: Unsupported move type (%d)", mtype);
             return;

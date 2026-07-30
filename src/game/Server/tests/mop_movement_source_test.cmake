@@ -1,6 +1,7 @@
 file(READ "${SOURCE_ROOT}/src/game/movement/MovementStructures.h" movement_structures)
 file(READ "${SOURCE_ROOT}/src/game/Object/Unit.h" unit_header)
 file(READ "${SOURCE_ROOT}/src/game/Object/Unit.cpp" unit_source)
+file(READ "${SOURCE_ROOT}/src/game/Object/UnitSpeed.cpp" unit_speed_source)
 file(READ "${SOURCE_ROOT}/src/game/Object/CreatureMovement.cpp" creature_movement_source)
 file(READ "${SOURCE_ROOT}/src/game/movement/MovementInfo.cpp" movement_codec)
 file(READ "${SOURCE_ROOT}/src/game/Server/Opcodes.cpp" opcode_registry)
@@ -11,7 +12,11 @@ file(READ "${SOURCE_ROOT}/src/game/movement/packet_builder.cpp" spline_packet_so
 file(READ "${SOURCE_ROOT}/src/game/movement/MoveSplineInit.cpp" spline_init_source)
 file(READ "${SOURCE_ROOT}/src/game/Server/WorldSession.cpp" world_session_source)
 
-if(MUTATION STREQUAL "drop_nonfinite_speed_guard")
+if(MUTATION STREQUAL "back_speed_early_return")
+    string(REPLACE "        case MOVE_SWIM_BACK:" "        case MOVE_SWIM_BACK:
+            return;"
+        unit_speed_source "${unit_speed_source}")
+elseif(MUTATION STREQUAL "drop_nonfinite_speed_guard")
     string(REPLACE "if (!std::isfinite(newspeed))" "if (false)"
         movement_handler "${movement_handler}")
 elseif(MUTATION STREQUAL "nonfinite_guard_after_bookkeeping")
@@ -409,3 +414,38 @@ if(NOT nonfinite_guard LESS forced_bookkeeping)
     message(FATAL_ERROR
         "The non-finite guard must run BEFORE the forced-change bookkeeping")
 endif()
+
+# --- Back speeds must reach SetSpeedRate ------------------------------------
+#
+# Unit::UpdateSpeed returned early for the three back move types, so no back
+# speed was ever computed and no packet ever sent -- while the GM command still
+# printed success. The inherited justification was that back speeds are constants
+# no aura touches. The wire falsifies it: in one tick, capture-000006 seq
+# 74392-74396 for one mover gives run 3.024 = 7.0 x 1.08 x 0.4, walk
+# 1.0 = 2.5 x 0.4 and run-back 1.8 = 4.5 x 0.4. The snare reaches run-back, the
+# mount bonus does not -- exactly what this function computes when allowed to
+# continue. Two further snares agree: 4.5 x 0.7 = 3.15 and 4.5 x 0.5 = 2.25.
+#
+# This is not a packet-layer gap: the builders are corpus-pinned and both mover
+# and observer opcodes are already admitted. Only the computation was missing.
+
+string(FIND "${unit_speed_source}" "void Unit::UpdateSpeed" update_speed_start)
+if(update_speed_start EQUAL -1)
+    message(FATAL_ERROR "Could not locate Unit::UpdateSpeed")
+endif()
+string(LENGTH "${unit_speed_source}" unit_speed_length)
+math(EXPR update_speed_room "${unit_speed_length} - ${update_speed_start}")
+if(update_speed_room GREATER 7000)
+    set(update_speed_room 7000)
+endif()
+string(SUBSTRING "${unit_speed_source}" ${update_speed_start} ${update_speed_room} update_speed_body)
+
+foreach(BACK_TYPE MOVE_RUN_BACK MOVE_SWIM_BACK MOVE_FLIGHT_BACK)
+    string(REGEX MATCH "case ${BACK_TYPE}:[ 	
+]+return;" back_returns "${update_speed_body}")
+    if(NOT back_returns STREQUAL "")
+        message(FATAL_ERROR
+            "Unit::UpdateSpeed returns early for ${BACK_TYPE} -- the speed is never "
+            "computed, no packet is sent, and the GM command reports success anyway")
+    endif()
+endforeach()
