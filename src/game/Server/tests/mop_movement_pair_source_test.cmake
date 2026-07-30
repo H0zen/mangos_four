@@ -21,6 +21,7 @@ file(READ "${SOURCE_ROOT}/src/game/Server/WorldSession.cpp" SESSION_SOURCE)
 file(READ "${SOURCE_ROOT}/src/game/Object/Unit.h" UNIT_HEADER)
 file(READ "${SOURCE_ROOT}/src/game/Object/UnitSpeed.cpp" UNIT_SPEED_SOURCE)
 file(READ "${SOURCE_ROOT}/src/game/Object/Unit.cpp" UNIT_SOURCE_EARLY)
+file(READ "${SOURCE_ROOT}/src/game/WorldHandlers/MovementHandler.cpp" MOVEMENT_HANDLER_SOURCE)
 
 if(MUTATION STREQUAL "drop_observer_half")
     string(REGEX REPLACE "SendMessageToSet[(]&spline, false[)];" ""
@@ -54,6 +55,12 @@ elseif(MUTATION STREQUAL "speed_constant_counter")
     string(REPLACE "MopCompactPackets::BuildMoveSetRunSpeed(data, guid.GetRawValue(), NextMovementCounter(), GetSpeed(mtype));"
         "MopCompactPackets::BuildMoveSetRunSpeed(data, guid.GetRawValue(), 0, GetSpeed(mtype));"
         UNIT_SPEED_SOURCE "${UNIT_SPEED_SOURCE}")
+elseif(MUTATION STREQUAL "knockback_constant_counter")
+    string(REPLACE "data << uint32(GetPlayer()->NextMovementCounter());" "data << uint32(0);"
+        MOVEMENT_HANDLER_SOURCE "${MOVEMENT_HANDLER_SOURCE}")
+elseif(MUTATION STREQUAL "collision_height_constant_counter")
+    string(REPLACE "data << uint32(NextMovementCounter());" "data << uint32(sWorld.GetGameTime());"
+        UNIT_SOURCE_EARLY "${UNIT_SOURCE_EARLY}")
 elseif(MUTATION STREQUAL "builder_discards_counter")
     string(REPLACE "*data << uint32(value);" "*data << uint32(0);"
         UNIT_SOURCE_EARLY "${UNIT_SOURCE_EARLY}")
@@ -353,3 +360,23 @@ foreach(BUILDER
         message(FATAL_ERROR "${BUILDER} ignores its value argument entirely")
     endif()
 endforeach()
+
+# The two direct writers outside the builder tables. Reverting either would have
+# passed every check above, because those count call sites in PlayerMovement.cpp
+# and UnitSpeed.cpp only -- a reviewer pointed out the blind spot.
+#
+# Knockback previously sent a literal 0, which the client reads as
+# "client-originated". Collision height sent sWorld.GetGameTime(), which is not a
+# per-mover sequence at all: it is shared by every unit in the world.
+string(FIND "${MOVEMENT_HANDLER_SOURCE}" "data << uint32(GetPlayer()->NextMovementCounter());" KNOCKBACK_COUNTER)
+if(KNOCKBACK_COUNTER EQUAL -1)
+    message(FATAL_ERROR
+        "SMSG_MOVE_KNOCK_BACK must stamp NextMovementCounter() -- a literal 0 tells the "
+        "client the knockback originated on the client")
+endif()
+
+string(FIND "${UNIT_SOURCE_EARLY}" "data << uint32(NextMovementCounter());  // Packet counter" COLLISION_COUNTER)
+if(COLLISION_COUNTER EQUAL -1)
+    message(FATAL_ERROR
+        "SMSG_MOVE_SET_COLLISION_HGT must stamp NextMovementCounter(), not game time")
+endif()

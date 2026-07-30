@@ -198,8 +198,16 @@ void Unit::UpdateSpeed(UnitMoveType mtype, bool forced, float ratio, bool ignore
             break;
     }
 
+    // The evidence for back speeds covers exactly one modifier: the slow. Neither
+    // the creature assistance reduction nor the ghost multiplier below is
+    // observed on them, and the latter's config is named GHOST_RUN_SPEED. So they
+    // are scoped to the forward types rather than inherited by accident when the
+    // early returns were removed.
+    bool const isBackSpeed = (mtype == MOVE_RUN_BACK || mtype == MOVE_SWIM_BACK ||
+                              mtype == MOVE_FLIGHT_BACK);
+
     // for creature case, we check explicit if mob searched for assistance
-    if (GetTypeId() == TYPEID_UNIT)
+    if (!isBackSpeed && GetTypeId() == TYPEID_UNIT)
     {
         if (((Creature*)this)->HasSearchedAssistance())
         {
@@ -207,7 +215,7 @@ void Unit::UpdateSpeed(UnitMoveType mtype, bool forced, float ratio, bool ignore
         }
     }
     // for player case, we look for some custom rates
-    else
+    else if (!isBackSpeed)
     {
         if (GetDeathState() == CORPSE)
         {

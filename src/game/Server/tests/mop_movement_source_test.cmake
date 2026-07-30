@@ -445,9 +445,37 @@ endif()
 string(SUBSTRING "${unit_speed_source}" ${update_speed_start} ${update_speed_room} update_speed_body)
 
 foreach(BACK_TYPE MOVE_RUN_BACK MOVE_SWIM_BACK MOVE_FLIGHT_BACK)
-    string(REGEX MATCH "case ${BACK_TYPE}:[ 	
-]+return;" back_returns "${update_speed_body}")
-    if(NOT back_returns STREQUAL "")
+    string(FIND "${update_speed_body}" "case ${BACK_TYPE}:" back_case)
+    if(back_case EQUAL -1)
+        message(FATAL_ERROR "Could not locate ${BACK_TYPE} in Unit::UpdateSpeed")
+    endif()
+
+    # Window this arm only: from its own label to the next case label, so a
+    # neighbour's break cannot satisfy it and a neighbour's return cannot fail it.
+    string(LENGTH "${update_speed_body}" body_length)
+    math(EXPR arm_room "${body_length} - ${back_case}")
+    if(arm_room GREATER 2000)
+        set(arm_room 2000)
+    endif()
+    string(SUBSTRING "${update_speed_body}" ${back_case} ${arm_room} back_arm)
+    string(SUBSTRING "${back_arm}" 5 -1 back_arm_tail)
+    # The arm ends at the next label, which may be a case OR the default arm --
+    # and default legitimately returns, so failing to stop there fails the
+    # unmutated source. That is exactly what happened on the first attempt.
+    string(FIND "${back_arm_tail}" "        case " next_case)
+    string(FIND "${back_arm_tail}" "        default:" next_default)
+    if(next_case EQUAL -1)
+        set(next_case ${next_default})
+    elseif(NOT next_default EQUAL -1 AND next_default LESS next_case)
+        set(next_case ${next_default})
+    endif()
+    if(NOT next_case EQUAL -1)
+        math(EXPR next_case_abs "${next_case} + 5")
+        string(SUBSTRING "${back_arm}" 0 ${next_case_abs} back_arm)
+    endif()
+
+    string(FIND "${back_arm}" "return;" back_returns_at)
+    if(NOT back_returns_at EQUAL -1)
         message(FATAL_ERROR
             "Unit::UpdateSpeed returns early for ${BACK_TYPE} -- the speed is never "
             "computed, no packet is sent, and the GM command reports success anyway")

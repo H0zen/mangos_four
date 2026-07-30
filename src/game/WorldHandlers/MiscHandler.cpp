@@ -1799,7 +1799,29 @@ void WorldSession::HandleMoveSetCanFlyAckOpcode(WorldPacket& recv_data)
         return;
     }
 
-    _player->GetMover()->m_movementInfo.SetMovementFlags(movementInfo.GetMovementFlags());
+    // Only the player's OWN acknowledgement is accepted. Player::SetCanFly is
+    // the only sender of the counter-bearing SMSG_MOVE_SET_CAN_FLY, and it sends
+    // it to the controlling session about that session's player; a creature is
+    // told with the counter-less spline form and has no acknowledgement to make.
+    // So a mover that is not the player is either a controlled unit that was
+    // never sent this opcode, or a forgery.
+    //
+    // This matters because the line below imports the client's entire movement
+    // flag word onto the authoritative mover with no filtering. Landing that on
+    // a vehicle or charmed creature feeds client-authored flags into
+    // creature-only pathfinding and the vehicle board/unboard state machine.
+    // Restricting it to self does not remove the trust, which ordinary movement
+    // packets already extend, but it does stop that trust being redirected onto
+    // a unit the client does not own.
+    if (_player->GetMover() != _player)
+    {
+        DEBUG_LOG("WorldSession::HandleMoveSetCanFlyAckOpcode: %s acknowledged for a "
+                  "non-self mover %s, ignored",
+                  _player->GetGuidStr().c_str(), _player->GetMover()->GetGuidStr().c_str());
+        return;
+    }
+
+    _player->m_movementInfo.SetMovementFlags(movementInfo.GetMovementFlags());
 }
 
 /**

@@ -1254,6 +1254,17 @@ void Aura::HandleAuraModDecreaseSpeed(bool apply, bool Real)
     target->UpdateSpeed(MOVE_RUN, true);
     target->UpdateSpeed(MOVE_SWIM, true);
     target->UpdateSpeed(MOVE_FLIGHT, true);
+
+    // The back speeds are snared too. Retail, one mover in one tick: run
+    // 3.024 = 7.0 x 1.08 x 0.4 while run-back is 1.8 = 4.5 x 0.4 -- the same
+    // multiplier, without the mount bonus. Two further snares agree.
+    //
+    // Removing the early returns in UpdateSpeed only made this computable;
+    // without these three calls nothing but the GM command would ever ask for
+    // it, so a snared player would keep full backward speed.
+    target->UpdateSpeed(MOVE_RUN_BACK, true);
+    target->UpdateSpeed(MOVE_SWIM_BACK, true);
+    target->UpdateSpeed(MOVE_FLIGHT_BACK, true);
 }
 
 /**

@@ -2297,74 +2297,107 @@ MovementStatusElements MovementSetCanFlySequence[] =
 
 MovementStatusElements MovementSetCanFlyAckSequence[] =
 {
-    MSEPositionY,
+    // Rebuilt from the client's own writer sub_674EA6, reached by the standard
+    // route: the CMSG thunk for 0x1052 (sub_66FCAA) -> its vtable off_D63CA8 ->
+    // slot 1. That writer is referenced by exactly one vtable slot in the whole
+    // binary, so it is specialised to this opcode and shared with nothing.
+    //
+    // The inherited sequence was wrong in eleven ways -- wrong prefix order, and
+    // missing the three unknown bits, the 22-bit force count, the unknown uint32
+    // and the 13-bit flags2 width. It read 18 bits where the client writes 42,
+    // so every body would have parsed three bytes out of phase. That is why the
+    // opcode stayed unregistered until now: a registered handler with a wrong
+    // reader is strictly worse than a dropped packet.
+    //
+    // Verified against 4 real 18414 bodies covering the minimum (35B), the
+    // flags2 arm, a six-byte GUID and the 30-bit flags arm -- all consumed
+    // byte-exactly, all recovering the GUID the other opcodes give for the same
+    // mover. The transport, force-id and unknown-uint32 arms are read straight
+    // from the writer but have NO captured body, so they ship structurally
+    // certain and corpus-unverified.
+
+    // Fixed 16-byte prefix, before any bit. Note Z first, then the counter.
+    MSEPositionZ,
     MSEMovementCounter,
     MSEPositionX,
-    MSEPositionZ,
+    MSEPositionY,
+
+    // 42 bits minimum: 20 single bits plus the 22-bit force count.
+    MSEUnknownBit148,
+    MSEHasMovementFlags2,
     MSEGuidBit3,
-    MSEHasTimestamp,
+    MSEHasFallData,
     MSEGuidBit4,
     MSEGuidBit0,
-    MSEHasOrientation,
-    MSEHasFallData,
-    MSEGuidBit2,
-    MSEGuidBit5,
-    MSEHasSplineElevation,
-    MSEHasMovementFlags2,
-    MSEHasUnknownBit,
-    MSEGuidBit7,
-    MSEHasSpline,
-    MSEGuidBit6,
+    MSEUnknownBit149,
     MSEGuidBit1,
-    MSEHasMovementFlags,
+    MSEUnknownBit172,
+    MSEHasUnknownUInt32,
+    MSEHasSplineElevation,
+    MSEHasOrientation,
+    MSEGuidBit6,
     MSEHasTransportData,
+    MSEHasTimestamp,
     MSEHasPitch,
-    MSETransportGuidBit3,
-    MSETransportGuidBit1,
-    MSETransportGuidBit2,
-    MSEHasTransportTime3,
+    MSEHasMovementFlags,
+    MSEMovementForceCount,
+    MSEGuidBit7,
+    MSEGuidBit5,
+    MSEGuidBit2,
+    MSEFlags2_13,
     MSEHasTransportTime2,
-    MSETransportGuidBit0,
-    MSETransportGuidBit5,
-    MSETransportGuidBit7,
-    MSETransportGuidBit4,
+    MSETransportGuidBit1,
+    MSETransportGuidBit3,
     MSETransportGuidBit6,
-    MSEFlags2,
+    MSETransportGuidBit2,
+    MSETransportGuidBit7,
+    MSETransportGuidBit5,
+    MSEHasTransportTime3,
+    MSETransportGuidBit4,
+    MSETransportGuidBit0,
     MSEFlags,
     MSEHasFallDirection,
-    MSEGuidByte1,
-    MSEGuidByte0,
-    MSEGuidByte2,
-    MSEGuidByte3,
-    MSEGuidByte7,
+
+    // Byte block. The force ids sit between GUID byte 4 and byte 3.
     MSEGuidByte6,
     MSEGuidByte4,
+    MSEMovementForceIds,
+    MSEGuidByte3,
+    MSEGuidByte2,
+    MSEGuidByte7,
+    MSEGuidByte1,
     MSEGuidByte5,
+    MSEGuidByte0,
     MSETransportTime2,
-    MSETransportGuidByte6,
-    MSETransportTime,
-    MSETransportTime3,
-    MSETransportGuidByte7,
-    MSETransportPositionZ,
-    MSETransportGuidByte3,
-    MSETransportPositionY,
-    MSETransportGuidByte5,
     MSETransportPositionX,
-    MSETransportGuidByte2,
+    MSETransportTime3,
     MSETransportPositionO,
+    MSETransportGuidByte3,
     MSETransportSeat,
-    MSETransportGuidByte1,
-    MSETransportGuidByte0,
+    MSETransportGuidByte5,
+    MSETransportPositionZ,
+    MSETransportGuidByte2,
+    MSETransportGuidByte7,
     MSETransportGuidByte4,
-    MSEFallTime,
-    MSEFallCosAngle,
-    MSEFallHorizontalSpeed,
-    MSEFallSinAngle,
-    MSEFallVerticalSpeed,
-    MSEPitch,
+    MSETransportTime,
+    MSETransportGuidByte1,
+    MSETransportGuidByte6,
+    MSETransportGuidByte0,
+    MSETransportPositionY,
     MSEPositionO,
     MSETimestamp,
+
+    // The fall tail runs time, vertical speed, then the three direction floats.
+    // That is the REVERSE of the swim acknowledgement's tail; do not copy that
+    // one across on the assumption the family is uniform.
+    MSEFallTime,
+    MSEFallVerticalSpeed,
+    MSEFallSinAngle,
+    MSEFallCosAngle,
+    MSEFallHorizontalSpeed,
     MSESplineElevation,
+    MSEPitch,
+    MSEUnknownUInt32,
     MSEEnd,
 };
 

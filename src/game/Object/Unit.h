@@ -5554,8 +5554,10 @@ class Unit : public WorldObject
          * @brief Next sequence number for a movement-state packet.
          *
          * Every movement-state change carrying a uint32 -- can-fly, water walk,
-         * fall, hover, gravity, root -- and every forced speed change stamps one
-         * of these. All fifteen used to send a literal 0.
+         * fall, hover, gravity, root -- plus every forced speed change, the
+         * knockback and the collision-height update stamp one of these. The
+         * fifteen state and speed senders used to send a literal 0; knockback
+         * sent 0 and collision height sent the wall-clock game time.
          *
          * What the client actually does with it, from the 18414 handler (which
          * lives in an undefined-code bank, so it is visible in Wow.exe.lst and
@@ -5587,7 +5589,6 @@ class Unit : public WorldObject
          * kind of movement packet for that mover draws from the one series.
          */
         uint32 NextMovementCounter() { return ++m_movementCounter; }
-        uint32 GetMovementCounter() const { return m_movementCounter; }
 
         // Packet builders
         void BuildForceMoveRootPacket(WorldPacket* data, bool apply, uint32 value);
