@@ -175,9 +175,9 @@
  *   TOTAL SMSG rows                   925
  *
  * SUBSYSTEM CONFIDENCE: high=365, low=221, medium=182, none=157
- * STATUS TOTALS: ACTIVE=476, DOC=435, DORMANT=609
+ * STATUS TOTALS: ACTIVE=477, DOC=435, DORMANT=608
  *   SMSG: ACTIVE=285, DOC=271, DORMANT=369
- *   CMSG: ACTIVE=191, DOC=164, DORMANT=240
+ *   CMSG: ACTIVE=192, DOC=164, DORMANT=239
  */
 
 // CAVEATS -- read before trusting any single row:
@@ -1344,7 +1344,7 @@ typedef uint16_t uint16;
  *   CMSG_QUERY_VOID_STORAGE                        0x0140  DOC
  *   CMSG_REQUEST_VEHICLE_NEXT_SEAT                 0x0141  DORMANT
  *   CMSG_MOVE_TIME_SKIPPED                         0x0150  ACTIVE
- *   CMSG_FORCE_RUN_BACK_SPEED_CHANGE_ACK           0x0158  DORMANT
+ *   CMSG_FORCE_RUN_BACK_SPEED_CHANGE_ACK           0x0158  ACTIVE
  *   CMSG_UNKNOWN_0x0160                            0x0160  DOC
  *   CMSG_BATTLE_PET_SET_BATTLE_SLOT                0x0163  DOC
  *   CMSG_MOVE_STOP_STRAFE                          0x0171  ACTIVE

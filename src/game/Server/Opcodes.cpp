@@ -1262,6 +1262,16 @@ void InitializeOpcodes()
     // inherited macro cut it at 24.
     DefC(CMSG_TOTEM_DESTROYED, "CMSG_TOTEM_DESTROYED", STATUS_LOGGEDIN, PROCESS_THREADUNSAFE, &WorldSession::HandleTotemDestroyed);
 
+    // The run-back speed acknowledgement. Of the nine members of this family only
+    // four put the speed first, and the shared handler reads a leading float, so
+    // only those four are structurally compatible with it at all. This is the one
+    // of the four with real traffic; swim is already registered, and the other two
+    // have no observed packets.
+    //
+    // The other five carry the speed INSIDE the movement sequence, where no
+    // element in this tree can express it. Registering them would misparse.
+    DefC(CMSG_FORCE_RUN_BACK_SPEED_CHANGE_ACK, "CMSG_FORCE_RUN_BACK_SPEED_CHANGE_ACK", STATUS_LOGGEDIN, PROCESS_THREADUNSAFE, &WorldSession::HandleForceSpeedChangeAckOpcodes);
+
     // CMSG_SET_ACTION_BUTTON is HELD. Its body is proven -- the reader matches
     // the client's writer sub_669CAE element for element and its fixtures stand
     // -- but the handler's type allowlist is narrower than the client's. The

@@ -2892,6 +2892,88 @@ MovementStatusElements MovementForceSwimSpeedChangeAckSequence[] =
     MSEEnd,
 };
 
+// CMSG_FORCE_RUN_BACK_SPEED_CHANGE_ACK (0x0158). Like the swim ack the speed
+// leads the body, so the handler consumes it before this sequence runs and the
+// sequence starts at the counter. Everything after differs: the bit order and
+// the GUID byte order are their own.
+MovementStatusElements MovementForceRunBackSpeedChangeAckSequence[] =
+{
+    MSEMovementCounter,
+    MSEPositionY,
+    MSEPositionX,
+    MSEPositionZ,
+    MSEUnknownBit149,
+    MSEGuidBit7,
+    MSEUnknownBit148,
+    MSEGuidBit1,
+    MSEMovementForceCount,
+    MSEHasSplineElevation,
+    MSEHasMovementFlags,
+    MSEHasMovementFlags2,
+    MSEGuidBit3,
+    MSEGuidBit6,
+    MSEGuidBit5,
+    MSEGuidBit4,
+    MSEUnknownBit172,
+    MSEHasOrientation,
+    MSEHasFallData,
+    MSEHasPitch,
+    MSEHasUnknownUInt32,
+    MSEHasTimestamp,
+    MSEHasTransportData,
+    MSEGuidBit2,
+    MSEGuidBit0,
+    MSEHasTransportTime2,
+    MSETransportGuidBit5,
+    MSETransportGuidBit2,
+    MSETransportGuidBit1,
+    MSETransportGuidBit3,
+    MSETransportGuidBit4,
+    MSETransportGuidBit0,
+    MSETransportGuidBit6,
+    MSETransportGuidBit7,
+    MSEHasTransportTime3,
+    MSEFlags,
+    MSEFlags2_13,
+    MSEHasFallDirection,
+    MSEGuidByte4,
+    MSEMovementForceIds,
+    MSEGuidByte2,
+    MSEGuidByte0,
+    MSEGuidByte7,
+    MSEGuidByte5,
+    MSEGuidByte1,
+    MSEGuidByte3,
+    MSEGuidByte6,
+    MSETransportTime2,
+    MSETransportPositionZ,
+    MSETransportGuidByte3,
+    MSETransportGuidByte6,
+    MSETransportGuidByte2,
+    MSETransportSeat,
+    MSETransportGuidByte7,
+    MSETransportTime,
+    MSETransportPositionO,
+    MSETransportGuidByte0,
+    MSETransportPositionX,
+    MSETransportGuidByte5,
+    MSETransportGuidByte4,
+    MSETransportPositionY,
+    MSETransportGuidByte1,
+    MSETransportTime3,
+    MSEFallCosAngle,
+    MSEFallSinAngle,
+    MSEFallHorizontalSpeed,
+    MSEFallVerticalSpeed,
+    MSEFallTime,
+    MSEPitch,
+    MSESplineElevation,
+    MSEUnknownUInt32,
+    MSEPositionO,
+    MSETimestamp,
+    MSEEnd
+};
+
 MovementStatusElements* GetMovementStatusElementsSequence(uint16 opcode)
 {
     switch (opcode)
@@ -2972,6 +3054,8 @@ MovementStatusElements* GetMovementStatusElementsSequence(uint16 opcode)
             return ChangeSeatsOnControlledVehicleSequence;
         case CMSG_FORCE_SWIM_SPEED_CHANGE_ACK:
             return MovementForceSwimSpeedChangeAckSequence;
+        case CMSG_FORCE_RUN_BACK_SPEED_CHANGE_ACK:
+            return MovementForceRunBackSpeedChangeAckSequence;
     }
     return NULL;
 }
