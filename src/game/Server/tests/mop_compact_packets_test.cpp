@@ -429,17 +429,23 @@ static void test_spline_speed_family_matches_retail_bodies()
 
 /// Every spline speed builder under an all-nonzero GUID.
 ///
-/// The retail bodies above all come from mover 0xF1308319002275D5, three of
-/// whose GUID bytes are zero and so are never emitted. Those fixtures pin each
-/// absent byte's mask position -- the bit is present and clear -- but they
-/// cannot catch a byte omitted from, or misplaced within, the byte interleave.
-/// A GUID with no zero byte forces all eight through every builder and closes
-/// exactly that gap. The mask is 0xFF in each case, so this is deliberately
-/// complementary: the retail fixtures remain the evidence for mask order and
-/// opcode identity, and this pins byte order and scalar position.
+/// The retail bodies above all come from mover 0xF1308319002275D5, exactly ONE
+/// of whose GUID bytes is zero -- byte 3 -- and so is never emitted. That is why
+/// those bodies are 12 bytes: one mask, seven emitted bytes and the float. Two
+/// reviews of the previous commit both caught this described as three; the
+/// commit message for it says three and is wrong.
+///
+/// So the retail fixtures pin byte 3's mask position and the interleave of the
+/// other seven, but cannot catch byte 3 omitted from or misplaced within the
+/// byte interleave. A GUID with no zero byte forces all eight through every
+/// builder and closes exactly that gap.
+///
+/// The mask is 0xFF in every case here, so this test pins no mask position at
+/// all. Mask order is covered separately, below.
 ///
 /// The last four have no retail body at all and are reader-derived only, so
-/// this is their whole test. They stay dormant until a capture exists.
+/// this and the mask-order test are their whole coverage. They stay dormant
+/// until a capture exists.
 static void test_spline_speed_family_full_interleaves_reader_derived()
 {
     uint64 const guid = 0x0123456789ABCDEFull;  // guid[7]^1 is 0x00, not absent
@@ -499,6 +505,93 @@ static void test_spline_speed_family_full_interleaves_reader_derived()
         CHECK(BytesEqual(p, { 0xFF, 0x44, 0x00, 0x00, 0x80, 0x3F, 0x66, 0xEE,
                               0x88, 0x22, 0xCC, 0xAA, 0x00 }));
     }
+}
+
+/// Mask ORDER, which neither the retail fixtures nor the all-nonzero test pins.
+///
+/// A GUID with exactly one zero byte emits exactly one CLEAR mask bit, and the
+/// position of that clear bit is where the byte sits in the mask order. Probing
+/// all eight slots therefore recovers the whole permutation, so no transposition
+/// survives. Both reviews of the previous commit raised this independently:
+/// without it, any of the 8! = 40320 orders would satisfy the suite for the four
+/// builders that have no retail body to constrain them, and promotion is one
+/// case label away.
+static void CheckSplineMaskOrder(char const* what, uint16 opcode, size_t maskOffset,
+    void (*build)(WorldPacket&, uint64, float), uint8 const (&expected)[8])
+{
+    uint8 recovered[8];
+    for (uint8 slot = 0; slot < 8; ++slot)
+    {
+        recovered[slot] = 0xFF;
+    }
+
+    for (uint8 slot = 0; slot < 8; ++slot)
+    {
+        uint64 const guid = 0x0123456789ABCDEFull & ~(uint64(0xFF) << (8 * slot));
+        WorldPacket packet(opcode, 13);
+        build(packet, guid, 1.0f);
+
+        uint8 const mask = packet.contents()[maskOffset];
+        uint8 const cleared = uint8(0xFF ^ mask);
+        if (cleared == 0 || (cleared & uint8(cleared - 1)) != 0)
+        {
+            std::fprintf(stderr, "FAIL %s: zeroing guid[%u] gave mask 0x%02X, wanted one clear bit\n",
+                         what, unsigned(slot), mask);
+            ++g_fail;
+            continue;
+        }
+
+        uint8 position = 0;
+        while (uint8(0x80 >> position) != cleared)
+        {
+            ++position;
+        }
+        recovered[position] = slot;
+    }
+
+    for (uint8 position = 0; position < 8; ++position)
+    {
+        if (recovered[position] != expected[position])
+        {
+            std::fprintf(stderr, "FAIL %s: mask bit %u is guid[%u], wanted guid[%u]\n",
+                         what, unsigned(position), unsigned(recovered[position]),
+                         unsigned(expected[position]));
+            ++g_fail;
+        }
+    }
+}
+
+static void test_spline_speed_family_mask_order()
+{
+    uint8 const run[8]        = { 3, 0, 1, 4, 7, 5, 6, 2 };
+    uint8 const walk[8]       = { 4, 1, 7, 6, 3, 2, 5, 0 };
+    uint8 const runBack[8]    = { 7, 4, 0, 3, 2, 5, 6, 1 };
+    uint8 const swim[8]       = { 5, 6, 7, 3, 4, 2, 1, 0 };
+    uint8 const flight[8]     = { 1, 4, 7, 3, 2, 6, 5, 0 };
+    uint8 const swimBack[8]   = { 2, 6, 5, 0, 4, 3, 1, 7 };
+    uint8 const turnRate[8]   = { 5, 7, 4, 0, 1, 6, 3, 2 };
+    uint8 const flightBack[8] = { 6, 0, 2, 7, 5, 4, 3, 1 };
+    uint8 const pitchRate[8]  = { 2, 6, 0, 5, 1, 3, 7, 4 };
+
+    CheckSplineMaskOrder("spline run", SMSG_SPLINE_MOVE_SET_RUN_SPEED, 0,
+        &MopCompactPackets::BuildSplineMoveSetRunSpeed, run);
+    CheckSplineMaskOrder("spline walk", SMSG_SPLINE_MOVE_SET_WALK_SPEED, 0,
+        &MopCompactPackets::BuildSplineMoveSetWalkSpeed, walk);
+    CheckSplineMaskOrder("spline run back", SMSG_SPLINE_MOVE_SET_RUN_BACK_SPEED, 0,
+        &MopCompactPackets::BuildSplineMoveSetRunBackSpeed, runBack);
+    CheckSplineMaskOrder("spline swim", SMSG_SPLINE_MOVE_SET_SWIM_SPEED, 0,
+        &MopCompactPackets::BuildSplineMoveSetSwimSpeed, swim);
+    // The flight speed leads, so its mask byte sits after the float.
+    CheckSplineMaskOrder("spline flight", SMSG_SPLINE_MOVE_SET_FLIGHT_SPEED, 4,
+        &MopCompactPackets::BuildSplineMoveSetFlightSpeed, flight);
+    CheckSplineMaskOrder("spline swim back", SMSG_SPLINE_MOVE_SET_SWIM_BACK_SPEED, 0,
+        &MopCompactPackets::BuildSplineMoveSetSwimBackSpeed, swimBack);
+    CheckSplineMaskOrder("spline turn rate", SMSG_SPLINE_MOVE_SET_TURN_RATE, 0,
+        &MopCompactPackets::BuildSplineMoveSetTurnRate, turnRate);
+    CheckSplineMaskOrder("spline flight back", SMSG_SPLINE_MOVE_SET_FLIGHT_BACK_SPEED, 0,
+        &MopCompactPackets::BuildSplineMoveSetFlightBackSpeed, flightBack);
+    CheckSplineMaskOrder("spline pitch rate", SMSG_SPLINE_MOVE_SET_PITCH_RATE, 0,
+        &MopCompactPackets::BuildSplineMoveSetPitchRate, pitchRate);
 }
 
 /// The interleave is what distinguishes run from swim: run writes one GUID byte
@@ -982,6 +1075,7 @@ int main(int /*argc*/, char** /*argv*/)
     test_spline_run_speed_matches_retail_body();
     test_spline_speed_family_matches_retail_bodies();
     test_spline_speed_family_full_interleaves_reader_derived();
+    test_spline_speed_family_mask_order();
     test_run_speed_differs_from_swim_interleave();
     test_swim_speed_guid_layouts();
     test_random_roll_guid_layouts();

@@ -911,11 +911,12 @@ bool ChatHandler::HandleModifyMountCommand(char* args)
     chr->SetUInt32Value(UNIT_FIELD_FLAGS, UNIT_FLAG_PVP);
     chr->Mount(mId);
 
-    WorldPacket data(SMSG_FORCE_RUN_SPEED_CHANGE, (8 + 4 + 1 + 4));
-    data << chr->GetPackGUID();
-    data << (uint32)0;
-    data << (uint8)0;                                       // new 2.1.0
-    data << float(speed);
+    // The legacy SMSG_FORCE_RUN_SPEED_CHANGE body that stood here was pack-GUID,
+    // counter, a 2.1.0-era uint8 and the speed. That opcode is dormant at 18414
+    // and never cleared the send gate, so the run-speed half of this command has
+    // been silently discarded; only the swim speed below took effect.
+    WorldPacket data(SMSG_MOVE_SET_RUN_SPEED, 1 + 8 + 4 + 4);
+    MopCompactPackets::BuildMoveSetRunSpeed(data, chr->GetObjectGuid().GetRawValue(), 0, speed);
     chr->SendMessageToSet(&data, true);
 
     data.Initialize(SMSG_MOVE_SET_SWIM_SPEED, 1 + 8 + 4 + 4);
