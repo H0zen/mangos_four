@@ -17,6 +17,7 @@ file(READ "${SOURCE_ROOT}/src/game/Server/Opcodes.cpp" opcode_registry)
 file(READ "${SOURCE_ROOT}/src/game/Server/Opcodes.h" opcode_header)
 file(READ "${SOURCE_ROOT}/src/game/WorldHandlers/SpellHandler.cpp" spell_handler)
 file(READ "${SOURCE_ROOT}/src/game/WorldHandlers/MovementHandler.cpp" movement_handler)
+file(READ "${SOURCE_ROOT}/src/game/WorldHandlers/MailHandler.cpp" mail_handler)
 file(READ "${SOURCE_ROOT}/src/game/Object/UnitCombat.cpp" unit_combat)
 file(READ "${SOURCE_ROOT}/src/game/Object/Unit.cpp" unit)
 file(READ "${SOURCE_ROOT}/src/game/Object/Unit.h" unit_header)
@@ -499,6 +500,16 @@ foreach(pairing IN ITEMS
         endif()
     endif()
 endforeach()
+
+# A failed mail take must still name the item. The retail equip-error body
+# carries a non-zero itemGuidLow with a zero itemCount, so replying with the
+# default 0 tells the client an item could not be taken without saying which.
+mop_strip_cxx_comments("${mail_handler}" mail_handler_code)
+if(NOT mail_handler_code MATCHES "MAIL_ERR_EQUIP_ERROR${ws}*,${ws}*msg${ws}*,${ws}*itemId")
+    message(FATAL_ERROR
+        "the equip-error mail reply no longer passes the item id, so a failed take "
+        "would not tell the client which item it was")
+endif()
 
 # CMSG_SET_ACTION_BUTTON is held: its body is proven but the handler's type
 # allowlist is narrower than the client's, so two families would be dropped.

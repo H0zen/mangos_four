@@ -645,7 +645,12 @@ void WorldSession::HandleMailTakeItem(WorldPacket& recv_data)
     }
     else
     {
-        pl->SendMailResult(mailId, MAIL_ITEM_TAKEN, MAIL_ERR_EQUIP_ERROR, msg);
+        // Retail echoes the item back even when the take FAILS: the fixtured
+        // equip-error body carries itemGuidLow 938134456 with itemCount 0. The
+        // default of 0 dropped it, so the client was told an item it had asked
+        // for could not be taken without being told which one. The count stays
+        // zero, because nothing moved.
+        pl->SendMailResult(mailId, MAIL_ITEM_TAKEN, MAIL_ERR_EQUIP_ERROR, msg, itemId, 0);
     }
 }
 /**
