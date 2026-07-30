@@ -1669,6 +1669,71 @@ static void test_totem_and_action_button_bodies()
     }
 }
 
+/// SMSG_SEND_MAIL_RESULT, pinned to real 18414 bodies.
+///
+/// Always 24 bytes, six little-endian uint32. The inherited sender wrote three
+/// of them and made the rest conditional, so it produced 12, 16 or 20 bytes in a
+/// different order.
+///
+/// The equip-error body is the one that discriminates the field order. Across
+/// every body of this build, a non-zero word at offset 4 occurs in exactly the
+/// bodies carrying 1 at offset 8 -- an equip error is only meaningful alongside
+/// MAIL_ERR_EQUIP_ERROR. Swap the two and 50 lands in a field whose range stops
+/// around 21, on a take that also reports success.
+static void test_send_mail_result_matches_retail_bodies()
+{
+    {   // An item taken successfully: action 2, one item, no error.
+        WorldPacket p(SMSG_SEND_MAIL_RESULT, 24);
+        MopCompactPackets::BuildSendMailResult(p, 1467794710u, 0, 0, 2, 965148878u, 1);
+        CHECK(BytesEqual(p, {
+            0x16, 0xC5, 0x7C, 0x57,                         // mailId
+            0x00, 0x00, 0x00, 0x00,                         // equipError
+            0x00, 0x00, 0x00, 0x00,                         // mailError
+            0x02, 0x00, 0x00, 0x00,                         // mailAction
+            0xCE, 0x00, 0x87, 0x39,                         // itemGuidLow
+            0x01, 0x00, 0x00, 0x00                          // itemCount
+        }));
+    }
+    {   // The discriminating body: equipError 50 with mailError 1, and the take
+        // reports no items because it failed.
+        WorldPacket p(SMSG_SEND_MAIL_RESULT, 24);
+        MopCompactPackets::BuildSendMailResult(p, 1442599846u, 50, 1, 2, 938134456u, 0);
+        CHECK(BytesEqual(p, {
+            0xA6, 0x53, 0xFC, 0x55,
+            0x32, 0x00, 0x00, 0x00,
+            0x01, 0x00, 0x00, 0x00,
+            0x02, 0x00, 0x00, 0x00,
+            0xB8, 0xCB, 0xEA, 0x37,
+            0x00, 0x00, 0x00, 0x00
+        }));
+    }
+    {   // A send that created no mail: everything zero but the error.
+        WorldPacket p(SMSG_SEND_MAIL_RESULT, 24);
+        MopCompactPackets::BuildSendMailResult(p, 0, 0, 2, 0, 0, 0);
+        CHECK(BytesEqual(p, {
+            0x00, 0x00, 0x00, 0x00,
+            0x00, 0x00, 0x00, 0x00,
+            0x02, 0x00, 0x00, 0x00,
+            0x00, 0x00, 0x00, 0x00,
+            0x00, 0x00, 0x00, 0x00,
+            0x00, 0x00, 0x00, 0x00
+        }));
+    }
+    {   // Returned to sender: action 4, no item fields.
+        WorldPacket p(SMSG_SEND_MAIL_RESULT, 24);
+        MopCompactPackets::BuildSendMailResult(p, 1467794710u, 0, 0, 4, 0, 0);
+        CHECK(p.size() == 24);                              // never conditional
+        CHECK(BytesEqual(p, {
+            0x16, 0xC5, 0x7C, 0x57,
+            0x00, 0x00, 0x00, 0x00,
+            0x00, 0x00, 0x00, 0x00,
+            0x04, 0x00, 0x00, 0x00,
+            0x00, 0x00, 0x00, 0x00,
+            0x00, 0x00, 0x00, 0x00
+        }));
+    }
+}
+
 static void test_opcode_values_are_framable()
 {
     CHECK(uint32_t(SMSG_ATTACKSWING_ERROR) == 0x11E1u);
@@ -1757,6 +1822,7 @@ int main(int /*argc*/, char** /*argv*/)
     test_pet_name_query_matches_retail_bodies();
     test_lfg_join_matches_retail_bodies();
     test_mail_family_matches_retail_bodies();
+    test_send_mail_result_matches_retail_bodies();
     test_totem_and_action_button_bodies();
     test_run_speed_differs_from_swim_interleave();
     test_swim_speed_guid_layouts();

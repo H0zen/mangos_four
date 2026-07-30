@@ -175,9 +175,9 @@
  *   TOTAL SMSG rows                   925
  *
  * SUBSYSTEM CONFIDENCE: high=365, low=221, medium=182, none=157
- * STATUS TOTALS: ACTIVE=477, DOC=435, DORMANT=608
- *   SMSG: ACTIVE=285, DOC=271, DORMANT=369
- *   CMSG: ACTIVE=192, DOC=164, DORMANT=239
+ * STATUS TOTALS: ACTIVE=479, DOC=435, DORMANT=606
+ *   SMSG: ACTIVE=286, DOC=271, DORMANT=368
+ *   CMSG: ACTIVE=193, DOC=164, DORMANT=238
  */
 
 // CAVEATS -- read before trusting any single row:
@@ -665,7 +665,7 @@ typedef uint16_t uint16;
  *  -- MailInfo.cpp (4) --
  *   SMSG_MAIL_QUERY_NEXT_TIME_RESULT               0x089B  ACTIVE
  *   SMSG_RECEIVED_MAIL                             0x182B  DORMANT
- *   SMSG_SEND_MAIL_RESULT                          0x1A9B  DORMANT
+ *   SMSG_SEND_MAIL_RESULT                          0x1A9B  ACTIVE
  *   SMSG_MAIL_LIST_RESULT                          0x1C0B  DORMANT
  *
  *  -- Missile_C.cpp (1) --
@@ -1753,7 +1753,7 @@ typedef uint16_t uint16;
  *   CMSG_GUILD_BANK_SWAP_ITEMS                     0x136A  DORMANT
  *   CMSG_PETITION_SHOW_SIGNATURES                  0x136B  DORMANT
  *   CMSG_QUEST_PUSH_RESULT                         0x1370  ACTIVE
- *   CMSG_MAIL_TAKE_ITEM                            0x1371  DORMANT
+ *   CMSG_MAIL_TAKE_ITEM                            0x1371  ACTIVE
  *   CMSG_GUILD_BANK_QUERY_TAB                      0x1372  DORMANT
  *   CMSG_BATTLEFIELD_PORT                          0x1379  DORMANT
  *   CMSG_UNKNOWN_0x140A                            0x140A  DOC

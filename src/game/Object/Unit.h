@@ -513,6 +513,36 @@ namespace MopCompactPackets
         type = uint8((packed >> 56) & 0xFF);
     }
 
+    /// SMSG_SEND_MAIL_RESULT (0x1A9B), the 18414 body.
+    ///
+    /// Six little-endian uint32, always 24 bytes. No bit packing, no mask, no
+    /// GUID obfuscation:
+    ///
+    ///     mailId, equipError, mailError, mailAction, itemGuidLow, itemCount
+    ///
+    /// The inherited sender wrote mailId, mailAction, mailError and then made
+    /// the last three CONDITIONAL, giving a 12, 16 or 20 byte body. Both the
+    /// order and the shape were wrong.
+    ///
+    /// The field order is discriminated rather than merely consistent. Across
+    /// all 1,317 bodies of this build, the set carrying a non-zero word at
+    /// offset 4 is EXACTLY the set carrying 1 at offset 8 -- three bodies -- which
+    /// reproduces the rule that an equip error is only meaningful when the mail
+    /// error is MAIL_ERR_EQUIP_ERROR. Swapping the two would put 50 in a field
+    /// whose range stops around 21. Likewise itemGuidLow and itemCount cannot
+    /// swap: a count of 965 million is not a count.
+    inline void BuildSendMailResult(WorldPacket& out, uint32 mailId,
+        uint32 equipError, uint32 mailError, uint32 mailAction,
+        uint32 itemGuidLow, uint32 itemCount)
+    {
+        out << uint32(mailId);
+        out << uint32(equipError);
+        out << uint32(mailError);
+        out << uint32(mailAction);
+        out << uint32(itemGuidLow);
+        out << uint32(itemCount);
+    }
+
     inline void BuildAttackStart(WorldPacket& out, uint64 attackerGuid,
         uint64 victimGuid)
     {

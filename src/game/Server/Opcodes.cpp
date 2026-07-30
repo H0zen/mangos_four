@@ -1253,6 +1253,13 @@ void InitializeOpcodes()
     // the others as each reply is converted and admitted.
     DefC(CMSG_MAIL_MARK_AS_READ, "CMSG_MAIL_MARK_AS_READ", STATUS_LOGGEDIN, PROCESS_THREADUNSAFE, &WorldSession::HandleMailMarkAsRead);
 
+    // CMSG_MAIL_TAKE_ITEM is promoted WITH its reply, which is the whole point of
+    // the pairing rule: the request commits an irreversible item and cash-on-
+    // delivery transaction, so it may only go live once the client can be told
+    // the outcome. SMSG_SEND_MAIL_RESULT is now the real 18414 body and admitted.
+    DefC(CMSG_MAIL_TAKE_ITEM, "CMSG_MAIL_TAKE_ITEM", STATUS_LOGGEDIN, PROCESS_THREADUNSAFE, &WorldSession::HandleMailTakeItem);
+    DefS(SMSG_SEND_MAIL_RESULT, "SMSG_SEND_MAIL_RESULT");
+
     // Both send no reply, so neither carries the unpaired-response hazard that
     // holds the rest of the mail family back. Each is a plain byte, a mask byte
     // and a packed value; the inherited readers took raw scalars.
