@@ -16,6 +16,7 @@ file(READ "${SOURCE_ROOT}/src/game/WorldHandlers/CharacterHandler.cpp" character
 file(READ "${SOURCE_ROOT}/src/game/Server/Opcodes.cpp" opcode_registry)
 file(READ "${SOURCE_ROOT}/src/game/Server/Opcodes.h" opcode_header)
 file(READ "${SOURCE_ROOT}/src/game/WorldHandlers/SpellHandler.cpp" spell_handler)
+file(READ "${SOURCE_ROOT}/src/game/WorldHandlers/MovementHandler.cpp" movement_handler)
 file(READ "${SOURCE_ROOT}/src/game/Object/UnitCombat.cpp" unit_combat)
 file(READ "${SOURCE_ROOT}/src/game/Object/Unit.cpp" unit)
 file(READ "${SOURCE_ROOT}/src/game/Object/Unit.h" unit_header)
@@ -506,6 +507,21 @@ if(registry_code MATCHES "DefC${ws}*[(]${ws}*CMSG_SET_ACTION_BUTTON${ws}*,")
         "CMSG_SET_ACTION_BUTTON is registered while its handler rejects the client's "
         "0x10 and 0x50 type families; recover those before promoting it")
 endif()
+
+# A registered speed acknowledgement must have a live arm in the shared handler.
+# Registering one whose case is commented out parses the body and then falls to
+# "Unknown move type opcode", so the forced-change bookkeeping never runs and the
+# packet is silently discarded -- indistinguishable from not registering it.
+mop_strip_cxx_comments("${movement_handler}" movement_handler_code)
+foreach(ack IN ITEMS CMSG_FORCE_RUN_BACK_SPEED_CHANGE_ACK CMSG_FORCE_SWIM_SPEED_CHANGE_ACK)
+    if(registry_code MATCHES "DefC${ws}*[(]${ws}*${ack}${ws}*,")
+        if(NOT movement_handler_code MATCHES "case${ws}+${ack}${ws}*:")
+            message(FATAL_ERROR
+                "${ack} is registered but its arm in HandleForceSpeedChangeAckOpcodes is "
+                "absent or commented out, so the acknowledgement would be parsed and dropped")
+        endif()
+    endif()
+endforeach()
 
 # The totem destroy request names a totem as well as a slot, and the handler must
 # compare them or a stale request can destroy a replacement in the same slot.
