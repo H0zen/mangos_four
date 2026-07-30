@@ -208,17 +208,9 @@ void ReputationMgr::SendForceReactions()
  */
 void ReputationMgr::SendState(FactionState const* faction, bool anyRankIncreased)
 {
-    uint32 count = 1;
-
-    WorldPacket data(SMSG_SET_FACTION_STANDING, 17);
-    data << float(0);                                       // refer-a-friend bonus reputation
-    data << uint8(anyRankIncreased ? 1 : 0);                // display visual effect
-
-    size_t p_count = data.wpos();
-    data << (uint32) count;                                 // placeholder
-
-    data << (uint32) faction->ReputationListID;
-    data << (uint32) faction->Standing;
+    std::vector<MopReputationPackets::Standing> standings;
+    standings.reserve(m_factions.size());
+    standings.push_back({ uint32(faction->Standing), uint32(faction->ReputationListID) });
 
     for (FactionStateList::iterator itr = m_factions.begin(); itr != m_factions.end(); ++itr)
     {
@@ -227,16 +219,14 @@ void ReputationMgr::SendState(FactionState const* faction, bool anyRankIncreased
         {
             subFaction.needSend = false;
             if (subFaction.ReputationListID != faction->ReputationListID)
-            {
-                data << uint32(subFaction.ReputationListID);
-                data << uint32(subFaction.Standing);
-
-                ++count;
-            }
+                standings.push_back({ uint32(subFaction.Standing),
+                    uint32(subFaction.ReputationListID) });
         }
     }
 
-    data.put<uint32>(p_count, count);
+    WorldPacket data;
+    MopReputationPackets::BuildSetFactionStanding(data, anyRankIncreased, standings,
+        0.0f, 0.0f);
     m_player->SendDirectMessage(&data);
 }
 

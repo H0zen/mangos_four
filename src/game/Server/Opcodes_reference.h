@@ -175,8 +175,8 @@
  *   TOTAL SMSG rows                   925
  *
  * SUBSYSTEM CONFIDENCE: high=365, low=221, medium=182, none=157
- * STATUS TOTALS: ACTIVE=503, DOC=435, DORMANT=582
- *   SMSG: ACTIVE=300, DOC=271, DORMANT=354
+ * STATUS TOTALS: ACTIVE=506, DOC=435, DORMANT=579
+ *   SMSG: ACTIVE=303, DOC=271, DORMANT=351
  *   CMSG: ACTIVE=203, DOC=164, DORMANT=228
  */
 
@@ -657,7 +657,7 @@ typedef uint16_t uint16;
  *   SMSG_WEEKLY_RESET_CURRENCY                     0x023E  ACTIVE   [low-conf]  server-binding=SMSG_WEEKLY_RESET_CURRENCIES
  *   SMSG_UNKNOWN_0x049A                            0x049A  DOC      [medium-conf]
  *   SMSG_UNKNOWN_0x0C13                            0x0C13  DOC      [medium-conf]
- *   SMSG_SET_CURRENCY_WEEK_LIMIT                   0x0E2A  DORMANT  [low-conf]
+ *   SMSG_SET_CURRENCY_WEEK_LIMIT                   0x0E2A  ACTIVE   [low-conf]
  *   SMSG_UPDATE_CURRENCY                           0x129E  ACTIVE   [low-conf]
  *   SMSG_SETUP_CURRENCY                            0x1A8B  ACTIVE   [low-conf]
  *   SMSG_UNKNOWN_0x1E13                            0x1E13  DOC      [low-conf]
@@ -876,9 +876,9 @@ typedef uint16_t uint16;
  *   SMSG_UNKNOWN_0x0A0B                            0x0A0B  DOC
  *   SMSG_INITIALIZE_FACTIONS                       0x0AAA  ACTIVE
  *   SMSG_SET_FACTION_ATWAR                         0x0C9B  DORMANT
- *   SMSG_SET_FACTION_STANDING                      0x10AA  DORMANT
+ *   SMSG_SET_FACTION_STANDING                      0x10AA  ACTIVE
  *   SMSG_UNKNOWN_0x1C2B                            0x1C2B  DOC
- *   SMSG_SET_FACTION_VISIBLE                       0x1E8E  DORMANT
+ *   SMSG_SET_FACTION_VISIBLE                       0x1E8E  ACTIVE
  *
  *  -- ResearchFrame.cpp (9) --
  *   SMSG_UNKNOWN_0x069A                            0x069A  DOC      [low-conf]

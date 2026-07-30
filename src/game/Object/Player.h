@@ -720,6 +720,32 @@ namespace MopBattlePetPackets
 
 namespace MopReputationPackets
 {
+    struct Standing
+    {
+        uint32 standing;
+        uint32 reputationIndex;
+    };
+
+    inline void BuildSetFactionStanding(WorldPacket& out,
+        bool showVisualEffect, std::vector<Standing> const& standings,
+        float bonusA, float bonusB)
+    {
+        // Wow.exe 18414 reader sub_73267C fixes the bit widths and field order;
+        // captured bodies cover counts 1, 2 and 7. Every capture sets the
+        // visual bit and carries two zero floats, so the false/nonzero cases
+        // are complementary serializer fixtures rather than corpus claims.
+        out.Initialize(SMSG_SET_FACTION_STANDING,
+            11 + standings.size() * 2 * sizeof(uint32));
+        out.WriteBit(showVisualEffect);
+        out.WriteBits(uint32(standings.size()), 21);
+        out.FlushBits();
+
+        for (Standing const& standing : standings)
+            out << standing.standing << standing.reputationIndex;
+
+        out << bonusA << bonusB;
+    }
+
     struct ForcedReaction
     {
         uint32 faction;

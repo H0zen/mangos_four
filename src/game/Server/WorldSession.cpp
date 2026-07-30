@@ -301,6 +301,8 @@ static bool IsEnterWorldConverted(uint16 opcode)
         case SMSG_MOTD:                            // 4-bit count, 7-bit lengths, raw strings; sub_75B75A
         case SMSG_CORPSE_RECLAIM_DELAY:            // no-delay bit plus optional uint32 milliseconds; sub_6D7781
         case SMSG_SET_FORCED_REACTIONS:            // 2-bit count plus uint32 pairs; sub_72C708
+        case SMSG_SET_FACTION_STANDING:            // 1-bit visual flag, 21-bit count, standing/index pairs, two floats
+        case SMSG_SET_FACTION_VISIBLE:             // one uint32 reputation-list index
         case SMSG_INIT_WORLD_STATES:                // map, area, zone, 21-bit count, uint32 pairs; sub_732740
         case SMSG_UPDATE_WORLD_STATE:              // hidden bit, value, field; sub_6E8FA4 -> sub_CC00A4
         case SMSG_ITEM_TIME_UPDATE:                  // packed item GUID then uint32 duration; sub_6F06A8
@@ -400,6 +402,7 @@ static bool IsEnterWorldConverted(uint16 opcode)
         case SMSG_UPDATE_CURRENCY:                 // MopCurrencyPackets::BuildUpdateCurrency
         case SMSG_SETUP_CURRENCY:                  // MopCurrencyPackets::BuildSetupCurrency
         case SMSG_WEEKLY_RESET_CURRENCIES:         // Empty 18414 weekly-counter reset
+        case SMSG_SET_CURRENCY_WEEK_LIMIT:         // uint32 week limit, then uint32 currency ID
         case SMSG_SPELL_EXECUTE_LOG:               // MopCombatLogPackets::BuildSpellExecuteLog
         case SMSG_SPELL_PERIODIC_AURA_LOG:         // MopCombatLogPackets::BuildPeriodicAuraLog
         case SMSG_SPELLDISPELLOG:                  // MopCombatLogPackets::BuildDispelLog
