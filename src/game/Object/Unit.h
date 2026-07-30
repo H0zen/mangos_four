@@ -1006,6 +1006,67 @@ namespace MopCompactPackets
         for (uint8 index : byteOrder) { out.WriteByteSeq(SwimSpeedGuidByte(moverGuid, index)); }
     }
 
+    /// Gravity. Readers sub_6D75A9 (0x159F), sub_C8DD60 (0x0A27),
+    /// sub_C8D6DA (0x0845) and sub_C8AAE3 (0x0865). The first sits outside the
+    /// C8xxxx reader cluster, which looked like a routing error and is not --
+    /// the 64-bit client places it out-of-cluster too.
+    ///
+    /// The layouts are settled. What is NOT settled is the SENSE: which opcode
+    /// the client treats as gravity off. There are no "gravity" strings in either
+    /// binary, neither reader carries a boolean, and the post-handlers are
+    /// generic obfuscated trampolines, so it is not decidable from the client.
+    /// Only a live test settles it.
+    ///
+    /// What IS decidable, and was wrong, is internal consistency: this tree had
+    /// Creature::SetLevitate mapping levitate-on to GRAVITY_DISABLE while
+    /// Unit::BuildMoveLevitatePacket mapped it to GRAVITY_ENABLE. Whichever
+    /// opcode truly means gravity off, both halves must agree or the mover and
+    /// the observers are told opposite things about the same event.
+    inline void BuildMoveGravityDisable(WorldPacket& out, uint64 moverGuid, uint32 counter)
+    {
+        uint8 const maskOrder[] = { 6, 1, 3, 7, 4, 2, 5, 0 };
+        uint8 const beforeCounter[] = { 5, 2, 1, 6, 0 };
+        uint8 const afterCounter[] = { 3, 4, 7 };
+
+        for (uint8 index : maskOrder) { out.WriteBit(SwimSpeedGuidByte(moverGuid, index) != 0); }
+        out.FlushBits();
+        for (uint8 index : beforeCounter) { out.WriteByteSeq(SwimSpeedGuidByte(moverGuid, index)); }
+        out << uint32(counter);
+        for (uint8 index : afterCounter) { out.WriteByteSeq(SwimSpeedGuidByte(moverGuid, index)); }
+    }
+
+    inline void BuildMoveGravityEnable(WorldPacket& out, uint64 moverGuid, uint32 counter)
+    {
+        uint8 const maskOrder[] = { 3, 0, 7, 1, 5, 2, 6, 4 };
+        uint8 const beforeCounter[] = { 3, 2, 1, 7, 6, 0, 4 };
+
+        for (uint8 index : maskOrder) { out.WriteBit(SwimSpeedGuidByte(moverGuid, index) != 0); }
+        out.FlushBits();
+        for (uint8 index : beforeCounter) { out.WriteByteSeq(SwimSpeedGuidByte(moverGuid, index)); }
+        out << uint32(counter);
+        out.WriteByteSeq(SwimSpeedGuidByte(moverGuid, 5));
+    }
+
+    inline void BuildSplineMoveGravityDisable(WorldPacket& out, uint64 moverGuid)
+    {
+        uint8 const maskOrder[] = { 1, 7, 4, 5, 6, 0, 2, 3 };
+        uint8 const byteOrder[] = { 3, 4, 5, 6, 0, 1, 2, 7 };
+
+        for (uint8 index : maskOrder) { out.WriteBit(SwimSpeedGuidByte(moverGuid, index) != 0); }
+        out.FlushBits();
+        for (uint8 index : byteOrder) { out.WriteByteSeq(SwimSpeedGuidByte(moverGuid, index)); }
+    }
+
+    inline void BuildSplineMoveGravityEnable(WorldPacket& out, uint64 moverGuid)
+    {
+        uint8 const maskOrder[] = { 5, 7, 4, 2, 3, 6, 1, 0 };
+        uint8 const byteOrder[] = { 6, 3, 2, 4, 1, 5, 7, 0 };
+
+        for (uint8 index : maskOrder) { out.WriteBit(SwimSpeedGuidByte(moverGuid, index) != 0); }
+        out.FlushBits();
+        for (uint8 index : byteOrder) { out.WriteByteSeq(SwimSpeedGuidByte(moverGuid, index)); }
+    }
+
     /// The observer halves. No counter at all -- the mask and the bytes are the
     /// whole body. Landing these with the mover pair is the point: admitting one
     /// side alone is what left four other movement states telling everyone except

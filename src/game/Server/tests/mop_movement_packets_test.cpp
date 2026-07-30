@@ -1706,6 +1706,77 @@ static void test_root_halves_and_scalars()
     CHECK(std::memcmp(splineRoot.contents(), splineUnroot.contents(), 9) != 0);
 }
 
+/// The gravity family against real 18414 bodies.
+///
+/// Three masks for DISABLE and two for ENABLE, so the split around the counter
+/// is exercised rather than just its presence -- DISABLE puts five bytes before
+/// and three after, ENABLE seven before and one after.
+///
+/// These fixtures pin the LAYOUTS, which are settled. They say nothing about the
+/// SENSE -- which opcode the client treats as gravity off -- because that is not
+/// decidable from the client at all: no gravity strings in either binary,
+/// no boolean in the readers, generic obfuscated post-handlers. A live test
+/// settles that, and the tree at least now uses one convention on both halves.
+static void test_gravity_family_retail_bodies()
+{
+    struct Case { uint64 guid; uint32 counter; uint8 const* body; size_t size; };
+
+    static uint8 const dis12[] = { 0xDF, 0xED, 0xAE, 0xBC, 0x51, 0xF0, 0x0C, 0x00, 0x00, 0x00, 0x89, 0xF0 };
+    static uint8 const dis11[] = { 0xF5, 0xB3, 0x23, 0x81, 0x07, 0x54, 0x00, 0x00, 0x00, 0x05, 0x00 };
+    static uint8 const dis10[] = { 0x75, 0x3D, 0xC9, 0xE9, 0x77, 0x00, 0x00, 0x00, 0x04, 0x05 };
+    static uint8 const ena10[] = { 0xF4, 0x04, 0x3D, 0xC9, 0x05, 0xE9, 0xE0, 0x00, 0x00, 0x00 };
+    static uint8 const ena12[] = { 0x7F, 0x6C, 0x46, 0xF0, 0x51, 0x8C, 0x6C, 0x0A, 0x00, 0x00, 0x00, 0xD9 };
+
+    Case const disables[] = {
+        { UINT64_C(0xF150EC8800AFBDF1),  12, dis12, sizeof(dis12) },
+        { UINT64_C(0x0180000004B22206),  84, dis11, sizeof(dis11) },
+        { UINT64_C(0x04000000053CC8E8), 119, dis10, sizeof(dis10) },
+    };
+    for (Case const& c : disables)
+    {
+        WorldPacket packet(SMSG_MOVE_GRAVITY_DISABLE, 13);
+        MopCompactPackets::BuildMoveGravityDisable(packet, c.guid, c.counter);
+        CHECK(packet.size() == c.size);
+        if (packet.size() == c.size)
+        {
+            CHECK(std::memcmp(packet.contents(), c.body, c.size) == 0);
+        }
+    }
+
+    Case const enables[] = {
+        { UINT64_C(0x04000000053CC8E8), 224, ena10, sizeof(ena10) },
+        { UINT64_C(0xF150D86D006D478D),  10, ena12, sizeof(ena12) },
+    };
+    for (Case const& c : enables)
+    {
+        WorldPacket packet(SMSG_MOVE_GRAVITY_ENABLE, 13);
+        MopCompactPackets::BuildMoveGravityEnable(packet, c.guid, c.counter);
+        CHECK(packet.size() == c.size);
+        if (packet.size() == c.size)
+        {
+            CHECK(std::memcmp(packet.contents(), c.body, c.size) == 0);
+        }
+    }
+
+    // The two mover halves and the two observer halves must each differ.
+    uint64 const guid = UINT64_C(0x8070605040302010);
+    WorldPacket md(SMSG_MOVE_GRAVITY_DISABLE, 13);
+    MopCompactPackets::BuildMoveGravityDisable(md, guid, 7);
+    WorldPacket me(SMSG_MOVE_GRAVITY_ENABLE, 13);
+    MopCompactPackets::BuildMoveGravityEnable(me, guid, 7);
+    CHECK(md.size() == 13);
+    CHECK(me.size() == 13);
+    CHECK(std::memcmp(md.contents(), me.contents(), 13) != 0);
+
+    WorldPacket sd(SMSG_SPLINE_MOVE_GRAVITY_DISABLE, 9);
+    MopCompactPackets::BuildSplineMoveGravityDisable(sd, guid);
+    WorldPacket se(SMSG_SPLINE_MOVE_GRAVITY_ENABLE, 9);
+    MopCompactPackets::BuildSplineMoveGravityEnable(se, guid);
+    CHECK(sd.size() == 9);          // observers get no scalar
+    CHECK(se.size() == 9);
+    CHECK(std::memcmp(sd.contents(), se.contents(), 9) != 0);
+}
+
 int main(int, char**)
 {
     test_thirteen_inbound_fixtures_and_exact_relay();
@@ -1730,6 +1801,7 @@ int main(int, char**)
     test_hover_mover_halves_differ();
     test_root_family_retail_bodies();
     test_root_halves_and_scalars();
+    test_gravity_family_retail_bodies();
     test_normal_fall_counter_offset_moves();
     test_hostile_counts_rejected();
     test_opcode_values_are_framable();

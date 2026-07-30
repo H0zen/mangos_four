@@ -110,13 +110,11 @@ void Creature::SetLevitate(bool enable)
         WorldPacket data(enable ? SMSG_SPLINE_MOVE_GRAVITY_DISABLE : SMSG_SPLINE_MOVE_GRAVITY_ENABLE, 9);
         if (enable)
         {
-            data.WriteGuidMask<7, 3, 4, 2, 5, 1, 0, 6>(GetObjectGuid());
-            data.WriteGuidBytes<7, 1, 3, 4, 6, 2, 5, 0>(GetObjectGuid());
+            MopCompactPackets::BuildSplineMoveGravityDisable(data, GetObjectGuid().GetRawValue());
         }
         else
         {
-            data.WriteGuidMask<5, 4, 7, 1, 3, 6, 2, 0>(GetObjectGuid());
-            data.WriteGuidBytes<7, 3, 4, 2, 1, 6, 0, 5>(GetObjectGuid());
+            MopCompactPackets::BuildSplineMoveGravityEnable(data, GetObjectGuid().GetRawValue());
         }
 
         SendMessageToSet(&data, true);

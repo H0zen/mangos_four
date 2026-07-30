@@ -55,6 +55,9 @@ elseif(MUTATION STREQUAL "speed_constant_counter")
     string(REPLACE "MopCompactPackets::BuildMoveSetRunSpeed(data, guid.GetRawValue(), NextMovementCounter(), GetSpeed(mtype));"
         "MopCompactPackets::BuildMoveSetRunSpeed(data, guid.GetRawValue(), 0, GetSpeed(mtype));"
         UNIT_SPEED_SOURCE "${UNIT_SPEED_SOURCE}")
+elseif(MUTATION STREQUAL "gravity_sense_disagrees")
+    string(REPLACE "        data->Initialize(SMSG_MOVE_GRAVITY_DISABLE, 13);" "        data->Initialize(SMSG_MOVE_GRAVITY_ENABLE, 13);"
+        UNIT_SOURCE_EARLY "${UNIT_SOURCE_EARLY}")
 elseif(MUTATION STREQUAL "player_setter_skips_server_state")
     string(REPLACE "        m_movementInfo.AddMovementFlag(MOVEFLAG_CAN_FLY);" ""
         PLAYER_SOURCE "${PLAYER_SOURCE}")
@@ -80,7 +83,10 @@ elseif(MUTATION STREQUAL "collision_height_constant_counter")
     string(REPLACE "data << uint32(NextMovementCounter());" "data << uint32(sWorld.GetGameTime());"
         UNIT_SOURCE_EARLY "${UNIT_SOURCE_EARLY}")
 elseif(MUTATION STREQUAL "builder_discards_counter")
-    string(REPLACE "*data << uint32(value);" "*data << uint32(0);"
+    # Every builder now delegates, so no direct "*data << uint32(value)" remains
+    # -- mutating that string became a no-op and the mutation stopped biting.
+    # Discard the counter at the delegation instead.
+    string(REPLACE "GetObjectGuid().GetRawValue(), value)" "GetObjectGuid().GetRawValue(), 0)"
         UNIT_SOURCE_EARLY "${UNIT_SOURCE_EARLY}")
 elseif(MUTATION STREQUAL "counter_getter_not_advancer")
     string(REPLACE "BuildForceMoveRootPacket(&data, enable, NextMovementCounter());"
@@ -292,6 +298,71 @@ if(ROOT_BUILDER EQUAL -1 OR ROOT_BUILDER_OFF EQUAL -1)
     message(FATAL_ERROR "Unit::BuildForceMoveRootPacket must use the reader-derived builders, both branches")
 endif()
 
+# --- Gravity: the two halves must use ONE convention ------------------------
+#
+# The absolute sense is undecidable from the client, so this does not assert
+# which opcode means gravity-off. It asserts the thing that IS decidable and was
+# wrong: Creature::SetLevitate mapped levitate-on to DISABLE while
+# Unit::BuildMoveLevitatePacket mapped it to ENABLE, so the mover and the
+# observers were told opposite things about one event.
+
+string(FIND "${PLAYER_SOURCE}" "void Player::SetLevitate(bool enable)" LEV_START)
+if(LEV_START EQUAL -1)
+    message(FATAL_ERROR "Could not locate Player::SetLevitate")
+endif()
+math(EXPR LEV_ROOM "${PLAYER_LENGTH} - ${LEV_START}")
+if(LEV_ROOM GREATER 3000)
+    set(LEV_ROOM 3000)
+endif()
+string(SUBSTRING "${PLAYER_SOURCE}" ${LEV_START} ${LEV_ROOM} LEV_BODY)
+
+string(FIND "${LEV_BODY}" "enable ? SMSG_SPLINE_MOVE_GRAVITY_DISABLE : SMSG_SPLINE_MOVE_GRAVITY_ENABLE" LEV_OBS_SENSE)
+if(LEV_OBS_SENSE EQUAL -1)
+    message(FATAL_ERROR "Player::SetLevitate must send the observer half with levitate-on = DISABLE")
+endif()
+
+string(FIND "${CREATURE_SOURCE}" "enable ? SMSG_SPLINE_MOVE_GRAVITY_DISABLE : SMSG_SPLINE_MOVE_GRAVITY_ENABLE" CR_LEV_SENSE)
+if(CR_LEV_SENSE EQUAL -1)
+    message(FATAL_ERROR "Creature::SetLevitate must use the same convention as the mover path")
+endif()
+
+# The mover path must agree: apply selects DISABLE.
+string(FIND "${UNIT_SOURCE_EARLY}" "void Unit::BuildMoveLevitatePacket" LEV_BUILD)
+if(LEV_BUILD EQUAL -1)
+    message(FATAL_ERROR "Could not locate Unit::BuildMoveLevitatePacket")
+endif()
+# Compute the length here: UNIT_EARLY_LENGTH is set further down the file, so
+# relying on it at this point silently yields an empty string and a negative
+# substring bound.
+string(LENGTH "${UNIT_SOURCE_EARLY}" LEV_UNIT_LENGTH)
+math(EXPR LEV_BUILD_ROOM "${LEV_UNIT_LENGTH} - ${LEV_BUILD}")
+if(LEV_BUILD_ROOM GREATER 1600)
+    set(LEV_BUILD_ROOM 1600)
+endif()
+string(SUBSTRING "${UNIT_SOURCE_EARLY}" ${LEV_BUILD} ${LEV_BUILD_ROOM} LEV_BUILD_BODY)
+
+# Search for the NEXT function past this one's own signature. Searching from 0
+# finds this function's signature at position 0 and truncates the body to
+# nothing, which reads as "the opcodes are missing" -- a guard failing for its
+# own bug rather than the code's.
+string(SUBSTRING "${LEV_BUILD_BODY}" 40 -1 LEV_BUILD_TAIL)
+string(FIND "${LEV_BUILD_TAIL}" "void Unit::" LEV_BUILD_NEXT)
+if(NOT LEV_BUILD_NEXT EQUAL -1)
+    math(EXPR LEV_BUILD_NEXT "${LEV_BUILD_NEXT} + 40")
+    string(SUBSTRING "${LEV_BUILD_BODY}" 0 ${LEV_BUILD_NEXT} LEV_BUILD_BODY)
+endif()
+string(FIND "${LEV_BUILD_BODY}" "if (apply)" LEV_APPLY)
+string(FIND "${LEV_BUILD_BODY}" "SMSG_MOVE_GRAVITY_DISABLE" LEV_DISABLE)
+string(FIND "${LEV_BUILD_BODY}" "SMSG_MOVE_GRAVITY_ENABLE" LEV_ENABLE)
+if(LEV_APPLY EQUAL -1 OR LEV_DISABLE EQUAL -1 OR LEV_ENABLE EQUAL -1)
+    message(FATAL_ERROR "Unit::BuildMoveLevitatePacket must select between both gravity opcodes")
+endif()
+if(NOT LEV_DISABLE LESS LEV_ENABLE)
+    message(FATAL_ERROR
+        "Unit::BuildMoveLevitatePacket must select DISABLE on apply, matching the "
+        "observer path -- the two halves disagreeing is the defect this guards")
+endif()
+
 # --- Creature::SetCanFly is the same pair seen from the other side ----------
 
 string(FIND "${CREATURE_SOURCE}" "void Creature::SetCanFly(bool enable)" CR_CANFLY_START)
@@ -342,7 +413,11 @@ foreach(GATED
         SMSG_FORCE_MOVE_ROOT
         SMSG_FORCE_MOVE_UNROOT
         SMSG_SPLINE_MOVE_ROOT
-        SMSG_SPLINE_MOVE_UNROOT)
+        SMSG_SPLINE_MOVE_UNROOT
+        SMSG_MOVE_GRAVITY_DISABLE
+        SMSG_MOVE_GRAVITY_ENABLE
+        SMSG_SPLINE_MOVE_GRAVITY_DISABLE
+        SMSG_SPLINE_MOVE_GRAVITY_ENABLE)
     string(FIND "${SESSION_SOURCE}" "case ${GATED}:" ADMITTED)
     if(ADMITTED EQUAL -1)
         message(FATAL_ERROR

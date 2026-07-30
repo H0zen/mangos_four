@@ -208,6 +208,23 @@ void Player::SetLevitate(bool enable)
     WorldPacket data;
     BuildMoveLevitatePacket(&data, enable, NextMovementCounter());
     GetSession()->SendPacket(&data);
+
+    if (!IsInWorld())
+    {
+        return;
+    }
+
+    WorldPacket spline(enable ? SMSG_SPLINE_MOVE_GRAVITY_DISABLE : SMSG_SPLINE_MOVE_GRAVITY_ENABLE, 9);
+    if (enable)
+    {
+        MopCompactPackets::BuildSplineMoveGravityDisable(spline, GetObjectGuid().GetRawValue());
+    }
+    else
+    {
+        MopCompactPackets::BuildSplineMoveGravityEnable(spline, GetObjectGuid().GetRawValue());
+    }
+
+    SendMessageToSet(&spline, false);
 }
 
 /**

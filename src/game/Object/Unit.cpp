@@ -6863,23 +6863,22 @@ void Unit::BuildMoveHoverPacket(WorldPacket* data, bool apply, uint32 value)
 
 void Unit::BuildMoveLevitatePacket(WorldPacket* data, bool apply, uint32 value)
 {
-    ObjectGuid guid = GetObjectGuid();
-
+    // apply == levitating == gravity does NOT act on this unit, so the enable
+    // flag selects the DISABLE opcode. This file had it the other way round
+    // while Creature::SetLevitate had it this way, so mover and observers were
+    // told opposite things about the same event. The absolute sense -- which
+    // opcode the client treats as gravity off -- is not decidable from the
+    // binary and needs a live test; the two halves agreeing is decidable and is
+    // fixed here.
     if (apply)
     {
-        data->Initialize(SMSG_MOVE_GRAVITY_ENABLE);
-        data->WriteGuidMask<1, 4, 7, 5, 2, 0, 3, 6>(GetObjectGuid());
-        data->WriteGuidBytes<3>(GetObjectGuid());
-        *data << uint32(value);
-        data->WriteGuidBytes<7, 6, 4, 0, 1, 5, 2>(GetObjectGuid());
+        data->Initialize(SMSG_MOVE_GRAVITY_DISABLE, 13);
+        MopCompactPackets::BuildMoveGravityDisable(*data, GetObjectGuid().GetRawValue(), value);
     }
     else
     {
-        data->Initialize(SMSG_MOVE_GRAVITY_DISABLE);
-        data->WriteGuidMask<0, 1, 5, 7, 6, 4, 3, 2>(GetObjectGuid());
-        data->WriteGuidBytes<7, 2, 0>(GetObjectGuid());
-        *data << uint32(value);
-        data->WriteGuidBytes<5, 1, 3, 4, 6>(GetObjectGuid());
+        data->Initialize(SMSG_MOVE_GRAVITY_ENABLE, 13);
+        MopCompactPackets::BuildMoveGravityEnable(*data, GetObjectGuid().GetRawValue(), value);
     }
 }
 
