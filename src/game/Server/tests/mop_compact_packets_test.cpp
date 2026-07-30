@@ -1719,7 +1719,8 @@ static void test_send_mail_result_matches_retail_bodies()
             0x00, 0x00, 0x00, 0x00
         }));
     }
-    {   // Returned to sender: action 4, no item fields.
+    {   // Deleted: action 4 is MAIL_DELETED, not MAIL_RETURNED_TO_SENDER, which
+        // is 3. Either way the item fields are zero but still present.
         WorldPacket p(SMSG_SEND_MAIL_RESULT, 24);
         MopCompactPackets::BuildSendMailResult(p, 1467794710u, 0, 0, 4, 0, 0);
         CHECK(p.size() == 24);                              // never conditional

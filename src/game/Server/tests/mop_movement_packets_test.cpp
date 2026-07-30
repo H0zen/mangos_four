@@ -743,10 +743,13 @@ static void test_force_run_back_speed_change_ack_fixture()
 ///
 /// The reference list above was derived by mapping the production sequence, so
 /// the two would agree even if the production sequence were wrong. A review
-/// raised exactly that. This body comes from the wire instead: it must consume
-/// to the last byte, and the speed and mover that fall out must be the ones the
-/// capture recorded. A wrong element anywhere shifts the bit cursor and either
-/// over-reads or leaves a remainder.
+/// raised exactly that. This body comes from the wire instead: capture-000004
+/// sequence 23268, build 18414, catalogue 2BE10C89.
+///
+/// It must consume to the last byte and yield the speed, mover and position the
+/// capture recorded. That catches any element that changes the bit cursor, but
+/// NOT every possible error: two same-width fields could still swap and consume
+/// exactly, which is why the position is asserted rather than the GUID alone.
 static void test_force_run_back_speed_change_ack_retail_body()
 {
     static uint8 const body[] = {
@@ -767,6 +770,14 @@ static void test_force_run_back_speed_change_ack_retail_body()
     CHECK(speed == 2.25f);
     CHECK(packet.rpos() == packet.size());                  // consumes exactly
     CHECK(info.GetGuid().GetRawValue() == UINT64_C(0x04000000053CC8E8));
+
+    // The three coordinates are the same width, so a swap among them would still
+    // consume exactly and preserve the GUID. Pin each individually, and note the
+    // wire order for this opcode is Y, X, Z -- not the order the fields are named
+    // in, which is exactly the kind of thing a length check cannot catch.
+    CHECK(info.GetPos()->y == 2268.258056640625f);          // wire offset 8
+    CHECK(info.GetPos()->x == 6172.76904296875f);           // wire offset 12
+    CHECK(info.GetPos()->z == 501.95819091796875f);         // wire offset 16
 }
 
 /// The two acks must NOT share a sequence. They agree on the leading speed and

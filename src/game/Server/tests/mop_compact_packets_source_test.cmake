@@ -512,11 +512,25 @@ endif()
 # Registering one whose case is commented out parses the body and then falls to
 # "Unknown move type opcode", so the forced-change bookkeeping never runs and the
 # packet is silently discarded -- indistinguishable from not registering it.
+#
+# The list is the COMPLETE family, not just the ones registered today, so a future
+# registration cannot escape the rule by being absent from it. The search is
+# scoped to HandleForceSpeedChangeAckOpcodes rather than the whole file, so an
+# unrelated case elsewhere cannot satisfy it.
 mop_strip_cxx_comments("${movement_handler}" movement_handler_code)
-foreach(ack IN ITEMS CMSG_FORCE_RUN_BACK_SPEED_CHANGE_ACK CMSG_FORCE_SWIM_SPEED_CHANGE_ACK
-                     CMSG_FORCE_SWIM_BACK_SPEED_CHANGE_ACK CMSG_FORCE_FLIGHT_BACK_SPEED_CHANGE_ACK)
+string(FIND "${movement_handler_code}" "HandleForceSpeedChangeAckOpcodes" ack_handler_at)
+if(ack_handler_at LESS 0)
+    message(FATAL_ERROR "HandleForceSpeedChangeAckOpcodes not found; the arm guard cannot be scoped")
+endif()
+string(SUBSTRING "${movement_handler_code}" ${ack_handler_at} 4000 ack_handler_body)
+foreach(ack IN ITEMS
+        CMSG_FORCE_WALK_SPEED_CHANGE_ACK CMSG_FORCE_RUN_SPEED_CHANGE_ACK
+        CMSG_FORCE_RUN_BACK_SPEED_CHANGE_ACK CMSG_FORCE_SWIM_SPEED_CHANGE_ACK
+        CMSG_FORCE_SWIM_BACK_SPEED_CHANGE_ACK CMSG_FORCE_TURN_RATE_CHANGE_ACK
+        CMSG_FORCE_FLIGHT_SPEED_CHANGE_ACK CMSG_FORCE_FLIGHT_BACK_SPEED_CHANGE_ACK
+        CMSG_FORCE_PITCH_RATE_CHANGE_ACK)
     if(registry_code MATCHES "DefC${ws}*[(]${ws}*${ack}${ws}*,")
-        if(NOT movement_handler_code MATCHES "case${ws}+${ack}${ws}*:")
+        if(NOT ack_handler_body MATCHES "case${ws}+${ack}${ws}*:")
             message(FATAL_ERROR
                 "${ack} is registered but its arm in HandleForceSpeedChangeAckOpcodes is "
                 "absent or commented out, so the acknowledgement would be parsed and dropped")
