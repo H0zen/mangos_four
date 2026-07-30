@@ -55,6 +55,9 @@ elseif(MUTATION STREQUAL "speed_constant_counter")
     string(REPLACE "MopCompactPackets::BuildMoveSetRunSpeed(data, guid.GetRawValue(), NextMovementCounter(), GetSpeed(mtype));"
         "MopCompactPackets::BuildMoveSetRunSpeed(data, guid.GetRawValue(), 0, GetSpeed(mtype));"
         UNIT_SPEED_SOURCE "${UNIT_SPEED_SOURCE}")
+elseif(MUTATION STREQUAL "player_setter_skips_server_state")
+    string(REPLACE "        m_movementInfo.AddMovementFlag(MOVEFLAG_CAN_FLY);" ""
+        PLAYER_SOURCE "${PLAYER_SOURCE}")
 elseif(MUTATION STREQUAL "root_broadcasts_mover")
     string(REPLACE "BuildForceMoveRootPacket(&data, enable, NextMovementCounter());
     GetSession()->SendPacket(&data);"
@@ -100,8 +103,8 @@ if(CANFLY_START EQUAL -1)
 endif()
 string(LENGTH "${PLAYER_SOURCE}" PLAYER_LENGTH)
 math(EXPR CANFLY_REMAINING "${PLAYER_LENGTH} - ${CANFLY_START}")
-if(CANFLY_REMAINING GREATER 1400)
-    set(CANFLY_REMAINING 1400)
+if(CANFLY_REMAINING GREATER 3000)
+    set(CANFLY_REMAINING 3000)
 endif()
 string(SUBSTRING "${PLAYER_SOURCE}" ${CANFLY_START} ${CANFLY_REMAINING} CANFLY_BODY)
 
@@ -136,8 +139,8 @@ if(WW_START EQUAL -1)
     message(FATAL_ERROR "Could not locate Player::SetWaterWalk")
 endif()
 math(EXPR WW_REMAINING "${PLAYER_LENGTH} - ${WW_START}")
-if(WW_REMAINING GREATER 1400)
-    set(WW_REMAINING 1400)
+if(WW_REMAINING GREATER 3000)
+    set(WW_REMAINING 3000)
 endif()
 string(SUBSTRING "${PLAYER_SOURCE}" ${WW_START} ${WW_REMAINING} WW_BODY)
 
@@ -181,8 +184,8 @@ if(FF_START EQUAL -1)
     message(FATAL_ERROR "Could not locate Player::SetFeatherFall")
 endif()
 math(EXPR FF_REMAINING "${PLAYER_LENGTH} - ${FF_START}")
-if(FF_REMAINING GREATER 1600)
-    set(FF_REMAINING 1600)
+if(FF_REMAINING GREATER 3000)
+    set(FF_REMAINING 3000)
 endif()
 string(SUBSTRING "${PLAYER_SOURCE}" ${FF_START} ${FF_REMAINING} FF_BODY)
 
@@ -226,8 +229,8 @@ if(HOVER_START EQUAL -1)
     message(FATAL_ERROR "Could not locate Player::SetHover")
 endif()
 math(EXPR HOVER_REMAINING "${PLAYER_LENGTH} - ${HOVER_START}")
-if(HOVER_REMAINING GREATER 1400)
-    set(HOVER_REMAINING 1400)
+if(HOVER_REMAINING GREATER 3000)
+    set(HOVER_REMAINING 3000)
 endif()
 string(SUBSTRING "${PLAYER_SOURCE}" ${HOVER_START} ${HOVER_REMAINING} HOVER_BODY)
 
@@ -260,8 +263,8 @@ if(ROOT_START EQUAL -1)
     message(FATAL_ERROR "Could not locate Player::SetRoot")
 endif()
 math(EXPR ROOT_REMAINING "${PLAYER_LENGTH} - ${ROOT_START}")
-if(ROOT_REMAINING GREATER 1800)
-    set(ROOT_REMAINING 1800)
+if(ROOT_REMAINING GREATER 3000)
+    set(ROOT_REMAINING 3000)
 endif()
 string(SUBSTRING "${PLAYER_SOURCE}" ${ROOT_START} ${ROOT_REMAINING} ROOT_BODY)
 
@@ -467,3 +470,49 @@ if(COLLISION_COUNTER EQUAL -1)
     message(FATAL_ERROR
         "SMSG_MOVE_SET_COLLISION_HGT must stamp NextMovementCounter(), not game time")
 endif()
+
+# --- Player setters must update the server's own view -----------------------
+#
+# Every Creature setter writes m_movementInfo; no Player setter did. So the
+# server told the client to fly and went on believing it could not -- CanFly()
+# reads m_movementInfo, and nothing wrote it until the client's next ordinary
+# movement packet happened to carry the flag. That is "changes client state
+# without updating server state", the same class as the mount command that used
+# to kick the player it helped.
+
+foreach(SETTER_NAME SetRoot SetWaterWalk SetLevitate SetCanFly SetFeatherFall SetHover)
+    # Explicit mapping rather than packed "name;flag" list entries: a CMake list
+    # splits on semicolons, so packing pairs into one string shreds them. That
+    # exact mistake broke this file once already.
+    if(SETTER_NAME STREQUAL "SetRoot")
+        set(SETTER_FLAGNAME "MOVEFLAG_ROOT")
+    elseif(SETTER_NAME STREQUAL "SetWaterWalk")
+        set(SETTER_FLAGNAME "MOVEFLAG_WATERWALKING")
+    elseif(SETTER_NAME STREQUAL "SetLevitate")
+        set(SETTER_FLAGNAME "MOVEFLAG_LEVITATING")
+    elseif(SETTER_NAME STREQUAL "SetCanFly")
+        set(SETTER_FLAGNAME "MOVEFLAG_CAN_FLY")
+    elseif(SETTER_NAME STREQUAL "SetFeatherFall")
+        set(SETTER_FLAGNAME "MOVEFLAG_SAFE_FALL")
+    else()
+        set(SETTER_FLAGNAME "MOVEFLAG_HOVER")
+    endif()
+
+    string(FIND "${PLAYER_SOURCE}" "void Player::${SETTER_NAME}(bool enable)" SETTER_START)
+    if(SETTER_START EQUAL -1)
+        message(FATAL_ERROR "Could not locate Player::${SETTER_NAME}")
+    endif()
+    math(EXPR SETTER_ROOM "${PLAYER_LENGTH} - ${SETTER_START}")
+    if(SETTER_ROOM GREATER 2400)
+        set(SETTER_ROOM 2400)
+    endif()
+    string(SUBSTRING "${PLAYER_SOURCE}" ${SETTER_START} ${SETTER_ROOM} SETTER_BODY)
+
+    string(FIND "${SETTER_BODY}" "AddMovementFlag(${SETTER_FLAGNAME})" SETTER_ADDS)
+    string(FIND "${SETTER_BODY}" "RemoveMovementFlag(${SETTER_FLAGNAME})" SETTER_REMOVES)
+    if(SETTER_ADDS EQUAL -1 OR SETTER_REMOVES EQUAL -1)
+        message(FATAL_ERROR
+            "Player::${SETTER_NAME} must update m_movementInfo with ${SETTER_FLAGNAME} -- "
+            "otherwise the client is told and the server's own view never changes")
+    endif()
+endforeach()

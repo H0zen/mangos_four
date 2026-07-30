@@ -88,6 +88,26 @@
  */
 void Player::SetRoot(bool enable)
 {
+    // Update the server's own view first. Every Creature setter does this and no
+    // Player setter did, so the server told the client to fly and then went on
+    // believing it could not: Player::CanFly() reads m_movementInfo, and nothing
+    // wrote it until the client's next ordinary movement packet happened to
+    // carry the flag. That is the brief's "changes client state without updating
+    // server state", one step earlier in the sequence than the mount command
+    // that used to kick the player it helped.
+    //
+    // The client remains authoritative for a player -- an incoming movement
+    // packet still assigns the whole struct -- so this closes the window rather
+    // than claiming ownership of it.
+    if (enable)
+    {
+        m_movementInfo.AddMovementFlag(MOVEFLAG_ROOT);
+    }
+    else
+    {
+        m_movementInfo.RemoveMovementFlag(MOVEFLAG_ROOT);
+    }
+
     // This was the last sender broadcasting the MOVER packet to everyone, and
     // the outlier among its own neighbours -- SetCanFly and SetWaterWalk had
     // already been corrected. Observers were handed SMSG_FORCE_MOVE_ROOT, which
@@ -138,6 +158,15 @@ void Player::SetRoot(bool enable)
  */
 void Player::SetWaterWalk(bool enable)
 {
+    if (enable)
+    {
+        m_movementInfo.AddMovementFlag(MOVEFLAG_WATERWALKING);
+    }
+    else
+    {
+        m_movementInfo.RemoveMovementFlag(MOVEFLAG_WATERWALKING);
+    }
+
     WorldPacket data;
     BuildMoveWaterWalkPacket(&data, enable, NextMovementCounter());
     GetSession()->SendPacket(&data);
@@ -167,6 +196,15 @@ void Player::SetWaterWalk(bool enable)
  */
 void Player::SetLevitate(bool enable)
 {
+    if (enable)
+    {
+        m_movementInfo.AddMovementFlag(MOVEFLAG_LEVITATING);
+    }
+    else
+    {
+        m_movementInfo.RemoveMovementFlag(MOVEFLAG_LEVITATING);
+    }
+
     WorldPacket data;
     BuildMoveLevitatePacket(&data, enable, NextMovementCounter());
     GetSession()->SendPacket(&data);
@@ -194,6 +232,15 @@ void Player::SetLevitate(bool enable)
  */
 void Player::SetCanFly(bool enable)
 {
+    if (enable)
+    {
+        m_movementInfo.AddMovementFlag(MOVEFLAG_CAN_FLY);
+    }
+    else
+    {
+        m_movementInfo.RemoveMovementFlag(MOVEFLAG_CAN_FLY);
+    }
+
     WorldPacket data;
     BuildMoveSetCanFlyPacket(&data, enable, NextMovementCounter());
     GetSession()->SendPacket(&data);
@@ -223,6 +270,15 @@ void Player::SetCanFly(bool enable)
  */
 void Player::SetFeatherFall(bool enable)
 {
+    if (enable)
+    {
+        m_movementInfo.AddMovementFlag(MOVEFLAG_SAFE_FALL);
+    }
+    else
+    {
+        m_movementInfo.RemoveMovementFlag(MOVEFLAG_SAFE_FALL);
+    }
+
     // This was the third variant of the pair defect: not a missing half, but the
     // MOVER packet broadcast to everyone. SMSG_MOVE_FEATHER_FALL carries a
     // movement counter and is addressed to the controlling session; observers
@@ -261,6 +317,15 @@ void Player::SetFeatherFall(bool enable)
  */
 void Player::SetHover(bool enable)
 {
+    if (enable)
+    {
+        m_movementInfo.AddMovementFlag(MOVEFLAG_HOVER);
+    }
+    else
+    {
+        m_movementInfo.RemoveMovementFlag(MOVEFLAG_HOVER);
+    }
+
     WorldPacket data;
     BuildMoveHoverPacket(&data, enable, NextMovementCounter());
     GetSession()->SendPacket(&data);
