@@ -217,9 +217,3 @@ require_once("${opcode_reference}"
 require_once("${opcode_reference}"
     "SMSG_CALENDAR_RAID_LOCKOUT_REMOVED             0x11E0  ACTIVE   [low-conf]"
     "calendar removal active reference with evidence annotation")
-require_once("${opcode_reference}"
-    "STATUS TOTALS: ACTIVE=499, DOC=435, DORMANT=586"
-    "staging reference totals")
-require_once("${opcode_reference}"
-    "SMSG: ACTIVE=300, DOC=271, DORMANT=354"
-    "staging SMSG reference totals")

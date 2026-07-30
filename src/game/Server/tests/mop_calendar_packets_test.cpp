@@ -313,7 +313,8 @@ static void test_raid_lockout_removed_matches_retail_bodies()
 {
     // These retained 18414 bodies cover both observed masks and consume
     // exactly. Their scalar values also rule out the inherited map/difficulty
-    // order: 580 and 550 are map IDs, while 4 is the difficulty.
+    // order: 580 and 550 are map IDs, so 4 occupies the difficulty field. It
+    // is a retail value, not one this tree's raid Difficulty enum produces.
     WorldPacket dense(SMSG_CALENDAR_RAID_LOCKOUT_REMOVED, 17);
     MopCalendarPackets::BuildCalendarRaidLockoutRemoved(
         dense, 4, 580, UINT64_C(0x1F4400001048C8DD));
@@ -330,6 +331,17 @@ static void test_raid_lockout_removed_matches_retail_bodies()
     CHECK(Equal(sparse, {
         0x04, 0x00, 0x00, 0x00, 0x26, 0x02, 0x00, 0x00,
         0xD6, 0x45, 0x1E, 0x11, 0xF7, 0x2D,
+    }));
+
+    // This tree encodes HIGHGUID_INSTANCE 0x1F4 in the upper 12 bits, yielding
+    // 0x1F40... rather than retail's observed 0x1F44.... Pin the actual shape
+    // the live CalendarHandler can emit without pretending it is retail proof.
+    WorldPacket local(SMSG_CALENDAR_RAID_LOCKOUT_REMOVED, 17);
+    MopCalendarPackets::BuildCalendarRaidLockoutRemoved(
+        local, 1, 580, UINT64_C(0x1F4000001048C8DD));
+    CHECK(Equal(local, {
+        0x01, 0x00, 0x00, 0x00, 0x44, 0x02, 0x00, 0x00,
+        0xD7, 0x41, 0xC9, 0x1E, 0x11, 0xDC, 0x49,
     }));
 }
 

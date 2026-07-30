@@ -377,6 +377,9 @@ namespace MopCalendarPackets
         // SMSG_CALENDAR_RAID_LOCKOUT_REMOVED (0x11E0). Both 18414 readers and
         // the retained retail bodies agree: difficulty precedes map ID, there
         // is no reset-delay dword, and the instance-save GUID is packed.
+        // Retail uses a 0x1F44... instance high field while this tree's
+        // HIGHGUID_INSTANCE model materializes 0x1F40...; the calendar list
+        // and this removal both use the same local GetInstanceGuid() value.
         out << difficulty;
         out << mapId;
         WriteGuidMask(out, instanceGuid, { 2, 0, 4, 6, 5, 7, 3, 1 });
