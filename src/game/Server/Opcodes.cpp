@@ -275,6 +275,14 @@ void InitializeOpcodes()
     DefS(SMSG_SPLINE_MOVE_SET_RUN_BACK_SPEED, "SMSG_SPLINE_MOVE_SET_RUN_BACK_SPEED");
     DefS(SMSG_SPLINE_MOVE_SET_SWIM_SPEED, "SMSG_SPLINE_MOVE_SET_SWIM_SPEED");
     DefS(SMSG_SPLINE_MOVE_SET_FLIGHT_SPEED, "SMSG_SPLINE_MOVE_SET_FLIGHT_SPEED");
+    // The corpus carries no observation of these four, so they have no retail
+    // fixture. They are admitted on binary proof: each is built from its client
+    // reader, and both mask order and byte order are pinned by test. Sending a
+    // reader-correct body beats suppressing the packet entirely.
+    DefS(SMSG_SPLINE_MOVE_SET_SWIM_BACK_SPEED, "SMSG_SPLINE_MOVE_SET_SWIM_BACK_SPEED");
+    DefS(SMSG_SPLINE_MOVE_SET_TURN_RATE, "SMSG_SPLINE_MOVE_SET_TURN_RATE");
+    DefS(SMSG_SPLINE_MOVE_SET_FLIGHT_BACK_SPEED, "SMSG_SPLINE_MOVE_SET_FLIGHT_BACK_SPEED");
+    DefS(SMSG_SPLINE_MOVE_SET_PITCH_RATE, "SMSG_SPLINE_MOVE_SET_PITCH_RATE");
     DefS(SMSG_RANDOM_ROLL, "SMSG_RANDOM_ROLL");
     DefS(SMSG_UPDATE_INSTANCE_ENCOUNTER_UNIT, "SMSG_UPDATE_INSTANCE_ENCOUNTER_UNIT");
     DefS(SMSG_SET_RAID_DIFFICULTY, "SMSG_SET_RAID_DIFFICULTY");

@@ -565,11 +565,11 @@ namespace MopCompactPackets
     /// client readers alone: the corpus carries no observation of any of them at
     /// 18414, so unlike the group above none can be pinned to a retail body.
     ///
-    /// They are therefore deliberately left DORMANT -- no DefS entry, and absent
-    /// from IsEnterWorldConverted -- so the send gate drops them before they can
-    /// reach a client. Reader proof is enough to retire a body that provably
-    /// disagrees with the client; capture proof remains the bar for admission.
-    /// Promote one only once a retail body for it exists.
+    /// They are nonetheless ADMITTED. The absence of a capture is a gap in the
+    /// sniff corpus, not evidence against the layout, and suppressing the packet
+    /// is a certain failure where sending a reader-correct body is at worst an
+    /// uncertain one. Both mask order and byte order are pinned by test, so a
+    /// transposition cannot pass silently.
     ///
     /// The opcode-to-reader mapping was resolved through the dispatcher
     /// sub_C80E74, whose case arithmetic reproduces all four cases of the pinned

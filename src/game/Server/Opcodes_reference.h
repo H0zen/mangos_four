@@ -175,8 +175,8 @@
  *   TOTAL SMSG rows                   925
  *
  * SUBSYSTEM CONFIDENCE: high=365, low=221, medium=182, none=157
- * STATUS TOTALS: ACTIVE=462, DOC=435, DORMANT=623
- *   SMSG: ACTIVE=276, DOC=271, DORMANT=378
+ * STATUS TOTALS: ACTIVE=466, DOC=435, DORMANT=619
+ *   SMSG: ACTIVE=280, DOC=271, DORMANT=374
  *   CMSG: ACTIVE=186, DOC=164, DORMANT=245
  */
 
@@ -991,7 +991,7 @@ typedef uint16_t uint16;
  *
  *  -- Unit_C.cpp (112) --
  *   SMSG_MOUNTSPECIAL_ANIM                         0x003A  DORMANT 
- *   SMSG_SPLINE_MOVE_SET_SWIM_BACK_SPEED           0x0046  DORMANT 
+ *   SMSG_SPLINE_MOVE_SET_SWIM_BACK_SPEED           0x0046  ACTIVE 
  *   SMSG_MOVE_UPDATE_WALK_SPEED                    0x0047  DORMANT
  *   SMSG_COMPOUND_MOVE                             0x0061  DORMANT 
  *   SMSG_FLIGHT_SPLINE_SYNC                        0x0063  DORMANT 
@@ -1025,7 +1025,7 @@ typedef uint16_t uint16;
  *   SMSG_AI_REACTION                               0x06AF  ACTIVE
  *   SMSG_SPLINE_MOVE_ROOT                          0x0728  DORMANT 
  *   SMSG_MOVE_SET_SWIM_SPEED                       0x0817  ACTIVE
- *   SMSG_SPLINE_MOVE_SET_TURN_RATE                 0x0832  DORMANT 
+ *   SMSG_SPLINE_MOVE_SET_TURN_RATE                 0x0832  ACTIVE 
  *   SMSG_SPLINE_MOVE_GRAVITY_DISABLE               0x0845  DORMANT 
  *   SMSG_MOVE_SET_VEHICLE_REC_ID                   0x0861  DORMANT
  *   SMSG_SPLINE_MOVE_GRAVITY_ENABLE                0x0865  DORMANT 
@@ -1040,11 +1040,11 @@ typedef uint16_t uint16;
  *   SMSG_UNKNOWN_0x0A03                            0x0A03  DOC     
  *   SMSG_MOVE_GRAVITY_ENABLE                       0x0A27  DORMANT 
  *   SMSG_MOVE_SET_RUN_BACK_SPEED                   0x0A83  ACTIVE
- *   SMSG_SPLINE_MOVE_SET_PITCH_RATE                0x0AB3  DORMANT 
+ *   SMSG_SPLINE_MOVE_SET_PITCH_RATE                0x0AB3  ACTIVE 
  *   SMSG_MOVE_UPDATE_APPLY_MOVEMENT_FORCE          0x0AB6  DORMANT
  *   SMSG_SPLINE_MOVE_SET_NORMAL_FALL               0x0B08  ACTIVE
  *   SMSG_SPLINE_MOVE_SET_RUN_MODE                  0x0B18  DORMANT 
- *   SMSG_SPLINE_MOVE_SET_FLIGHT_BACK_SPEED         0x0B28  DORMANT 
+ *   SMSG_SPLINE_MOVE_SET_FLIGHT_BACK_SPEED         0x0B28  ACTIVE 
  *   SMSG_MOVE_TELEPORT                             0x0B39  ACTIVE
  *   SMSG_MOVE_FEATHER_FALL                         0x0C60  DORMANT 
  *   SMSG_MOVE_SET_ACTIVE_MOVER                     0x0C6D  ACTIVE

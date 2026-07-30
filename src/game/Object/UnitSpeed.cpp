@@ -390,16 +390,16 @@ void Unit::SetSpeedRate(UnitMoveType mtype, float rate, bool forced, bool ignore
             }
             case MOVE_SWIM_BACK:
             {
-                // Reader-derived only, and dormant: no corpus body exists for
-                // this one, so it is built correctly but never admitted.
+                // Reader-derived: no corpus body exists for this one, so it has
+                // no retail fixture, but it is built from the client reader.
                 data.Initialize(SMSG_SPLINE_MOVE_SET_SWIM_BACK_SPEED, 1 + 8 + 4);
                 MopCompactPackets::BuildSplineMoveSetSwimBackSpeed(data, guid.GetRawValue(), GetSpeed(mtype));
                 break;
             }
             case MOVE_TURN_RATE:
             {
-                // Reader-derived only, and dormant. Note the client reads two
-                // GUID bytes before the rate, not zero as written here before.
+                // Reader-derived. Note the client reads two GUID bytes before
+                // the rate, where this once wrote none.
                 data.Initialize(SMSG_SPLINE_MOVE_SET_TURN_RATE, 1 + 8 + 4);
                 MopCompactPackets::BuildSplineMoveSetTurnRate(data, guid.GetRawValue(), GetSpeed(mtype));
                 break;
@@ -413,14 +413,14 @@ void Unit::SetSpeedRate(UnitMoveType mtype, float rate, bool forced, bool ignore
             }
             case MOVE_FLIGHT_BACK:
             {
-                // Reader-derived only, and dormant.
+                // Reader-derived; no corpus body exists for this one.
                 data.Initialize(SMSG_SPLINE_MOVE_SET_FLIGHT_BACK_SPEED, 1 + 8 + 4);
                 MopCompactPackets::BuildSplineMoveSetFlightBackSpeed(data, guid.GetRawValue(), GetSpeed(mtype));
                 break;
             }
             case MOVE_PITCH_RATE:
             {
-                // Reader-derived only, and dormant.
+                // Reader-derived; no corpus body exists for this one.
                 data.Initialize(SMSG_SPLINE_MOVE_SET_PITCH_RATE, 1 + 8 + 4);
                 MopCompactPackets::BuildSplineMoveSetPitchRate(data, guid.GetRawValue(), GetSpeed(mtype));
                 break;
