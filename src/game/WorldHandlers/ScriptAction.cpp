@@ -208,7 +208,22 @@ bool ScriptAction::GetScriptProcessTargets(WorldObject* pOrigSource, WorldObject
 
             if (!pBuddy)
             {
-                sLog.outErrorDb(" DB-SCRIPTS: Process table `db_scripts [type = %d]` id %u, command %u has buddy %u not found in range %u of searcher %s (data-flags %u), skipping.", m_type, m_script->id, m_script->command, m_script->buddyEntry, m_script->searchRadiusOrGuid, pSearcher->GetGuidStr().c_str(), m_script->data_flags);
+                // Gated because this fires on every EXECUTION, not once at load:
+                // a single piece of broken script data produced 3315 of 6222
+                // console lines in one session, drowning everything else.
+                //
+                // LOG_FILTER_DB_STRICTED_CHECK, not LOG_FILTER_DB_SCRIPTS. The
+                // latter is documented in Log.h as "execution, not errors", so
+                // using it here would contradict its own definition; the former
+                // is the established idiom for noisy DB-data complaints and is
+                // already used that way in LootMgr and ObjectMgrCreatures.
+                //
+                // The message is unchanged and still a real data fault. Clear
+                // LogFilter_DbStrictedCheck in mangosd.conf to see it.
+                if (!sLog.HasLogFilter(LOG_FILTER_DB_STRICTED_CHECK))
+                {
+                    sLog.outErrorDb(" DB-SCRIPTS: Process table `db_scripts [type = %d]` id %u, command %u has buddy %u not found in range %u of searcher %s (data-flags %u), skipping.", m_type, m_script->id, m_script->command, m_script->buddyEntry, m_script->searchRadiusOrGuid, pSearcher->GetGuidStr().c_str(), m_script->data_flags);
+                }
                 return false;
             }
         }
