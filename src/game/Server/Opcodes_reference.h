@@ -175,9 +175,9 @@
  *   TOTAL SMSG rows                   925
  *
  * SUBSYSTEM CONFIDENCE: high=365, low=221, medium=182, none=157
- * STATUS TOTALS: ACTIVE=488, DOC=435, DORMANT=597
+ * STATUS TOTALS: ACTIVE=489, DOC=435, DORMANT=596
  *   SMSG: ACTIVE=290, DOC=271, DORMANT=364
- *   CMSG: ACTIVE=198, DOC=164, DORMANT=233
+ *   CMSG: ACTIVE=199, DOC=164, DORMANT=232
  */
 
 // CAVEATS -- read before trusting any single row:
@@ -1676,7 +1676,7 @@ typedef uint16_t uint16;
  *   CMSG_ITEM_UPGRADE                              0x1042  DOC
  *   CMSG_MOVE_SET_FACING                           0x1050  ACTIVE
  *   CMSG_FORCE_MOVE_UNROOT_ACK                     0x1051  DORMANT
- *   CMSG_MOVE_SET_CAN_FLY_ACK                      0x1052  DORMANT
+ *   CMSG_MOVE_SET_CAN_FLY_ACK                      0x1052  ACTIVE
  *   CMSG_MOVE_START_STRAFE_RIGHT                   0x1058  ACTIVE
  *   CMSG_UNKNOWN_0x105A                            0x105A  DOC
  *   CMSG_FORCE_FLIGHT_BACK_SPEED_CHANGE_ACK        0x105B  ACTIVE

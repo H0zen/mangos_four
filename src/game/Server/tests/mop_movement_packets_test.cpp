@@ -1404,6 +1404,113 @@ static void test_normal_fall_counter_offset_moves()
     CHECK(both.size() == one.size() + 1);
 }
 
+/// CMSG_MOVE_SET_CAN_FLY_ACK against real 18414 bodies.
+///
+/// The inherited sequence read 18 bits where the client writes 42, so every body
+/// would have parsed three bytes out of phase. It was never caught because the
+/// opcode was unregistered -- but the sequence was already ROUTED, so adding the
+/// registration alone would have armed a broken reader. A registered handler
+/// with a wrong reader is strictly worse than a dropped packet.
+///
+/// Rebuilt from the client's writer sub_674EA6. These four bodies were decoded
+/// independently before the sequence was written, not after: 35 bytes minimum,
+/// a six-byte GUID, the 30-bit flags arm, and both flag arms together. Each
+/// recovers the GUID the other opcodes give for the same mover.
+///
+/// The transport, movement-force and unknown-uint32 arms have NO captured body
+/// anywhere in the corpus. They come straight from the writer and ship
+/// structurally certain but corpus-unverified; that is stated rather than
+/// implied by silence.
+static void test_move_set_can_fly_ack_retail_bodies()
+{
+    struct Case
+    {
+        uint8 const* body;
+        size_t size;
+        uint64 guid;
+        uint32 counter;
+        uint32 timestamp;
+        uint32 flags;
+        uint16 flags2;
+        char const* origin;
+    };
+
+    static uint8 const min35[] = {
+        0x1b, 0x99, 0xca, 0x43, 0xb8, 0x00, 0x00, 0x00, 0x8a, 0xe8, 0xc3, 0x42,
+        0xfb, 0x53, 0xbc, 0x44, 0x65, 0x61, 0x80, 0x00, 0x01, 0x40, 0x04, 0x49,
+        0x05, 0x28, 0xd0, 0x4d, 0xe8, 0xc3, 0x40, 0xc5, 0xf2, 0xb9, 0x02
+    };
+    static uint8 const sixByteGuid37[] = {
+        0xf3, 0xda, 0xb9, 0x43, 0x43, 0x00, 0x00, 0x00, 0x7b, 0x1c, 0x2b, 0x44,
+        0xcb, 0x0b, 0x02, 0x45, 0x25, 0x69, 0x80, 0x00, 0x01, 0x50, 0x00, 0x81,
+        0x05, 0xb3, 0x00, 0x23, 0x07, 0x04, 0x69, 0x7b, 0x3c, 0xa7, 0x51, 0x2d, 0x16
+    };
+    static uint8 const flagsArm38[] = {
+        0x0c, 0x82, 0x1d, 0x43, 0x6f, 0x03, 0x00, 0x00, 0x3d, 0x6a, 0xe1, 0x44,
+        0xd7, 0x61, 0x83, 0x45, 0x65, 0x61, 0x00, 0x00, 0x01, 0x40, 0x80, 0x00,
+        0x00, 0x04, 0x3d, 0x05, 0xc9, 0xe9, 0x6f, 0x98, 0x8d, 0x3e, 0xae, 0x15, 0x3a, 0x00
+    };
+    static uint8 const bothArms40[] = {
+        0x8f, 0xd2, 0x08, 0x44, 0x42, 0x00, 0x00, 0x00, 0x29, 0x6f, 0x04, 0x46,
+        0xcd, 0xcc, 0x5e, 0x44, 0x25, 0x61, 0x00, 0x00, 0x01, 0x50, 0x00, 0x04,
+        0x00, 0x00, 0x00, 0x04, 0x3d, 0x05, 0xc9, 0xe9, 0x94, 0x25, 0x6a, 0x40,
+        0xe5, 0x27, 0x0e, 0x00
+    };
+
+    Case const cases[] = {
+        { min35, sizeof(min35), UINT64_C(0x04000000054829D1), 184, 45740741,
+          0, 0, "capture-000540/1165180" },
+        { sixByteGuid37, sizeof(sixByteGuid37), UINT64_C(0x0180000004B22206), 67, 372068775,
+          0, 0x0800, "capture-000020/3995" },
+        { flagsArm38, sizeof(flagsArm38), UINT64_C(0x04000000053CC8E8), 879, 3806638,
+          0x00800000, 0, "capture-000086/117991" },
+        { bothArms40, sizeof(bothArms40), UINT64_C(0x04000000053CC8E8), 66, 927717,
+          0x00800000, 0x0800, "capture-000004/606" },
+    };
+
+    for (Case const& c : cases)
+    {
+        WorldPacket packet(CMSG_MOVE_SET_CAN_FLY_ACK, c.size);
+        packet.append(c.body, c.size);
+
+        MovementInfo info;
+        packet >> info;
+
+        // Exact consumption is necessary but not sufficient -- every leading
+        // scalar is four bytes wide. The GUID is what discriminates: it is
+        // reassembled from a scattered bit order AND a scattered byte order, so
+        // a wrong layout cannot land on the right value by accident.
+        CHECK(packet.rpos() == packet.size());
+        CHECK(info.GetGuid().GetRawValue() == c.guid);
+        CHECK(uint32(info.GetMovementFlags()) == c.flags);
+        CHECK(uint16(info.GetMovementFlags2()) == c.flags2);
+        CHECK(info.GetTime() == c.timestamp);
+    }
+}
+
+/// The prefix is Z, counter, X, Y -- NOT the Y, counter, X, Z the inherited
+/// sequence had. Stated on its own because the two are the same length and
+/// swapping them is invisible to a consumption check.
+static void test_move_set_can_fly_ack_prefix_order()
+{
+    static uint8 const body[] = {
+        0x1b, 0x99, 0xca, 0x43, 0xb8, 0x00, 0x00, 0x00, 0x8a, 0xe8, 0xc3, 0x42,
+        0xfb, 0x53, 0xbc, 0x44, 0x65, 0x61, 0x80, 0x00, 0x01, 0x40, 0x04, 0x49,
+        0x05, 0x28, 0xd0, 0x4d, 0xe8, 0xc3, 0x40, 0xc5, 0xf2, 0xb9, 0x02
+    };
+
+    WorldPacket packet(CMSG_MOVE_SET_CAN_FLY_ACK, sizeof(body));
+    packet.append(body, sizeof(body));
+
+    MovementInfo info;
+    packet >> info;
+
+    CHECK(info.GetPos()->z == 405.196136f);
+    CHECK(info.GetPos()->x == 97.954178f);
+    CHECK(info.GetPos()->y == 1506.624390f);
+    CHECK(info.GetPos()->o == 6.122107f);
+}
+
 int main(int, char**)
 {
     test_thirteen_inbound_fixtures_and_exact_relay();
@@ -1422,6 +1529,8 @@ int main(int, char**)
     test_water_walk_mover_retail_bodies();
     test_water_and_land_walk_layouts_differ();
     test_fall_mover_retail_bodies();
+    test_move_set_can_fly_ack_retail_bodies();
+    test_move_set_can_fly_ack_prefix_order();
     test_normal_fall_counter_offset_moves();
     test_hostile_counts_rejected();
     test_opcode_values_are_framable();

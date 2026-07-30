@@ -1295,6 +1295,26 @@ void InitializeOpcodes()
     DefC(CMSG_FORCE_RUN_SPEED_CHANGE_ACK, "CMSG_FORCE_RUN_SPEED_CHANGE_ACK", STATUS_LOGGEDIN, PROCESS_THREADUNSAFE, &WorldSession::HandleForceSpeedChangeAckOpcodes);
     DefC(CMSG_FORCE_FLIGHT_SPEED_CHANGE_ACK, "CMSG_FORCE_FLIGHT_SPEED_CHANGE_ACK", STATUS_LOGGEDIN, PROCESS_THREADUNSAFE, &WorldSession::HandleForceSpeedChangeAckOpcodes);
 
+    // The flight acknowledgement, now that SMSG_MOVE_SET_CAN_FLY is admitted and
+    // the client is therefore sending this.
+    //
+    // It stayed dormant for a specific reason, not inertia: MovementSetCanFlyAckSequence
+    // was wrong in eleven ways and read 18 bits where the client writes 42. The
+    // sequence was already routed, so a DefC line on its own would have armed a
+    // reader that parsed every body three bytes out of phase -- worse than
+    // dropping the packet, because a garbage GUID that happens to match applies a
+    // garbage flag word to the mover. The sequence is rebuilt from the client's
+    // writer sub_674EA6 and pinned to four real bodies before this line was added.
+    //
+    // THREADUNSAFE because the handler mutates Unit::m_movementInfo, matching the
+    // speed acknowledgements above.
+    //
+    // What it buys: Player::SetCanFly does not set MOVEFLAG_CAN_FLY server-side,
+    // so without this the server's CanFly() stays false until the client's next
+    // ordinary movement packet happens to carry the flag. Anything consulting it
+    // in that window -- spline building, spell checks -- reads a stale value.
+    DefC(CMSG_MOVE_SET_CAN_FLY_ACK, "CMSG_MOVE_SET_CAN_FLY_ACK", STATUS_LOGGEDIN, PROCESS_THREADUNSAFE, &WorldSession::HandleMoveSetCanFlyAckOpcode);
+
     // CMSG_SET_ACTION_BUTTON is HELD. Its body is proven -- the reader matches
     // the client's writer sub_669CAE element for element and its fixtures stand
     // -- but the handler's type allowlist is narrower than the client's. The
