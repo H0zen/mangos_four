@@ -913,15 +913,31 @@ bool ChatHandler::HandleModifyMountCommand(char* args)
 
     // The legacy SMSG_FORCE_RUN_SPEED_CHANGE body that stood here was pack-GUID,
     // counter, a 2.1.0-era uint8 and the speed. That opcode is dormant at 18414
-    // and never cleared the send gate, so the run-speed half of this command has
-    // been silently discarded; only the swim speed below took effect.
+    // and never cleared the send gate, so the run-speed half of this command was
+    // silently discarded; only the swim speed took effect.
+    //
+    // Each speed also needs BOTH halves, split the way Unit::SetSpeedRate splits
+    // them. The direct packet addresses the mover, carries a counter, and goes to
+    // that one session; observers get the spline form, which has a different
+    // reader and no counter. Broadcasting the direct body to observers, as this
+    // did, sends them a packet that is not theirs to act on.
+    uint64 const moverGuid = chr->GetObjectGuid().GetRawValue();
+
     WorldPacket data(SMSG_MOVE_SET_RUN_SPEED, 1 + 8 + 4 + 4);
-    MopCompactPackets::BuildMoveSetRunSpeed(data, chr->GetObjectGuid().GetRawValue(), 0, speed);
-    chr->SendMessageToSet(&data, true);
+    MopCompactPackets::BuildMoveSetRunSpeed(data, moverGuid, 0, speed);
+    chr->GetSession()->SendPacket(&data);
+
+    data.Initialize(SMSG_SPLINE_MOVE_SET_RUN_SPEED, 1 + 8 + 4);
+    MopCompactPackets::BuildSplineMoveSetRunSpeed(data, moverGuid, speed);
+    chr->SendMessageToSet(&data, false);
 
     data.Initialize(SMSG_MOVE_SET_SWIM_SPEED, 1 + 8 + 4 + 4);
-    MopCompactPackets::BuildMoveSetSwimSpeed(data, chr->GetObjectGuid().GetRawValue(), 0, speed);
-    chr->SendMessageToSet(&data, true);
+    MopCompactPackets::BuildMoveSetSwimSpeed(data, moverGuid, 0, speed);
+    chr->GetSession()->SendPacket(&data);
+
+    data.Initialize(SMSG_SPLINE_MOVE_SET_SWIM_SPEED, 1 + 8 + 4);
+    MopCompactPackets::BuildSplineMoveSetSwimSpeed(data, moverGuid, speed);
+    chr->SendMessageToSet(&data, false);
 
     return true;
 }
