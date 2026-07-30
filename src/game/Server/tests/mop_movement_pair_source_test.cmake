@@ -142,13 +142,25 @@ if(FF_REMAINING GREATER 1600)
 endif()
 string(SUBSTRING "${PLAYER_SOURCE}" ${FF_START} ${FF_REMAINING} FF_BODY)
 
-string(REGEX MATCH "BuildMoveFeatherFallPacket[(]&data, enable, 0[)];[ 	
-]*GetSession[(][)]->SendPacket[(]&data[)]"
-    FF_MOVER_DIRECT "${FF_BODY}")
-if(FF_MOVER_DIRECT STREQUAL "")
+# Two plain FINDs and an ordering check, rather than a regex spanning the line
+# break -- an embedded literal tab/newline in a character class made this file
+# fail git diff --check.
+string(FIND "${FF_BODY}" "BuildMoveFeatherFallPacket(&data, enable, 0);" FF_MOVER_BUILD)
+string(FIND "${FF_BODY}" "GetSession()->SendPacket(&data);" FF_MOVER_SEND)
+if(FF_MOVER_BUILD EQUAL -1 OR FF_MOVER_SEND EQUAL -1)
     message(FATAL_ERROR
-        "Player::SetFeatherFall must send the mover packet to the session alone -- "
-        "broadcasting it hands observers an opcode addressed to a mover they are not")
+        "Player::SetFeatherFall must send the mover packet to the session alone")
+endif()
+if(NOT FF_MOVER_BUILD LESS FF_MOVER_SEND)
+    message(FATAL_ERROR "The mover packet must be built before it is sent")
+endif()
+
+# ...and it must NOT be broadcast. That was the actual defect: observers were
+# handed a counter-bearing opcode addressed to a mover they are not.
+string(FIND "${FF_BODY}" "SendMessageToSet(&data" FF_MOVER_BROADCAST)
+if(NOT FF_MOVER_BROADCAST EQUAL -1)
+    message(FATAL_ERROR
+        "Player::SetFeatherFall must not broadcast the MOVER packet to observers")
 endif()
 
 string(FIND "${FF_BODY}" "BuildSplineMoveSetFeatherFall" FF_OBS_ON)
