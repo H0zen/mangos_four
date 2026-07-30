@@ -534,17 +534,16 @@ void WorldSession::SendPetNameQuery(ObjectGuid petguid, uint64 petnumber)
     }
 
     std::string petName = name ? name : "";
-    std::string declinedStorage[MAX_DECLINED_NAME_CASES];
-    std::string const* declined = NULL;
 
-    if (pet->IsPet() && ((Pet*)pet)->GetDeclinedNames())
-    {
-        for (int i = 0; i < MAX_DECLINED_NAME_CASES; ++i)
-        {
-            declinedStorage[i] = ((Pet*)pet)->GetDeclinedNames()->name[i];
-        }
-        declined = declinedStorage;
-    }
+    // Declined names are deliberately NOT sent. Every observed response had all
+    // five length fields zero, which pins the 36-bit run before the name length
+    // but not its division into five 7-bit fields and a spare -- that split is a
+    // hypothesis. Feeding real declined names through an unproven grammar would
+    // put a guess on the wire for the locales that have them, so the extension
+    // stays suppressed until a body or the client's reader proves the layout.
+    // The zero-declined path below is the proven one and is what every observed
+    // response used.
+    std::string const* declined = NULL;
 
     WorldPacket data(SMSG_PET_NAME_QUERY_RESPONSE, 6 + petName.size() + 4 + 8);
     MopCompactPackets::BuildPetNameQueryResponse(data, petnumber, &petName,

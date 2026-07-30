@@ -456,9 +456,16 @@ endif()
 if(player_stats_mods MATCHES "MopCompactPackets::Build(Spline)?MoveSet")
     message(FATAL_ERROR "a stat-mod command builds a speed packet by hand instead of using SetSpeedRate")
 endif()
+# Require the COMPLETE call, not merely a mention of SetSpeedRate. The argument
+# is an absolute speed and SetSpeedRate takes a rate, so the per-type division is
+# the load-bearing part: without it the command asks for fifteen times base. The
+# two trailing trues select forced handling and force the send even when the rate
+# is unchanged, which is what registers the forced change the ack is matched
+# against. A bare SetSpeedRate(MOVE_RUN, speed, true, true) must NOT pass.
 foreach(move_type IN ITEMS MOVE_RUN MOVE_SWIM)
-    if(NOT player_stats_mods MATCHES "SetSpeedRate\\([ \t]*${move_type}[ \t]*,")
-        message(FATAL_ERROR "mount command no longer sets ${move_type} through the stateful speed path")
+    if(NOT player_stats_mods MATCHES
+       "SetSpeedRate\\([ \t]*${move_type}[ \t]*,[ \t]*speed[ \t]*/[ \t]*baseMoveSpeed\\[${move_type}\\][ \t]*,[ \t]*true[ \t]*,[ \t]*true[ \t]*\\)")
+        message(FATAL_ERROR "mount command must set ${move_type} via SetSpeedRate with the absolute-to-rate division and forced/ignoreChange")
     endif()
 endforeach()
 if(group_handler MATCHES "WorldPacket[ \t]+data\\(MSG_RANDOM_ROLL")

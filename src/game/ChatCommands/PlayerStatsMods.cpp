@@ -933,6 +933,12 @@ bool ChatHandler::HandleModifyMountCommand(char* args)
     // that against an unchanged server speed, found the client faster, and KICKED
     // THE PLAYER for cheating.
     //
+    // That reached the player through SWIM specifically: of the acknowledgement
+    // family only CMSG_FORCE_SWIM_SPEED_CHANGE_ACK is registered today, so the
+    // run acknowledgement is dropped before it can be compared. The bookkeeping
+    // is needed for both regardless, and the run ack becoming live must not be
+    // the thing that reintroduces a kick.
+    //
     // The command's argument is an ABSOLUTE speed and SetSpeedRate takes a rate,
     // so convert per movement type: GetSpeed is m_speed_rate * baseMoveSpeed.
     // ignoreChange forces the send even when the rate is already at that value.

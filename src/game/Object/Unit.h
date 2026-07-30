@@ -106,6 +106,17 @@ namespace MopCompactPackets
     /// mask byte per GUID; that fitted every observed length, because only the
     /// total popcount sets the length, and it was still wrong.
     ///
+    /// The bodies CONSTRAIN that order; the client's own writer PROVES it. Bits
+    /// present together in every observed body stay mutually permutable, which
+    /// left 86,400 equivalent orders. sub_68C8C8, the client's writer for this
+    /// opcode, emits all sixteen presence bits and all sixteen bytes in exactly
+    /// the sequence below, collapsing those to one.
+    ///
+    /// It settles the position too. The writer emits the three floats from
+    /// object offsets +36, +40 and +32, so with x, y, z laid out at +32, +36,
+    /// +40 the wire order is y, z, x -- which the coordinate bands had only
+    /// supported, not established.
+    ///
     /// The middle float is z. In the one positional body it reads 246.8356,
     /// matching the ground height in every SMSG_ON_MONSTER_MOVE body captured
     /// beside it to four decimals. Which of the outer two is x and which is y is
@@ -162,6 +173,11 @@ namespace MopCompactPackets
     /// consumes exactly, every pet GUID decodes under HIGHGUID_PET, and every
     /// pet number falls in a plausible range with its top four bytes zero, which
     /// is what makes the shorter bodies short.
+    ///
+    /// Those bodies constrain the order only weakly -- a pet number's top bytes
+    /// are absent in all of them, leaving over 87 million equivalent orders. The
+    /// client's writer for this opcode, sub_6951B5, emits the sequence below
+    /// element for element, which is what actually proves it.
     inline void ReadPetNameQuery(WorldPacket& in, ObjectGuid& petGuid,
         uint64& petNumber)
     {
