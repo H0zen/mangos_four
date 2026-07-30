@@ -144,6 +144,14 @@ void WorldSession::HandlePetAction(WorldPacket& recv_data)
                     ? static_cast<Pet*>(pet)
                     : NULL;
 
+    // The same reasoning one level up. A charmed PLAYER reaches the attack
+    // command by design -- the filter above admits exactly that case -- and
+    // ((Creature*)pet)->AI() would then read a CreatureAI pointer from a Player
+    // object and call through whatever it found.
+    Creature* controlledCreature = pet->GetTypeId() == TYPEID_UNIT
+                                   ? static_cast<Creature*>(pet)
+                                   : NULL;
+
     switch (flag)
     {
         case ACT_COMMAND:                                   // 0x07
@@ -187,7 +195,11 @@ void WorldSession::HandlePetAction(WorldPacket& recv_data)
 
                     Unit* targetUnit = targetGuid ? _player->GetMap()->GetUnit(targetGuid) : NULL;
 
-                    if (targetUnit && targetUnit != pet && targetUnit->IsTargetableForAttack() && targetUnit->isInAccessablePlaceFor((Creature*)pet))
+                    // The accessibility test asks whether a CREATURE can reach the
+                    // target, reading its locomotion flags, so it is meaningless
+                    // for a charmed player and must not be asked of one.
+                    if (targetUnit && targetUnit != pet && targetUnit->IsTargetableForAttack() &&
+                        (!controlledCreature || targetUnit->isInAccessablePlaceFor(controlledCreature)))
                     {
                         _player->SetInCombatState(true, targetUnit);
 
@@ -197,9 +209,9 @@ void WorldSession::HandlePetAction(WorldPacket& recv_data)
                             pet->AttackStop();
                             pet->GetMotionMaster()->Clear();
 
-                            if (((Creature*)pet)->AI())
+                            if (controlledCreature && controlledCreature->AI())
                             {
-                                ((Creature*)pet)->AI()->AttackStart(targetUnit);
+                                controlledCreature->AI()->AttackStart(targetUnit);
                                  // 10% chance to play special warlock pet attack talk, else growl
                                 if (((Creature*)pet)->IsPet() && ((Pet*)pet)->getPetType() == SUMMON_PET && roll_chance_i(10))
                                 {
@@ -352,7 +364,10 @@ void WorldSession::HandlePetAction(WorldPacket& recv_data)
                 pet->AttackStop();
                 pet->GetMotionMaster()->Clear();
 
-                ((Creature*)pet)->AI()->AttackStart(unit_target);
+                if (controlledCreature && controlledCreature->AI())
+                {
+                    controlledCreature->AI()->AttackStart(unit_target);
+                }
                  // 10% chance to play special warlock pet attack talk, else growl
                 if (((Creature*)pet)->IsPet() && ((Pet*)pet)->getPetType() == SUMMON_PET && pet != unit_target && roll_chance_i(10))
                 {
@@ -423,7 +438,10 @@ void WorldSession::HandlePetAction(WorldPacket& recv_data)
                     GetPlayer()->SendClearCooldown(spellid, pet);
                 }
 
-                ((Pet*)pet)->SetSpellOpener();
+                if (ownedPet)
+                {
+                    ownedPet->SetSpellOpener();
+                }
                 spell->finish(false);
                 delete spell;
             }

@@ -1096,6 +1096,15 @@ static void test_pre_resurrect_packet()
 ///
 /// The decoded GUIDs are then checked against a fact outside the packet: 0xF14
 /// is HIGHGUID_PET, 0xF13 HIGHGUID_UNIT and 0xF15 HIGHGUID_VEHICLE.
+///
+/// WHAT THIS STILL DOES NOT PIN. Bits that are present together in every one of
+/// these bodies remain mutually permutable, so the interleave is constrained but
+/// NOT unique. A review enumerated the residue: three free classes and 86,400
+/// equivalent orders, of which only three bit positions are actually pinned --
+/// pet[3] and target[3], which are never present, and target[1], by the
+/// 0x7DAE/0x7DAF pair. Only the client's own writer can close the rest, and the
+/// consequence of a wrong choice inside a free class is not a desync but a
+/// silently wrong GUID whenever a real one carries a zero byte in a free slot.
 static void CheckPetAction(char const* what, uint8_t const* body, size_t length,
     uint32 expectedAction, uint64 expectedPet, uint64 expectedTarget)
 {
@@ -1239,8 +1248,15 @@ static void test_pet_action_matches_retail_bodies()
 /// CMSG_PET_NAME_QUERY and its response, pinned to real 18414 bodies.
 ///
 /// The request carries sixteen presence bits interleaved across the pet GUID and
-/// the pet number. Four bodies across THREE distinct masks -- 0xB7DA, 0xB79A and
-/// 0xB7DE -- so the bit order is constrained rather than merely reproduced.
+/// the pet number. Four bodies across three distinct masks -- 0xB7DA, 0xB79A and
+/// 0xB7DE.
+///
+/// That is WEAKER than it looks and an earlier version of this comment overstated
+/// it. Because a pet number is small, its top four bytes are absent in every
+/// body, and ten further slots are present in all of them, so a review counted
+/// 87,091,200 equivalent bit orders. Only number[3] and pet[2] are pinned. These
+/// fixtures prove the reader consumes real bodies exactly and recovers the right
+/// values for them; they do not prove the interleave.
 ///
 /// The response is tied to the request by evidence rather than by assumption:
 /// the "Blue" body below is the actual reply to the first request body, three
