@@ -1109,25 +1109,30 @@ void WorldSession::HandleRequestAccountData(WorldPacket& recv_data)
 void WorldSession::HandleSetActionButtonOpcode(WorldPacket& recv_data)
 {
     DEBUG_LOG("WORLD: Received opcode CMSG_SET_ACTION_BUTTON");
+    // 18414 sends the button plainly, then a PACKED eight-byte value: the action
+    // in the full low 32 bits and the type in byte 7. The inherited read took a
+    // raw uint32 and split it at bit 24, which is neither the right width nor the
+    // right boundary. See MopCompactPackets::ReadSetActionButton.
     uint8 button;
-    uint32 packetData;
-    recv_data >> button >> packetData;
-
-    uint32 action = ACTION_BUTTON_ACTION(packetData);
-    uint8  type   = ACTION_BUTTON_TYPE(packetData);
+    uint32 action = 0;
+    uint8 type = 0;
+    MopCompactPackets::ReadSetActionButton(recv_data, button, action, type);
 
     DETAIL_LOG("BUTTON: %u ACTION: %u TYPE: %u", button, action, type);
-    if (!packetData)
+    if (!action && !type)
     {
         DETAIL_LOG("MISC: Remove action from button %u", button);
         GetPlayer()->removeActionButton(GetPlayer()->GetActiveSpec(), button);
     }
     else
     {
-        switch (type)
+        // The client's own type predicates all test type & 0xF0, so dispatch on
+        // the high nibble. Switching on the exact byte would send a legitimate
+        // low-nibble modifier to the error branch.
+        switch (type & 0xF0)
         {
-            case ACTION_BUTTON_MACRO:
-            case ACTION_BUTTON_CMACRO:
+            case ACTION_BUTTON_MACRO:                       // and CMACRO, whose
+                                                            // low nibble masks off
                 DETAIL_LOG("MISC: Added Macro %u into button %u", action, button);
                 break;
             case ACTION_BUTTON_EQSET:

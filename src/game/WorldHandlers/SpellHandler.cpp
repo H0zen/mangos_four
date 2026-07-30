@@ -772,9 +772,11 @@ void WorldSession::HandleCancelChanneling(WorldPacket& recv_data)
  */
 void WorldSession::HandleTotemDestroyed(WorldPacket& recvPacket)
 {
+    // 18414 sends the slot plainly, then the totem's PACKED GUID; the inherited
+    // read took a raw uint64 and discarded it.
     uint8 slotId;
-
-    recvPacket >> slotId >> Unused<uint64>();
+    ObjectGuid totemGuid = MopCompactPackets::ReadTotemDestroyed(recvPacket, slotId);
+    (void)totemGuid;                                        // slot drives the removal
 
     // ignore for remote control state
     if (!_player->IsSelfMover())

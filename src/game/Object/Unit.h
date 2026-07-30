@@ -454,6 +454,64 @@ namespace MopCompactPackets
         return ObjectGuid(raw);
     }
 
+    /// A plain byte, then one mask byte, then the present bytes of a packed
+    /// eight-byte value. Two unrelated opcodes share this exact shape at 18414
+    /// and differ only in their orders, so the walk is written once.
+    inline uint64 ReadPrefixedPackedValue(WorldPacket& in, uint8& prefix,
+        uint8 const (&maskOrder)[8], uint8 const (&byteOrder)[8])
+    {
+        in >> prefix;
+
+        uint8 value[8] = { 0, 0, 0, 0, 0, 0, 0, 0 };
+        in.ResetBitReader();
+        for (uint8 index = 0; index < 8; ++index)
+        {
+            value[maskOrder[index]] = in.ReadBit();
+        }
+        for (uint8 index = 0; index < 8; ++index)
+        {
+            in.ReadByteSeq(value[byteOrder[index]]);
+        }
+
+        uint64 raw = 0;
+        for (uint8 index = 0; index < 8; ++index)
+        {
+            raw |= uint64(value[index]) << (8 * index);
+        }
+        return raw;
+    }
+
+    /// CMSG_TOTEM_DESTROYED (0x1263): the slot, then the totem's packed GUID.
+    /// The inherited reader took the slot then a raw uint64 it discarded.
+    inline ObjectGuid ReadTotemDestroyed(WorldPacket& in, uint8& slotId)
+    {
+        uint8 const maskOrder[] = { 4, 2, 1, 3, 0, 6, 7, 5 };
+        uint8 const byteOrder[] = { 6, 2, 4, 1, 5, 0, 3, 7 };
+        return ObjectGuid(ReadPrefixedPackedValue(in, slotId, maskOrder, byteOrder));
+    }
+
+    /// CMSG_SET_ACTION_BUTTON (0x1F8C): the button, then a packed eight-byte
+    /// value, byte-for-byte identical to the client's writer sub_669CAE.
+    ///
+    /// The value is NOT the pre-MoP packed uint32. The action occupies the full
+    /// low 32 bits rather than 24, and the type is byte 7 -- so the inherited
+    /// ACTION_BUTTON_ACTION and ACTION_BUTTON_TYPE macros, which split a uint32
+    /// at bit 24, cut it in the wrong place. Bytes 4 to 6 belong to neither
+    /// field, are never set on the wire, and are not read here.
+    ///
+    /// The client dispatches on the type's HIGH NIBBLE: its four predicates all
+    /// test type & 0xF0. Callers should do the same rather than switch on the
+    /// exact byte, since a low-nibble modifier is plausible and unproven.
+    inline void ReadSetActionButton(WorldPacket& in, uint8& button,
+        uint32& action, uint8& type)
+    {
+        uint8 const maskOrder[] = { 7, 0, 5, 2, 1, 6, 3, 4 };
+        uint8 const byteOrder[] = { 6, 7, 3, 5, 2, 1, 4, 0 };
+        uint64 const packed = ReadPrefixedPackedValue(in, button, maskOrder, byteOrder);
+        action = uint32(packed & UINT64_C(0xFFFFFFFF));
+        type = uint8((packed >> 56) & 0xFF);
+    }
+
     inline void BuildAttackStart(WorldPacket& out, uint64 attackerGuid,
         uint64 victimGuid)
     {

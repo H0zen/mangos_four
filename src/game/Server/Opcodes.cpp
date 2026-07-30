@@ -1253,6 +1253,16 @@ void InitializeOpcodes()
     // the others as each reply is converted and admitted.
     DefC(CMSG_MAIL_MARK_AS_READ, "CMSG_MAIL_MARK_AS_READ", STATUS_LOGGEDIN, PROCESS_THREADUNSAFE, &WorldSession::HandleMailMarkAsRead);
 
+    // Both send no reply, so neither carries the unpaired-response hazard that
+    // holds the rest of the mail family back. Each is a plain byte, a mask byte
+    // and a packed value; the inherited readers took raw scalars.
+    //
+    // CMSG_SET_ACTION_BUTTON is additionally proven against the client's own
+    // writer sub_669CAE, and its action field is a full 32 bits where the
+    // inherited macro cut it at 24.
+    DefC(CMSG_TOTEM_DESTROYED, "CMSG_TOTEM_DESTROYED", STATUS_LOGGEDIN, PROCESS_THREADUNSAFE, &WorldSession::HandleTotemDestroyed);
+    DefC(CMSG_SET_ACTION_BUTTON, "CMSG_SET_ACTION_BUTTON", STATUS_LOGGEDIN, PROCESS_THREADUNSAFE, &WorldSession::HandleSetActionButtonOpcode);
+
     // CMSG_CONTACT_LIST (0x0BB4, 4,122 observed) is deliberately NOT registered,
     // and this note exists because it looks safe and is not.
     //

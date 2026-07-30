@@ -175,9 +175,9 @@
  *   TOTAL SMSG rows                   925
  *
  * SUBSYSTEM CONFIDENCE: high=365, low=221, medium=182, none=157
- * STATUS TOTALS: ACTIVE=475, DOC=435, DORMANT=610
+ * STATUS TOTALS: ACTIVE=477, DOC=435, DORMANT=608
  *   SMSG: ACTIVE=285, DOC=271, DORMANT=369
- *   CMSG: ACTIVE=190, DOC=164, DORMANT=241
+ *   CMSG: ACTIVE=192, DOC=164, DORMANT=239
  */
 
 // CAVEATS -- read before trusting any single row:
@@ -1723,7 +1723,7 @@ typedef uint16_t uint16;
  *   CMSG_GET_ITEM_PURCHASE_DATA                    0x1258  DORMANT
  *   CMSG_INSPECT                                   0x1259  ACTIVE
  *   CMSG_SET_LOOT_SPECIALIZATION                   0x1260  DOC
- *   CMSG_TOTEM_DESTROYED                           0x1263  DORMANT
+ *   CMSG_TOTEM_DESTROYED                           0x1263  ACTIVE
  *   CMSG_SHOWING_HELM                              0x126B  ACTIVE
  *   CMSG_MAIL_CREATE_TEXT_ITEM                     0x1270  DORMANT
  *   CMSG_CANCEL_AUTO_REPEAT_SPELL                  0x1272  DORMANT
@@ -1889,7 +1889,7 @@ typedef uint16_t uint16;
  *   CMSG_COMPLETE_CINEMATIC                        0x1F34  ACTIVE
  *   CMSG_UNKNOWN_0x1F88                            0x1F88  DOC
  *   CMSG_GMTICKET_GETTICKET                        0x1F89  ACTIVE
- *   CMSG_SET_ACTION_BUTTON                         0x1F8C  DORMANT
+ *   CMSG_SET_ACTION_BUTTON                         0x1F8C  ACTIVE
  *   CMSG_CALENDAR_UPDATE_EVENT                     0x1F8D  DORMANT
  *   CMSG_CHANGEPLAYER_DIFFICULTY                   0x1F8E  DORMANT
  *   CMSG_CALENDAR_COMPLAIN                         0x1F8F  DORMANT

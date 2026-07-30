@@ -1582,6 +1582,93 @@ static void test_mail_family_matches_retail_bodies()
     }
 }
 
+/// CMSG_TOTEM_DESTROYED and CMSG_SET_ACTION_BUTTON, pinned to real 18414 bodies.
+///
+/// Both are a plain byte, a mask byte, then the present bytes of a packed value.
+/// Four distinct masks each. The action button is additionally byte-for-byte
+/// identical to the client's writer sub_669CAE, which is what proves its orders
+/// rather than merely constraining them.
+///
+/// The empty action-button body is the important one: mask 0x00 means every byte
+/// of the packed value is absent, so the whole request is two bytes and clears
+/// the slot. A reader expecting a fixed uint32 cannot express that at all.
+static void test_totem_and_action_button_bodies()
+{
+    struct Totem { char const* what; uint8_t body[9]; size_t length; uint8 slot; uint64 guid; };
+    Totem const totems[] = {
+        { "totem mask A7", { 0x00, 0xA7, 0x31, 0x0C, 0x92, 0x67, 0xF0 }, 7, 0,
+          UINT64_C(0xF130660D00009300) },
+        { "totem mask 8F", { 0x00, 0x8F, 0x31, 0x07, 0xE9, 0x80, 0xF0 }, 7, 0,
+          UINT64_C(0xF130E80600000081) },
+        { "totem mask AF", { 0x01, 0xAF, 0x31, 0x20, 0x09, 0xBB, 0x84, 0xF0 }, 8, 1,
+          UINT64_C(0xF130BA2100000885) },
+        { "totem mask E7", { 0x00, 0xE7, 0x31, 0x26, 0xEA, 0xB6, 0xA8, 0xF0 }, 8, 0,
+          UINT64_C(0xF130A9EB0027B700) },
+    };
+    for (size_t i = 0; i < sizeof(totems) / sizeof(totems[0]); ++i)
+    {
+        WorldPacket p(CMSG_TOTEM_DESTROYED, uint32(totems[i].length));
+        p.append(totems[i].body, totems[i].length);
+        uint8 slot = 0xFF;
+        ObjectGuid const guid = MopCompactPackets::ReadTotemDestroyed(p, slot);
+        if (slot != totems[i].slot || guid.GetRawValue() != totems[i].guid ||
+            p.rpos() != p.size())
+        {
+            std::fprintf(stderr, "FAIL %s: slot %u guid 0x%016llX consumed %u/%u\n",
+                         totems[i].what, unsigned(slot),
+                         (unsigned long long)guid.GetRawValue(),
+                         unsigned(p.rpos()), unsigned(p.size()));
+            ++g_fail;
+        }
+        // Every totem here is a creature, which is the check outside the packet.
+        CHECK((guid.GetRawValue() >> 52) == 0xF13);
+    }
+
+    struct Button { char const* what; uint8_t body[6]; size_t length; uint8 slot; uint32 action; };
+    Button const buttons[] = {
+        { "action button cleared", { 0x0C, 0x00 }, 2, 12, 0 },
+        { "action button mask 40", { 0x09, 0x40, 0x8A }, 3, 9, 139 },
+        { "action button mask 48", { 0x00, 0x48, 0x00, 0x92 }, 4, 0, 403 },
+        { "action button mask 18", { 0x3F, 0x18, 0x00, 0xA6 }, 4, 63, 108288 },
+    };
+    for (size_t i = 0; i < sizeof(buttons) / sizeof(buttons[0]); ++i)
+    {
+        WorldPacket p(CMSG_SET_ACTION_BUTTON, uint32(buttons[i].length));
+        p.append(buttons[i].body, buttons[i].length);
+        uint8 slot = 0xFF, type = 0xFF;
+        uint32 action = 0xFFFFFFFF;
+        MopCompactPackets::ReadSetActionButton(p, slot, action, type);
+        if (slot != buttons[i].slot || action != buttons[i].action || type != 0 ||
+            p.rpos() != p.size())
+        {
+            std::fprintf(stderr, "FAIL %s: slot %u action %u type %u consumed %u/%u\n",
+                         buttons[i].what, unsigned(slot), action, unsigned(type),
+                         unsigned(p.rpos()), unsigned(p.size()));
+            ++g_fail;
+        }
+    }
+
+    {   // CONSTRUCTED, not observed: no corpus body sets the action's high byte,
+        // so this one is built to the layout to pin the field's WIDTH. The action
+        // occupies the full low 32 bits, and the inherited macro cut it at 24, so
+        // a value above 0x00FFFFFF would have been silently truncated.
+        //
+        // Mask 0x42 marks byte0 (bit 6) and byte3 (bit 1) present. The byte order
+        // reaches byte3 before byte0, and each is sent XOR 1, giving 0x03 then
+        // 0x00 for the real values 0x02 and 0x01.
+        uint8_t const wide[] = { 0x01, 0x42, 0x03, 0x00 };
+        WorldPacket p(CMSG_SET_ACTION_BUTTON, sizeof(wide));
+        p.append(wide, sizeof(wide));
+        uint8 slot = 0, type = 0;
+        uint32 action = 0;
+        MopCompactPackets::ReadSetActionButton(p, slot, action, type);
+        CHECK(p.rpos() == p.size());
+        CHECK(slot == 0x01);
+        CHECK(action == 0x02000001u);                       // survives past bit 24
+        CHECK(type == 0);
+    }
+}
+
 static void test_opcode_values_are_framable()
 {
     CHECK(uint32_t(SMSG_ATTACKSWING_ERROR) == 0x11E1u);
@@ -1670,6 +1757,7 @@ int main(int /*argc*/, char** /*argv*/)
     test_pet_name_query_matches_retail_bodies();
     test_lfg_join_matches_retail_bodies();
     test_mail_family_matches_retail_bodies();
+    test_totem_and_action_button_bodies();
     test_run_speed_differs_from_swim_interleave();
     test_swim_speed_guid_layouts();
     test_random_roll_guid_layouts();
