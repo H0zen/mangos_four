@@ -499,9 +499,15 @@ namespace MopCompactPackets
     /// at bit 24, cut it in the wrong place. Bytes 4 to 6 belong to neither
     /// field, are never set on the wire, and are not read here.
     ///
-    /// The client dispatches on the type's HIGH NIBBLE: its four predicates all
-    /// test type & 0xF0. Callers should do the same rather than switch on the
-    /// exact byte, since a low-nibble modifier is plausible and unproven.
+    /// The client dispatches on the type's HIGH NIBBLE -- every one of its type
+    /// predicates tests type & 0xF0 -- so callers should do the same rather than
+    /// switch on the exact byte.
+    ///
+    /// There are MORE families than this tree's enum knows. The client tests at
+    /// least 0x00, 0x10, 0x30, 0x40, 0x50 and 0x80 (sub_8B5DF1, sub_8B5EAF,
+    /// sub_8B5EE0, sub_8B5E4D, sub_8B5E7E, sub_8B5E1C). An earlier note here said
+    /// four, which undercounted. 0x10 and 0x50 have no entry in ActionButtonType
+    /// and no observed body carries them, so their meaning is unrecovered.
     inline void ReadSetActionButton(WorldPacket& in, uint8& button,
         uint32& action, uint8& type)
     {

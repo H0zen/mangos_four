@@ -1261,7 +1261,15 @@ void InitializeOpcodes()
     // writer sub_669CAE, and its action field is a full 32 bits where the
     // inherited macro cut it at 24.
     DefC(CMSG_TOTEM_DESTROYED, "CMSG_TOTEM_DESTROYED", STATUS_LOGGEDIN, PROCESS_THREADUNSAFE, &WorldSession::HandleTotemDestroyed);
-    DefC(CMSG_SET_ACTION_BUTTON, "CMSG_SET_ACTION_BUTTON", STATUS_LOGGEDIN, PROCESS_THREADUNSAFE, &WorldSession::HandleSetActionButtonOpcode);
+
+    // CMSG_SET_ACTION_BUTTON is HELD. Its body is proven -- the reader matches
+    // the client's writer sub_669CAE element for element and its fixtures stand
+    // -- but the handler's type allowlist is narrower than the client's. The
+    // client tests at least six high-nibble families and two of them, 0x10 and
+    // 0x50, have no entry in ActionButtonType, so a button of either kind would
+    // reach the default branch and be silently dropped. Losing a legitimate
+    // button is a misparse by another name. Promote once those two are
+    // identified and accepted.
 
     // CMSG_CONTACT_LIST (0x0BB4, 4,122 observed) is deliberately NOT registered,
     // and this note exists because it looks safe and is not.

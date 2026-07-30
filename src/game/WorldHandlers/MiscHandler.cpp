@@ -1120,20 +1120,10 @@ void WorldSession::HandleSetActionButtonOpcode(WorldPacket& recv_data)
 
     DETAIL_LOG("BUTTON: %u ACTION: %u TYPE: %u", button, action, type);
 
-    // The wire carries a 32-bit action, but storage does not. ActionButton packs
-    // the action and the type into one uint32 as action | type << 24, and
-    // GetAction masks back to 24 bits, so anything above 0x00FFFFFF would
-    // overflow into the type and come back as a different kind of button. No
-    // observed action approaches that -- spell, item and macro ids all sit well
-    // inside 24 bits -- so refuse the value rather than widen the store on
-    // speculation, and say so if it ever appears.
-    if (action > 0x00FFFFFFu)
-    {
-        sLog.outError("CMSG_SET_ACTION_BUTTON from %s carries action %u for button %u, "
-                      "which exceeds the 24 bits this tree can store; request refused.",
-                      GetPlayerName(), action, button);
-        return;
-    }
+    // The wire carries a 32-bit action and storage holds 24, but nothing is
+    // needed here: IsActionButtonDataValid already rejects anything at or above
+    // MAX_ACTION_BUTTON_ACTION_VALUE, and addActionButton runs it for the active
+    // spec. A guard was briefly added at this level and was pure duplication.
 
     if (!action && !type)
     {
