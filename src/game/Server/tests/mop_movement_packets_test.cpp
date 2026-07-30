@@ -1747,11 +1747,10 @@ static void test_root_halves_and_scalars()
 /// is exercised rather than just its presence -- DISABLE puts five bytes before
 /// and three after, ENABLE seven before and one after.
 ///
-/// These fixtures pin the LAYOUTS, which are settled. They say nothing about the
-/// SENSE -- which opcode the client treats as gravity off -- because that is not
-/// decidable from the client at all: no gravity strings in either binary,
-/// no boolean in the readers, generic obfuscated post-handlers. A live test
-/// settles that, and the tree at least now uses one convention on both halves.
+/// These fixtures pin the LAYOUTS. The SENSE was not decidable from the binary
+/// and was settled by live test instead: with levitate on, the client holds the
+/// player at altitude and refuses to jump, and acknowledges each packet with the
+/// matching ack. So levitate-on = DISABLE is confirmed, not assumed.
 static void test_gravity_family_retail_bodies()
 {
     struct Case { uint64 guid; uint32 counter; uint8 const* body; size_t size; };

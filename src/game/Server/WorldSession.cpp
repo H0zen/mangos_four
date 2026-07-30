@@ -342,12 +342,11 @@ static bool IsEnterWorldConverted(uint16 opcode)
         case SMSG_SPLINE_MOVE_SET_FLYING:          // MopCompactPackets::BuildSplineMoveSetFlying
         case SMSG_SPLINE_MOVE_UNSET_FLYING:        // MopCompactPackets::BuildSplineMoveUnsetFlying
         case SMSG_SEND_MAIL_RESULT:                // MopCompactPackets::BuildSendMailResult
-        // Gravity, admitted so the sense can be tested against a live client --
-        // which is the only thing that can settle it. Layouts are reader-derived
-        // and fixtured; both halves agree on levitate-on = DISABLE. If the
-        // client shows that inverted, swap the two Initialize/Build pairs in
-        // Unit::BuildMoveLevitatePacket and the two conditionals in
-        // Player::SetLevitate and Creature::SetLevitate.
+        // Gravity, admitted and CONFIRMED against a live 18414 client: the mover
+        // floats and holds altitude, the client stops sending CMSG_MOVE_JUMP
+        // rather than having one rejected, and it acknowledges each packet with
+        // the matching ack. Layouts were reader-derived and are byte-exact on
+        // the live wire, not only against captured bodies.
         case SMSG_MOVE_GRAVITY_DISABLE:            // MopCompactPackets::BuildMoveGravityDisable
         case SMSG_MOVE_GRAVITY_ENABLE:             // MopCompactPackets::BuildMoveGravityEnable
         case SMSG_SPLINE_MOVE_GRAVITY_DISABLE:     // MopCompactPackets::BuildSplineMoveGravityDisable

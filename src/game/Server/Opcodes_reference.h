@@ -175,8 +175,8 @@
  *   TOTAL SMSG rows                   925
  *
  * SUBSYSTEM CONFIDENCE: high=365, low=221, medium=182, none=157
- * STATUS TOTALS: ACTIVE=489, DOC=435, DORMANT=596
- *   SMSG: ACTIVE=290, DOC=271, DORMANT=364
+ * STATUS TOTALS: ACTIVE=493, DOC=435, DORMANT=592
+ *   SMSG: ACTIVE=294, DOC=271, DORMANT=360
  *   CMSG: ACTIVE=199, DOC=164, DORMANT=232
  */
 
@@ -1026,9 +1026,9 @@ typedef uint16_t uint16;
  *   SMSG_SPLINE_MOVE_ROOT                          0x0728  DORMANT
  *   SMSG_MOVE_SET_SWIM_SPEED                       0x0817  ACTIVE
  *   SMSG_SPLINE_MOVE_SET_TURN_RATE                 0x0832  ACTIVE
- *   SMSG_SPLINE_MOVE_GRAVITY_DISABLE               0x0845  DORMANT
+ *   SMSG_SPLINE_MOVE_GRAVITY_DISABLE               0x0845  ACTIVE
  *   SMSG_MOVE_SET_VEHICLE_REC_ID                   0x0861  DORMANT
- *   SMSG_SPLINE_MOVE_GRAVITY_ENABLE                0x0865  DORMANT
+ *   SMSG_SPLINE_MOVE_GRAVITY_ENABLE                0x0865  ACTIVE
  *   SMSG_MOVE_UNSET_CAN_TRANSITION_BETWEEN_SWIM_AND_FLY 0x0868  DORMANT
  *   SMSG_MOVE_LAND_WALK                            0x086A  DORMANT
  *   SMSG_MOVE_UPDATE_RUN_BACK_SPEED                0x08A3  DORMANT
@@ -1038,7 +1038,7 @@ typedef uint16_t uint16;
  *   SMSG_MOVE_UPDATE_PITCH_RATE                    0x09E2  DOC
  *   SMSG_UNKNOWN_0x0A02                            0x0A02  DOC
  *   SMSG_UNKNOWN_0x0A03                            0x0A03  DOC
- *   SMSG_MOVE_GRAVITY_ENABLE                       0x0A27  DORMANT
+ *   SMSG_MOVE_GRAVITY_ENABLE                       0x0A27  ACTIVE
  *   SMSG_MOVE_SET_RUN_BACK_SPEED                   0x0A83  ACTIVE
  *   SMSG_SPLINE_MOVE_SET_PITCH_RATE                0x0AB3  ACTIVE
  *   SMSG_MOVE_UPDATE_APPLY_MOVEMENT_FORCE          0x0AB6  DORMANT
@@ -1066,7 +1066,7 @@ typedef uint16_t uint16;
  *   SMSG_HIGHEST_THREAT_UPDATE                     0x14AE  ACTIVE   [high-conf]
  *   SMSG_UNKNOWN_0x1553                            0x1553  DOC
  *   SMSG_MOVE_UPDATE_RUN_SPEED                     0x158E  DORMANT
- *   SMSG_MOVE_GRAVITY_DISABLE                      0x159F  DORMANT
+ *   SMSG_MOVE_GRAVITY_DISABLE                      0x159F  ACTIVE
  *   SMSG_MOVE_UPDATE_TELEPORT                      0x15A9  DOC
  *   SMSG_FORCE_MOVE_ROOT                           0x15AE  DORMANT
  *   SMSG_MOVE_COLLISION_DISABLE                    0x15B8  DORMANT

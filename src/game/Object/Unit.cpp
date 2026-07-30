@@ -6864,12 +6864,12 @@ void Unit::BuildMoveHoverPacket(WorldPacket* data, bool apply, uint32 value)
 void Unit::BuildMoveLevitatePacket(WorldPacket* data, bool apply, uint32 value)
 {
     // apply == levitating == gravity does NOT act on this unit, so the enable
-    // flag selects the DISABLE opcode. This file had it the other way round
-    // while Creature::SetLevitate had it this way, so mover and observers were
-    // told opposite things about the same event. The absolute sense -- which
-    // opcode the client treats as gravity off -- is not decidable from the
-    // binary and needs a live test; the two halves agreeing is decidable and is
-    // fixed here.
+    // flag selects the DISABLE opcode. Confirmed live: with this on, the client
+    // holds the player at whatever altitude they are at and refuses to jump.
+    //
+    // This file had it the other way round while Creature::SetLevitate had it
+    // this way, so mover and observers were told opposite things about one
+    // event. Creature was correct.
     if (apply)
     {
         data->Initialize(SMSG_MOVE_GRAVITY_DISABLE, 13);

@@ -300,11 +300,11 @@ endif()
 
 # --- Gravity: the two halves must use ONE convention ------------------------
 #
-# The absolute sense is undecidable from the client, so this does not assert
-# which opcode means gravity-off. It asserts the thing that IS decidable and was
-# wrong: Creature::SetLevitate mapped levitate-on to DISABLE while
-# Unit::BuildMoveLevitatePacket mapped it to ENABLE, so the mover and the
-# observers were told opposite things about one event.
+# levitate-on = DISABLE is confirmed against a live 18414 client: the mover
+# floats and holds altitude, and the client refuses to jump. This guard keeps the
+# two halves using that one convention -- they previously disagreed, with
+# Creature::SetLevitate mapping levitate-on to DISABLE and
+# Unit::BuildMoveLevitatePacket mapping it to ENABLE.
 
 string(FIND "${PLAYER_SOURCE}" "void Player::SetLevitate(bool enable)" LEV_START)
 if(LEV_START EQUAL -1)
@@ -598,7 +598,7 @@ foreach(SETTER_NAME SetRoot SetWaterWalk SetLevitate SetCanFly SetFeatherFall Se
     endif()
 endforeach()
 
-# Gravity is now admitted, so it joins the completeness list above rather than
-# being asserted absent. The sense remains a live-client question; the guard that
-# both halves agree on one convention is further up this file and still applies.
+# Gravity is admitted and its sense is confirmed live, so it sits in the
+# completeness list above. The guard that both halves use one convention is
+# further up this file and still applies.
 

@@ -919,6 +919,16 @@ void InitializeOpcodes()
     DefS(SMSG_MONSTER_MOVE, "SMSG_MONSTER_MOVE");
     DefS(SMSG_SPLINE_MOVE_SET_NORMAL_FALL, "SMSG_SPLINE_MOVE_SET_NORMAL_FALL");
     DefS(SMSG_SPLINE_MOVE_SET_WATER_WALK, "SMSG_SPLINE_MOVE_SET_WATER_WALK");
+
+    // Names for the packet log. DefS is logging metadata, NOT a gate -- these
+    // four transmit either way. Without a row they appear as
+    // "OPCODE: UNKNOWN (0x159F)", which is what they did during the live test
+    // that confirmed this family, and it made them invisible to an
+    // opcode-name search of the capture.
+    DefS(SMSG_MOVE_GRAVITY_DISABLE, "SMSG_MOVE_GRAVITY_DISABLE");
+    DefS(SMSG_MOVE_GRAVITY_ENABLE, "SMSG_MOVE_GRAVITY_ENABLE");
+    DefS(SMSG_SPLINE_MOVE_GRAVITY_DISABLE, "SMSG_SPLINE_MOVE_GRAVITY_DISABLE");
+    DefS(SMSG_SPLINE_MOVE_GRAVITY_ENABLE, "SMSG_SPLINE_MOVE_GRAVITY_ENABLE");
     DefS(SMSG_SPLINE_MOVE_SET_FEATHER_FALL, "SMSG_SPLINE_MOVE_SET_FEATHER_FALL");
     DefS(SMSG_SPLINE_MOVE_SET_LAND_WALK, "SMSG_SPLINE_MOVE_SET_LAND_WALK");
 

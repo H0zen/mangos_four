@@ -1011,17 +1011,23 @@ namespace MopCompactPackets
     /// C8xxxx reader cluster, which looked like a routing error and is not --
     /// the 64-bit client places it out-of-cluster too.
     ///
-    /// The layouts are settled. What is NOT settled is the SENSE: which opcode
-    /// the client treats as gravity off. There are no "gravity" strings in either
-    /// binary, neither reader carries a boolean, and the post-handlers are
-    /// generic obfuscated trampolines, so it is not decidable from the client.
-    /// Only a live test settles it.
+    /// The SENSE was not decidable from the binary -- no "gravity" strings in
+    /// either image, no boolean in the readers, generic obfuscated
+    /// post-handlers -- so it was settled by live test instead. levitate-on selects DISABLE, and that is CONFIRMED against a live 18414
+    /// client: the mover floats and holds altitude, the client refuses to jump
+    /// locally (it stops sending CMSG_MOVE_JUMP entirely rather than having one
+    /// rejected), and it acknowledges each packet with the matching ack --
+    /// 0x09D3 for DISABLE, 0x11D8 for ENABLE.
     ///
-    /// What IS decidable, and was wrong, is internal consistency: this tree had
-    /// Creature::SetLevitate mapping levitate-on to GRAVITY_DISABLE while
-    /// Unit::BuildMoveLevitatePacket mapped it to GRAVITY_ENABLE. Whichever
-    /// opcode truly means gravity off, both halves must agree or the mover and
-    /// the observers are told opposite things about the same event.
+    /// Live capture, GUID 0x1, counters 4 then 5:
+    ///     .levitate on   0x159F  01 00 04 00 00 00
+    ///     .levitate off  0x0A27  40 00 05 00 00 00
+    /// Both consumed exactly by an independent decoder.
+    ///
+    /// This tree also disagreed with itself: Creature::SetLevitate mapped
+    /// levitate-on to DISABLE while Unit::BuildMoveLevitatePacket mapped it to
+    /// ENABLE, so mover and observers were told opposite things. Creature had it
+    /// right.
     inline void BuildMoveGravityDisable(WorldPacket& out, uint64 moverGuid, uint32 counter)
     {
         uint8 const maskOrder[] = { 6, 1, 3, 7, 4, 2, 5, 0 };

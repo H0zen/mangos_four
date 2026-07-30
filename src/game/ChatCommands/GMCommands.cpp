@@ -272,12 +272,9 @@ bool ChatHandler::HandleHoverCommand(char* args)
  * Same situation as hover: Player::SetLevitate had no callers, so the gravity
  * family could not be exercised from the GM surface at all.
  *
- * NOTE the four gravity opcodes are deliberately NOT admitted to the in-world
- * send gate yet, because which opcode the client treats as gravity-off is not
- * decidable from the binary. This command exists so that question can be
- * answered by looking at the client. Until the opcodes are admitted it will
- * report success and change the server's flag while the packets are dropped --
- * which is why the message says so rather than claiming the client was told.
+ * This command is what settled the gravity sense, which was not decidable from
+ * the binary. With it on, the client holds the player at whatever altitude they
+ * are at and refuses to jump -- gravity genuinely off.
  *
  * @param args "on" or "off".
  * @returns True if the command executed successfully, false otherwise.
@@ -308,9 +305,12 @@ bool ChatHandler::HandleLevitateCommand(char* args)
 
     player->SetLevitate(value);
 
-    PSendSysMessage("Levitate %s for %s (gravity opcodes are held out of the send "
-                    "gate until their sense is confirmed).",
-                    value ? "ON" : "OFF", GetNameLink(player).c_str());
+    PSendSysMessage("Levitate %s for %s.", value ? "ON" : "OFF", GetNameLink(player).c_str());
+    if (needReportToTarget(player))
+    {
+        ChatHandler(player).PSendSysMessage("%s set your levitate mode to %s.",
+                                            GetNameLink().c_str(), value ? "ON" : "OFF");
+    }
     return true;
 }
 
