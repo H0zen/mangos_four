@@ -96,6 +96,15 @@ void Player::SetRoot(bool enable)
 /**
  * @brief Enables or disables water walking for the player.
  *
+ * The same pair rule as SetCanFly: the mover is told with SMSG_MOVE_WATER_WALK /
+ * SMSG_MOVE_LAND_WALK, which carry a movement counter, and observers with
+ * SMSG_SPLINE_MOVE_SET_WATER_WALK / SMSG_SPLINE_MOVE_SET_LAND_WALK, which do
+ * not. Only the mover half was sent, and its body was wrong in every field, so
+ * this changed nothing on any screen.
+ *
+ * This runs well beyond .waterwalk: it also fires on death and on ghost login,
+ * so a broken pair leaves corpses walking into water.
+ *
  * @param enable True to enable water walking; false to restore normal movement.
  */
 void Player::SetWaterWalk(bool enable)
@@ -103,6 +112,23 @@ void Player::SetWaterWalk(bool enable)
     WorldPacket data;
     BuildMoveWaterWalkPacket(&data, enable, 0);
     GetSession()->SendPacket(&data);
+
+    if (!IsInWorld())
+    {
+        return;
+    }
+
+    WorldPacket spline(enable ? SMSG_SPLINE_MOVE_SET_WATER_WALK : SMSG_SPLINE_MOVE_SET_LAND_WALK, 9);
+    if (enable)
+    {
+        MopCompactPackets::BuildSplineMoveSetWaterWalk(spline, GetObjectGuid());
+    }
+    else
+    {
+        MopCompactPackets::BuildSplineMoveSetLandWalk(spline, GetObjectGuid());
+    }
+
+    SendMessageToSet(&spline, false);
 }
 
 /**

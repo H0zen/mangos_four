@@ -826,6 +826,43 @@ namespace MopCompactPackets
         for (uint8 index : afterCounter) { out.WriteByteSeq(SwimSpeedGuidByte(moverGuid, index)); }
     }
 
+    /// Water walking, mover halves. Readers sub_C8F544 (0x1F9A) and sub_C8DFF2
+    /// (0x086A), reached through the movement dispatcher sub_C80E74 at cases 314
+    /// and 410; the dispatcher's case formula was validated against two opcodes
+    /// whose readers are already pinned in this file before being trusted here.
+    ///
+    /// Both replace inherited orders that were wrong in every field. The old
+    /// bodies were the right LENGTH, so nothing caught them: this family is a
+    /// mask byte, some XOR-1 GUID bytes and a uint32 in some order, and every
+    /// permutation of that occupies the same space.
+    inline void BuildMoveWaterWalk(WorldPacket& out, uint64 moverGuid, uint32 counter)
+    {
+        uint8 const maskOrder[] = { 2, 0, 4, 5, 3, 7, 1, 6 };
+        uint8 const byteOrder[] = { 4, 7, 0, 1, 6, 2, 3, 5 };
+
+        for (uint8 index : maskOrder) { out.WriteBit(SwimSpeedGuidByte(moverGuid, index) != 0); }
+        out.FlushBits();
+        for (uint8 index : byteOrder) { out.WriteByteSeq(SwimSpeedGuidByte(moverGuid, index)); }
+        out << uint32(counter);
+    }
+
+    /// Land walk splits its GUID around the counter: byte 5 is written AFTER the
+    /// uint32, alone. That is the reader's order, not a guess -- but note that
+    /// byte 5 is absent from every captured body, because the GUIDs observed all
+    /// have a zero there, so the fixtures below cannot exercise that arm. It
+    /// rests on sub_C8DFF2 alone.
+    inline void BuildMoveLandWalk(WorldPacket& out, uint64 moverGuid, uint32 counter)
+    {
+        uint8 const maskOrder[] = { 0, 7, 3, 1, 6, 5, 2, 4 };
+        uint8 const beforeCounter[] = { 7, 6, 4, 3, 2, 0, 1 };
+
+        for (uint8 index : maskOrder) { out.WriteBit(SwimSpeedGuidByte(moverGuid, index) != 0); }
+        out.FlushBits();
+        for (uint8 index : beforeCounter) { out.WriteByteSeq(SwimSpeedGuidByte(moverGuid, index)); }
+        out << uint32(counter);
+        out.WriteByteSeq(SwimSpeedGuidByte(moverGuid, 5));
+    }
+
     /// The observer halves. No counter at all -- the mask and the bytes are the
     /// whole body. Landing these with the mover pair is the point: admitting one
     /// side alone is what left four other movement states telling everyone except

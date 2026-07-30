@@ -6827,17 +6827,12 @@ void Unit::BuildMoveWaterWalkPacket(WorldPacket* data, bool apply, uint32 value)
     if (apply)
     {
         data->Initialize(SMSG_MOVE_WATER_WALK, 13);
-        data->WriteGuidMask<4, 7, 6, 0, 1, 3, 5, 2>(GetObjectGuid());
-        data->WriteGuidBytes<0, 5, 2>(GetObjectGuid());
-        *data << uint32(value);
-        data->WriteGuidBytes<7, 3, 4, 1, 6>(GetObjectGuid());
+        MopCompactPackets::BuildMoveWaterWalk(*data, GetObjectGuid().GetRawValue(), value);
     }
     else
     {
         data->Initialize(SMSG_MOVE_LAND_WALK, 13);
-        data->WriteGuidMask<5, 1, 6, 2, 3, 4, 0, 7>(GetObjectGuid());
-        data->WriteGuidBytes<6, 1, 7, 5, 4, 0, 3, 2>(GetObjectGuid());
-        *data << uint32(value);
+        MopCompactPackets::BuildMoveLandWalk(*data, GetObjectGuid().GetRawValue(), value);
     }
 }
 

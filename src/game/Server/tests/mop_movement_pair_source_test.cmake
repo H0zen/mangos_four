@@ -28,6 +28,12 @@ elseif(MUTATION STREQUAL "drop_mover_half")
 elseif(MUTATION STREQUAL "observer_half_to_self")
     string(REPLACE "SendMessageToSet(&spline, false);" "SendMessageToSet(&spline, true);"
         PLAYER_SOURCE "${PLAYER_SOURCE}")
+elseif(MUTATION STREQUAL "drop_waterwalk_observer")
+    string(REGEX REPLACE "BuildSplineMoveSetWaterWalk[(]spline, GetObjectGuid[(][)][)];" ""
+        PLAYER_SOURCE "${PLAYER_SOURCE}")
+elseif(MUTATION STREQUAL "unadmitted_water_mover")
+    string(REGEX REPLACE "case SMSG_MOVE_WATER_WALK:" ""
+        SESSION_SOURCE "${SESSION_SOURCE}")
 elseif(MUTATION STREQUAL "unadmitted_spline")
     string(REGEX REPLACE "case SMSG_SPLINE_MOVE_SET_FLYING:" ""
         SESSION_SOURCE "${SESSION_SOURCE}")
@@ -68,6 +74,49 @@ if(CANFLY_EXCLUDES_SELF STREQUAL "")
         "the mover must not receive a second, counter-less state change")
 endif()
 
+# --- Player::SetWaterWalk must send both halves -----------------------------
+#
+# This one runs far beyond .waterwalk: it also fires on death and on ghost login.
+
+string(FIND "${PLAYER_SOURCE}" "void Player::SetWaterWalk(bool enable)" WW_START)
+if(WW_START EQUAL -1)
+    message(FATAL_ERROR "Could not locate Player::SetWaterWalk")
+endif()
+math(EXPR WW_REMAINING "${PLAYER_LENGTH} - ${WW_START}")
+if(WW_REMAINING GREATER 1400)
+    set(WW_REMAINING 1400)
+endif()
+string(SUBSTRING "${PLAYER_SOURCE}" ${WW_START} ${WW_REMAINING} WW_BODY)
+
+string(FIND "${WW_BODY}" "BuildMoveWaterWalkPacket" WW_MOVER)
+if(WW_MOVER EQUAL -1)
+    message(FATAL_ERROR "Player::SetWaterWalk must tell the mover")
+endif()
+
+string(FIND "${WW_BODY}" "BuildSplineMoveSetWaterWalk" WW_OBS_ON)
+string(FIND "${WW_BODY}" "BuildSplineMoveSetLandWalk" WW_OBS_OFF)
+if(WW_OBS_ON EQUAL -1 OR WW_OBS_OFF EQUAL -1)
+    message(FATAL_ERROR "Player::SetWaterWalk must tell observers too")
+endif()
+
+string(REGEX MATCH "SendMessageToSet[(]&spline,[ 	]*false[)]" WW_EXCLUDES_SELF "${WW_BODY}")
+if(WW_EXCLUDES_SELF STREQUAL "")
+    message(FATAL_ERROR "Player::SetWaterWalk must broadcast the observer half with self=false")
+endif()
+
+# The mover builders must be the reader-derived ones, not the inherited orders
+# that were wrong in every field while still producing the right length.
+file(READ "${SOURCE_ROOT}/src/game/Object/Unit.cpp" UNIT_SOURCE)
+string(FIND "${UNIT_SOURCE}" "MopCompactPackets::BuildMoveWaterWalk(" WW_BUILDER)
+string(FIND "${UNIT_SOURCE}" "MopCompactPackets::BuildMoveLandWalk(" LW_BUILDER)
+if(WW_BUILDER EQUAL -1 OR LW_BUILDER EQUAL -1)
+    message(FATAL_ERROR "Unit::BuildMoveWaterWalkPacket must use the reader-derived builders")
+endif()
+string(FIND "${UNIT_SOURCE}" "WriteGuidMask<4, 7, 6, 0, 1, 3, 5, 2>" WW_LEGACY)
+if(NOT WW_LEGACY EQUAL -1)
+    message(FATAL_ERROR "The inherited water-walk mask order is still present")
+endif()
+
 # --- Creature::SetCanFly is the same pair seen from the other side ----------
 
 string(FIND "${CREATURE_SOURCE}" "void Creature::SetCanFly(bool enable)" CR_CANFLY_START)
@@ -102,7 +151,11 @@ foreach(GATED
         SMSG_MOVE_SET_CAN_FLY
         SMSG_MOVE_UNSET_CAN_FLY
         SMSG_SPLINE_MOVE_SET_FLYING
-        SMSG_SPLINE_MOVE_UNSET_FLYING)
+        SMSG_SPLINE_MOVE_UNSET_FLYING
+        SMSG_MOVE_WATER_WALK
+        SMSG_MOVE_LAND_WALK
+        SMSG_SPLINE_MOVE_SET_WATER_WALK
+        SMSG_SPLINE_MOVE_SET_LAND_WALK)
     string(FIND "${SESSION_SOURCE}" "case ${GATED}:" ADMITTED)
     if(ADMITTED EQUAL -1)
         message(FATAL_ERROR
@@ -111,4 +164,4 @@ foreach(GATED
     endif()
 endforeach()
 
-message(STATUS "mop_movement_pair_source: can-fly sends and admits both halves")
+message(STATUS "mop_movement_pair_source: can-fly and water-walk send and admit both halves")

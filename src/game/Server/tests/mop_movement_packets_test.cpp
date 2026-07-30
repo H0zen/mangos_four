@@ -1239,6 +1239,96 @@ static void test_speed_embedded_ack_write_arm()
     }
 }
 
+/// The water-walk mover halves, against real 18414 bodies.
+///
+/// These are checked differently from the observer halves above. CheckSplineStatePacket
+/// compares a builder to a re-implementation using the SAME constants, so it catches
+/// drift but is not wire evidence. Here the expected bytes ARE the wire: each fixture is
+/// a captured body, and the builder must reproduce it exactly from the GUID and counter
+/// that body decodes to.
+///
+/// That distinction mattered. The inherited builders had the wrong mask order, the wrong
+/// byte order AND the wrong counter position, yet produced bodies of the correct length,
+/// because this family is a mask byte, some XOR-1 GUID bytes and a uint32 -- and every
+/// permutation of that occupies the same space. Only byte-exact comparison sees it.
+///
+/// Two masks per opcode, chosen to differ in which GUID bytes are present.
+static void test_water_walk_mover_retail_bodies()
+{
+    struct Case
+    {
+        OpcodesList opcode;
+        uint64 guid;
+        uint32 counter;
+        uint8 const* body;
+        size_t size;
+        char const* origin;
+    };
+
+    // SMSG_MOVE_WATER_WALK 0x1F9A -- reader sub_C8F544
+    static uint8 const water10[] = {
+        0xCE, 0x05, 0xE9, 0xC9, 0x3D, 0x04, 0xC1, 0x00, 0x00, 0x00
+    };
+    static uint8 const water11[] = {
+        0xCF, 0x00, 0x07, 0x23, 0x81, 0xB3, 0x05, 0x19, 0x00, 0x00, 0x00
+    };
+    // SMSG_MOVE_LAND_WALK 0x086A -- reader sub_C8DFF2
+    static uint8 const land10[] = {
+        0xF2, 0x07, 0x06, 0x2C, 0x02, 0x4E, 0x2C, 0x02, 0x00, 0x00
+    };
+    static uint8 const land11[] = {
+        0xFA, 0x00, 0x81, 0x05, 0xB3, 0x07, 0x23, 0x81, 0x00, 0x00, 0x00
+    };
+
+    Case const cases[] = {
+        { SMSG_MOVE_WATER_WALK, UINT64_C(0x04000000053CC8E8), 193, water10, sizeof(water10), "capture-000015/25163" },
+        { SMSG_MOVE_WATER_WALK, UINT64_C(0x0180000004B22206),  25, water11, sizeof(water11), "capture-000020/27516" },
+        { SMSG_MOVE_LAND_WALK,  UINT64_C(0x06000000072D4F03), 556, land10,  sizeof(land10),  "capture-000019/112562" },
+        { SMSG_MOVE_LAND_WALK,  UINT64_C(0x0180000004B22206), 129, land11,  sizeof(land11),  "capture-000183/44649" },
+    };
+
+    for (Case const& c : cases)
+    {
+        WorldPacket packet(c.opcode, 13);
+        if (c.opcode == SMSG_MOVE_WATER_WALK)
+        {
+            MopCompactPackets::BuildMoveWaterWalk(packet, c.guid, c.counter);
+        }
+        else
+        {
+            MopCompactPackets::BuildMoveLandWalk(packet, c.guid, c.counter);
+        }
+
+        CHECK(packet.size() == c.size);
+        if (packet.size() != c.size) { continue; }
+        CHECK(std::memcmp(packet.contents(), c.body, c.size) == 0);
+    }
+}
+
+/// The two mover opcodes must not share a layout. They are the same shape and were
+/// both wrong before, so a copy-paste between them would be invisible to the
+/// fixtures above only if the fixtures were weak -- this states it directly.
+static void test_water_and_land_walk_layouts_differ()
+{
+    uint64 const guid = UINT64_C(0x8070605040302010);
+
+    WorldPacket water(SMSG_MOVE_WATER_WALK, 13);
+    MopCompactPackets::BuildMoveWaterWalk(water, guid, 7);
+
+    WorldPacket land(SMSG_MOVE_LAND_WALK, 13);
+    MopCompactPackets::BuildMoveLandWalk(land, guid, 7);
+
+    // All eight bytes present, so both bodies are 1 + 8 + 4.
+    CHECK(water.size() == 13);
+    CHECK(land.size() == 13);
+    CHECK(std::memcmp(water.contents(), land.contents(), 13) != 0);
+
+    // Land walk puts GUID byte 5 after the counter; water walk puts the counter
+    // last. So their final bytes cannot agree for this GUID.
+    CHECK(water.contents()[12] == 0x00);            // high byte of counter 7
+    CHECK(land.contents()[12] == uint8(0x60 ^ 1));  // GUID byte 5 of the test GUID, XOR 1
+}
+
 int main(int, char**)
 {
     test_thirteen_inbound_fixtures_and_exact_relay();
@@ -1254,6 +1344,8 @@ int main(int, char**)
     test_all_speed_ack_sequences_differ();
     test_speed_ack_sequences_are_distinct();
     test_spline_state_packets();
+    test_water_walk_mover_retail_bodies();
+    test_water_and_land_walk_layouts_differ();
     test_hostile_counts_rejected();
     test_opcode_values_are_framable();
     test_transport_stop_monster_move_fixture();

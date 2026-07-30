@@ -1961,7 +1961,7 @@ add_test(NAME mop_movement_pair_source
     COMMAND ${CMAKE_COMMAND} -DSOURCE_ROOT=${CMAKE_SOURCE_DIR}
         -P ${CMAKE_CURRENT_SOURCE_DIR}/mop_movement_pair_source_test.cmake)
 
-foreach(mutation IN ITEMS drop_observer_half drop_mover_half observer_half_to_self unadmitted_spline)
+foreach(mutation IN ITEMS drop_observer_half drop_mover_half observer_half_to_self unadmitted_spline drop_waterwalk_observer unadmitted_water_mover)
     add_test(NAME mop_movement_pair_source_mutation_${mutation}
         COMMAND ${CMAKE_COMMAND} -DSOURCE_ROOT=${CMAKE_SOURCE_DIR}
             -DMUTATION=${mutation}
