@@ -224,9 +224,11 @@ bool ChatHandler::HandleWaterwalkCommand(char* args)
 /**
  * @brief Toggles hover mode for the selected player.
  *
- * Hover had correct wire formats and no way to reach them: Player::SetHover had
- * no callers at all, so the family was unreachable from the GM surface even once
- * its four opcodes were rebuilt and admitted. This is the trigger.
+ * Hover had correct wire formats and no GM trigger. Aura::HandleAuraHover does
+ * call SetHover, so the path was reachable from a hover aura -- an earlier
+ * version of this comment claimed no callers at all, which was wrong and came
+ * from a truncated grep. What was missing is a way for a tester to exercise it
+ * directly, which is what this provides.
  *
  * @param args "on" or "off".
  * @returns True if the command executed successfully, false otherwise.

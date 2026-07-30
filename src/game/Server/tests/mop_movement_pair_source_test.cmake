@@ -601,4 +601,3 @@ endforeach()
 # Gravity is admitted and its sense is confirmed live, so it sits in the
 # completeness list above. The guard that both halves use one convention is
 # further up this file and still applies.
-

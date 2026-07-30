@@ -342,11 +342,18 @@ static bool IsEnterWorldConverted(uint16 opcode)
         case SMSG_SPLINE_MOVE_SET_FLYING:          // MopCompactPackets::BuildSplineMoveSetFlying
         case SMSG_SPLINE_MOVE_UNSET_FLYING:        // MopCompactPackets::BuildSplineMoveUnsetFlying
         case SMSG_SEND_MAIL_RESULT:                // MopCompactPackets::BuildSendMailResult
-        // Gravity, admitted and CONFIRMED against a live 18414 client: the mover
-        // floats and holds altitude, the client stops sending CMSG_MOVE_JUMP
-        // rather than having one rejected, and it acknowledges each packet with
-        // the matching ack. Layouts were reader-derived and are byte-exact on
-        // the live wire, not only against captured bodies.
+        // Gravity. The MOVER pair 0x159F/0x0A27 is confirmed against a live 18414
+        // client: the mover floats and holds altitude, stops sending
+        // CMSG_MOVE_JUMP rather than having one rejected, and acknowledges each
+        // packet with the matching ack.
+        //
+        // That test does NOT cover the observer pair 0x0845/0x0865. Those go out
+        // through SendMessageToSet(..., false), which excludes the mover, and the
+        // capture had no second client nearby -- so zero of them appear in it.
+        // Their layouts are reader-derived and byte-exact against captured corpus
+        // bodies, which is the same standard the other five families landed on,
+        // but "confirmed live" applies to the mover pair alone. A two-client or
+        // creature-levitate capture would close it.
         case SMSG_MOVE_GRAVITY_DISABLE:            // MopCompactPackets::BuildMoveGravityDisable
         case SMSG_MOVE_GRAVITY_ENABLE:             // MopCompactPackets::BuildMoveGravityEnable
         case SMSG_SPLINE_MOVE_GRAVITY_DISABLE:     // MopCompactPackets::BuildSplineMoveGravityDisable

@@ -33,6 +33,9 @@
  */
 
 #include "ScriptMgr.h"
+
+#include <mutex>
+#include <set>
 #include "Log.h"
 #include "ObjectMgr.h"
 #include "GridNotifiers.h"
@@ -208,21 +211,37 @@ bool ScriptAction::GetScriptProcessTargets(WorldObject* pOrigSource, WorldObject
 
             if (!pBuddy)
             {
-                // Gated because this fires on every EXECUTION, not once at load:
-                // a single piece of broken script data produced 3315 of 6222
-                // console lines in one session, drowning everything else.
+                // This fires on every EXECUTION, not once at load, so one bad
+                // row produced 3315 of 6222 console lines in a single session.
                 //
-                // LOG_FILTER_DB_STRICTED_CHECK, not LOG_FILTER_DB_SCRIPTS. The
-                // latter is documented in Log.h as "execution, not errors", so
-                // using it here would contradict its own definition; the former
-                // is the established idiom for noisy DB-data complaints and is
-                // already used that way in LootMgr and ObjectMgrCreatures.
+                // It is NOT filtered. CLAUDE.md is explicit that outError and
+                // outErrorDb must always show, and my first attempt gated this
+                // on LOG_FILTER_DB_STRICTED_CHECK, which ships enabled and would
+                // have hidden a real data fault by default. Deduplicating keeps
+                // the error while removing the flood: the first occurrence of
+                // each distinct fault reports in full, repeats stay silent.
                 //
-                // The message is unchanged and still a real data fault. Clear
-                // LogFilter_DbStrictedCheck in mangosd.conf to see it.
-                if (!sLog.HasLogFilter(LOG_FILTER_DB_STRICTED_CHECK))
+                // Keyed on the fault, not the call: script id, command and the
+                // buddy entry that could not be found. Two different broken rows
+                // still produce two errors.
                 {
-                    sLog.outErrorDb(" DB-SCRIPTS: Process table `db_scripts [type = %d]` id %u, command %u has buddy %u not found in range %u of searcher %s (data-flags %u), skipping.", m_type, m_script->id, m_script->command, m_script->buddyEntry, m_script->searchRadiusOrGuid, pSearcher->GetGuidStr().c_str(), m_script->data_flags);
+                    uint64 const faultKey = (uint64(m_script->id) << 32)
+                                          ^ (uint64(m_script->command) << 16)
+                                          ^ uint64(m_script->buddyEntry);
+
+                    static std::mutex reportedMutex;
+                    static std::set<uint64> reported;
+
+                    bool firstReport = false;
+                    {
+                        std::lock_guard<std::mutex> guard(reportedMutex);
+                        firstReport = reported.insert(faultKey).second;
+                    }
+
+                    if (firstReport)
+                    {
+                        sLog.outErrorDb(" DB-SCRIPTS: Process table `db_scripts [type = %d]` id %u, command %u has buddy %u not found in range %u of searcher %s (data-flags %u), skipping. (further occurrences of this row suppressed)", m_type, m_script->id, m_script->command, m_script->buddyEntry, m_script->searchRadiusOrGuid, pSearcher->GetGuidStr().c_str(), m_script->data_flags);
+                    }
                 }
                 return false;
             }
