@@ -254,6 +254,74 @@ namespace MopCompactPackets
         out << uint64(petNumber);
     }
 
+    /// CMSG_LFG_JOIN (0x046B), the 18414 body.
+    ///
+    ///     uint8   partyIndex          0x7F in every observed body
+    ///     uint32  unknown[3]          zero in every observed body
+    ///     uint32  roles
+    ///     22 bits dungeon count       MSB-first, packed with the two below
+    ///     8 bits  comment length
+    ///     1 bit   flag
+    ///     1 bit   flush padding
+    ///     uint32  dungeon[count]      id = value & 0xFFFFFF, type = value >> 24
+    ///     bytes   comment             length-prefixed above, NOT terminated
+    ///
+    /// Total is 21 + 4 * count + commentLength. The inherited reader shared no
+    /// field with this: it took the roles first, read a uint8 count, invented a
+    /// trailing counted array that is not on the wire, and finished with a
+    /// NUL-terminated string. Fed a real 25-byte body it decoded a count of zero
+    /// and left sixteen bytes unread.
+    ///
+    /// COUNT BOUND. The count field is 22 bits, so a client may claim up to
+    /// 4,194,303 dungeons in a 25-byte packet. The old reader resized a vector
+    /// from the count BEFORE reading, which turns that into an allocation the
+    /// packet never justified. This one refuses an impossible count outright: the
+    /// body cannot hold more entries than its remaining bytes allow, and that is
+    /// checkable before a single one is read.
+    ///
+    /// Returns false if the body cannot hold what it claims, leaving the caller
+    /// to drop the request rather than trust a partial parse.
+    inline bool ReadLfgJoin(WorldPacket& in, uint8& partyIndex, uint32& roles,
+        uint32& flag, std::vector<uint32>& dungeons, std::string& comment)
+    {
+        in >> partyIndex;
+        in.read_skip<uint32>();
+        in.read_skip<uint32>();
+        in.read_skip<uint32>();
+        in >> roles;
+
+        in.ResetBitReader();
+        uint32 const count = in.ReadBits(22);
+        uint32 const commentLength = in.ReadBits(8);
+        flag = in.ReadBits(1);
+        in.ReadBits(1);                                     // flush padding
+
+        // Every remaining entry costs four bytes and the comment costs its own
+        // length, so anything larger than that cannot be in this packet.
+        size_t const remaining = in.size() - in.rpos();
+        if (size_t(count) * 4 + size_t(commentLength) > remaining)
+        {
+            return false;
+        }
+
+        dungeons.clear();
+        dungeons.reserve(count);
+        for (uint32 index = 0; index < count; ++index)
+        {
+            uint32 slot = 0;
+            in >> slot;
+            dungeons.push_back(slot);
+        }
+
+        comment.clear();
+        if (commentLength)
+        {
+            comment.assign((char const*)in.contents() + in.rpos(), commentLength);
+            in.read_skip(commentLength);
+        }
+        return true;
+    }
+
     inline void BuildAttackStart(WorldPacket& out, uint64 attackerGuid,
         uint64 victimGuid)
     {

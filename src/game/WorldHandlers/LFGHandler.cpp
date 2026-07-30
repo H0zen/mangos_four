@@ -102,31 +102,30 @@ void WorldSession::HandleLfgJoinOpcode(WorldPacket& recv_data)
 {
     DEBUG_LOG("CMSG_LFG_JOIN");
 
-    uint8 dungeonsCount, counter2;
+    // The inherited body was the 3.3.5 shape and shared no field with 18414.
+    // See MopCompactPackets::ReadLfgJoin for the layout and for why the dungeon
+    // count is bounded before anything is read.
+    uint8 partyIndex = 0;
+    uint32 roles = 0;
+    uint32 flag = 0;
     std::string comment;
     std::vector<uint32> dungeons;
 
-    recv_data >> Unused<uint32>();                          // lfg roles
-    recv_data >> Unused<uint8>();                           // lua: GetLFGInfoLocal
-    recv_data >> Unused<uint8>();                           // lua: GetLFGInfoLocal
-
-    recv_data >> dungeonsCount;
-
-    dungeons.resize(dungeonsCount);
-
-    for (uint8 i = 0; i < dungeonsCount; ++i)
+    if (!MopCompactPackets::ReadLfgJoin(recv_data, partyIndex, roles, flag, dungeons, comment))
     {
-        recv_data >> dungeons[i];                           // dungeons id/type
+        sLog.outError("CMSG_LFG_JOIN from %s claims more dungeons than its body can hold.",
+                      GetPlayerName());
+        return;
     }
 
-    recv_data >> counter2;                                  // const count = 3, lua: GetLFGInfoLocal
-
-    for (uint8 i = 0; i < counter2; ++i)
+    // The high byte of each slot is the LFG type tag, not part of the id.
+    for (size_t i = 0; i < dungeons.size(); ++i)
     {
-        recv_data >> Unused<uint8>();                       // lua: GetLFGInfoLocal
+        dungeons[i] &= 0x00FFFFFF;
     }
 
-    recv_data >> comment;                                   // lfg comment
+    DEBUG_LOG("CMSG_LFG_JOIN: %s roles %u, %u dungeon(s), comment %u byte(s).",
+              GetPlayerName(), roles, uint32(dungeons.size()), uint32(comment.size()));
 
     // SendLfgJoinResult(ERR_LFG_OK);
     // SendLfgUpdate(false, LFG_UPDATE_JOIN, dungeons[0]);

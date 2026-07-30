@@ -1330,6 +1330,105 @@ static void test_pet_name_query_matches_retail_bodies()
     }
 }
 
+/// CMSG_LFG_JOIN, pinned to real 18414 bodies across the observed count range.
+///
+/// The interesting field is the 22-bit dungeon count, which is packed with an
+/// 8-bit comment length and a flag into one 32-bit block. Counts of 1, 6 and 15
+/// exercise the low bits of that field, and each body must consume exactly.
+///
+/// Every decoded slot carries its LFG type in the high byte and the dungeon id
+/// in the low three, which is the check that does not come from the packet: the
+/// ids land in a plausible LFGDungeons range and the type tags are uniform
+/// within a request, as a queue built from one category should be.
+static void test_lfg_join_matches_retail_bodies()
+{
+    struct Case
+    {
+        char const* what;
+        uint8_t const* body;
+        size_t length;
+        uint32 roles;
+        size_t dungeons;
+        uint32 firstId;
+        uint32 firstType;
+    };
+
+    static uint8_t const oneDungeon[] = {
+        0x7F, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+        0x00, 0x07, 0x00, 0x00, 0x00, 0x00, 0x00, 0x04, 0x02, 0x03, 0x01, 0x00,
+        0x06
+    };
+    static uint8_t const sixDungeons[] = {
+        0x7F, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+        0x00, 0x08, 0x00, 0x00, 0x00, 0x00, 0x00, 0x18, 0x02, 0x8E, 0x02, 0x00,
+        0x01, 0x86, 0x02, 0x00, 0x01, 0x1B, 0x02, 0x00, 0x01, 0xF8, 0x01, 0x00,
+        0x01, 0x4A, 0x02, 0x00, 0x01, 0x53, 0x02, 0x00, 0x01
+    };
+    static uint8_t const fifteenDungeons[] = {
+        0x7F, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+        0x00, 0x08, 0x00, 0x00, 0x00, 0x00, 0x00, 0x3C, 0x02, 0x05, 0x02, 0x00,
+        0x01, 0x6B, 0x02, 0x00, 0x01, 0xFF, 0x01, 0x00, 0x01, 0x19, 0x02, 0x00,
+        0x01, 0x8E, 0x02, 0x00, 0x01, 0x86, 0x02, 0x00, 0x01, 0x1B, 0x02, 0x00,
+        0x01, 0xF8, 0x01, 0x00, 0x01, 0x4A, 0x02, 0x00, 0x01, 0x87, 0x02, 0x00,
+        0x01, 0x53, 0x02, 0x00, 0x01, 0xEC, 0x01, 0x00, 0x01, 0x89, 0x02, 0x00,
+        0x01, 0x37, 0x02, 0x00, 0x01, 0xF3, 0x01, 0x00, 0x01
+    };
+
+    Case const cases[] = {
+        { "lfg join one dungeon", oneDungeon, sizeof(oneDungeon), 7, 1, 259, 6 },
+        { "lfg join six dungeons", sixDungeons, sizeof(sixDungeons), 8, 6, 654, 1 },
+        { "lfg join fifteen dungeons", fifteenDungeons, sizeof(fifteenDungeons), 8, 15, 517, 1 },
+    };
+
+    for (size_t i = 0; i < sizeof(cases) / sizeof(cases[0]); ++i)
+    {
+        Case const& c = cases[i];
+        WorldPacket packet(CMSG_LFG_JOIN, uint32(c.length));
+        packet.append(c.body, c.length);
+
+        uint8 partyIndex = 0;
+        uint32 roles = 0, flag = 0;
+        std::vector<uint32> dungeons;
+        std::string comment;
+
+        bool const ok = MopCompactPackets::ReadLfgJoin(packet, partyIndex, roles,
+            flag, dungeons, comment);
+
+        if (!ok || partyIndex != 0x7F || roles != c.roles ||
+            dungeons.size() != c.dungeons || flag != 1 || !comment.empty() ||
+            packet.rpos() != packet.size() ||
+            (dungeons[0] & 0x00FFFFFF) != c.firstId || (dungeons[0] >> 24) != c.firstType)
+        {
+            std::fprintf(stderr,
+                "FAIL %s: ok=%d party=0x%02X roles=%u count=%u flag=%u consumed %u/%u\n",
+                c.what, int(ok), unsigned(partyIndex), roles,
+                unsigned(dungeons.size()), flag,
+                unsigned(packet.rpos()), unsigned(packet.size()));
+            ++g_fail;
+        }
+    }
+
+    {   // A claimed count that the body cannot hold must be refused outright,
+        // not resized from. The count field is 22 bits, so this is 0x3FFFFF
+        // dungeons in a body with four bytes left.
+        uint8_t const liar[] = {
+            0x7F, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+            0x00, 0x07, 0x00, 0x00, 0x00, 0xFF, 0xFF, 0xFC, 0x02, 0x00, 0x00, 0x00,
+            0x00
+        };
+        WorldPacket packet(CMSG_LFG_JOIN, uint32(sizeof(liar)));
+        packet.append(liar, sizeof(liar));
+
+        uint8 partyIndex = 0;
+        uint32 roles = 0, flag = 0;
+        std::vector<uint32> dungeons;
+        std::string comment;
+        CHECK(!MopCompactPackets::ReadLfgJoin(packet, partyIndex, roles, flag,
+                                              dungeons, comment));
+        CHECK(dungeons.empty());
+    }
+}
+
 static void test_opcode_values_are_framable()
 {
     CHECK(uint32_t(SMSG_ATTACKSWING_ERROR) == 0x11E1u);
@@ -1416,6 +1515,7 @@ int main(int /*argc*/, char** /*argv*/)
     test_spline_speed_family_mask_order();
     test_pet_action_matches_retail_bodies();
     test_pet_name_query_matches_retail_bodies();
+    test_lfg_join_matches_retail_bodies();
     test_run_speed_differs_from_swim_interleave();
     test_swim_speed_guid_layouts();
     test_random_roll_guid_layouts();

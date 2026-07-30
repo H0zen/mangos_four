@@ -1228,6 +1228,13 @@ void InitializeOpcodes()
     DefC(CMSG_SHOWING_HELM, "CMSG_SHOWING_HELM", STATUS_LOGGEDIN, PROCESS_THREADUNSAFE, &WorldSession::HandleShowingHelmOpcode);
     DefC(CMSG_SHOWING_CLOAK, "CMSG_SHOWING_CLOAK", STATUS_LOGGEDIN, PROCESS_THREADUNSAFE, &WorldSession::HandleShowingCloakOpcode);
 
+    // CMSG_LFG_JOIN's inherited reader was the 3.3.5 shape and shared no field
+    // with 18414; fed a real body it decoded a zero dungeon count and left
+    // sixteen bytes unread. The 18414 layout is in MopCompactPackets::ReadLfgJoin
+    // and its 22-bit dungeon count is bounded against the body's own remaining
+    // length before anything is allocated from it.
+    DefC(CMSG_LFG_JOIN, "CMSG_LFG_JOIN", STATUS_LOGGEDIN, PROCESS_THREADUNSAFE, &WorldSession::HandleLfgJoinOpcode);
+
     // CMSG_CONTACT_LIST (0x0BB4, 4,122 observed) is deliberately NOT registered,
     // and this note exists because it looks safe and is not.
     //
