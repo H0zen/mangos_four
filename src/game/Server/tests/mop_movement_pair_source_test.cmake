@@ -18,12 +18,13 @@
 file(READ "${SOURCE_ROOT}/src/game/Object/PlayerMovement.cpp" PLAYER_SOURCE)
 file(READ "${SOURCE_ROOT}/src/game/Object/CreatureMovement.cpp" CREATURE_SOURCE)
 file(READ "${SOURCE_ROOT}/src/game/Server/WorldSession.cpp" SESSION_SOURCE)
+file(READ "${SOURCE_ROOT}/src/game/Object/Unit.h" UNIT_HEADER)
 
 if(MUTATION STREQUAL "drop_observer_half")
     string(REGEX REPLACE "SendMessageToSet[(]&spline, false[)];" ""
         PLAYER_SOURCE "${PLAYER_SOURCE}")
 elseif(MUTATION STREQUAL "drop_mover_half")
-    string(REPLACE "BuildMoveSetCanFlyPacket(&data, enable, 0);" ""
+    string(REPLACE "BuildMoveSetCanFlyPacket(&data, enable, NextMovementCounter());" ""
         PLAYER_SOURCE "${PLAYER_SOURCE}")
 elseif(MUTATION STREQUAL "observer_half_to_self")
     string(REPLACE "SendMessageToSet(&spline, false);" "SendMessageToSet(&spline, true);"
@@ -35,14 +36,22 @@ elseif(MUTATION STREQUAL "unadmitted_water_mover")
     string(REGEX REPLACE "case SMSG_MOVE_WATER_WALK:" ""
         SESSION_SOURCE "${SESSION_SOURCE}")
 elseif(MUTATION STREQUAL "feather_mover_to_observers")
-    string(REPLACE "BuildMoveFeatherFallPacket(&data, enable, 0);
+    string(REPLACE "BuildMoveFeatherFallPacket(&data, enable, NextMovementCounter());
     GetSession()->SendPacket(&data);"
-        "BuildMoveFeatherFallPacket(&data, enable, 0);
+        "BuildMoveFeatherFallPacket(&data, enable, NextMovementCounter());
     SendMessageToSet(&data, true);"
         PLAYER_SOURCE "${PLAYER_SOURCE}")
 elseif(MUTATION STREQUAL "unadmitted_feather_mover")
     string(REGEX REPLACE "case SMSG_MOVE_FEATHER_FALL:" ""
         SESSION_SOURCE "${SESSION_SOURCE}")
+elseif(MUTATION STREQUAL "constant_counter")
+    string(REPLACE "BuildMoveSetCanFlyPacket(&data, enable, NextMovementCounter());"
+        "BuildMoveSetCanFlyPacket(&data, enable, 0);"
+        PLAYER_SOURCE "${PLAYER_SOURCE}")
+elseif(MUTATION STREQUAL "counter_does_not_advance")
+    string(REPLACE "uint32 NextMovementCounter() { return ++m_movementCounter; }"
+        "uint32 NextMovementCounter() { return m_movementCounter; }"
+        UNIT_HEADER "${UNIT_HEADER}")
 elseif(MUTATION STREQUAL "unadmitted_spline")
     string(REGEX REPLACE "case SMSG_SPLINE_MOVE_SET_FLYING:" ""
         SESSION_SOURCE "${SESSION_SOURCE}")
@@ -145,7 +154,7 @@ string(SUBSTRING "${PLAYER_SOURCE}" ${FF_START} ${FF_REMAINING} FF_BODY)
 # Two plain FINDs and an ordering check, rather than a regex spanning the line
 # break -- an embedded literal tab/newline in a character class made this file
 # fail git diff --check.
-string(FIND "${FF_BODY}" "BuildMoveFeatherFallPacket(&data, enable, 0);" FF_MOVER_BUILD)
+string(FIND "${FF_BODY}" "BuildMoveFeatherFallPacket(&data, enable, NextMovementCounter());" FF_MOVER_BUILD)
 string(FIND "${FF_BODY}" "GetSession()->SendPacket(&data);" FF_MOVER_SEND)
 if(FF_MOVER_BUILD EQUAL -1 OR FF_MOVER_SEND EQUAL -1)
     message(FATAL_ERROR
@@ -227,3 +236,43 @@ foreach(GATED
 endforeach()
 
 message(STATUS "mop_movement_pair_source: can-fly, water-walk and fall send and admit both halves")
+
+# --- The movement counter must be a real sequence, not a constant ------------
+#
+# Every one of these call sites passed a literal 0. Retail 18414 traffic shows
+# the value incrementing per mover and echoed back at offset 4 of the matching
+# acknowledgement, so a constant is provably not what the client is sent. Whether
+# it REJECTS a repeat is unproven; that is a reason to stop sending one, not a
+# reason to assume it is harmless.
+
+string(REGEX MATCHALL "Build(Move|ForceMove)[A-Za-z]*Packet[(]&data, enable, [0-9]+[)]"
+    CONSTANT_COUNTERS "${PLAYER_SOURCE}")
+if(NOT CONSTANT_COUNTERS STREQUAL "")
+    message(FATAL_ERROR
+        "movement-state senders must pass NextMovementCounter(), not a constant: ${CONSTANT_COUNTERS}")
+endif()
+
+# ...and the source must actually advance.
+string(FIND "${UNIT_HEADER}" "uint32 NextMovementCounter() { return ++m_movementCounter; }" COUNTER_ADVANCES)
+if(COUNTER_ADVANCES EQUAL -1)
+    message(FATAL_ERROR
+        "Unit::NextMovementCounter must pre-increment -- it must advance, and it must "
+        "not emit 0, which the movement block encodes as absent")
+endif()
+
+# Every sender that takes a counter must draw from it.
+foreach(SENDER SetRoot SetWaterWalk SetLevitate SetCanFly SetFeatherFall SetHover)
+    string(FIND "${PLAYER_SOURCE}" "void Player::${SENDER}(bool enable)" SENDER_START)
+    if(SENDER_START EQUAL -1)
+        message(FATAL_ERROR "Could not locate Player::${SENDER}")
+    endif()
+    math(EXPR SENDER_LEN "${PLAYER_LENGTH} - ${SENDER_START}")
+    if(SENDER_LEN GREATER 1600)
+        set(SENDER_LEN 1600)
+    endif()
+    string(SUBSTRING "${PLAYER_SOURCE}" ${SENDER_START} ${SENDER_LEN} SENDER_BODY)
+    string(FIND "${SENDER_BODY}" "NextMovementCounter()" SENDER_USES_COUNTER)
+    if(SENDER_USES_COUNTER EQUAL -1)
+        message(FATAL_ERROR "Player::${SENDER} must stamp a movement counter")
+    endif()
+endforeach()

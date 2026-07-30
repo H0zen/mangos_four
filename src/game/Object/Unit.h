@@ -5550,6 +5550,30 @@ class Unit : public WorldObject
         bool IsInWorgenForm(bool inPermanent = false) const;
         bool HasWorgenForm() const;
 
+        /**
+         * @brief Next sequence number for a movement-state packet.
+         *
+         * Every movement-state change that carries a uint32 -- can-fly, water
+         * walk, fall, hover, gravity, root -- stamps one of these. Retail 18414
+         * traffic shows the value incrementing per mover and being echoed back
+         * at offset 4 of the matching acknowledgement, so it is a sequence
+         * number the client tracks, not padding.
+         *
+         * Every call site here used to pass a literal 0, which is why this
+         * exists. Whether the client rejects a repeated value is not proven, but
+         * a constant is provably not what retail sends.
+         *
+         * Counts from 1: the value is never 0 in observed traffic, and in the
+         * movement block a zero counter is encoded as absent, so 0 is a value
+         * worth not emitting.
+         *
+         * The counter is per-Unit and shared across the families above -- the
+         * observed sequences skip values, because each mover's packets of every
+         * kind draw from one series.
+         */
+        uint32 NextMovementCounter() { return ++m_movementCounter; }
+        uint32 GetMovementCounter() const { return m_movementCounter; }
+
         // Packet builders
         void BuildForceMoveRootPacket(WorldPacket* data, bool apply, uint32 value);
         void BuildMoveWaterWalkPacket(WorldPacket* data, bool apply, uint32 value);
@@ -5640,6 +5664,11 @@ class Unit : public WorldObject
 
         uint32 m_state;                                     // Even derived shouldn't modify
         uint32 m_CombatTimer;
+
+        // Sequence number stamped into every movement-state packet that carries
+        // one -- can-fly, water walk, fall, hover, gravity, root. See
+        // NextMovementCounter().
+        uint32 m_movementCounter;
 
         Spell* m_currentSpells[CURRENT_MAX_SPELL];
         uint32 m_castCounter;                               // count casts chain of triggered spells for prevent infinity cast crashes

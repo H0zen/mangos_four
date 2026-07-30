@@ -141,6 +141,7 @@ Unit::Unit() :
     m_extraAttacks = 0;
 
     m_state = 0;
+    m_movementCounter = 0;
     m_deathState = ALIVE;
 
     for (uint32 i = 0; i < CURRENT_MAX_SPELL; ++i)

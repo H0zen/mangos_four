@@ -89,7 +89,7 @@
 void Player::SetRoot(bool enable)
 {
     WorldPacket data;
-    BuildForceMoveRootPacket(&data, enable, 0);
+    BuildForceMoveRootPacket(&data, enable, NextMovementCounter());
     SendMessageToSet(&data, true);
 }
 
@@ -110,7 +110,7 @@ void Player::SetRoot(bool enable)
 void Player::SetWaterWalk(bool enable)
 {
     WorldPacket data;
-    BuildMoveWaterWalkPacket(&data, enable, 0);
+    BuildMoveWaterWalkPacket(&data, enable, NextMovementCounter());
     GetSession()->SendPacket(&data);
 
     if (!IsInWorld())
@@ -139,7 +139,7 @@ void Player::SetWaterWalk(bool enable)
 void Player::SetLevitate(bool enable)
 {
     WorldPacket data;
-    BuildMoveLevitatePacket(&data, enable, 0);
+    BuildMoveLevitatePacket(&data, enable, NextMovementCounter());
     GetSession()->SendPacket(&data);
 }
 
@@ -166,7 +166,7 @@ void Player::SetLevitate(bool enable)
 void Player::SetCanFly(bool enable)
 {
     WorldPacket data;
-    BuildMoveSetCanFlyPacket(&data, enable, 0);
+    BuildMoveSetCanFlyPacket(&data, enable, NextMovementCounter());
     GetSession()->SendPacket(&data);
 
     if (!IsInWorld())
@@ -200,7 +200,7 @@ void Player::SetFeatherFall(bool enable)
     // receiving it are being handed an acknowledgement they cannot make. They
     // need SMSG_SPLINE_MOVE_SET_FEATHER_FALL, which has no counter.
     WorldPacket data;
-    BuildMoveFeatherFallPacket(&data, enable, 0);
+    BuildMoveFeatherFallPacket(&data, enable, NextMovementCounter());
     GetSession()->SendPacket(&data);
 
     if (IsInWorld())
@@ -233,6 +233,6 @@ void Player::SetFeatherFall(bool enable)
 void Player::SetHover(bool enable)
 {
     WorldPacket data;
-    BuildMoveHoverPacket(&data, enable, 0);
+    BuildMoveHoverPacket(&data, enable, NextMovementCounter());
     GetSession()->SendPacket(&data);
 }
