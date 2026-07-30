@@ -780,11 +780,6 @@ static void test_force_run_back_speed_change_ack_retail_body()
     CHECK(info.GetPos()->z == 501.95819091796875f);         // wire offset 16
 }
 
-/// The two acks must NOT share a sequence. They agree on the leading speed and
-/// nothing else -- the bit order and the GUID byte order are both their own -- so
-/// the same state must encode differently, and a body built for one must not
-/// decode cleanly through the other. Without this the run-back registration
-/// could quietly be pointed at the swim sequence and nothing would complain.
 /// The two acks with no observed traffic. Their sequences come from the client's
 /// own writers, so absence from the corpus is a gap in what was recorded rather
 /// than evidence against the layout -- but it does mean there is no retail body
@@ -846,6 +841,11 @@ static void test_all_speed_ack_sequences_differ()
     }
 }
 
+/// The acks must NOT share a sequence. They agree on the leading speed and
+/// nothing else -- the bit order and the GUID byte order are both their own -- so
+/// the same state must encode differently, and a body built for one must not
+/// decode cleanly through the other. Without this a registration could quietly
+/// be pointed at the wrong sequence and nothing would complain.
 static void test_speed_ack_sequences_are_distinct()
 {
     RefState state;

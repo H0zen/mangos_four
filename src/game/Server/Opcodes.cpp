@@ -1239,18 +1239,16 @@ void InitializeOpcodes()
     // a raw ObjectGuid first; at 18414 all four pack it and the scalars lead. The
     // readers and their fixtures are in place for all four.
     //
-    // Only MARK_AS_READ is REGISTERED. The other three each owe the client a
-    // reply -- SMSG_MAIL_LIST_RESULT, SMSG_SEND_MAIL_RESULT and
-    // SMSG_GUILD_BANK_LIST -- and every one of those is still a legacy
-    // serializer, unregistered, and dropped by the send gate. Wiring the requests
-    // without them is worse than dropping the requests: CMSG_MAIL_TAKE_ITEM
-    // removes the attachment, settles any cash on delivery and commits inventory
-    // and mail state, so the transaction would succeed irreversibly while the
-    // client heard nothing and its mailbox stayed stale. The retry would be just
-    // as silent.
+    // MARK_AS_READ and TAKE_ITEM are registered. MARK_AS_READ owes no command
+    // result at all; TAKE_ITEM was promoted together with SMSG_SEND_MAIL_RESULT
+    // once that reply was rebuilt to its 18414 body and admitted.
     //
-    // MARK_AS_READ owes no command result, so it is safe to admit alone. Promote
-    // the others as each reply is converted and admitted.
+    // GET_MAIL_LIST and GUILD_BANK_QUERY_TAB are still HELD, because
+    // SMSG_MAIL_LIST_RESULT and SMSG_GUILD_BANK_LIST remain legacy serializers
+    // that the send gate drops. Wiring a request without its reply is worse than
+    // dropping the request: the work commits, the client hears nothing, and the
+    // retry is equally silent. Promote each pair together, which the source
+    // policy enforces rather than leaving to this note.
     DefC(CMSG_MAIL_MARK_AS_READ, "CMSG_MAIL_MARK_AS_READ", STATUS_LOGGEDIN, PROCESS_THREADUNSAFE, &WorldSession::HandleMailMarkAsRead);
 
     // CMSG_MAIL_TAKE_ITEM is promoted WITH its reply, which is the whole point of
