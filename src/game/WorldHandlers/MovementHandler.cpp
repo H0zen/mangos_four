@@ -69,6 +69,8 @@
 #include "MapPersistentStateMgr.h"
 #include "ObjectMgr.h"
 
+#include <cmath>
+
 #define MOVEMENT_PACKET_TIME_DELAY 0
 
 /**
@@ -487,6 +489,22 @@ void WorldSession::HandleForceSpeedChangeAckOpcodes(WorldPacket& recv_data)
             recv_data >> movementInfo;
             newspeed = movementInfo.GetSpeedFloat();
             break;
+    }
+
+    // A non-finite speed defeats the check below entirely: every comparison
+    // against NaN is false, so fabs(expected - NaN) > 0.01f does not fire and the
+    // acknowledgement is accepted with neither a correction nor a kick. The
+    // client has no reason to send one, which is precisely why it is worth
+    // rejecting here rather than trusting the arithmetic downstream.
+    //
+    // This must come before the forced-change bookkeeping, or a NaN would also
+    // consume the pending-change credit that suppresses the check.
+    if (!std::isfinite(newspeed))
+    {
+        sLog.outError("%s: player %s sent a non-finite speed, ignored",
+                      LookupClientOpcodeName(uint16(opcode)), _player->GetName());
+        recv_data.rpos(recv_data.wpos());
+        return;
     }
 
     // now can skip not our packet

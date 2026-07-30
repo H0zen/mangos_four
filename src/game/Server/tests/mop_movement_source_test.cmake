@@ -11,7 +11,20 @@ file(READ "${SOURCE_ROOT}/src/game/movement/packet_builder.cpp" spline_packet_so
 file(READ "${SOURCE_ROOT}/src/game/movement/MoveSplineInit.cpp" spline_init_source)
 file(READ "${SOURCE_ROOT}/src/game/Server/WorldSession.cpp" world_session_source)
 
-if(MUTATION STREQUAL "inbound_sequence")
+if(MUTATION STREQUAL "drop_nonfinite_speed_guard")
+    string(REPLACE "if (!std::isfinite(newspeed))" "if (false)"
+        movement_handler "${movement_handler}")
+elseif(MUTATION STREQUAL "nonfinite_guard_after_bookkeeping")
+    # Moving the guard below the forced-change bookkeeping would let a NaN consume
+    # the pending-change credit that suppresses the comparison entirely.
+    string(REPLACE "    if (!std::isfinite(newspeed))
+    {
+        sLog.outError(\"%s: player %s sent a non-finite speed, ignored\","
+        "    if (false)
+    {
+        sLog.outError(\"%s: player %s sent a non-finite speed, ignored\","
+        movement_handler "${movement_handler}")
+elseif(MUTATION STREQUAL "inbound_sequence")
     string(REPLACE "MSEPositionZ,\n    MSEPositionX,\n    MSEPositionY,\n    MSEHasMovementFlags2"
         "MSEPositionX,\n    MSEPositionZ,\n    MSEPositionY,\n    MSEHasMovementFlags2"
         movement_structures "${movement_structures}")
@@ -359,3 +372,40 @@ require_once("${opcode_registry}"
 require_once("${movement_handler}"
     "plMover->SetSemaphoreTeleportNear(false)"
     "near-teleport semaphore release")
+
+# --- The speed anti-cheat must reject non-finite speeds ---------------------
+#
+# Every comparison against NaN is false, so fabs(expected - NaN) > 0.01f does not
+# fire and the acknowledgement is accepted with neither a correction nor a kick.
+# That became reachable when the walk/run/flight acknowledgements were registered
+# -- run being the one a speed hack actually abuses -- so this guard is
+# load-bearing rather than defensive tidiness.
+
+string(FIND "${movement_handler}" "void WorldSession::HandleForceSpeedChangeAckOpcodes" speed_ack_start)
+if(speed_ack_start EQUAL -1)
+    message(FATAL_ERROR "Could not locate HandleForceSpeedChangeAckOpcodes")
+endif()
+string(LENGTH "${movement_handler}" movement_handler_length)
+math(EXPR speed_ack_remaining "${movement_handler_length} - ${speed_ack_start}")
+if(speed_ack_remaining GREATER 4000)
+    set(speed_ack_remaining 4000)
+endif()
+string(SUBSTRING "${movement_handler}" ${speed_ack_start} ${speed_ack_remaining} speed_ack_body)
+
+string(FIND "${speed_ack_body}" "std::isfinite(newspeed)" nonfinite_guard)
+if(nonfinite_guard EQUAL -1)
+    message(FATAL_ERROR
+        "HandleForceSpeedChangeAckOpcodes must reject non-finite speeds -- "
+        "NaN compares false against everything and walks past the check unkicked")
+endif()
+
+# It must precede the forced-change bookkeeping, or a NaN consumes the pending
+# change credit that legitimately suppresses the comparison.
+string(FIND "${speed_ack_body}" "m_forced_speed_changes[force_move_type]" forced_bookkeeping)
+if(forced_bookkeeping EQUAL -1)
+    message(FATAL_ERROR "Could not locate the forced-speed-change bookkeeping")
+endif()
+if(NOT nonfinite_guard LESS forced_bookkeeping)
+    message(FATAL_ERROR
+        "The non-finite guard must run BEFORE the forced-change bookkeeping")
+endif()
