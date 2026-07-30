@@ -1070,9 +1070,21 @@ static void test_move_knock_back_ack_retail_body()
 /// acknowledgement handler and the acknowledgement was being dropped. Run is the
 /// one a speed hack actually abuses.
 ///
-/// Consuming exactly is the load-bearing assertion. Reading a leading float from
-/// one of these would swallow a coordinate and desync everything after it, which
-/// is precisely what the shared handler used to do.
+/// Consuming exactly is necessary but NOT sufficient: the leading scalars are all
+/// four bytes wide, so any permutation of them consumes the same total. The
+/// position assertions discriminate, and they are not circular. The three bodies
+/// carry their scalars in three DIFFERENT orders --
+///     walk    counter, speed, X, Y, Z
+///     run     counter, Y, Z, X, speed
+///     flight  Y, counter, X, Z, speed
+/// -- yet walk and flight decode to the same position, because they are adjacent
+/// sequences captured at one instant. A decoder reading a wrong order cannot
+/// produce that agreement from two different byte layouts. Each float was also
+/// confirmed present in the raw body at the offset its sequence names.
+///
+/// That mattered beyond tidiness: reading a leading float from one of these would
+/// swallow a coordinate and desync everything after it, which is precisely what
+/// the shared handler used to do.
 static void test_speed_embedded_acks_retail_bodies()
 {
     {   // walk -- capture-000004 sequence 23271
@@ -1089,13 +1101,16 @@ static void test_speed_embedded_acks_retail_bodies()
         packet >> info;
 
         CHECK(packet.rpos() == packet.size());
-        // The capture's float is not the exact decimal: 1.25 on the wire is
-        // 0x3FA00000, one ULP from the literal. Compare the bits.
+        // 1.25 is exactly representable, so this one needs no bit comparison --
+        // it is done by bits anyway to keep the three arms identical.
         float expectedSpeed;
         uint32 const expectedSpeedBits = 0x3FA00000u;
         std::memcpy(&expectedSpeed, &expectedSpeedBits, sizeof(expectedSpeed));
         CHECK(info.GetSpeedFloat() == expectedSpeed);
         CHECK(info.GetGuid().GetRawValue() == UINT64_C(0x04000000053CC8E8));
+        CHECK(info.GetPos()->x == 6172.769043f);
+        CHECK(info.GetPos()->y == 2268.258057f);
+        CHECK(info.GetPos()->z == 501.958191f);
     }
     {   // run -- capture-000004 sequence 605
         static uint8 const body[] = {
@@ -1118,6 +1133,9 @@ static void test_speed_embedded_acks_retail_bodies()
         std::memcpy(&expectedSpeed, &expectedSpeedBits, sizeof(expectedSpeed));
         CHECK(info.GetSpeedFloat() == expectedSpeed);
         CHECK(info.GetGuid().GetRawValue() == UINT64_C(0x04000000053CC8E8));
+        CHECK(info.GetPos()->x == 8475.790039f);
+        CHECK(info.GetPos()->y == 891.200012f);
+        CHECK(info.GetPos()->z == 547.289978f);
     }
     {   // flight -- capture-000004 sequence 23270
         static uint8 const body[] = {
@@ -1140,6 +1158,84 @@ static void test_speed_embedded_acks_retail_bodies()
         std::memcpy(&expectedSpeed, &expectedSpeedBits, sizeof(expectedSpeed));
         CHECK(info.GetSpeedFloat() == expectedSpeed);
         CHECK(info.GetGuid().GetRawValue() == UINT64_C(0x04000000053CC8E8));
+        CHECK(info.GetPos()->x == 6172.769043f);
+        CHECK(info.GetPos()->y == 2268.258057f);
+        CHECK(info.GetPos()->z == 501.958191f);
+    }
+}
+
+/// The Write arm of MSESpeedFloat, which the read fixtures above cannot reach.
+///
+/// Read and Write share the sequence table, so a symmetric mistake would survive
+/// a decode/encode/decode round trip untouched. This checks against the CAPTURE
+/// instead: decode a retail body, re-encode it, and require the result to be the
+/// retail body back, byte for byte.
+///
+/// The counter is the one exclusion. MSEMovementCounter writes zero rather than
+/// echoing what was read, so those four bytes cannot match and their offset is
+/// listed per opcode. Everything else must, which pins not just that the speed is
+/// written but that it is written in the right PLACE -- the three opcodes put it
+/// at different offsets, so a writer using one order for all three fails here.
+static void test_speed_embedded_ack_write_arm()
+{
+    struct Case
+    {
+        OpcodesList opcode;
+        uint8 const* body;
+        size_t size;
+        size_t counterOffset;
+        char const* name;
+    };
+
+    static uint8 const walkBody[] = {
+        0xF1, 0x01, 0x00, 0x00, 0x00, 0x00, 0xA0, 0x3F, 0x27, 0xE6, 0xC0, 0x45,
+        0x21, 0xC4, 0x0D, 0x45, 0xA6, 0xFA, 0xFA, 0x43, 0x6F, 0x00, 0x00, 0x00,
+        0x70, 0x10, 0x00, 0xC9, 0xE9, 0x05, 0x04, 0x3D, 0xA2, 0x3E, 0x1F, 0x00,
+        0x81, 0x09, 0x3C, 0x40
+    };
+    static uint8 const runBody[] = {
+        0x41, 0x00, 0x00, 0x00, 0xCD, 0xCC, 0x5E, 0x44, 0x8F, 0xD2, 0x08, 0x44,
+        0x29, 0x6F, 0x04, 0x46, 0x67, 0x66, 0xF6, 0x40, 0x40, 0xE3, 0x00, 0x00,
+        0x03, 0x90, 0x00, 0xE9, 0x3D, 0xC9, 0x04, 0x05, 0x94, 0x25, 0x6A, 0x40,
+        0xE3, 0x27, 0x0E, 0x00
+    };
+    static uint8 const flightBody[] = {
+        0x21, 0xC4, 0x0D, 0x45, 0xF0, 0x01, 0x00, 0x00, 0x27, 0xE6, 0xC0, 0x45,
+        0xA6, 0xFA, 0xFA, 0x43, 0x67, 0x66, 0x76, 0x40, 0x41, 0x00, 0x00, 0x03,
+        0xA9, 0x90, 0x00, 0xC9, 0x04, 0x05, 0x3D, 0xE9, 0xA0, 0x3E, 0x1F, 0x00,
+        0x81, 0x09, 0x3C, 0x40
+    };
+
+    Case const cases[] = {
+        { CMSG_FORCE_WALK_SPEED_CHANGE_ACK,   walkBody,   sizeof(walkBody),   0, "walk" },
+        { CMSG_FORCE_RUN_SPEED_CHANGE_ACK,    runBody,    sizeof(runBody),    0, "run" },
+        { CMSG_FORCE_FLIGHT_SPEED_CHANGE_ACK, flightBody, sizeof(flightBody), 4, "flight" },
+    };
+
+    for (Case const& c : cases)
+    {
+        WorldPacket inbound(c.opcode, c.size);
+        inbound.append(c.body, c.size);
+
+        MovementInfo info;
+        inbound >> info;
+
+        WorldPacket rebuilt(c.opcode, c.size);
+        rebuilt << info;
+
+        CHECK(rebuilt.size() == c.size);
+        if (rebuilt.size() != c.size) { continue; }
+
+        for (size_t i = 0; i < c.size; ++i)
+        {
+            if (i >= c.counterOffset && i < c.counterOffset + 4) { continue; }
+            CHECK(rebuilt.contents()[i] == c.body[i]);
+        }
+
+        // The counter really is the only difference, and it is zero.
+        uint32 writtenCounter;
+        std::memcpy(&writtenCounter, rebuilt.contents() + c.counterOffset, sizeof(writtenCounter));
+        CHECK(writtenCounter == 0u);
     }
 }
 
@@ -1154,6 +1250,7 @@ int main(int, char**)
     test_back_speed_change_ack_round_trips();
     test_move_knock_back_ack_retail_body();
     test_speed_embedded_acks_retail_bodies();
+    test_speed_embedded_ack_write_arm();
     test_all_speed_ack_sequences_differ();
     test_speed_ack_sequences_are_distinct();
     test_spline_state_packets();

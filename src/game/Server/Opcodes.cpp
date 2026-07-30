@@ -1271,14 +1271,15 @@ void InitializeOpcodes()
     // inherited macro cut it at 24.
     DefC(CMSG_TOTEM_DESTROYED, "CMSG_TOTEM_DESTROYED", STATUS_LOGGEDIN, PROCESS_THREADUNSAFE, &WorldSession::HandleTotemDestroyed);
 
-    // The run-back speed acknowledgement. Of the nine members of this family only
-    // four put the speed first, and the shared handler reads a leading float, so
-    // only those four are structurally compatible with it at all. This is the one
-    // of the four with real traffic; swim is already registered, and the other two
-    // have no observed packets.
+    // The run-back speed acknowledgement. Of the nine members of this family,
+    // four put the speed ahead of the movement block and the handler reads it as
+    // a leading float. This is the one of those four with real traffic; swim is
+    // already registered, and the other two are registered just below.
     //
-    // The other five carry the speed INSIDE the movement sequence, where no
-    // element in this tree can express it. Registering them would misparse.
+    // The remaining five carry the speed INSIDE the movement sequence. That was
+    // once inexpressible here and the reason they stayed unregistered; MSESpeedFloat
+    // now expresses it, and three of the five are registered further down. The
+    // handler branches on which group an opcode belongs to.
     DefC(CMSG_FORCE_RUN_BACK_SPEED_CHANGE_ACK, "CMSG_FORCE_RUN_BACK_SPEED_CHANGE_ACK", STATUS_LOGGEDIN, PROCESS_THREADUNSAFE, &WorldSession::HandleForceSpeedChangeAckOpcodes);
     // The other two speed-leading members. Neither has observed traffic, so
     // neither has a capture fixture, but their sequences come from the client's
