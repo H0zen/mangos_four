@@ -950,6 +950,62 @@ namespace MopCompactPackets
         for (uint8 index : byteOrder) { out.WriteByteSeq(SwimSpeedGuidByte(moverGuid, index)); }
     }
 
+    /// Rooting. Readers sub_C6915A (0x15AE), sub_C8A419 (0x1FAE),
+    /// sub_C8CED2 (0x0728) and sub_C8B308 (0x01E1).
+    ///
+    /// The mover pair splits its GUID around the counter in opposite proportions:
+    /// ROOT writes six bytes before and two after, UNROOT two before and six
+    /// after. Both are unconditional -- the scalar is always present -- so the
+    /// split point is what a wrong layout gets wrong while keeping the length.
+    /// Real bodies at two different masks pin it.
+    inline void BuildForceMoveRoot(WorldPacket& out, uint64 moverGuid, uint32 counter)
+    {
+        uint8 const maskOrder[] = { 0, 3, 4, 1, 5, 2, 6, 7 };
+        uint8 const beforeCounter[] = { 4, 7, 1, 2, 6, 5 };
+        uint8 const afterCounter[] = { 0, 3 };
+
+        for (uint8 index : maskOrder) { out.WriteBit(SwimSpeedGuidByte(moverGuid, index) != 0); }
+        out.FlushBits();
+        for (uint8 index : beforeCounter) { out.WriteByteSeq(SwimSpeedGuidByte(moverGuid, index)); }
+        out << uint32(counter);
+        for (uint8 index : afterCounter) { out.WriteByteSeq(SwimSpeedGuidByte(moverGuid, index)); }
+    }
+
+    inline void BuildForceMoveUnroot(WorldPacket& out, uint64 moverGuid, uint32 counter)
+    {
+        uint8 const maskOrder[] = { 3, 5, 7, 1, 0, 2, 4, 6 };
+        uint8 const beforeCounter[] = { 0, 7 };
+        uint8 const afterCounter[] = { 5, 4, 2, 1, 3, 6 };
+
+        for (uint8 index : maskOrder) { out.WriteBit(SwimSpeedGuidByte(moverGuid, index) != 0); }
+        out.FlushBits();
+        for (uint8 index : beforeCounter) { out.WriteByteSeq(SwimSpeedGuidByte(moverGuid, index)); }
+        out << uint32(counter);
+        for (uint8 index : afterCounter) { out.WriteByteSeq(SwimSpeedGuidByte(moverGuid, index)); }
+    }
+
+    /// The observer halves read no scalar at all -- neither reader contains the
+    /// uint32 primitive, so the body is GUID and nothing else.
+    inline void BuildSplineMoveRoot(WorldPacket& out, uint64 moverGuid)
+    {
+        uint8 const maskOrder[] = { 3, 7, 2, 4, 5, 6, 0, 1 };
+        uint8 const byteOrder[] = { 2, 4, 5, 7, 1, 0, 3, 6 };
+
+        for (uint8 index : maskOrder) { out.WriteBit(SwimSpeedGuidByte(moverGuid, index) != 0); }
+        out.FlushBits();
+        for (uint8 index : byteOrder) { out.WriteByteSeq(SwimSpeedGuidByte(moverGuid, index)); }
+    }
+
+    inline void BuildSplineMoveUnroot(WorldPacket& out, uint64 moverGuid)
+    {
+        uint8 const maskOrder[] = { 1, 5, 2, 0, 3, 6, 4, 7 };
+        uint8 const byteOrder[] = { 2, 7, 1, 3, 5, 0, 4, 6 };
+
+        for (uint8 index : maskOrder) { out.WriteBit(SwimSpeedGuidByte(moverGuid, index) != 0); }
+        out.FlushBits();
+        for (uint8 index : byteOrder) { out.WriteByteSeq(SwimSpeedGuidByte(moverGuid, index)); }
+    }
+
     /// The observer halves. No counter at all -- the mask and the bytes are the
     /// whole body. Landing these with the mover pair is the point: admitting one
     /// side alone is what left four other movement states telling everyone except

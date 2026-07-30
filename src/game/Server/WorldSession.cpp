@@ -342,6 +342,12 @@ static bool IsEnterWorldConverted(uint16 opcode)
         case SMSG_SPLINE_MOVE_SET_FLYING:          // MopCompactPackets::BuildSplineMoveSetFlying
         case SMSG_SPLINE_MOVE_UNSET_FLYING:        // MopCompactPackets::BuildSplineMoveUnsetFlying
         case SMSG_SEND_MAIL_RESULT:                // MopCompactPackets::BuildSendMailResult
+        // Rooting, admitted as a complete set. Reaches far beyond any GM
+        // command: death, resurrection and vehicle boarding all root.
+        case SMSG_FORCE_MOVE_ROOT:                 // MopCompactPackets::BuildForceMoveRoot
+        case SMSG_FORCE_MOVE_UNROOT:               // MopCompactPackets::BuildForceMoveUnroot
+        case SMSG_SPLINE_MOVE_ROOT:                // MopCompactPackets::BuildSplineMoveRoot
+        case SMSG_SPLINE_MOVE_UNROOT:              // MopCompactPackets::BuildSplineMoveUnroot
         // Hovering, admitted as a complete set. All four inherited bodies were
         // wrong -- they decode none of the 51 real bodies to a plausible GUID --
         // and none was admitted, so the family failed silently at both ends.

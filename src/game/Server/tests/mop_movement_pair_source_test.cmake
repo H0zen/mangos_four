@@ -55,6 +55,15 @@ elseif(MUTATION STREQUAL "speed_constant_counter")
     string(REPLACE "MopCompactPackets::BuildMoveSetRunSpeed(data, guid.GetRawValue(), NextMovementCounter(), GetSpeed(mtype));"
         "MopCompactPackets::BuildMoveSetRunSpeed(data, guid.GetRawValue(), 0, GetSpeed(mtype));"
         UNIT_SPEED_SOURCE "${UNIT_SPEED_SOURCE}")
+elseif(MUTATION STREQUAL "root_broadcasts_mover")
+    string(REPLACE "BuildForceMoveRootPacket(&data, enable, NextMovementCounter());
+    GetSession()->SendPacket(&data);"
+        "BuildForceMoveRootPacket(&data, enable, NextMovementCounter());
+    SendMessageToSet(&data, true);"
+        PLAYER_SOURCE "${PLAYER_SOURCE}")
+elseif(MUTATION STREQUAL "unadmitted_root_observer")
+    string(REGEX REPLACE "case SMSG_SPLINE_MOVE_ROOT:" ""
+        SESSION_SOURCE "${SESSION_SOURCE}")
 elseif(MUTATION STREQUAL "drop_hover_observer")
     string(REGEX REPLACE "MopCompactPackets::BuildSplineMoveSetHover[(]spline, GetObjectGuid[(][)].GetRawValue[(][)][)];" ""
         PLAYER_SOURCE "${PLAYER_SOURCE}")
@@ -239,6 +248,41 @@ if(CR_HOVER EQUAL -1)
     message(FATAL_ERROR "Creature::SetHover must use the reader-derived spline builder")
 endif()
 
+# --- Player::SetRoot must not broadcast the mover packet --------------------
+#
+# The last sender doing it, and the outlier among its neighbours. Observers were
+# handed a counter-bearing opcode expecting an acknowledgement they cannot make,
+# while the observer opcode that exists for them was never sent. Death,
+# resurrection and vehicle boarding all root through here.
+
+string(FIND "${PLAYER_SOURCE}" "void Player::SetRoot(bool enable)" ROOT_START)
+if(ROOT_START EQUAL -1)
+    message(FATAL_ERROR "Could not locate Player::SetRoot")
+endif()
+math(EXPR ROOT_REMAINING "${PLAYER_LENGTH} - ${ROOT_START}")
+if(ROOT_REMAINING GREATER 1800)
+    set(ROOT_REMAINING 1800)
+endif()
+string(SUBSTRING "${PLAYER_SOURCE}" ${ROOT_START} ${ROOT_REMAINING} ROOT_BODY)
+
+string(FIND "${ROOT_BODY}" "SendMessageToSet(&data" ROOT_BROADCASTS_MOVER)
+if(NOT ROOT_BROADCASTS_MOVER EQUAL -1)
+    message(FATAL_ERROR
+        "Player::SetRoot must not broadcast the MOVER packet -- observers need "
+        "SMSG_SPLINE_MOVE_ROOT, which carries no counter")
+endif()
+
+string(FIND "${ROOT_BODY}" "BuildSplineMoveRoot" ROOT_OBS_ON)
+string(FIND "${ROOT_BODY}" "BuildSplineMoveUnroot" ROOT_OBS_OFF)
+if(ROOT_OBS_ON EQUAL -1 OR ROOT_OBS_OFF EQUAL -1)
+    message(FATAL_ERROR "Player::SetRoot must tell observers with the spline pair")
+endif()
+
+string(FIND "${UNIT_SOURCE_EARLY}" "MopCompactPackets::BuildForceMoveRoot(" ROOT_BUILDER)
+if(ROOT_BUILDER EQUAL -1)
+    message(FATAL_ERROR "Unit::BuildForceMoveRootPacket must use the reader-derived builders")
+endif()
+
 # --- Creature::SetCanFly is the same pair seen from the other side ----------
 
 string(FIND "${CREATURE_SOURCE}" "void Creature::SetCanFly(bool enable)" CR_CANFLY_START)
@@ -285,7 +329,11 @@ foreach(GATED
         SMSG_MOVE_SET_HOVER
         SMSG_MOVE_UNSET_HOVER
         SMSG_SPLINE_MOVE_SET_HOVER
-        SMSG_SPLINE_MOVE_UNSET_HOVER)
+        SMSG_SPLINE_MOVE_UNSET_HOVER
+        SMSG_FORCE_MOVE_ROOT
+        SMSG_FORCE_MOVE_UNROOT
+        SMSG_SPLINE_MOVE_ROOT
+        SMSG_SPLINE_MOVE_UNROOT)
     string(FIND "${SESSION_SOURCE}" "case ${GATED}:" ADMITTED)
     if(ADMITTED EQUAL -1)
         message(FATAL_ERROR

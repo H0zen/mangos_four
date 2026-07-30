@@ -1596,6 +1596,80 @@ static void test_hover_mover_halves_differ()
     CHECK(set.contents()[8] != unset.contents()[8]);
 }
 
+/// The root family against real 18414 bodies.
+///
+/// The mover pair splits its GUID around the counter in opposite proportions --
+/// ROOT six bytes before and two after, UNROOT two before and six after -- and
+/// the scalar is unconditional in both. So the split POINT is the thing a wrong
+/// layout gets wrong while keeping the total length identical, which is why two
+/// masks are pinned per opcode rather than one.
+///
+/// The inherited builders scored 0/17 and 0/13 against real bodies.
+static void test_root_family_retail_bodies()
+{
+    // SMSG_FORCE_MOVE_ROOT 0x15AE -- two masks, so the split point is exercised.
+    static uint8 const root12[] = { 0xBF, 0x89, 0xF0, 0xBC, 0xAE, 0x51, 0xED,
+                                    0x0D, 0x00, 0x00, 0x00, 0xF0 };
+    static uint8 const root11[] = { 0xBB, 0x6C, 0xF0, 0x02, 0x51, 0x71,
+                                    0x39, 0x00, 0x00, 0x00, 0x15 };
+    // SMSG_SPLINE_MOVE_ROOT 0x0728 -- no scalar at all.
+    static uint8 const splineRoot[] = { 0xFF, 0x03, 0x0D, 0xD4, 0xF0, 0x31, 0x6A, 0x30, 0x41 };
+
+    {   // capture-000110 seq 191935, counter 13
+        WorldPacket packet(SMSG_FORCE_MOVE_ROOT, 13);
+        MopCompactPackets::BuildForceMoveRoot(packet, UINT64_C(0xF150EC8800AFBDF1), 13);
+        CHECK(packet.size() == sizeof(root12));
+        if (packet.size() == sizeof(root12))
+        {
+            CHECK(std::memcmp(packet.contents(), root12, sizeof(root12)) == 0);
+        }
+    }
+    {   // capture-000663 seq 634810, counter 57 -- a different mask
+        WorldPacket packet(SMSG_FORCE_MOVE_ROOT, 13);
+        MopCompactPackets::BuildForceMoveRoot(packet, UINT64_C(0xF150706D00000314), 57);
+        CHECK(packet.size() == sizeof(root11));
+        if (packet.size() == sizeof(root11))
+        {
+            CHECK(std::memcmp(packet.contents(), root11, sizeof(root11)) == 0);
+        }
+    }
+    {   // capture-000067 seq 62141 -- a PET mover, all eight bytes present
+        WorldPacket packet(SMSG_SPLINE_MOVE_ROOT, 9);
+        MopCompactPackets::BuildSplineMoveRoot(packet, UINT64_C(0xF140D50C3102306B));
+        CHECK(packet.size() == sizeof(splineRoot));
+        if (packet.size() == sizeof(splineRoot))
+        {
+            CHECK(std::memcmp(packet.contents(), splineRoot, sizeof(splineRoot)) == 0);
+        }
+    }
+}
+
+/// Root and unroot must not share a layout, and the observer halves must carry
+/// no scalar -- neither client reader contains the uint32 primitive at all.
+static void test_root_halves_and_scalars()
+{
+    uint64 const guid = UINT64_C(0x8070605040302010);
+
+    WorldPacket root(SMSG_FORCE_MOVE_ROOT, 13);
+    MopCompactPackets::BuildForceMoveRoot(root, guid, 7);
+    WorldPacket unroot(SMSG_FORCE_MOVE_UNROOT, 13);
+    MopCompactPackets::BuildForceMoveUnroot(unroot, guid, 7);
+
+    CHECK(root.size() == 13);
+    CHECK(unroot.size() == 13);
+    CHECK(std::memcmp(root.contents(), unroot.contents(), 13) != 0);
+
+    // Observers get mask + eight bytes and nothing else: 9, not 13.
+    WorldPacket splineRoot(SMSG_SPLINE_MOVE_ROOT, 9);
+    MopCompactPackets::BuildSplineMoveRoot(splineRoot, guid);
+    WorldPacket splineUnroot(SMSG_SPLINE_MOVE_UNROOT, 9);
+    MopCompactPackets::BuildSplineMoveUnroot(splineUnroot, guid);
+
+    CHECK(splineRoot.size() == 9);
+    CHECK(splineUnroot.size() == 9);
+    CHECK(std::memcmp(splineRoot.contents(), splineUnroot.contents(), 9) != 0);
+}
+
 int main(int, char**)
 {
     test_thirteen_inbound_fixtures_and_exact_relay();
@@ -1618,6 +1692,8 @@ int main(int, char**)
     test_move_set_can_fly_ack_prefix_order();
     test_hover_family_retail_bodies();
     test_hover_mover_halves_differ();
+    test_root_family_retail_bodies();
+    test_root_halves_and_scalars();
     test_normal_fall_counter_offset_moves();
     test_hostile_counts_rejected();
     test_opcode_values_are_framable();

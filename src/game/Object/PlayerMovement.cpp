@@ -88,9 +88,38 @@
  */
 void Player::SetRoot(bool enable)
 {
+    // This was the last sender broadcasting the MOVER packet to everyone, and
+    // the outlier among its own neighbours -- SetCanFly and SetWaterWalk had
+    // already been corrected. Observers were handed SMSG_FORCE_MOVE_ROOT, which
+    // carries a counter and expects an acknowledgement they cannot make, while
+    // the observer opcode that exists for them was never sent at all.
+    //
+    // Retail splits the audience: a capture window shows the mover's root
+    // arriving as SMSG_FORCE_MOVE_ROOT and acknowledged ten packets later, with
+    // no SMSG_SPLINE_MOVE_ROOT anywhere in it -- that one goes to everybody else.
+    //
+    // This runs far beyond any GM command: death, resurrection and vehicle
+    // boarding all root through here.
     WorldPacket data;
     BuildForceMoveRootPacket(&data, enable, NextMovementCounter());
-    SendMessageToSet(&data, true);
+    GetSession()->SendPacket(&data);
+
+    if (!IsInWorld())
+    {
+        return;
+    }
+
+    WorldPacket spline(enable ? SMSG_SPLINE_MOVE_ROOT : SMSG_SPLINE_MOVE_UNROOT, 9);
+    if (enable)
+    {
+        MopCompactPackets::BuildSplineMoveRoot(spline, GetObjectGuid().GetRawValue());
+    }
+    else
+    {
+        MopCompactPackets::BuildSplineMoveUnroot(spline, GetObjectGuid().GetRawValue());
+    }
+
+    SendMessageToSet(&spline, false);
 }
 
 /**

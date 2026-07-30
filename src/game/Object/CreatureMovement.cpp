@@ -345,13 +345,11 @@ void Creature::SetRoot(bool enable)
         WorldPacket data(enable ? SMSG_SPLINE_MOVE_ROOT : SMSG_SPLINE_MOVE_UNROOT, 9);
         if (enable)
         {
-            data.WriteGuidMask<5, 4, 6, 1, 3, 7, 2, 0>(GetObjectGuid());
-            data.WriteGuidBytes<2, 1, 7, 3, 5, 0, 6, 4>(GetObjectGuid());
+            MopCompactPackets::BuildSplineMoveRoot(data, GetObjectGuid().GetRawValue());
         }
         else
         {
-            data.WriteGuidMask<0, 1, 6, 5, 3, 2, 7, 4>(GetObjectGuid());
-            data.WriteGuidBytes<6, 3, 1, 5, 2, 0, 7, 4>(GetObjectGuid());
+            MopCompactPackets::BuildSplineMoveUnroot(data, GetObjectGuid().GetRawValue());
         }
 
         SendMessageToSet(&data, true);

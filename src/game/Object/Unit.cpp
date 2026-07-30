@@ -6783,18 +6783,12 @@ void Unit::BuildForceMoveRootPacket(WorldPacket* data, bool apply, uint32 value)
     if (apply)
     {
         data->Initialize(SMSG_FORCE_MOVE_ROOT, 13);
-        data->WriteGuidMask<2, 7, 6, 0, 5, 4, 1, 3>(GetObjectGuid());
-        data->WriteGuidBytes<1, 0, 2, 5>(GetObjectGuid());
-        *data << uint32(value);
-        data->WriteGuidBytes<3, 4, 7, 6>(GetObjectGuid());
+        MopCompactPackets::BuildForceMoveRoot(*data, GetObjectGuid().GetRawValue(), value);
     }
     else
     {
         data->Initialize(SMSG_FORCE_MOVE_UNROOT, 13);
-        data->WriteGuidMask<0, 1, 3, 7, 5, 2, 4, 6>(GetObjectGuid());
-        data->WriteGuidBytes<3, 6, 1>(GetObjectGuid());
-        *data << uint32(value);
-        data->WriteGuidBytes<2, 0, 7, 4, 5>(GetObjectGuid());
+        MopCompactPackets::BuildForceMoveUnroot(*data, GetObjectGuid().GetRawValue(), value);
     }
 }
 
