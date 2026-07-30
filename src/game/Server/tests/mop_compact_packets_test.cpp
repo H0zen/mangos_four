@@ -36,6 +36,7 @@
 
 #include <cstdint>
 #include <cstdio>
+#include <cstring>
 #include <vector>
 
 // InstanceData is exported on Windows, so merely including its owning header emits
@@ -207,6 +208,60 @@ static void test_attacker_state_update()
     expectedExtended[5] = 0x01;
     expectedExtended[19] = 0x01;
     CHECK(BytesEqual(extended, expectedExtended));
+}
+
+/// SMSG_MOVE_SET_RUN_SPEED, recovered from the client reader sub_C8B928 and
+/// pinned here against a REAL retail body rather than a synthetic one.
+///
+/// capture-000004 seq 579, build 18414, catalogue 2BE10C89. Decoding it under
+/// the reader's sequence yields guid 0x04000000053CC8E8, counter 65, speed 7.7 --
+/// and 0x0400 is the same high pair the creatures in that capture's name
+/// queries carry, so the GUID is corroborated independently of this packet.
+static void test_run_speed_matches_retail_body()
+{
+    // The captured speed is 0x40F66667, one ULP above what the literal 7.7f
+    // compiles to (0x40F66666). Retail's value was computed rather than typed --
+    // 7.0 base run times a 1.1 modifier -- so the exact bits are reconstructed
+    // here. Using the literal would fail on byte 9 alone, which is a fair
+    // demonstration that this fixture is byte-exact and not merely shape-exact.
+    float speed;
+    uint32 const speedBits = 0x40F66667u;
+    std::memcpy(&speed, &speedBits, sizeof(speed));
+
+    WorldPacket packet(SMSG_MOVE_SET_RUN_SPEED, 17);
+    MopCompactPackets::BuildMoveSetRunSpeed(packet, 0x04000000053CC8E8ull, 65u, speed);
+    CHECK(BytesEqual(packet, {
+        0xD5,                                           // mask, guid order 1,7,4,2,5,3,6,0
+        0xC9,                                           // guid[1] ^ 1
+        0x41, 0x00, 0x00, 0x00,                         // counter 65
+        0x05, 0x04, 0xE9,                               // guid[7], guid[3], guid[0] ^ 1
+        0x67, 0x66, 0xF6, 0x40,                         // 7.7f
+        0x3D                                            // guid[2] ^ 1; 4,6,5 are zero
+    }));
+}
+
+/// The interleave is what distinguishes run from swim: run writes one GUID byte
+/// before the counter, swim writes none. Reusing the swim builder would produce
+/// a body the client cannot parse, so pin that they differ.
+static void test_run_speed_differs_from_swim_interleave()
+{
+    WorldPacket run(SMSG_MOVE_SET_RUN_SPEED, 17);
+    MopCompactPackets::BuildMoveSetRunSpeed(run, 0x0123456789ABCDEFull, 0x12345678u, 1.0f);
+
+    WorldPacket swim(SMSG_MOVE_SET_SWIM_SPEED, 17);
+    MopCompactPackets::BuildMoveSetSwimSpeed(swim, 0x0123456789ABCDEFull, 0x12345678u, 1.0f);
+
+    CHECK(run.size() == swim.size());                   // same field set, same width
+    bool differs = false;
+    for (size_t i = 0; i < run.size(); ++i)
+    {
+        if (run.contents()[i] != swim.contents()[i])
+        {
+            differs = true;
+            break;
+        }
+    }
+    CHECK(differs);                                     // ...but a different body
 }
 
 static void test_swim_speed_guid_layouts()
@@ -588,6 +643,8 @@ static void test_opcode_values_are_framable()
 {
     CHECK(uint32_t(SMSG_ATTACKSWING_ERROR) == 0x11E1u);
     CHECK(uint32_t(SMSG_MOVE_SET_SWIM_SPEED) == 0x0817u);
+    CHECK(uint32_t(SMSG_MOVE_SET_RUN_SPEED) == 0x184Cu);
+    CHECK(uint32_t(SMSG_MOVE_SET_RUN_SPEED) <= 0x1FFFu);   // must fit the 13-bit wire header
     CHECK(uint32_t(SMSG_RANDOM_ROLL) == 0x141Au);
     CHECK(uint32_t(SMSG_UPDATE_INSTANCE_ENCOUNTER_UNIT) == 0x0332u);
     CHECK(uint32_t(SMSG_SET_RAID_DIFFICULTY) == 0x0591u);
@@ -652,6 +709,8 @@ int main(int /*argc*/, char** /*argv*/)
     test_attack_swing_reasons();
     test_attack_packets();
     test_attacker_state_update();
+    test_run_speed_matches_retail_body();
+    test_run_speed_differs_from_swim_interleave();
     test_swim_speed_guid_layouts();
     test_random_roll_guid_layouts();
     test_instance_encounter_variants();

@@ -336,6 +336,44 @@ namespace MopCompactPackets
         return uint8(guid >> (8 * index));
     }
 
+    /// SMSG_MOVE_SET_RUN_SPEED (0x184C).
+    ///
+    /// Recovered from the client's own reader, sub_C8B928, reached from the
+    /// second-stage dispatcher sub_C80E74 at case index 444. Its bit and byte
+    /// sequence is transcribed directly from that function; a reference fork's
+    /// movement table agrees element for element, which is corroboration rather
+    /// than the source.
+    ///
+    /// The interleave differs from swim, which is why the swim builder could not
+    /// simply be reused: run writes one GUID byte BEFORE the counter, three
+    /// between the counter and the speed, and four after it.
+    ///
+    /// Verified against six retail bodies (14, 15 and 16 byte cases) from
+    /// captures 4 and 20 at catalogue 2BE10C89: every one consumes exactly, and
+    /// the GUIDs that fall out carry the same high bytes as the movers those
+    /// captures' name queries report -- 0x0400 for the creature, 0x0180 for the
+    /// player.
+    inline void BuildMoveSetRunSpeed(WorldPacket& out, uint64 moverGuid,
+        uint32 counter, float speed)
+    {
+        uint8 const maskOrder[] = { 1, 7, 4, 2, 5, 3, 6, 0 };
+        uint8 const bytesBeforeCounter[] = { 1 };
+        uint8 const bytesBeforeSpeed[] = { 7, 3, 0 };
+        uint8 const bytesAfterSpeed[] = { 2, 4, 6, 5 };
+
+        for (uint8 index : maskOrder)
+            out.WriteBit(SwimSpeedGuidByte(moverGuid, index) != 0);
+        out.FlushBits();
+        for (uint8 index : bytesBeforeCounter)
+            out.WriteByteSeq(SwimSpeedGuidByte(moverGuid, index));
+        out << uint32(counter);
+        for (uint8 index : bytesBeforeSpeed)
+            out.WriteByteSeq(SwimSpeedGuidByte(moverGuid, index));
+        out << float(speed);
+        for (uint8 index : bytesAfterSpeed)
+            out.WriteByteSeq(SwimSpeedGuidByte(moverGuid, index));
+    }
+
     inline void BuildMoveSetSwimSpeed(WorldPacket& out, uint64 moverGuid,
         uint32 counter, float speed)
     {

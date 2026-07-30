@@ -293,12 +293,13 @@ void Unit::SetSpeedRate(UnitMoveType mtype, float rate, bool forced, bool ignore
                 }
                 case MOVE_RUN:
                 {
-                    data.Initialize(SMSG_MOVE_SET_RUN_SPEED, 1 + 8 + 4 + 4 );
-                    data.WriteGuidMask<6, 1, 5, 2, 7, 0, 3, 4>(guid);
-                    data.WriteGuidBytes<5, 3, 1, 4>(guid);
-                    data << uint32(0);
-                    data << float(GetSpeed(mtype));
-                    data.WriteGuidBytes<6, 0, 7, 2>(guid);
+                    // The inherited body here was wrong in field ORDER, not just
+                    // GUID order: it put four GUID bytes before the counter and
+                    // none between the counter and the speed. The client's
+                    // reader sub_C8B928 takes one byte, the counter, three
+                    // bytes, the speed, then four. See BuildMoveSetRunSpeed.
+                    data.Initialize(SMSG_MOVE_SET_RUN_SPEED, 1 + 8 + 4 + 4);
+                    MopCompactPackets::BuildMoveSetRunSpeed(data, guid.GetRawValue(), 0, GetSpeed(mtype));
                     break;
                 }
                 case MOVE_RUN_BACK:

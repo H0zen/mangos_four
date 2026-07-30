@@ -315,6 +315,7 @@ static bool IsEnterWorldConverted(uint16 opcode)
         case SMSG_PLAYER_MOVE:                     // MovementInfo relay serializer
         case SMSG_MONSTER_MOVE:                    // PacketBuilder 18414 spline serializer (transport data is embedded)
         case SMSG_MOVE_SET_SWIM_SPEED:             // MopCompactPackets::BuildMoveSetSwimSpeed
+        case SMSG_MOVE_SET_RUN_SPEED:              // MopCompactPackets::BuildMoveSetRunSpeed
         case SMSG_SPLINE_MOVE_SET_NORMAL_FALL:     // MopMovementPackets::BuildSplineState
         case SMSG_SPLINE_MOVE_SET_WATER_WALK:      // MopMovementPackets::BuildSplineState
         case SMSG_SPLINE_MOVE_SET_FEATHER_FALL:    // MopMovementPackets::BuildSplineState

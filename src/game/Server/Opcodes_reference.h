@@ -175,8 +175,8 @@
  *   TOTAL SMSG rows                   925
  *
  * SUBSYSTEM CONFIDENCE: high=365, low=221, medium=182, none=157
- * STATUS TOTALS: ACTIVE=452, DOC=435, DORMANT=633
- *   SMSG: ACTIVE=267, DOC=271, DORMANT=387
+ * STATUS TOTALS: ACTIVE=453, DOC=435, DORMANT=632
+ *   SMSG: ACTIVE=268, DOC=271, DORMANT=386
  *   CMSG: ACTIVE=185, DOC=164, DORMANT=246
  */
 
@@ -1080,7 +1080,7 @@ typedef uint16_t uint16;
  *   SMSG_UNKNOWN_0x181B                            0x181B  DOC     
  *   SMSG_SPLINE_MOVE_SET_WATER_WALK                0x1823  ACTIVE
  *   SMSG_MOVE_COLLISION_ENABLE                     0x1826  DORMANT
- *   SMSG_MOVE_SET_RUN_SPEED                        0x184C  DORMANT 
+ *   SMSG_MOVE_SET_RUN_SPEED                        0x184C  ACTIVE
  *   SMSG_SPLINE_MOVE_SET_WALK_MODE                 0x1865  DORMANT 
  *   SMSG_UNKNOWN_0x186F                            0x186F  DOC     
  *   SMSG_SPLINE_MOVE_SET_FEATHER_FALL              0x1893  ACTIVE
