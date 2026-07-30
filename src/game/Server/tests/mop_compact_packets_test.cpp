@@ -255,12 +255,12 @@ static void test_walk_speed_matches_retail_body()
 
     WorldPacket packet(SMSG_MOVE_SET_WALK_SPEED, 17);
     MopCompactPackets::BuildMoveSetWalkSpeed(packet, 0x04000000053CC8E8ull, 497u, speed);
+    // guid 5, 6 and 4 are all zero in this mover, so the {5,6} and {4} groups
+    // emit nothing at all and the counter follows the mask byte directly.
     CHECK(BytesEqual(packet, {
         0x7C,                                               // mask, guid order 6,7,3,1,2,0,4,5
-        0xF1,                                               // guid[5]; guid[6] is zero so absent
-        0x01, 0x00, 0x00, 0x00,                             // counter 497
-        0x00,                                               // guid[4] ^ 1 -- present but zero-valued
-        0xA0, 0x3F,                                         // (speed continues)
+        0xF1, 0x01, 0x00, 0x00,                             // counter 497
+        0x00, 0x00, 0xA0, 0x3F,                             // 1.25f
         0x3D, 0x04, 0xE9, 0xC9, 0x05                        // guid[2,3,0,1,7] ^ 1
     }));
 }
@@ -318,6 +318,25 @@ static void test_flight_speed_scalars_precede_mask()
         0x44, 0x00, 0x00, 0x00,                             // counter 68
         0x2F,                                               // mask, guid order 6,5,0,4,1,7,3,2
         0xE9, 0x05, 0x3D, 0x04, 0xC9                        // guid[0,7,4,5,6,2,3,1] ^ 1
+    }));
+}
+
+/// SMSG_MOVE_SET_SWIM_BACK_SPEED, reader sub_C8AF44. NOT a retail fixture --
+/// this opcode has zero observations at 18414, so there is no captured body to
+/// pin it against and it stays outside the send gate. This test is structural:
+/// an all-nonzero GUID forces every byte to be emitted, which catches the defect
+/// the old serializer had (it wrote guid byte 0 twice and byte 2 never) and pins
+/// the counter and float being adjacent.
+static void test_swim_back_speed_structure_reader_derived()
+{
+    WorldPacket packet(SMSG_MOVE_SET_SWIM_BACK_SPEED, 17);
+    MopCompactPackets::BuildMoveSetSwimBackSpeed(packet, 0x0123456789ABCDEFull, 0x12345678u, 1.0f);
+    CHECK(BytesEqual(packet, {
+        0xFF,                                               // every GUID byte present
+        0x44, 0x22, 0xEE, 0x66,                             // guid[5,6,0,4] ^ 1
+        0x78, 0x56, 0x34, 0x12,                             // counter
+        0x00, 0x00, 0x80, 0x3F,                             // 1.0f, adjacent to the counter
+        0xCC, 0x00, 0xAA, 0x88                              // guid[1,7,2,3] ^ 1
     }));
 }
 
@@ -796,6 +815,7 @@ int main(int /*argc*/, char** /*argv*/)
     test_run_speed_matches_retail_body();
     test_walk_speed_matches_retail_body();
     test_run_back_speed_matches_retail_body();
+    test_swim_back_speed_structure_reader_derived();
     test_flight_speed_scalars_precede_mask();
     test_spline_run_speed_matches_retail_body();
     test_run_speed_differs_from_swim_interleave();
