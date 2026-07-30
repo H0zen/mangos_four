@@ -893,6 +893,8 @@ ChatCommand* ChatHandler::getCommandTable()
         { "repairitems",    SEC_GAMEMASTER,     true,  &ChatHandler::HandleRepairitemsCommand,         "", NULL },
         { "stable",         SEC_ADMINISTRATOR,  false, &ChatHandler::HandleStableCommand,              "", NULL },
         { "waterwalk",      SEC_GAMEMASTER,     false, &ChatHandler::HandleWaterwalkCommand,           "", NULL },
+        { "hover",          SEC_GAMEMASTER,     false, &ChatHandler::HandleHoverCommand,               "", NULL },
+        { "levitate",       SEC_GAMEMASTER,     false, &ChatHandler::HandleLevitateCommand,            "", NULL },
         { "freezeplayer",   SEC_GAMEMASTER,     false, &ChatHandler::HandleFreezePlayerCommand,        "", NULL },
         { "unfreezeplayer", SEC_GAMEMASTER,     false, &ChatHandler::HandleUnfreezePlayerCommand,      "", NULL },
         { "quit",           SEC_CONSOLE,        true,  &ChatHandler::HandleQuitCommand,                "", NULL },

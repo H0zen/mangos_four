@@ -222,6 +222,99 @@ bool ChatHandler::HandleWaterwalkCommand(char* args)
 }
 
 /**
+ * @brief Toggles hover mode for the selected player.
+ *
+ * Hover had correct wire formats and no way to reach them: Player::SetHover had
+ * no callers at all, so the family was unreachable from the GM surface even once
+ * its four opcodes were rebuilt and admitted. This is the trigger.
+ *
+ * @param args "on" or "off".
+ * @returns True if the command executed successfully, false otherwise.
+ */
+bool ChatHandler::HandleHoverCommand(char* args)
+{
+    bool value;
+    if (!ExtractOnOff(&args, value))
+    {
+        SendSysMessage(LANG_USE_BOL);
+        SetSentErrorMessage(true);
+        return false;
+    }
+
+    Player* player = getSelectedPlayer();
+
+    if (!player)
+    {
+        PSendSysMessage(LANG_NO_CHAR_SELECTED);
+        SetSentErrorMessage(true);
+        return false;
+    }
+
+    if (HasLowerSecurity(player))
+    {
+        return false;
+    }
+
+    player->SetHover(value);
+
+    PSendSysMessage("Hover mode %s for %s.", value ? "ON" : "OFF", GetNameLink(player).c_str());
+    if (needReportToTarget(player))
+    {
+        ChatHandler(player).PSendSysMessage("%s set your hover mode to %s.",
+                                            GetNameLink().c_str(), value ? "ON" : "OFF");
+    }
+    return true;
+}
+
+/**
+ * @brief Toggles levitation (gravity) for the selected player.
+ *
+ * Same situation as hover: Player::SetLevitate had no callers, so the gravity
+ * family could not be exercised from the GM surface at all.
+ *
+ * NOTE the four gravity opcodes are deliberately NOT admitted to the in-world
+ * send gate yet, because which opcode the client treats as gravity-off is not
+ * decidable from the binary. This command exists so that question can be
+ * answered by looking at the client. Until the opcodes are admitted it will
+ * report success and change the server's flag while the packets are dropped --
+ * which is why the message says so rather than claiming the client was told.
+ *
+ * @param args "on" or "off".
+ * @returns True if the command executed successfully, false otherwise.
+ */
+bool ChatHandler::HandleLevitateCommand(char* args)
+{
+    bool value;
+    if (!ExtractOnOff(&args, value))
+    {
+        SendSysMessage(LANG_USE_BOL);
+        SetSentErrorMessage(true);
+        return false;
+    }
+
+    Player* player = getSelectedPlayer();
+
+    if (!player)
+    {
+        PSendSysMessage(LANG_NO_CHAR_SELECTED);
+        SetSentErrorMessage(true);
+        return false;
+    }
+
+    if (HasLowerSecurity(player))
+    {
+        return false;
+    }
+
+    player->SetLevitate(value);
+
+    PSendSysMessage("Levitate %s for %s (gravity opcodes are held out of the send "
+                    "gate until their sense is confirmed).",
+                    value ? "ON" : "OFF", GetNameLink(player).c_str());
+    return true;
+}
+
+/**
  * @brief Handler for HandleGMCommand command.
  *
  * @param args Command arguments.

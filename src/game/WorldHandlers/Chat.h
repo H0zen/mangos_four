@@ -1011,6 +1011,8 @@ class ChatHandler
         bool HandleRepairitemsCommand(char* args);
         bool HandleStableCommand(char* args);
         bool HandleWaterwalkCommand(char* args);
+        bool HandleHoverCommand(char* args);
+        bool HandleLevitateCommand(char* args);
         bool HandleQuitCommand(char* args);
         bool HandleShowGearScoreCommand(char* args);
 
