@@ -287,7 +287,7 @@ void Unit::SetSpeedRate(UnitMoveType mtype, float rate, bool forced, bool ignore
                     // counter and the speed, and five after. See
                     // BuildMoveSetWalkSpeed.
                     data.Initialize(SMSG_MOVE_SET_WALK_SPEED, 1 + 8 + 4 + 4);
-                    MopCompactPackets::BuildMoveSetWalkSpeed(data, guid.GetRawValue(), 0, GetSpeed(mtype));
+                    MopCompactPackets::BuildMoveSetWalkSpeed(data, guid.GetRawValue(), NextMovementCounter(), GetSpeed(mtype));
                     break;
                 }
                 case MOVE_RUN:
@@ -298,19 +298,19 @@ void Unit::SetSpeedRate(UnitMoveType mtype, float rate, bool forced, bool ignore
                     // reader sub_C8B928 takes one byte, the counter, three
                     // bytes, the speed, then four. See BuildMoveSetRunSpeed.
                     data.Initialize(SMSG_MOVE_SET_RUN_SPEED, 1 + 8 + 4 + 4);
-                    MopCompactPackets::BuildMoveSetRunSpeed(data, guid.GetRawValue(), 0, GetSpeed(mtype));
+                    MopCompactPackets::BuildMoveSetRunSpeed(data, guid.GetRawValue(), NextMovementCounter(), GetSpeed(mtype));
                     break;
                 }
                 case MOVE_RUN_BACK:
                 {
                     data.Initialize(SMSG_MOVE_SET_RUN_BACK_SPEED, 1 + 8 + 4 + 4 );
-                    MopCompactPackets::BuildMoveSetRunBackSpeed(data, guid.GetRawValue(), 0, GetSpeed(mtype));
+                    MopCompactPackets::BuildMoveSetRunBackSpeed(data, guid.GetRawValue(), NextMovementCounter(), GetSpeed(mtype));
                     break;
                 }
                 case MOVE_SWIM:
                 {
                     data.Initialize(SMSG_MOVE_SET_SWIM_SPEED, 1 + 8 + 4 + 4 );
-                    MopCompactPackets::BuildMoveSetSwimSpeed(data, guid.GetRawValue(), 0, GetSpeed(mtype));
+                    MopCompactPackets::BuildMoveSetSwimSpeed(data, guid.GetRawValue(), NextMovementCounter(), GetSpeed(mtype));
                     break;
                 }
                 case MOVE_SWIM_BACK:
@@ -319,13 +319,13 @@ void Unit::SetSpeedRate(UnitMoveType mtype, float rate, bool forced, bool ignore
                     // The body here wrote GUID byte 0 twice and byte 2 never.
                     // Rebuilt from the client reader sub_C8AF44; see
                     // BuildMoveSetSwimBackSpeed.
-                    MopCompactPackets::BuildMoveSetSwimBackSpeed(data, guid.GetRawValue(), 0, GetSpeed(mtype));
+                    MopCompactPackets::BuildMoveSetSwimBackSpeed(data, guid.GetRawValue(), NextMovementCounter(), GetSpeed(mtype));
                     break;
                 }
                 case MOVE_TURN_RATE:
                 {
                     data.Initialize(SMSG_MOVE_SET_TURN_RATE, 1 + 8 + 4 + 4 );
-                    MopCompactPackets::BuildMoveSetTurnRate(data, guid.GetRawValue(), 0, GetSpeed(mtype));
+                    MopCompactPackets::BuildMoveSetTurnRate(data, guid.GetRawValue(), NextMovementCounter(), GetSpeed(mtype));
                     break;
                 }
                 case MOVE_FLIGHT:
@@ -333,19 +333,19 @@ void Unit::SetSpeedRate(UnitMoveType mtype, float rate, bool forced, bool ignore
                     data.Initialize(SMSG_MOVE_SET_FLIGHT_SPEED, 1 + 8 + 4 + 4 );
                     // Reads the float and counter BEFORE the mask byte; see
                     // BuildMoveSetFlightSpeed.
-                    MopCompactPackets::BuildMoveSetFlightSpeed(data, guid.GetRawValue(), 0, GetSpeed(mtype));
+                    MopCompactPackets::BuildMoveSetFlightSpeed(data, guid.GetRawValue(), NextMovementCounter(), GetSpeed(mtype));
                     break;
                 }
                 case MOVE_FLIGHT_BACK:
                 {
                     data.Initialize(SMSG_MOVE_SET_FLIGHT_BACK_SPEED, 1 + 8 + 4 + 4 );
-                    MopCompactPackets::BuildMoveSetFlightBackSpeed(data, guid.GetRawValue(), 0, GetSpeed(mtype));
+                    MopCompactPackets::BuildMoveSetFlightBackSpeed(data, guid.GetRawValue(), NextMovementCounter(), GetSpeed(mtype));
                     break;
                 }
                 case MOVE_PITCH_RATE:
                 {
                     data.Initialize(SMSG_MOVE_SET_PITCH_RATE, 1 + 8 + 4 + 4 );
-                    MopCompactPackets::BuildMoveSetPitchRate(data, guid.GetRawValue(), 0, GetSpeed(mtype));
+                    MopCompactPackets::BuildMoveSetPitchRate(data, guid.GetRawValue(), NextMovementCounter(), GetSpeed(mtype));
                     break;
                 }
                 default:

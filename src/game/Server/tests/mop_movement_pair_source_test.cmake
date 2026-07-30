@@ -19,6 +19,7 @@ file(READ "${SOURCE_ROOT}/src/game/Object/PlayerMovement.cpp" PLAYER_SOURCE)
 file(READ "${SOURCE_ROOT}/src/game/Object/CreatureMovement.cpp" CREATURE_SOURCE)
 file(READ "${SOURCE_ROOT}/src/game/Server/WorldSession.cpp" SESSION_SOURCE)
 file(READ "${SOURCE_ROOT}/src/game/Object/Unit.h" UNIT_HEADER)
+file(READ "${SOURCE_ROOT}/src/game/Object/UnitSpeed.cpp" UNIT_SPEED_SOURCE)
 
 if(MUTATION STREQUAL "drop_observer_half")
     string(REGEX REPLACE "SendMessageToSet[(]&spline, false[)];" ""
@@ -48,6 +49,10 @@ elseif(MUTATION STREQUAL "constant_counter")
     string(REPLACE "BuildMoveSetCanFlyPacket(&data, enable, NextMovementCounter());"
         "BuildMoveSetCanFlyPacket(&data, enable, 0);"
         PLAYER_SOURCE "${PLAYER_SOURCE}")
+elseif(MUTATION STREQUAL "speed_constant_counter")
+    string(REPLACE "MopCompactPackets::BuildMoveSetRunSpeed(data, guid.GetRawValue(), NextMovementCounter(), GetSpeed(mtype));"
+        "MopCompactPackets::BuildMoveSetRunSpeed(data, guid.GetRawValue(), 0, GetSpeed(mtype));"
+        UNIT_SPEED_SOURCE "${UNIT_SPEED_SOURCE}")
 elseif(MUTATION STREQUAL "counter_does_not_advance")
     string(REPLACE "uint32 NextMovementCounter() { return ++m_movementCounter; }"
         "uint32 NextMovementCounter() { return m_movementCounter; }"
@@ -258,6 +263,17 @@ if(COUNTER_ADVANCES EQUAL -1)
     message(FATAL_ERROR
         "Unit::NextMovementCounter must pre-increment -- it must advance, and it must "
         "not emit 0, which the movement block encodes as absent")
+endif()
+
+# The speed family draws from the SAME per-mover series. That is why observed
+# retail sequences skip values: a mover's packets of every kind share one
+# counter. Nine mover builders here; the nine SPLINE counterparts take no
+# counter at all and must not be given one.
+string(REGEX MATCHALL "BuildMoveSet[A-Za-z]+[(]data, guid.GetRawValue[(][)], [0-9]+,"
+    SPEED_CONSTANT_COUNTERS "${UNIT_SPEED_SOURCE}")
+if(NOT SPEED_CONSTANT_COUNTERS STREQUAL "")
+    message(FATAL_ERROR
+        "speed senders must pass NextMovementCounter(), not a constant: ${SPEED_CONSTANT_COUNTERS}")
 endif()
 
 # Every sender that takes a counter must draw from it.
