@@ -153,8 +153,8 @@ void WorldSession::HandleBankerActivateOpcode(WorldPacket& recv_data)
  */
 void WorldSession::SendShowBank(ObjectGuid guid)
 {
-    WorldPacket data(SMSG_SHOW_BANK, 8);
-    data << ObjectGuid(guid);
+    WorldPacket data;
+    MopCompactPackets::BuildShowBank(data, guid);
     SendPacket(&data);
 }
 

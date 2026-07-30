@@ -175,8 +175,8 @@
  *   TOTAL SMSG rows                   925
  *
  * SUBSYSTEM CONFIDENCE: high=365, low=221, medium=182, none=157
- * STATUS TOTALS: ACTIVE=493, DOC=435, DORMANT=592
- *   SMSG: ACTIVE=294, DOC=271, DORMANT=360
+ * STATUS TOTALS: ACTIVE=499, DOC=435, DORMANT=586
+ *   SMSG: ACTIVE=300, DOC=271, DORMANT=354
  *   CMSG: ACTIVE=199, DOC=164, DORMANT=232
  */
 
@@ -342,7 +342,7 @@ typedef uint16_t uint16;
  *   SMSG_CALENDAR_RAID_LOCKOUT_UPDATED             0x0E1F  DORMANT  [medium-conf]
  *   SMSG_MOVE_CHARACTER_CHEAT                      0x100F  ACTIVE   [low-conf]  server-binding=SMSG_QUERY_TIME_RESPONSE
  *   SMSG_CALENDAR_EVENT_INVITE_NOTES               0x11C0  DORMANT  [medium-conf]
- *   SMSG_CALENDAR_RAID_LOCKOUT_REMOVED             0x11E0  DORMANT  [low-conf]
+ *   SMSG_CALENDAR_RAID_LOCKOUT_REMOVED             0x11E0  ACTIVE   [low-conf]
  *   SMSG_CALENDAR_EVENT_INVITE_REMOVED_ALERT       0x122B  DORMANT  [low-conf]
  *   SMSG_CALENDAR_EVENT_INVITE_NOTES_ALERT         0x1286  DORMANT  [medium-conf]
  *   SMSG_COMPLAIN_RESULT                           0x128F  DORMANT  [low-conf]
@@ -472,7 +472,7 @@ typedef uint16_t uint16;
  *   SMSG_WHO                                       0x161B  DORMANT
  *
  *  -- GMTicketInfo.cpp (7) --
- *   SMSG_GM_TICKET_STATUS_UPDATE                   0x000B  DORMANT  [medium-conf]
+ *   SMSG_GM_TICKET_STATUS_UPDATE                   0x000B  ACTIVE   [medium-conf]
  *   SMSG_UNKNOWN_0x009B                            0x009B  DOC      [low-conf]
  *   SMSG_GM_TICKET_RESPONSE                        0x0207  DORMANT  [medium-conf]
  *   SMSG_GM_TICKET_UPDATE                          0x02A6  ACTIVE   [medium-conf]
@@ -594,7 +594,7 @@ typedef uint16_t uint16;
  *   SMSG_ADD_RUNE_POWER                            0x1860  ACTIVE   [high-conf]
  *
  *  -- ItemSocketInfo.cpp (1) --
- *   SMSG_SHOW_BANK                                 0x0007  DORMANT  [low-conf]
+ *   SMSG_SHOW_BANK                                 0x0007  ACTIVE   [low-conf]
  *
  *  -- KnowledgeBase.cpp (2) --
  *   SMSG_MOTD                                      0x183B  ACTIVE   [medium-conf]
@@ -664,7 +664,7 @@ typedef uint16_t uint16;
  *
  *  -- MailInfo.cpp (4) --
  *   SMSG_MAIL_QUERY_NEXT_TIME_RESULT               0x089B  ACTIVE
- *   SMSG_RECEIVED_MAIL                             0x182B  DORMANT
+ *   SMSG_RECEIVED_MAIL                             0x182B  ACTIVE
  *   SMSG_SEND_MAIL_RESULT                          0x1A9B  ACTIVE
  *   SMSG_MAIL_LIST_RESULT                          0x1C0B  DORMANT
  *
@@ -1166,7 +1166,7 @@ typedef uint16_t uint16;
  *   SMSG_UNKNOWN_0x029F                            0x029F  DOC      [unattributed]  handler never installed in this build
  *   SMSG_UNKNOWN_0x02A3                            0x02A3  DOC      [unattributed]  handler never installed in this build
  *   SMSG_UNKNOWN_0x02BE                            0x02BE  DOC      [unattributed]  handler never installed in this build
- *   SMSG_SERVER_MESSAGE                            0x0302  DORMANT  [unattributed]  dynamic slot 66 installed by 0xCE2FDA
+ *   SMSG_SERVER_MESSAGE                            0x0302  ACTIVE   [unattributed]  dynamic slot 66 installed by 0xCE2FDA
  *   SMSG_READ_ITEM_OK                              0x0305  DORMANT  [unattributed]  dynamic slot 69 installed by 0x7C170E
  *   SMSG_UPDATE_INSTANCE_ENCOUNTER_UNIT            0x0332  ACTIVE   [unattributed]  dynamic slot 90 installed by 0x94E1E0
  *   SMSG_UNKNOWN_0x040A                            0x040A  DOC      [unattributed]  handler never installed in this build
@@ -1300,7 +1300,7 @@ typedef uint16_t uint16;
  *   SMSG_UNKNOWN_0x1E8B                            0x1E8B  DOC      [unattributed]  handler never installed in this build
  *   SMSG_UNKNOWN_0x1E9B                            0x1E9B  DOC      [unattributed]
  *   SMSG_UNKNOWN_0x1EBE                            0x1EBE  DOC      [unattributed]  handler never installed in this build
- *   SMSG_SHOW_MAILBOX                              0x1F13  DORMANT  [unattributed]  dynamic slot 971 installed by 0x9AADC7
+ *   SMSG_SHOW_MAILBOX                              0x1F13  ACTIVE   [unattributed]  dynamic slot 971 installed by 0x9AADC7
  *   SMSG_CONTACT_LIST                              0x1F22  DORMANT  [unattributed]  dynamic slot 978 installed by 0xA6C177
  *
  * ==== CMSG (595) ====

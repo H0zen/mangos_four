@@ -309,6 +309,30 @@ static void test_primary_calendar_bounds()
     CHECK(!MopCalendarPackets::BuildCalendarEvent(eventPacket, event, {}));
 }
 
+static void test_raid_lockout_removed_matches_retail_bodies()
+{
+    // These retained 18414 bodies cover both observed masks and consume
+    // exactly. Their scalar values also rule out the inherited map/difficulty
+    // order: 580 and 550 are map IDs, while 4 is the difficulty.
+    WorldPacket dense(SMSG_CALENDAR_RAID_LOCKOUT_REMOVED, 17);
+    MopCalendarPackets::BuildCalendarRaidLockoutRemoved(
+        dense, 4, 580, UINT64_C(0x1F4400001048C8DD));
+    CHECK(dense.GetOpcode() == SMSG_CALENDAR_RAID_LOCKOUT_REMOVED);
+    CHECK(Equal(dense, {
+        0x04, 0x00, 0x00, 0x00, 0x44, 0x02, 0x00, 0x00,
+        0xD7, 0x45, 0xC9, 0x1E, 0x11, 0xDC, 0x49,
+    }));
+
+    WorldPacket sparse(SMSG_CALENDAR_RAID_LOCKOUT_REMOVED, 17);
+    MopCalendarPackets::BuildCalendarRaidLockoutRemoved(
+        sparse, 4, 550, UINT64_C(0x1F440000102C00F6));
+    CHECK(sparse.GetOpcode() == SMSG_CALENDAR_RAID_LOCKOUT_REMOVED);
+    CHECK(Equal(sparse, {
+        0x04, 0x00, 0x00, 0x00, 0x26, 0x02, 0x00, 0x00,
+        0xD6, 0x45, 0x1E, 0x11, 0xF7, 0x2D,
+    }));
+}
+
 static void test_opcodes()
 {
     CHECK(uint32(SMSG_CALENDAR_EVENT_INITIAL_INVITE) == 0x16AEu);
@@ -320,6 +344,7 @@ static void test_opcodes()
     CHECK(uint32(CMSG_CALENDAR_GET_EVENT) == 0x030Cu);
     CHECK(uint32(SMSG_CALENDAR_SEND_CALENDAR) == 0x1A0Au);
     CHECK(uint32(SMSG_CALENDAR_SEND_EVENT) == 0x12AEu);
+    CHECK(uint32(SMSG_CALENDAR_RAID_LOCKOUT_REMOVED) == 0x11E0u);
     CHECK(uint32(CMSG_CALENDAR_GET_NUM_PENDING) < uint32(OPCODE_TABLE_SIZE));
     CHECK(uint32(SMSG_CALENDAR_SEND_NUM_PENDING) < uint32(OPCODE_TABLE_SIZE));
     CHECK(uint32(SMSG_CALENDAR_EVENT_INITIAL_INVITE) < uint32(OPCODE_TABLE_SIZE));
@@ -329,6 +354,7 @@ static void test_opcodes()
     CHECK(uint32(CMSG_CALENDAR_GET_EVENT) < uint32(OPCODE_TABLE_SIZE));
     CHECK(uint32(SMSG_CALENDAR_SEND_CALENDAR) < uint32(OPCODE_TABLE_SIZE));
     CHECK(uint32(SMSG_CALENDAR_SEND_EVENT) < uint32(OPCODE_TABLE_SIZE));
+    CHECK(uint32(SMSG_CALENDAR_RAID_LOCKOUT_REMOVED) < uint32(OPCODE_TABLE_SIZE));
 }
 
 int main(int /*argc*/, char** /*argv*/)
@@ -344,6 +370,7 @@ int main(int /*argc*/, char** /*argv*/)
     test_populated_selected_event();
     test_sparse_selected_event_guid_masks();
     test_primary_calendar_bounds();
+    test_raid_lockout_removed_matches_retail_bodies();
     test_opcodes();
 
     if (g_fail)

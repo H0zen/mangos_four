@@ -1639,6 +1639,16 @@ namespace MopCompactPackets
         out.WriteGuidBytes<3, 6, 7, 5, 1, 4, 2, 0>(guid);
     }
 
+    inline void BuildShowBank(WorldPacket& out, ObjectGuid guid)
+    {
+        // SMSG_SHOW_BANK (0x0007). The 32- and 64-bit 18414 readers agree on
+        // this packed banker GUID, and the focused fixtures pin both observed
+        // retail masks. The inherited flat uint64 body could not be parsed.
+        out.Initialize(SMSG_SHOW_BANK, 9);
+        out.WriteGuidMask<2, 4, 3, 6, 5, 1, 7, 0>(guid);
+        out.WriteGuidBytes<7, 0, 5, 3, 6, 1, 4, 2>(guid);
+    }
+
     inline void BuildPreResurrect(WorldPacket& out, ObjectGuid guid)
     {
         // Wow.exe 18414 parser sub_709F6B (dispatcher sub_659694 case 696,

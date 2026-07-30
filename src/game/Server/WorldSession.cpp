@@ -459,6 +459,16 @@ static bool IsEnterWorldConverted(uint16 opcode)
         case SMSG_DISMOUNT:                          // MopCompactPackets::BuildDismount
         case SMSG_PRE_RESURRECT:                     // MopCompactPackets::BuildPreResurrect
         case SMSG_UPDATE_COMBO_POINTS:               // MopComboPointPackets::BuildUpdate
+        // Staging UI. SHOW_BANK and the calendar lockout removal use dedicated
+        // 18414 packed-GUID builders; the other four already matched their
+        // client readers and needed admission only. SHOW_MAILBOX has no corpus
+        // body, and the GM ticket opcode name remains a single-fork hypothesis.
+        case SMSG_SHOW_BANK:                         // MopCompactPackets::BuildShowBank
+        case SMSG_SHOW_MAILBOX:                      // flat uint64 reader; binary-only evidence
+        case SMSG_SERVER_MESSAGE:                    // uint32 type plus NUL-terminated text
+        case SMSG_RECEIVED_MAIL:                     // one float delivery delay
+        case SMSG_GM_TICKET_STATUS_UPDATE:           // one uint32; GM-ticket module route
+        case SMSG_CALENDAR_RAID_LOCKOUT_REMOVED:     // MopCalendarPackets::BuildCalendarRaidLockoutRemoved
         case SMSG_CANCEL_COMBAT:                   // Empty reader; terminal clears local-player combat state
         case SMSG_CANCEL_AUTO_REPEAT:              // packed unit GUID; Unit_C leaf 0x819546 clears auto-repeat
         case SMSG_AI_REACTION:                     // packed unit GUID plus reaction; Unit_C.cpp leaf 0x80AD80

@@ -1042,6 +1042,23 @@ add_test(NAME mop_enter_world_gate_source
     COMMAND ${CMAKE_COMMAND} -DSOURCE_ROOT=${CMAKE_SOURCE_DIR}
         -P ${CMAKE_CURRENT_SOURCE_DIR}/mop_enter_world_gate_source_test.cmake)
 
+add_test(NAME mop_staging_ui_packets_source
+    COMMAND ${CMAKE_COMMAND} -DSOURCE_ROOT=${CMAKE_SOURCE_DIR}
+        -P ${CMAKE_CURRENT_SOURCE_DIR}/mop_staging_ui_packets_source_test.cmake)
+
+foreach(mutation IN ITEMS
+        bank_mask bank_bytes bank_sender mailbox_body server_message_body
+        received_mail_body ticket_body calendar_scalar_order calendar_reset_field
+        calendar_mask calendar_bytes calendar_instance_guid calendar_sender
+        staging_gate staging_registration staging_reference)
+    add_test(NAME mop_staging_ui_packets_source_mutation_${mutation}
+        COMMAND ${CMAKE_COMMAND} -DSOURCE_ROOT=${CMAKE_SOURCE_DIR}
+            -DMUTATION=${mutation}
+            -P ${CMAKE_CURRENT_SOURCE_DIR}/mop_staging_ui_packets_source_test.cmake)
+    set_tests_properties(mop_staging_ui_packets_source_mutation_${mutation}
+        PROPERTIES WILL_FAIL TRUE)
+endforeach()
+
 foreach(mutation IN ITEMS converted_packet transfer_registration
         update_gate update_registration update_bypass
         destroy_gate destroy_registration destroy_bypass)

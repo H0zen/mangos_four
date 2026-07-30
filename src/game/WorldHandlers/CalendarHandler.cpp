@@ -1096,14 +1096,9 @@ void CalendarMgr::SendCalendarRaidLockoutRemove(Player* player, DungeonPersisten
     }
 
     DEBUG_LOG("SMSG_CALENDAR_RAID_LOCKOUT_REMOVED [%s]", player->GetObjectGuid().GetString().c_str());
-    time_t currTime = time(NULL);
-
-    WorldPacket data(SMSG_CALENDAR_RAID_LOCKOUT_REMOVED, 4 + 4 + 4 + 8);
-    data << uint32(save->GetMapId());
-    data << uint32(save->GetDifficulty());
-    data << uint32(save->GetResetTime() - currTime);
-    data << uint64(save->GetInstanceId());
-    //data.hexlike();
+    WorldPacket data(SMSG_CALENDAR_RAID_LOCKOUT_REMOVED, 17);
+    MopCalendarPackets::BuildCalendarRaidLockoutRemoved(data,
+        save->GetDifficulty(), save->GetMapId(), save->GetInstanceGuid().GetRawValue());
     player->SendDirectMessage(&data);
 }
 

@@ -1045,6 +1045,27 @@ static void test_dismount_packet()
     }));
 }
 
+static void test_show_bank_matches_retail_bodies()
+{
+    // Two retained 18414 bodies independently pin the full-mask and sparse
+    // forms. Every present GUID byte is XOR-obfuscated by WriteGuidBytes.
+    WorldPacket dense;
+    MopCompactPackets::BuildShowBank(
+        dense, ObjectGuid(UINT64_C(0xF130F9DF002B6ED1)));
+    CHECK(dense.GetOpcode() == SMSG_SHOW_BANK);
+    CHECK(BytesEqual(dense, {
+        0xDF, 0xF0, 0xD0, 0xF8, 0x31, 0x6F, 0xDE, 0x2A,
+    }));
+
+    WorldPacket sparse;
+    MopCompactPackets::BuildShowBank(
+        sparse, ObjectGuid(UINT64_C(0xF130F9E2000021A2)));
+    CHECK(sparse.GetOpcode() == SMSG_SHOW_BANK);
+    CHECK(BytesEqual(sparse, {
+        0x5F, 0xF0, 0xA3, 0xF8, 0x31, 0x20, 0xE3,
+    }));
+}
+
 static void test_combo_points_packet()
 {
     WorldPacket packet;
@@ -1901,6 +1922,7 @@ int main(int /*argc*/, char** /*argv*/)
     test_rune_packets();
     test_threat_packets();
     test_dismount_packet();
+    test_show_bank_matches_retail_bodies();
     test_pre_resurrect_packet();
     test_combo_points_packet();
     test_opcode_values_are_framable();

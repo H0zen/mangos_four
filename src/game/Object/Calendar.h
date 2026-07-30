@@ -370,6 +370,19 @@ namespace MopCalendarPackets
         out << record.eventId;
         WriteGuidBytes(out, record.inviteeGuid, { 0 });
     }
+
+    inline void BuildCalendarRaidLockoutRemoved(WorldPacket& out,
+        uint32 difficulty, uint32 mapId, uint64 instanceGuid)
+    {
+        // SMSG_CALENDAR_RAID_LOCKOUT_REMOVED (0x11E0). Both 18414 readers and
+        // the retained retail bodies agree: difficulty precedes map ID, there
+        // is no reset-delay dword, and the instance-save GUID is packed.
+        out << difficulty;
+        out << mapId;
+        WriteGuidMask(out, instanceGuid, { 2, 0, 4, 6, 5, 7, 3, 1 });
+        out.FlushBits();
+        WriteGuidBytes(out, instanceGuid, { 6, 1, 7, 3, 4, 5, 0, 2 });
+    }
 }
 
 enum CalendarEventType
