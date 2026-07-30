@@ -60,6 +60,38 @@
 #include "LuaEngine.h"
 #endif /* ENABLE_ELUNA */
 
+namespace
+{
+    /// The 18414 client appends "-Realm" to a whisper target it did not get by
+    /// hand: a reply, a chat link, or a who-list click all arrive as
+    /// "Name-RealmWithoutSpaces", while a typed name arrives bare. Both forms
+    /// name the same character, so the home-realm suffix has to come off before
+    /// the lookup or replying to anyone fails with "player not found".
+    ///
+    /// Only OUR realm's suffix is stripped. A genuinely foreign "Name-Other"
+    /// keeps it and fails to resolve, which is correct -- silently matching a
+    /// local character of the same name would whisper the wrong person.
+    void StripHomeRealmSuffix(std::string& name)
+    {
+        std::string const suffix = "-" + NormalizeRealmName(CachedRealmName());
+        if (name.size() <= suffix.size())
+        {
+            return;
+        }
+
+        size_t const at = name.size() - suffix.size();
+        for (size_t i = 0; i < suffix.size(); ++i)
+        {
+            if (std::tolower(static_cast<unsigned char>(name[at + i])) !=
+                std::tolower(static_cast<unsigned char>(suffix[i])))
+            {
+                return;
+            }
+        }
+        name.resize(at);
+    }
+}
+
 /**
  * @brief Applies post-parse security checks to a chat message before broadcast.
  *
@@ -351,6 +383,8 @@ void WorldSession::HandleMessagechatOpcode(WorldPacket& recv_data)
             {
                 return;
             }
+
+            StripHomeRealmSuffix(to);
 
             if (!normalizePlayerName(to))
             {
@@ -1008,6 +1042,8 @@ void WorldSession::HandleAddonMessagechatOpcode(WorldPacket& recv_data)
             std::string targetName = recv_data.ReadString(targetLen);
             std::string prefix = recv_data.ReadString(prefixLen);
             std::string msg = recv_data.ReadString(msgLen);
+
+            StripHomeRealmSuffix(targetName);
 
             if (!normalizePlayerName(targetName))
             {

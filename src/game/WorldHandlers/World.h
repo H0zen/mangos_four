@@ -838,6 +838,11 @@ class World
 
 extern uint32 realmID;
 
+/// This realm's name as `realmlist` records it, read once and cached.
+std::string const& CachedRealmName();
+/// The client's cross-realm link form of a realm name, which is space-free.
+std::string NormalizeRealmName(std::string const& name);
+
 #define sWorld MaNGOS::Singleton<World>::Instance()
 #endif
 /// @}

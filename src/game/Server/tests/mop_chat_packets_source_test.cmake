@@ -143,6 +143,11 @@ elseif(MUTATION STREQUAL "say_parser_layout")
         "uint8 const length = uint8(in.ReadBits(8));"
         "uint8 const length = uint8(in.ReadBits(9)); /* damaged SAY length */"
         chat_header "${chat_header}")
+elseif(MUTATION STREQUAL "realm_suffix_strip")
+    string(REPLACE
+        "StripHomeRealmSuffix(to);"
+        "/* removed home-realm suffix strip */"
+        chat_handler "${chat_handler}")
 elseif(MUTATION STREQUAL "inline_length_width")
     string(REPLACE
         "msg = recv_data.ReadString(recv_data.ReadBits(8));"
@@ -346,6 +351,16 @@ require_once("${channel_sender}"
 require_once("${chat_handler}"
     "receiver->GetSession()->SendPacket(&data);"
     "addon whisper recipient")
+# The client appends "-Realm" to a whisper target taken from a reply, a chat
+# link or the who list, so both whisper paths must strip the home-realm suffix
+# before the lookup or replying to anyone fails with "player not found".
+require_once("${chat_handler}"
+    "StripHomeRealmSuffix(to);"
+    "whisper home-realm suffix strip")
+require_once("${chat_handler}"
+    "StripHomeRealmSuffix(targetName);"
+    "addon whisper home-realm suffix strip")
+
 # The ten chat types that read their message length inline rather than through
 # ReadSayMessageRequest. The 18414 client writes an 8-bit byte-aligned length
 # (its writer consumes exactly eight bits), and a 9-bit read silently drops the

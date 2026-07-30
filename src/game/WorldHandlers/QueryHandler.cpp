@@ -199,45 +199,43 @@ void WorldSession::HandleQueryTimeOpcode(WorldPacket & /*recv_data*/)
     SendQueryTimeResponse();
 }
 
-namespace
+/// This world's realm name, loaded once from the login DB (realmd's realmlist).
+/// The realm-name query needs it, and so does whisper: the client appends
+/// "-Realm" to a target taken from a chat link or a reply, and that suffix has
+/// to come back off before the name is looked up. Declared in World.h.
+/// C++11 function-local static init is thread-safe.
+std::string const& CachedRealmName()
 {
-    /// This world's realm name, loaded once from the login DB (realmd's realmlist).
-    /// Only the realm-name query needs it; for the home realm the client suppresses
-    /// the "-Realm" suffix (isHomeRealm), so a non-empty value is all that matters.
-    /// C++11 function-local static init is thread-safe.
-    std::string const& CachedRealmName()
+    static std::string const realmName = []() -> std::string
     {
-        static std::string const realmName = []() -> std::string
+        std::string name;
+        if (QueryResult* result = LoginDatabase.PQuery("SELECT `name` FROM `realmlist` WHERE `id` = '%u'", realmID))
         {
-            std::string name;
-            if (QueryResult* result = LoginDatabase.PQuery("SELECT `name` FROM `realmlist` WHERE `id` = '%u'", realmID))
-            {
-                name = (*result)[0].GetCppString();
-                delete result;
-            }
-            if (name.empty())
-            {
-                name = "MaNGOS";
-            }
-            return name;
-        }();
-        return realmName;
-    }
-
-    /// The client's cross-realm link form uses a space-free realm name.
-    std::string NormalizeRealmName(std::string const& name)
-    {
-        std::string out;
-        out.reserve(name.size());
-        for (char c : name)
-        {
-            if (c != ' ')
-            {
-                out.push_back(c);
-            }
+            name = (*result)[0].GetCppString();
+            delete result;
         }
-        return out;
+        if (name.empty())
+        {
+            name = "MaNGOS";
+        }
+        return name;
+    }();
+    return realmName;
+}
+
+/// The client's cross-realm link form uses a space-free realm name.
+std::string NormalizeRealmName(std::string const& name)
+{
+    std::string out;
+    out.reserve(name.size());
+    for (char c : name)
+    {
+        if (c != ' ')
+        {
+            out.push_back(c);
+        }
     }
+    return out;
 }
 
 void WorldSession::HandleRealmNameQueryOpcode(WorldPacket& recv_data)
