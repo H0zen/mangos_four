@@ -5423,8 +5423,9 @@ void Player::SetTitle(CharTitlesEntry const* title, bool lost)
         SetFlag(PLAYER__FIELD_KNOWN_TITLES + fieldIndexOffset, flag);
     }
 
-    WorldPacket data;
-    MopCharacterPanePackets::BuildTitleUpdate(data, uint32(title->Mask_ID), lost);
+    WorldPacket data(lost ? SMSG_TITLE_LOST : SMSG_TITLE_EARNED,
+        sizeof(uint32));
+    MopCharacterPanePackets::BuildTitleUpdate(data, uint32(title->Mask_ID));
     GetSession()->SendPacket(&data);
 }
 

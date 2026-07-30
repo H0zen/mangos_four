@@ -285,8 +285,8 @@ void CurrencyMgr::SendWeekCap(CurrencyTypesEntry const* currency) const
     }
 
     WorldPacket packet(SMSG_SET_CURRENCY_WEEK_LIMIT, 8);
-    packet << uint32(floor(cap / currency->GetPrecision()));
-    packet << uint32(currency->ID);
+    MopCurrencyPackets::BuildSetCurrencyWeekLimit(packet,
+        uint32(floor(cap / currency->GetPrecision())), uint32(currency->ID));
     m_owner->GetSession()->SendPacket(&packet);
 }
 

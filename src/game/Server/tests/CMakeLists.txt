@@ -1767,12 +1767,16 @@ add_test(NAME mop_character_pane_packets_source
         -P ${CMAKE_CURRENT_SOURCE_DIR}/mop_character_pane_packets_source_test.cmake)
 
 foreach(mutation IN ITEMS
-        standing_order standing_sender visible_body currency_order
+        standing_order standing_opcode standing_sender
+        visible_body visible_opcode visible_sender
+        currency_order currency_opcode currency_sender
         standing_registration visible_registration currency_registration
         standing_admission visible_admission currency_admission
         standing_reference visible_reference currency_reference
-        title_sender pvp_mask pvp_bytes pvp_sender
-        inebriation_mask inebriation_byte3 inebriation_bytes inebriation_sender
+        title_opcode title_sender
+        pvp_scalar_order pvp_mask pvp_bytes pvp_opcode pvp_sender
+        inebriation_scalar_order inebriation_mask inebriation_byte3
+        inebriation_bytes inebriation_opcode inebriation_sender
         title_earned_registration title_lost_registration pvp_registration inebriation_registration
         title_earned_admission title_lost_admission pvp_admission inebriation_admission
         title_earned_reference title_lost_reference pvp_reference inebriation_reference)

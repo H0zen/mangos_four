@@ -39,6 +39,12 @@ struct CurrencyTypesEntry;
 
 namespace MopCurrencyPackets
 {
+    inline void BuildSetCurrencyWeekLimit(WorldPacket& out,
+        uint32 weekCap, uint32 currencyId)
+    {
+        out << weekCap << currencyId;
+    }
+
     struct CurrencyUpdate
     {
         uint32 currencyId;

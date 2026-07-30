@@ -224,7 +224,8 @@ void ReputationMgr::SendState(FactionState const* faction, bool anyRankIncreased
         }
     }
 
-    WorldPacket data;
+    WorldPacket data(SMSG_SET_FACTION_STANDING,
+        11 + standings.size() * 2 * sizeof(uint32));
     MopReputationPackets::BuildSetFactionStanding(data, anyRankIncreased, standings,
         0.0f, 0.0f);
     m_player->SendDirectMessage(&data);
@@ -265,7 +266,7 @@ void ReputationMgr::SendVisible(FactionState const* faction) const
 
     // make faction visible in reputation list at client
     WorldPacket data(SMSG_SET_FACTION_VISIBLE, 4);
-    data << faction->ReputationListID;
+    MopReputationPackets::BuildSetFactionVisible(data, faction->ReputationListID);
     m_player->SendDirectMessage(&data);
 }
 

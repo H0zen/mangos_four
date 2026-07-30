@@ -204,7 +204,7 @@ bool HonorMgr::Reward(Unit* uVictim, uint32 groupsize, float honor)
     // victim_rank [1..4]  HK: <dishonored rank>
     // victim_rank [5..19] HK: <alliance\horde rank>
     // victim_rank [0,20+] HK: <>
-    WorldPacket data;
+    WorldPacket data(SMSG_PVP_CREDIT, 17);
     MopCharacterPanePackets::BuildPvpCredit(data, uint32(victim_rank),
         uint32(honor), victim_guid);
     m_owner->GetSession()->SendPacket(&data);

@@ -734,8 +734,6 @@ namespace MopReputationPackets
         // captured bodies cover counts 1, 2 and 7. Every capture sets the
         // visual bit and carries two zero floats, so the false/nonzero cases
         // are complementary serializer fixtures rather than corpus claims.
-        out.Initialize(SMSG_SET_FACTION_STANDING,
-            11 + standings.size() * 2 * sizeof(uint32));
         out.WriteBit(showVisualEffect);
         out.WriteBits(uint32(standings.size()), 21);
         out.FlushBits();
@@ -744,6 +742,11 @@ namespace MopReputationPackets
             out << standing.standing << standing.reputationIndex;
 
         out << bonusA << bonusB;
+    }
+
+    inline void BuildSetFactionVisible(WorldPacket& out, uint32 reputationIndex)
+    {
+        out << reputationIndex;
     }
 
     struct ForcedReaction
@@ -768,11 +771,10 @@ namespace MopReputationPackets
 
 namespace MopCharacterPanePackets
 {
-    inline void BuildTitleUpdate(WorldPacket& out, uint32 titleMaskId, bool lost)
+    inline void BuildTitleUpdate(WorldPacket& out, uint32 titleMaskId)
     {
         // Earned and lost use distinct 18414 opcodes with the same one-uint32
         // body. A paired retail capture carries the same Mask_ID under both.
-        out.Initialize(lost ? SMSG_TITLE_LOST : SMSG_TITLE_EARNED, sizeof(uint32));
         out << titleMaskId;
     }
 
@@ -781,7 +783,6 @@ namespace MopCharacterPanePackets
     {
         // Wow.exe 18414 reader sub_6CBADE fixes both scalar and GUID order;
         // captured bodies cover a sparse player GUID and the zero-GUID award.
-        out.Initialize(SMSG_PVP_CREDIT, 17);
         out << rank << honor;
         out.WriteGuidMask<4, 2, 5, 3, 0, 6, 1, 7>(victimGuid);
         out.FlushBits();
@@ -793,7 +794,6 @@ namespace MopCharacterPanePackets
     {
         // Wow.exe 18414 reader sub_6E7A17 consumes GUID byte 3 between the
         // mask and the item/state scalars. Three captured bodies pin the order.
-        out.Initialize(SMSG_CROSSED_INEBRIATION_THRESHOLD, 17);
         out.WriteGuidMask<0, 4, 2, 6, 5, 1, 3, 7>(playerGuid);
         out.FlushBits();
         out.WriteGuidBytes<3>(playerGuid);
