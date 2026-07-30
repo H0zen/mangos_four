@@ -13,7 +13,15 @@ file(READ "${SOURCE_ROOT}/src/game/movement/packet_builder.cpp" spline_packet_so
 file(READ "${SOURCE_ROOT}/src/game/movement/MoveSplineInit.cpp" spline_init_source)
 file(READ "${SOURCE_ROOT}/src/game/Server/WorldSession.cpp" world_session_source)
 
-if(MUTATION STREQUAL "drop_back_speed_snare_calls")
+if(MUTATION STREQUAL "root_then_clear_flags")
+    string(REPLACE "            ((Player*)target)->m_movementInfo.SetMovementFlags(MOVEFLAG_NONE);
+
+            target->SetRoot(true);"
+        "            target->SetRoot(true);
+
+            ((Player*)target)->m_movementInfo.SetMovementFlags(MOVEFLAG_NONE);"
+        spell_aura_control_source "${spell_aura_control_source}")
+elseif(MUTATION STREQUAL "drop_back_speed_snare_calls")
     string(REPLACE "    target->UpdateSpeed(MOVE_RUN_BACK, true);" ""
         spell_aura_control_source "${spell_aura_control_source}")
 elseif(MUTATION STREQUAL "speed_correction_is_noop")
@@ -557,3 +565,45 @@ if(canfly_ack_self_guard EQUAL -1)
         "client's whole movement-flag word, and on a vehicle or charmed creature those "
         "flags reach creature pathfinding and the board/unboard state machine")
 endif()
+
+# --- A movement-flag clear must not follow the SetRoot it would erase --------
+#
+# SetRoot now records MOVEFLAG_ROOT server-side. The spell-root path cleared
+# every movement flag AFTER calling it, so IsRooted() -- which reads that flag --
+# reported the target free. The stun path already clears first; this makes the
+# root path match.
+string(FIND "${spell_aura_control_source}" "SetMovementFlags(MOVEFLAG_NONE)" clear_at)
+while(NOT clear_at EQUAL -1)
+    math(EXPR clear_window_start "${clear_at} + 30")
+    string(LENGTH "${spell_aura_control_source}" sac_length)
+    math(EXPR clear_window "${sac_length} - ${clear_window_start}")
+    if(clear_window GREATER 200)
+        set(clear_window 200)
+    endif()
+    string(SUBSTRING "${spell_aura_control_source}" ${clear_window_start} ${clear_window} clear_tail)
+    string(FIND "${clear_tail}" "SetRoot(true)" root_after_clear)
+
+    math(EXPR before_start "${clear_at} - 200")
+    if(before_start LESS 0)
+        set(before_start 0)
+    endif()
+    math(EXPR before_len "${clear_at} - ${before_start}")
+    string(SUBSTRING "${spell_aura_control_source}" ${before_start} ${before_len} clear_head)
+    string(FIND "${clear_head}" "SetRoot(true)" root_before_clear)
+
+    if(NOT root_before_clear EQUAL -1)
+        message(FATAL_ERROR
+            "a SetMovementFlags(MOVEFLAG_NONE) immediately follows SetRoot(true) -- "
+            "the clear erases the root flag that SetRoot just recorded, and IsRooted() "
+            "reads exactly that flag")
+    endif()
+
+    math(EXPR clear_at "${clear_at} + 30")
+    string(SUBSTRING "${spell_aura_control_source}" ${clear_at} -1 clear_rest)
+    string(FIND "${clear_rest}" "SetMovementFlags(MOVEFLAG_NONE)" next_clear)
+    if(next_clear EQUAL -1)
+        set(clear_at -1)
+    else()
+        math(EXPR clear_at "${clear_at} + ${next_clear}")
+    endif()
+endwhile()

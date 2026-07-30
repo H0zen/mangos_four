@@ -862,10 +862,14 @@ void Aura::HandleAuraModRoot(bool apply, bool Real)
 
         if (target->GetTypeId() == TYPEID_PLAYER)
         {
-            target->SetRoot(true);
-
-            // Clear unit movement flags
+            // Clear first, THEN root. The other way round wipes the root flag
+            // that SetRoot just recorded, because this clears every movement
+            // flag -- and IsRooted() reads exactly that flag, so a spell root
+            // left the server believing the target was free. The stun path a few
+            // hundred lines up already does it in this order.
             ((Player*)target)->m_movementInfo.SetMovementFlags(MOVEFLAG_NONE);
+
+            target->SetRoot(true);
         }
         else
         {

@@ -1678,6 +1678,41 @@ static void test_root_family_retail_bodies()
             CHECK(std::memcmp(packet.contents(), splineRoot, sizeof(splineRoot)) == 0);
         }
     }
+
+    // UNROOT, byte-exact. Previously it had only a size check and a
+    // "differs from ROOT" check, so its 2/6 split could have been ordered wrongly
+    // and still passed -- the claim that two masks were pinned per opcode was
+    // true of ROOT and not of UNROOT.
+    static uint8 const unroot12a[] = { 0x7F, 0xCF, 0xF0, 0x95, 0x00, 0x00,
+                                       0x00, 0xFE, 0x22, 0x42, 0x62, 0x51 };
+    static uint8 const unroot12b[] = { 0x7F, 0x60, 0xF0, 0x24, 0x00, 0x00,
+                                       0x00, 0x98, 0x7F, 0x00, 0x26, 0x51 };
+    static uint8 const splineUnroot[] = { 0xFF, 0x03, 0xF0, 0x31, 0x30, 0xD4, 0x6A, 0x0D, 0x41 };
+
+    struct UnrootCase { uint64 guid; uint32 counter; uint8 const* body; size_t size; };
+    UnrootCase const unroots[] = {
+        { UINT64_C(0xF150FF23004363CE), 149, unroot12a, sizeof(unroot12a) },
+        { UINT64_C(0xF150997E00012761),  36, unroot12b, sizeof(unroot12b) },
+    };
+    for (UnrootCase const& c : unroots)
+    {
+        WorldPacket packet(SMSG_FORCE_MOVE_UNROOT, 13);
+        MopCompactPackets::BuildForceMoveUnroot(packet, c.guid, c.counter);
+        CHECK(packet.size() == c.size);
+        if (packet.size() == c.size)
+        {
+            CHECK(std::memcmp(packet.contents(), c.body, c.size) == 0);
+        }
+    }
+    {
+        WorldPacket packet(SMSG_SPLINE_MOVE_UNROOT, 9);
+        MopCompactPackets::BuildSplineMoveUnroot(packet, UINT64_C(0xF140D50C3102306B));
+        CHECK(packet.size() == sizeof(splineUnroot));
+        if (packet.size() == sizeof(splineUnroot))
+        {
+            CHECK(std::memcmp(packet.contents(), splineUnroot, sizeof(splineUnroot)) == 0);
+        }
+    }
 }
 
 /// Root and unroot must not share a layout, and the observer halves must carry
