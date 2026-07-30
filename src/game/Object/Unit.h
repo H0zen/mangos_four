@@ -92,6 +92,66 @@ namespace MopCompactPackets
         return target;
     }
 
+    /// CMSG_PET_ACTION (0x025B), the 18414 body.
+    ///
+    /// Recovered from decoded corpus bodies at catalogue 2BE10C89. Five bodies
+    /// consume exactly: four with a zero position, and the single positional one
+    /// in all 21,530 packets of the build. Every pet GUID that falls out decodes
+    /// under HIGHGUID_PET and the one populated target under HIGHGUID_UNIT,
+    /// which is a check independent of the packet itself.
+    ///
+    /// The action leads, then the position, then SIXTEEN presence bits
+    /// INTERLEAVED across the two GUIDs -- not one mask byte each -- then the
+    /// present bytes in their own order. An earlier reading here had it as one
+    /// mask byte per GUID; that fitted every observed length, because only the
+    /// total popcount sets the length, and it was still wrong.
+    ///
+    /// The middle float is z. In the one positional body it reads 246.8356,
+    /// matching the ground height in every SMSG_ON_MONSTER_MOVE body captured
+    /// beside it to four decimals. Which of the outer two is x and which is y is
+    /// NOT established: no observed body distinguishes them, so that pairing is
+    /// a hypothesis and is named here only for readability. Nothing consumes the
+    /// position, so no behaviour depends on it.
+    inline void ReadPetAction(WorldPacket& in, uint32& action,
+        float& posY, float& posZ, float& posX,
+        ObjectGuid& petGuid, ObjectGuid& targetGuid)
+    {
+        in >> action;
+        in >> posY >> posZ >> posX;
+
+        uint8 pet[8] = { 0, 0, 0, 0, 0, 0, 0, 0 };
+        uint8 target[8] = { 0, 0, 0, 0, 0, 0, 0, 0 };
+
+        in.ResetBitReader();
+        pet[1]    = in.ReadBit();  pet[0]    = in.ReadBit();
+        pet[6]    = in.ReadBit();  pet[7]    = in.ReadBit();
+        pet[5]    = in.ReadBit();  target[7] = in.ReadBit();
+        pet[2]    = in.ReadBit();  pet[3]    = in.ReadBit();
+        target[6] = in.ReadBit();  target[3] = in.ReadBit();
+        target[0] = in.ReadBit();  target[2] = in.ReadBit();
+        target[5] = in.ReadBit();  pet[4]    = in.ReadBit();
+        target[4] = in.ReadBit();  target[1] = in.ReadBit();
+
+        in.ReadByteSeq(pet[7]);     in.ReadByteSeq(pet[6]);
+        in.ReadByteSeq(pet[1]);     in.ReadByteSeq(pet[2]);
+        in.ReadByteSeq(pet[5]);     in.ReadByteSeq(pet[4]);
+        in.ReadByteSeq(target[5]);  in.ReadByteSeq(pet[3]);
+        in.ReadByteSeq(target[0]);  in.ReadByteSeq(target[1]);
+        in.ReadByteSeq(target[7]);  in.ReadByteSeq(target[4]);
+        in.ReadByteSeq(target[6]);  in.ReadByteSeq(target[2]);
+        in.ReadByteSeq(target[3]);  in.ReadByteSeq(pet[0]);
+
+        uint64 petRaw = 0;
+        uint64 targetRaw = 0;
+        for (uint8 index = 0; index < 8; ++index)
+        {
+            petRaw |= uint64(pet[index]) << (8 * index);
+            targetRaw |= uint64(target[index]) << (8 * index);
+        }
+        petGuid = ObjectGuid(petRaw);
+        targetGuid = ObjectGuid(targetRaw);
+    }
+
     inline void BuildAttackStart(WorldPacket& out, uint64 attackerGuid,
         uint64 victimGuid)
     {

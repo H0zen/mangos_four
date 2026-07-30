@@ -175,9 +175,9 @@
  *   TOTAL SMSG rows                   925
  *
  * SUBSYSTEM CONFIDENCE: high=365, low=221, medium=182, none=157
- * STATUS TOTALS: ACTIVE=461, DOC=435, DORMANT=624
+ * STATUS TOTALS: ACTIVE=462, DOC=435, DORMANT=623
  *   SMSG: ACTIVE=276, DOC=271, DORMANT=378
- *   CMSG: ACTIVE=185, DOC=164, DORMANT=246
+ *   CMSG: ACTIVE=186, DOC=164, DORMANT=245
  */
 
 // CAVEATS -- read before trusting any single row:
@@ -1370,7 +1370,7 @@ typedef uint16_t uint16;
  *   CMSG_PETITION_QUERY                            0x0255  DORMANT 
  *   CMSG_LEAVE_BATTLEFIELD                         0x0257  ACTIVE
  *   CMSG_AUCTION_REMOVE_ITEM                       0x0259  DORMANT 
- *   CMSG_PET_ACTION                                0x025B  DORMANT 
+ *   CMSG_PET_ACTION                                0x025B  ACTIVE 
  *   CMSG_AUTOEQUIP_ITEM                            0x025F  ACTIVE
  *   CMSG_KEYBOUND_OVERRIDE                         0x0264  DOC     
  *   CMSG_ZONEUPDATE                                0x0265  DORMANT 

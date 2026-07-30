@@ -556,6 +556,10 @@ void InitializeOpcodes()
     DefC(CMSG_STANDSTATECHANGE, "CMSG_STANDSTATECHANGE", STATUS_LOGGEDIN, PROCESS_THREADUNSAFE, &WorldSession::HandleStandStateChangeOpcode);
     DefS(SMSG_STANDSTATE_UPDATE, "SMSG_STANDSTATE_UPDATE");
     DefC(CMSG_ATTACKSWING, "CMSG_ATTACKSWING", STATUS_LOGGEDIN, PROCESS_THREADUNSAFE, &WorldSession::HandleAttackSwingOpcode);
+    // Body recovered from decoded 18414 corpus payloads, not from size
+    // agreement: the action leads, then the position, then sixteen presence
+    // bits interleaved across the pet and target GUIDs.
+    DefC(CMSG_PET_ACTION, "CMSG_PET_ACTION", STATUS_LOGGEDIN, PROCESS_THREADUNSAFE, &WorldSession::HandlePetAction);
     DefC(CMSG_ATTACKSTOP, "CMSG_ATTACKSTOP", STATUS_LOGGEDIN, PROCESS_THREADUNSAFE, &WorldSession::HandleAttackStopOpcode);
     DefS(SMSG_ATTACKSTART, "SMSG_ATTACKSTART");
     DefS(SMSG_ATTACKSTOP, "SMSG_ATTACKSTOP");

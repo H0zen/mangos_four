@@ -74,14 +74,16 @@ void WorldSession::HandleBattlePetRequestJournal(WorldPacket& /*recv_data*/)
  */
 void WorldSession::HandlePetAction(WorldPacket& recv_data)
 {
+    // The pre-MoP body read here was petGuid, data, targetGuid and three floats
+    // as 32 fixed bytes with raw GUIDs. The 18414 body is variable, 18 to 34
+    // bytes, puts the action FIRST, and packs both GUIDs behind sixteen
+    // interleaved presence bits. See MopCompactPackets::ReadPetAction for the
+    // corpus evidence. The position is read but, as before, is not used.
     ObjectGuid petGuid;
-    uint32 data;
     ObjectGuid targetGuid;
-    float x, y, z;
-    recv_data >> petGuid;
-    recv_data >> data;
-    recv_data >> targetGuid;
-    recv_data >> x >> y >> z;
+    uint32 data;
+    float posY, posZ, posX;
+    MopCompactPackets::ReadPetAction(recv_data, data, posY, posZ, posX, petGuid, targetGuid);
 
     uint32 spellid = UNIT_ACTION_BUTTON_ACTION(data);
     uint8 flag = UNIT_ACTION_BUTTON_TYPE(data);             // delete = 0x07 CastSpell = C1

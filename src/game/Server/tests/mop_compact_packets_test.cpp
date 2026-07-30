@@ -993,6 +993,107 @@ static void test_pre_resurrect_packet()
     }));
 }
 
+/// CMSG_PET_ACTION, pinned to real 18414 bodies.
+///
+/// Four bodies at catalogue 2BE10C89, spanning three lengths and both the
+/// target-absent and target-present cases. Each must consume EXACTLY: a body
+/// that over- or under-reads would leave rpos short of size, and because the
+/// length is 18 + popcount of the sixteen presence bits, exact consumption is a
+/// real constraint rather than a tautology.
+///
+/// The decoded GUIDs are checked against a fact outside the packet: 0xF14 is
+/// HIGHGUID_PET and 0xF13 is HIGHGUID_UNIT, so every pet slot decodes as a pet
+/// and the one populated target as a creature. A wrong byte interleave would
+/// have to produce a valid high type by accident, four times.
+static void CheckPetAction(char const* what, uint8_t const* body, size_t length,
+    uint32 expectedAction, uint64 expectedPet, uint64 expectedTarget)
+{
+    WorldPacket packet(CMSG_PET_ACTION, uint32(length));
+    packet.append(body, length);
+
+    uint32 action = 0;
+    float posY = 0.0f, posZ = 0.0f, posX = 0.0f;
+    ObjectGuid pet;
+    ObjectGuid target;
+    MopCompactPackets::ReadPetAction(packet, action, posY, posZ, posX, pet, target);
+
+    if (action != expectedAction || pet.GetRawValue() != expectedPet ||
+        target.GetRawValue() != expectedTarget || packet.rpos() != packet.size())
+    {
+        std::fprintf(stderr,
+            "FAIL %s: action 0x%08X pet 0x%016llX target 0x%016llX consumed %u/%u\n",
+            what, action, (unsigned long long)pet.GetRawValue(),
+            (unsigned long long)target.GetRawValue(),
+            unsigned(packet.rpos()), unsigned(packet.size()));
+        ++g_fail;
+    }
+}
+
+static void test_pet_action_matches_retail_bodies()
+{
+    // Command actions carry no target. UNIT_ACTION_BUTTON_TYPE 0x07 is ACT_COMMAND.
+    uint8_t const stay[] = {
+        0x03, 0x00, 0x00, 0x07,
+        0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+        0x79, 0x04, 0xF0, 0x43, 0x0D, 0x9A, 0x29, 0x02
+    };
+    CheckPetAction("pet action stay", stay, sizeof(stay),
+        0x07000003u, UINT64_C(0xF1420C9B28000003), 0);
+
+    uint8_t const follow[] = {
+        0x01, 0x00, 0x00, 0x07,
+        0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+        0x79, 0x04, 0xF0, 0x43, 0x0D, 0x9B, 0xB8, 0x5E
+    };
+    CheckPetAction("pet action follow", follow, sizeof(follow),
+        0x07000001u, UINT64_C(0xF1420C9AB900005F), 0);
+
+    // The only target-bearing shape sampled: fifteen of the sixteen bits set.
+    uint8_t const attack[] = {
+        0x02, 0x00, 0x00, 0x07,
+        0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+        0xFF, 0xBF, 0xF0, 0x40, 0x76, 0x03, 0x73, 0x8C, 0xEF, 0x30, 0x3C, 0xA0,
+        0xF0, 0x05, 0x31, 0xAF, 0x28
+    };
+    CheckPetAction("pet action attack", attack, sizeof(attack),
+        0x07000002u, UINT64_C(0xF141728D31027729), UINT64_C(0xF130EE0400AEA13D));
+
+    // The single positional body in all 21,530 packets of the build. Its middle
+    // float is 246.8356, the ground height every SMSG_ON_MONSTER_MOVE captured
+    // beside it reports, which is what identifies the middle slot as z. Which of
+    // the outer two is x and which is y is NOT established by any observed body.
+    uint8_t const moveTo[] = {
+        0x04, 0x00, 0x00, 0x07,
+        0x09, 0x26, 0x41, 0x44,
+        0xEA, 0xD5, 0x76, 0x43,
+        0xFE, 0x38, 0xB8, 0x44,
+        0x79, 0x04, 0xF0, 0x43, 0x0D, 0x9B, 0xB8, 0x02
+    };
+    CheckPetAction("pet action move to", moveTo, sizeof(moveTo),
+        0x07000004u, UINT64_C(0xF1420C9AB9000003), 0);
+
+    // Pin the position itself, so a reordering of the three reads is caught.
+    WorldPacket packet(CMSG_PET_ACTION, uint32(sizeof(moveTo)));
+    packet.append(moveTo, sizeof(moveTo));
+
+    uint32 action = 0;
+    float posY = 0.0f, posZ = 0.0f, posX = 0.0f;
+    ObjectGuid pet;
+    ObjectGuid target;
+    MopCompactPackets::ReadPetAction(packet, action, posY, posZ, posX, pet, target);
+
+    float expectedY, expectedZ, expectedX;
+    uint32 const bitsY = 0x44412609u;
+    uint32 const bitsZ = 0x4376D5EAu;
+    uint32 const bitsX = 0x44B838FEu;
+    std::memcpy(&expectedY, &bitsY, sizeof(expectedY));
+    std::memcpy(&expectedZ, &bitsZ, sizeof(expectedZ));
+    std::memcpy(&expectedX, &bitsX, sizeof(expectedX));
+    CHECK(posY == expectedY);
+    CHECK(posZ == expectedZ);
+    CHECK(posX == expectedX);
+}
+
 static void test_opcode_values_are_framable()
 {
     CHECK(uint32_t(SMSG_ATTACKSWING_ERROR) == 0x11E1u);
@@ -1076,6 +1177,7 @@ int main(int /*argc*/, char** /*argv*/)
     test_spline_speed_family_matches_retail_bodies();
     test_spline_speed_family_full_interleaves_reader_derived();
     test_spline_speed_family_mask_order();
+    test_pet_action_matches_retail_bodies();
     test_run_speed_differs_from_swim_interleave();
     test_swim_speed_guid_layouts();
     test_random_roll_guid_layouts();
