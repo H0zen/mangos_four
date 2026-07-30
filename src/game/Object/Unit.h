@@ -117,12 +117,7 @@ namespace MopCompactPackets
     /// +40 the wire order is y, z, x -- which the coordinate bands had only
     /// supported, not established.
     ///
-    /// The floats are y, z, x. The corpus alone could not separate the outer
-    /// pair; the client's writer settles it, emitting them from object offsets
-    /// +36, +40 and +32. Which of the outer two is x and which is y is
-    /// NOT established: no observed body distinguishes them, so that pairing is
-    /// a hypothesis and is named here only for readability. Nothing consumes the
-    /// position, so no behaviour depends on it.
+    /// Nothing consumes the position regardless, so no behaviour depends on it.
     inline void ReadPetAction(WorldPacket& in, uint32& action,
         float& posY, float& posZ, float& posX,
         ObjectGuid& petGuid, ObjectGuid& targetGuid)

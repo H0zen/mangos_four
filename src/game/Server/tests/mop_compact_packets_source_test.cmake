@@ -15,6 +15,7 @@ file(READ "${SOURCE_ROOT}/src/game/Object/PlayerInstance.cpp" player_instance)
 file(READ "${SOURCE_ROOT}/src/game/WorldHandlers/CharacterHandler.cpp" character_handler)
 file(READ "${SOURCE_ROOT}/src/game/Server/Opcodes.cpp" opcode_registry)
 file(READ "${SOURCE_ROOT}/src/game/Server/Opcodes.h" opcode_header)
+file(READ "${SOURCE_ROOT}/src/game/WorldHandlers/SpellHandler.cpp" spell_handler)
 file(READ "${SOURCE_ROOT}/src/game/Object/UnitCombat.cpp" unit_combat)
 file(READ "${SOURCE_ROOT}/src/game/Object/Unit.cpp" unit)
 file(READ "${SOURCE_ROOT}/src/game/Object/Unit.h" unit_header)
@@ -455,8 +456,28 @@ endif()
 # CMSG_MAIL_TAKE_ITEM is the sharp case -- it removes the attachment and settles
 # cash on delivery -- and it reached master once before being pulled back.
 #
-# So these three may only be registered together with their replies. Promote a
-# pair atomically or not at all.
+# Comments are stripped first. Without that, a commented-out DefS or gate case
+# would appear to authorise a registration, and a commented-out DefC would hide
+# one. Token gaps allow whitespace and newlines so that reformatting the call,
+# or splitting it across lines, neither evades a rule nor satisfies one falsely.
+function(mop_strip_cxx_comments in_text out_var)
+    # Character classes, not backslash escapes. CMake's regex engine drops a
+    # single backslash from a quoted argument, so "\*" reaches it as a bare
+    # star and fails to compile; "[*]" says the same thing and survives.
+    string(REGEX REPLACE "/[*][^*]*[*]+/" "" stripped "${in_text}")
+    string(REGEX REPLACE "//[^
+]*" "" stripped "${stripped}")
+    set(${out_var} "${stripped}" PARENT_SCOPE)
+endfunction()
+
+# Any run of C++ whitespace between tokens, so reformatting or splitting a call
+# across lines neither evades a rule nor satisfies one.
+set(ws "[ \t\r\n]")
+
+mop_strip_cxx_comments("${opcode_registry}" registry_code)
+mop_strip_cxx_comments("${world_session}" session_code)
+mop_strip_cxx_comments("${spell_handler}" spell_handler_code)
+
 foreach(pairing IN ITEMS
         "CMSG_GET_MAIL_LIST|SMSG_MAIL_LIST_RESULT"
         "CMSG_MAIL_TAKE_ITEM|SMSG_SEND_MAIL_RESULT"
@@ -464,13 +485,13 @@ foreach(pairing IN ITEMS
     string(REPLACE "|" ";" pairing_parts "${pairing}")
     list(GET pairing_parts 0 request_name)
     list(GET pairing_parts 1 reply_name)
-    if(opcode_registry MATCHES "DefC\\(${request_name},")
-        if(NOT opcode_registry MATCHES "DefS\\(${reply_name},")
+    if(registry_code MATCHES "DefC${ws}*[(]${ws}*${request_name}${ws}*,")
+        if(NOT registry_code MATCHES "DefS${ws}*[(]${ws}*${reply_name}${ws}*,")
             message(FATAL_ERROR
                 "${request_name} is registered but ${reply_name} has no outbound metadata: "
                 "the request would commit and the client would never hear the result")
         endif()
-        if(NOT world_session MATCHES "case[ \t]+${reply_name}:")
+        if(NOT session_code MATCHES "case${ws}+${reply_name}${ws}*:")
             message(FATAL_ERROR
                 "${request_name} is registered but ${reply_name} is not admitted to the "
                 "in-world send gate, so its reply is dropped before transmission")
@@ -478,9 +499,23 @@ foreach(pairing IN ITEMS
     endif()
 endforeach()
 
+# CMSG_SET_ACTION_BUTTON is held: its body is proven but the handler's type
+# allowlist is narrower than the client's, so two families would be dropped.
+if(registry_code MATCHES "DefC${ws}*[(]${ws}*CMSG_SET_ACTION_BUTTON${ws}*,")
+    message(FATAL_ERROR
+        "CMSG_SET_ACTION_BUTTON is registered while its handler rejects the client's "
+        "0x10 and 0x50 type families; recover those before promoting it")
+endif()
+
+# The totem destroy request names a totem as well as a slot, and the handler must
+# compare them or a stale request can destroy a replacement in the same slot.
+if(NOT spell_handler_code MATCHES "totem->GetObjectGuid[(][)]${ws}*!=${ws}*totemGuid")
+    message(FATAL_ERROR "totem-destroy handler no longer verifies the named totem occupies the slot")
+endif()
+
 # MARK_AS_READ owes no reply and may stand alone, but exactly once: a duplicate
 # registration reached the tree already, from a script that was not atomic.
-string(REGEX MATCHALL "DefC\\(CMSG_MAIL_MARK_AS_READ," mark_as_read_registrations "${opcode_registry}")
+string(REGEX MATCHALL "DefC${ws}*[(]${ws}*CMSG_MAIL_MARK_AS_READ${ws}*," mark_as_read_registrations "${registry_code}")
 list(LENGTH mark_as_read_registrations mark_as_read_count)
 if(NOT mark_as_read_count EQUAL 1)
     message(FATAL_ERROR "CMSG_MAIL_MARK_AS_READ must be registered exactly once, found ${mark_as_read_count}")
