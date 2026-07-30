@@ -333,6 +333,14 @@ static bool IsEnterWorldConverted(uint16 opcode)
         case SMSG_MOVE_SET_FLIGHT_BACK_SPEED:      // MopCompactPackets::BuildMoveSetFlightBackSpeed
         case SMSG_MOVE_SET_PITCH_RATE:             // MopCompactPackets::BuildMoveSetPitchRate
         case SMSG_PET_NAME_QUERY_RESPONSE:         // MopCompactPackets::BuildPetNameQueryResponse
+        // The can-fly family, admitted as a complete set. The mover pair alone
+        // would tell the flying player and leave observers seeing them walk; the
+        // observer pair alone is the inversion four other movement states are
+        // still in. All four or none.
+        case SMSG_MOVE_SET_CAN_FLY:                // MopCompactPackets::BuildMoveSetCanFly
+        case SMSG_MOVE_UNSET_CAN_FLY:              // MopCompactPackets::BuildMoveUnsetCanFly
+        case SMSG_SPLINE_MOVE_SET_FLYING:          // MopCompactPackets::BuildSplineMoveSetFlying
+        case SMSG_SPLINE_MOVE_UNSET_FLYING:        // MopCompactPackets::BuildSplineMoveUnsetFlying
         case SMSG_SEND_MAIL_RESULT:                // MopCompactPackets::BuildSendMailResult
         case SMSG_SPLINE_MOVE_SET_NORMAL_FALL:     // MopMovementPackets::BuildSplineState
         case SMSG_SPLINE_MOVE_SET_WATER_WALK:      // MopMovementPackets::BuildSplineState

@@ -253,13 +253,11 @@ void Creature::SetCanFly(bool enable)
         WorldPacket data(enable ? SMSG_SPLINE_MOVE_SET_FLYING : SMSG_SPLINE_MOVE_UNSET_FLYING, 9);
         if (enable)
         {
-            data.WriteGuidMask<0, 4, 1, 6, 7, 2, 3, 5>(GetObjectGuid());
-            data.WriteGuidBytes<7, 0, 5, 6, 4, 1, 3, 2>(GetObjectGuid());
+            MopCompactPackets::BuildSplineMoveSetFlying(data, GetObjectGuid().GetRawValue());
         }
         else
         {
-            data.WriteGuidMask<5, 0, 4, 7, 2, 3, 1, 6>(GetObjectGuid());
-            data.WriteGuidBytes<7, 2, 3, 4, 5, 1, 6, 0>(GetObjectGuid());
+            MopCompactPackets::BuildSplineMoveUnsetFlying(data, GetObjectGuid().GetRawValue());
         }
 
         SendMessageToSet(&data, true);

@@ -6802,18 +6802,12 @@ void Unit::BuildMoveSetCanFlyPacket(WorldPacket* data, bool apply, uint32 value)
     if (apply)
     {
         data->Initialize(SMSG_MOVE_SET_CAN_FLY, 13);
-        data->WriteGuidMask<1, 6, 5, 0, 7, 4, 2, 3>(GetObjectGuid());
-        data->WriteGuidBytes<6, 3>(GetObjectGuid());
-        *data << uint32(value);
-        data->WriteGuidBytes<2, 1, 4, 7, 0, 5>(GetObjectGuid());
+        MopCompactPackets::BuildMoveSetCanFly(*data, GetObjectGuid().GetRawValue(), value);
     }
     else
     {
         data->Initialize(SMSG_MOVE_UNSET_CAN_FLY, 13);
-        data->WriteGuidMask<1, 4, 2, 5, 0, 3, 6, 7>(GetObjectGuid());
-        data->WriteGuidBytes<4, 6>(GetObjectGuid());
-        *data << uint32(value);
-        data->WriteGuidBytes<1, 0, 2, 3, 5, 7>(GetObjectGuid());
+        MopCompactPackets::BuildMoveUnsetCanFly(*data, GetObjectGuid().GetRawValue(), value);
     }
 }
 

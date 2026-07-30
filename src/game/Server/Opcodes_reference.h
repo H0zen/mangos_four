@@ -175,8 +175,8 @@
  *   TOTAL SMSG rows                   925
  *
  * SUBSYSTEM CONFIDENCE: high=365, low=221, medium=182, none=157
- * STATUS TOTALS: ACTIVE=484, DOC=435, DORMANT=601
- *   SMSG: ACTIVE=286, DOC=271, DORMANT=368
+ * STATUS TOTALS: ACTIVE=488, DOC=435, DORMANT=597
+ *   SMSG: ACTIVE=290, DOC=271, DORMANT=364
  *   CMSG: ACTIVE=198, DOC=164, DORMANT=233
  */
 
@@ -1000,7 +1000,7 @@ typedef uint16_t uint16;
  *   SMSG_MOVE_SET_FLIGHT_SPEED                     0x006E  ACTIVE
  *   SMSG_AURA_UPDATE                               0x0072  ACTIVE
  *   SMSG_MOVE_UPDATE_FLIGHT_SPEED                  0x00E1  DORMANT
- *   SMSG_MOVE_UNSET_CAN_FLY                        0x0162  DORMANT
+ *   SMSG_MOVE_UNSET_CAN_FLY                        0x0162  ACTIVE
  *   SMSG_SPLINE_MOVE_UNROOT                        0x01E1  DORMANT
  *   SMSG_MOVE_UPDATE_SWIM_SPEED                    0x01E2  DORMANT
  *   SMSG_UNKNOWN_0x023B                            0x023B  DOC
@@ -1052,12 +1052,12 @@ typedef uint16_t uint16;
  *   SMSG_SPLINE_MOVE_UNSET_HOVER                   0x0CE1  DORMANT
  *   SMSG_MOVE_UNSET_CAN_TURN_WHILE_FALLING         0x0D61  DOC
  *   SMSG_MOVE_UPDATE_TURN_RATE                     0x0D62  DORMANT
- *   SMSG_SPLINE_MOVE_UNSET_FLYING                  0x0DE2  DORMANT
+ *   SMSG_SPLINE_MOVE_UNSET_FLYING                  0x0DE2  ACTIVE
  *   SMSG_DISMOUNT                                  0x0E3A  ACTIVE   [high-conf]
  *   SMSG_SPLINE_MOVE_START_SWIM                    0x0F29  DORMANT
  *   SMSG_UNKNOWN_0x100B                            0x100B  DOC
  *   SMSG_CLIENT_CONTROL_UPDATE                     0x1043  ACTIVE
- *   SMSG_SPLINE_MOVE_SET_FLYING                    0x1046  DORMANT
+ *   SMSG_SPLINE_MOVE_SET_FLYING                    0x1046  ACTIVE
  *   SMSG_MOVE_SET_CAN_TURN_WHILE_FALLING           0x1065  DORMANT
  *   SMSG_POWER_UPDATE                              0x109F  ACTIVE
  *   SMSG_MOVE_UPDATE_REMOVE_MOVEMENT_FORCE         0x1464  DORMANT
@@ -1071,7 +1071,7 @@ typedef uint16_t uint16;
  *   SMSG_FORCE_MOVE_ROOT                           0x15AE  DORMANT
  *   SMSG_MOVE_COLLISION_DISABLE                    0x15B8  DORMANT
  *   SMSG_PET_ACTION_SOUND                          0x15E2  ACTIVE
- *   SMSG_MOVE_SET_CAN_FLY                          0x178D  DORMANT
+ *   SMSG_MOVE_SET_CAN_FLY                          0x178D  ACTIVE
  *   SMSG_SPLINE_MOVE_STOP_SWIM                     0x1798  DORMANT
  *   SMSG_MOVE_SET_PITCH_RATE                       0x17AB  ACTIVE
  *   SMSG_MOVE_SET_HOVER                            0x1802  DORMANT

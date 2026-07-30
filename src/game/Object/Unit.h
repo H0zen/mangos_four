@@ -787,6 +787,70 @@ namespace MopCompactPackets
         return uint8(guid >> (8 * index));
     }
 
+    /// The can-fly family, all four opcodes, from their client readers.
+    ///
+    /// The mover pair carries a uint32 counter interleaved into the GUID byte
+    /// run at a fixed point; the observer pair carries nothing but the GUID.
+    /// Body is 1 + popcount(mask) [+ 4] and there is no other field.
+    ///
+    /// Every one of the four was wrong before. SET had the mask and byte orders
+    /// permuted, which a length check cannot see. UNSET was worse: it wrote two
+    /// GUID bytes before the counter where the client reads THREE, so the client
+    /// takes a GUID byte as the counter's low byte and then over-reads. The total
+    /// length matched either way, which is exactly why it survived.
+    ///
+    /// Verified against 28 real bodies across 11 distinct presence masks.
+    inline void BuildMoveSetCanFly(WorldPacket& out, uint64 moverGuid, uint32 counter)
+    {
+        uint8 const maskOrder[] = { 6, 1, 4, 0, 3, 7, 5, 2 };
+        uint8 const beforeCounter[] = { 4, 2 };
+        uint8 const afterCounter[] = { 6, 3, 1, 0, 7, 5 };
+
+        for (uint8 index : maskOrder) { out.WriteBit(SwimSpeedGuidByte(moverGuid, index) != 0); }
+        out.FlushBits();
+        for (uint8 index : beforeCounter) { out.WriteByteSeq(SwimSpeedGuidByte(moverGuid, index)); }
+        out << uint32(counter);
+        for (uint8 index : afterCounter) { out.WriteByteSeq(SwimSpeedGuidByte(moverGuid, index)); }
+    }
+
+    inline void BuildMoveUnsetCanFly(WorldPacket& out, uint64 moverGuid, uint32 counter)
+    {
+        uint8 const maskOrder[] = { 6, 5, 0, 4, 3, 7, 2, 1 };
+        uint8 const beforeCounter[] = { 4, 5, 7 };
+        uint8 const afterCounter[] = { 6, 2, 3, 1, 0 };
+
+        for (uint8 index : maskOrder) { out.WriteBit(SwimSpeedGuidByte(moverGuid, index) != 0); }
+        out.FlushBits();
+        for (uint8 index : beforeCounter) { out.WriteByteSeq(SwimSpeedGuidByte(moverGuid, index)); }
+        out << uint32(counter);
+        for (uint8 index : afterCounter) { out.WriteByteSeq(SwimSpeedGuidByte(moverGuid, index)); }
+    }
+
+    /// The observer halves. No counter at all -- the mask and the bytes are the
+    /// whole body. Landing these with the mover pair is the point: admitting one
+    /// side alone is what left four other movement states telling everyone except
+    /// the player they applied to.
+    inline void BuildSplineMoveSetFlying(WorldPacket& out, uint64 moverGuid)
+    {
+        uint8 const maskOrder[] = { 4, 1, 2, 0, 7, 5, 3, 6 };
+        uint8 const byteOrder[] = { 4, 7, 1, 0, 3, 5, 6, 2 };
+
+        for (uint8 index : maskOrder) { out.WriteBit(SwimSpeedGuidByte(moverGuid, index) != 0); }
+        out.FlushBits();
+        for (uint8 index : byteOrder) { out.WriteByteSeq(SwimSpeedGuidByte(moverGuid, index)); }
+    }
+
+    inline void BuildSplineMoveUnsetFlying(WorldPacket& out, uint64 moverGuid)
+    {
+        uint8 const maskOrder[] = { 1, 5, 7, 2, 6, 3, 0, 4 };
+        uint8 const byteOrder[] = { 2, 5, 4, 6, 1, 0, 7, 3 };
+
+        for (uint8 index : maskOrder) { out.WriteBit(SwimSpeedGuidByte(moverGuid, index) != 0); }
+        out.FlushBits();
+        for (uint8 index : byteOrder) { out.WriteByteSeq(SwimSpeedGuidByte(moverGuid, index)); }
+    }
+
+
     /// SMSG_MOVE_SET_WALK_SPEED (0x0469), from reader sub_C8F849 (dispatcher
     /// sub_C80E74, case 405).
     ///

@@ -1735,6 +1735,67 @@ static void test_send_mail_result_matches_retail_bodies()
     }
 }
 
+/// The can-fly family, all four opcodes, pinned to real 18414 bodies.
+///
+/// Every one of these builders was wrong before, and none of the errors would
+/// have shown as a wrong length. The two mover packets had their mask and byte
+/// orders permuted, and SMSG_MOVE_UNSET_CAN_FLY wrote TWO GUID bytes before the
+/// counter where the client reads THREE -- so the client takes a GUID byte as
+/// the counter's low byte and then over-reads, while the total length matches
+/// either way. That is why it survived: nothing here was checking order.
+///
+/// Five mover bodies across five distinct masks, four observer bodies across two.
+/// The mover pair carries a uint32 counter interleaved into the byte run; the
+/// observer pair carries no scalar at all.
+static void test_can_fly_family_matches_retail_bodies()
+{
+    {   // set can fly
+        WorldPacket p(SMSG_MOVE_SET_CAN_FLY, 13);
+        MopCompactPackets::BuildMoveSetCanFly(p, UINT64_C(0xF15070260011F951), 23);
+        CHECK(BytesEqual(p, { 0xF7, 0x27, 0x10, 0x17, 0x00, 0x00, 0x00, 0x51, 0xF8, 0x50, 0xF0, 0x71 }));
+    }
+    {   // set can fly, sparse guid
+        WorldPacket p(SMSG_MOVE_SET_CAN_FLY, 13);
+        MopCompactPackets::BuildMoveSetCanFly(p, UINT64_C(0x04000000053CC8E8), 66);
+        CHECK(BytesEqual(p, { 0x5D, 0x3D, 0x42, 0x00, 0x00, 0x00, 0x04, 0xC9, 0xE9, 0x05 }));
+    }
+    {   // set can fly, third mask
+        WorldPacket p(SMSG_MOVE_SET_CAN_FLY, 13);
+        MopCompactPackets::BuildMoveSetCanFly(p, UINT64_C(0x0180000004B22206), 88);
+        CHECK(BytesEqual(p, { 0xDD, 0xB3, 0x58, 0x00, 0x00, 0x00, 0x81, 0x05, 0x23, 0x07, 0x00 }));
+    }
+    {   // unset can fly
+        WorldPacket p(SMSG_MOVE_UNSET_CAN_FLY, 13);
+        MopCompactPackets::BuildMoveUnsetCanFly(p, UINT64_C(0x04000000053CC8E8), 74);
+        CHECK(BytesEqual(p, { 0x2F, 0x05, 0x4A, 0x00, 0x00, 0x00, 0x3D, 0x04, 0xC9, 0xE9 }));
+    }
+    {   // unset can fly, second mask
+        WorldPacket p(SMSG_MOVE_UNSET_CAN_FLY, 13);
+        MopCompactPackets::BuildMoveUnsetCanFly(p, UINT64_C(0x0180000004B22206), 67);
+        CHECK(BytesEqual(p, { 0xAF, 0x00, 0x43, 0x00, 0x00, 0x00, 0x81, 0xB3, 0x05, 0x23, 0x07 }));
+    }
+    {   // spline set flying
+        WorldPacket p(SMSG_SPLINE_MOVE_SET_FLYING, 9);
+        MopCompactPackets::BuildSplineMoveSetFlying(p, UINT64_C(0x0580000003EC8BCD));
+        CHECK(BytesEqual(p, { 0x7B, 0x04, 0x8A, 0xCC, 0x02, 0x81, 0xED }));
+    }
+    {   // spline set flying, other guid
+        WorldPacket p(SMSG_SPLINE_MOVE_SET_FLYING, 9);
+        MopCompactPackets::BuildSplineMoveSetFlying(p, UINT64_C(0x0180000004F3F30B));
+        CHECK(BytesEqual(p, { 0x7B, 0x00, 0xF2, 0x0A, 0x05, 0x81, 0xF2 }));
+    }
+    {   // spline unset flying
+        WorldPacket p(SMSG_SPLINE_MOVE_UNSET_FLYING, 9);
+        MopCompactPackets::BuildSplineMoveUnsetFlying(p, UINT64_C(0x04000000053C811E));
+        CHECK(BytesEqual(p, { 0xB6, 0x3D, 0x80, 0x1F, 0x05, 0x04 }));
+    }
+    {   // spline unset flying, other guid
+        WorldPacket p(SMSG_SPLINE_MOVE_UNSET_FLYING, 9);
+        MopCompactPackets::BuildSplineMoveUnsetFlying(p, UINT64_C(0x0400000002196723));
+        CHECK(BytesEqual(p, { 0xB6, 0x18, 0x66, 0x22, 0x05, 0x03 }));
+    }
+}
+
 static void test_opcode_values_are_framable()
 {
     CHECK(uint32_t(SMSG_ATTACKSWING_ERROR) == 0x11E1u);
@@ -1825,6 +1886,7 @@ int main(int /*argc*/, char** /*argv*/)
     test_mail_family_matches_retail_bodies();
     test_send_mail_result_matches_retail_bodies();
     test_totem_and_action_button_bodies();
+    test_can_fly_family_matches_retail_bodies();
     test_run_speed_differs_from_swim_interleave();
     test_swim_speed_guid_layouts();
     test_random_roll_guid_layouts();
