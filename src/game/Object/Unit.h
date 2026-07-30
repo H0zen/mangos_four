@@ -407,17 +407,6 @@ namespace MopCompactPackets
         }
     }
 
-    /// SMSG_MOVE_SET_SWIM_BACK_SPEED (0x0962), from reader sub_C8AF44
-    /// (dispatcher sub_C80E74, case 378).
-    ///
-    /// The body this replaced was broken on its face, independently of any
-    /// client evidence: it wrote GUID byte 0 TWICE and byte 2 never, nine
-    /// byte-writes for eight bytes.
-    ///
-    /// NOT corpus-verified. The layout is transcribed from the reader, but no
-    /// retail body for this opcode has been decoded, so unlike walk, run and
-    /// spline this one has no capture-pinned fixture and stays outside the send
-    /// gate until it does.
     /// SMSG_MOVE_SET_RUN_BACK_SPEED (0x0A83), reader sub_C8977A, case 49.
     /// Pinned to capture-000004 seq 23260: 14 bytes consuming exactly, guid
     /// 0x04000000053CC8E8, counter 494, speed 2.25.
@@ -555,6 +544,17 @@ namespace MopCompactPackets
         }
     }
 
+    /// SMSG_MOVE_SET_SWIM_BACK_SPEED (0x0962), from reader sub_C8AF44
+    /// (dispatcher sub_C80E74, case 378).
+    ///
+    /// The body this replaced was broken on its face, independently of any
+    /// client evidence: it wrote GUID byte 0 TWICE and byte 2 never, nine
+    /// byte-writes for eight bytes.
+    ///
+    /// NOT corpus-verified. The layout is transcribed from the reader, but no
+    /// retail body for this opcode has been decoded, so unlike walk, run and
+    /// spline this one has no capture-pinned fixture and stays outside the send
+    /// gate until it does.
     inline void BuildMoveSetSwimBackSpeed(WorldPacket& out, uint64 moverGuid,
         uint32 counter, float speed)
     {

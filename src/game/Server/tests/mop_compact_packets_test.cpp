@@ -340,6 +340,53 @@ static void test_swim_back_speed_structure_reader_derived()
     }));
 }
 
+/// Reader-derived structural cases, NOT retail fixtures.
+///
+/// The retail bodies available for this family all come from one mover whose
+/// GUID has three zero bytes, so those byte positions are never exercised. These
+/// use an all-nonzero GUID so every position is emitted, which pins the full
+/// interleave rather than the subset a sparse GUID happens to reach.
+///
+/// TURN_RATE, FLIGHT_BACK and PITCH_RATE have ZERO observations at 18414 and so
+/// have no retail body at all; these are their only serializer tests, and all
+/// three remain outside the send gate.
+static void test_speed_family_full_interleaves_reader_derived()
+{
+    uint64 const guid = 0x0123456789ABCDEFull;
+    uint32 const counter = 0x12345678u;
+
+    {   // run-back: u32 leads, then seven bytes, float, one byte
+        WorldPacket p(SMSG_MOVE_SET_RUN_BACK_SPEED, 17);
+        MopCompactPackets::BuildMoveSetRunBackSpeed(p, guid, counter, 1.0f);
+        CHECK(BytesEqual(p, { 0xFF, 0x78, 0x56, 0x34, 0x12, 0xEE, 0x88, 0x00,
+                              0x44, 0xAA, 0x66, 0xCC, 0x00, 0x00, 0x80, 0x3F, 0x22 }));
+    }
+    {   // flight: float and counter BEFORE the mask byte
+        WorldPacket p(SMSG_MOVE_SET_FLIGHT_SPEED, 17);
+        MopCompactPackets::BuildMoveSetFlightSpeed(p, guid, counter, 1.0f);
+        CHECK(BytesEqual(p, { 0x00, 0x00, 0x80, 0x3F, 0x78, 0x56, 0x34, 0x12,
+                              0xFF, 0xEE, 0x00, 0x66, 0x44, 0x22, 0xAA, 0x88, 0xCC }));
+    }
+    {   // turn rate: float first, counter almost last
+        WorldPacket p(SMSG_MOVE_SET_TURN_RATE, 17);
+        MopCompactPackets::BuildMoveSetTurnRate(p, guid, counter, 1.0f);
+        CHECK(BytesEqual(p, { 0xFF, 0x00, 0x00, 0x80, 0x3F, 0x00, 0x88, 0x44,
+                              0xEE, 0x66, 0x22, 0xAA, 0x78, 0x56, 0x34, 0x12, 0xCC }));
+    }
+    {   // flight back: float trails everything
+        WorldPacket p(SMSG_MOVE_SET_FLIGHT_BACK_SPEED, 17);
+        MopCompactPackets::BuildMoveSetFlightBackSpeed(p, guid, counter, 1.0f);
+        CHECK(BytesEqual(p, { 0xFF, 0x66, 0xCC, 0x22, 0xEE, 0xAA, 0x78, 0x56,
+                              0x34, 0x12, 0x00, 0x88, 0x44, 0x00, 0x00, 0x80, 0x3F }));
+    }
+    {   // pitch rate
+        WorldPacket p(SMSG_MOVE_SET_PITCH_RATE, 17);
+        MopCompactPackets::BuildMoveSetPitchRate(p, guid, counter, 1.0f);
+        CHECK(BytesEqual(p, { 0xFF, 0x66, 0x78, 0x56, 0x34, 0x12, 0xAA, 0x44,
+                              0x22, 0xCC, 0x00, 0x00, 0x80, 0x3F, 0x00, 0x88, 0xEE }));
+    }
+}
+
 /// The interleave is what distinguishes run from swim: run writes one GUID byte
 /// before the counter, swim writes none. Reusing the swim builder would produce
 /// a body the client cannot parse, so pin that they differ.
@@ -816,6 +863,7 @@ int main(int /*argc*/, char** /*argv*/)
     test_walk_speed_matches_retail_body();
     test_run_back_speed_matches_retail_body();
     test_swim_back_speed_structure_reader_derived();
+    test_speed_family_full_interleaves_reader_derived();
     test_flight_speed_scalars_precede_mask();
     test_spline_run_speed_matches_retail_body();
     test_run_speed_differs_from_swim_interleave();
