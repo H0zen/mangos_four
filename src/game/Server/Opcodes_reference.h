@@ -175,9 +175,9 @@
  *   TOTAL SMSG rows                   925
  *
  * SUBSYSTEM CONFIDENCE: high=365, low=221, medium=182, none=157
- * STATUS TOTALS: ACTIVE=478, DOC=435, DORMANT=607
+ * STATUS TOTALS: ACTIVE=475, DOC=435, DORMANT=610
  *   SMSG: ACTIVE=285, DOC=271, DORMANT=369
- *   CMSG: ACTIVE=193, DOC=164, DORMANT=238
+ *   CMSG: ACTIVE=190, DOC=164, DORMANT=241
  */
 
 // CAVEATS -- read before trusting any single row:
@@ -1547,7 +1547,7 @@ typedef uint16_t uint16;
  *   CMSG_GUILD_BANK_DEPOSIT_MONEY                  0x0770  DORMANT
  *   CMSG_SET_FACTION_INACTIVE                      0x0778  DORMANT
  *   CMSG_QUESTLOG_REMOVE_QUEST                     0x0779  ACTIVE
- *   CMSG_GET_MAIL_LIST                             0x077A  ACTIVE
+ *   CMSG_GET_MAIL_LIST                             0x077A  DORMANT
  *   CMSG_MAIL_QUERY_NEXT_TIME                      0x077B  ACTIVE
  *   CMSG_GUILD_BANK_UPDATE_TAB                     0x07C2  DORMANT
  *   CMSG_QUESTGIVER_CHOOSE_REWARD                  0x07CB  ACTIVE
@@ -1753,8 +1753,8 @@ typedef uint16_t uint16;
  *   CMSG_GUILD_BANK_SWAP_ITEMS                     0x136A  DORMANT
  *   CMSG_PETITION_SHOW_SIGNATURES                  0x136B  DORMANT
  *   CMSG_QUEST_PUSH_RESULT                         0x1370  ACTIVE
- *   CMSG_MAIL_TAKE_ITEM                            0x1371  ACTIVE
- *   CMSG_GUILD_BANK_QUERY_TAB                      0x1372  ACTIVE
+ *   CMSG_MAIL_TAKE_ITEM                            0x1371  DORMANT
+ *   CMSG_GUILD_BANK_QUERY_TAB                      0x1372  DORMANT
  *   CMSG_BATTLEFIELD_PORT                          0x1379  DORMANT
  *   CMSG_UNKNOWN_0x140A                            0x140A  DOC
  *   CMSG_CHANNEL_SET_OWNER                         0x141A  DORMANT

@@ -295,8 +295,8 @@ namespace MopCompactPackets
     /// body cannot hold more entries than its remaining bytes allow, and that is
     /// checkable before a single one is read.
     ///
-    /// Returns false if the body cannot hold what it claims, leaving the caller
-    /// to drop the request rather than trust a partial parse.
+    /// Returns false unless the body is exactly the size its own fields describe,
+    /// leaving the caller to drop the request rather than trust a partial parse.
     inline bool ReadLfgJoin(WorldPacket& in, uint8& partyIndex, uint32& roles,
         uint32& flag, std::vector<uint32>& dungeons, std::string& comment)
     {
@@ -314,8 +314,11 @@ namespace MopCompactPackets
 
         // Every remaining entry costs four bytes and the comment costs its own
         // length, so anything larger than that cannot be in this packet.
+        // The grammar has an exact total, so a body with bytes left over is
+        // malformed too, not merely one whose claim fits. Requiring equality
+        // rejects a trailing suffix as well as an oversized claim.
         size_t const remaining = in.size() - in.rpos();
-        if (size_t(count) * 4 + size_t(commentLength) > remaining)
+        if (size_t(count) * 4 + size_t(commentLength) != remaining)
         {
             return false;
         }

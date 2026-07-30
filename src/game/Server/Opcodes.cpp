@@ -1235,25 +1235,23 @@ void InitializeOpcodes()
     // length before anything is allocated from it.
     DefC(CMSG_LFG_JOIN, "CMSG_LFG_JOIN", STATUS_LOGGEDIN, PROCESS_THREADUNSAFE, &WorldSession::HandleLfgJoinOpcode);
 
-    // The mailbox family and the guild-bank tab query. Each inherited reader
-    // took a raw ObjectGuid first; at 18414 all four pack it and the scalars
-    // lead. Beyond per-opcode bodies the GUID orders cross-check each other: the
-    // same mailbox recovered through three different mask and byte orders comes
-    // out byte-identical.
-    DefC(CMSG_GET_MAIL_LIST, "CMSG_GET_MAIL_LIST", STATUS_LOGGEDIN, PROCESS_THREADUNSAFE, &WorldSession::HandleGetMailList);
+    // The mailbox family and the guild-bank tab query. Each inherited reader took
+    // a raw ObjectGuid first; at 18414 all four pack it and the scalars lead. The
+    // readers and their fixtures are in place for all four.
+    //
+    // Only MARK_AS_READ is REGISTERED. The other three each owe the client a
+    // reply -- SMSG_MAIL_LIST_RESULT, SMSG_SEND_MAIL_RESULT and
+    // SMSG_GUILD_BANK_LIST -- and every one of those is still a legacy
+    // serializer, unregistered, and dropped by the send gate. Wiring the requests
+    // without them is worse than dropping the requests: CMSG_MAIL_TAKE_ITEM
+    // removes the attachment, settles any cash on delivery and commits inventory
+    // and mail state, so the transaction would succeed irreversibly while the
+    // client heard nothing and its mailbox stayed stale. The retry would be just
+    // as silent.
+    //
+    // MARK_AS_READ owes no command result, so it is safe to admit alone. Promote
+    // the others as each reply is converted and admitted.
     DefC(CMSG_MAIL_MARK_AS_READ, "CMSG_MAIL_MARK_AS_READ", STATUS_LOGGEDIN, PROCESS_THREADUNSAFE, &WorldSession::HandleMailMarkAsRead);
-    DefC(CMSG_MAIL_TAKE_ITEM, "CMSG_MAIL_TAKE_ITEM", STATUS_LOGGEDIN, PROCESS_THREADUNSAFE, &WorldSession::HandleMailTakeItem);
-    DefC(CMSG_GUILD_BANK_QUERY_TAB, "CMSG_GUILD_BANK_QUERY_TAB", STATUS_LOGGEDIN, PROCESS_THREADUNSAFE, &WorldSession::HandleGuildBankQueryTab);
-
-    // The mailbox family and the guild-bank tab query. Each inherited reader
-    // took a raw ObjectGuid first; at 18414 all four pack it, and the scalars
-    // lead. Beyond per-opcode bodies, the GUID orders are cross-checked against
-    // each other: the same mailbox recovered through three different mask and
-    // byte orders comes out byte-identical.
-    DefC(CMSG_GET_MAIL_LIST, "CMSG_GET_MAIL_LIST", STATUS_LOGGEDIN, PROCESS_THREADUNSAFE, &WorldSession::HandleGetMailList);
-    DefC(CMSG_MAIL_MARK_AS_READ, "CMSG_MAIL_MARK_AS_READ", STATUS_LOGGEDIN, PROCESS_THREADUNSAFE, &WorldSession::HandleMailMarkAsRead);
-    DefC(CMSG_MAIL_TAKE_ITEM, "CMSG_MAIL_TAKE_ITEM", STATUS_LOGGEDIN, PROCESS_THREADUNSAFE, &WorldSession::HandleMailTakeItem);
-    DefC(CMSG_GUILD_BANK_QUERY_TAB, "CMSG_GUILD_BANK_QUERY_TAB", STATUS_LOGGEDIN, PROCESS_THREADUNSAFE, &WorldSession::HandleGuildBankQueryTab);
 
     // CMSG_CONTACT_LIST (0x0BB4, 4,122 observed) is deliberately NOT registered,
     // and this note exists because it looks safe and is not.

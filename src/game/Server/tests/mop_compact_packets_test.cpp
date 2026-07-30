@@ -445,7 +445,7 @@ static void test_spline_speed_family_matches_retail_bodies()
 ///
 /// The last four have no observed body at all and are reader-derived only, so
 /// this and the mask-order test are their whole coverage. They are admitted
-/// nonetheless, on binary proof.
+/// nonetheless, on binary proof, as are their four direct counterparts.
 static void test_spline_speed_family_full_interleaves_reader_derived()
 {
     uint64 const guid = 0x0123456789ABCDEFull;  // guid[7]^1 is 0x00, not absent
@@ -1442,6 +1442,24 @@ static void test_lfg_join_matches_retail_bodies()
         CHECK(!MopCompactPackets::ReadLfgJoin(packet, partyIndex, roles, flag,
                                               dungeons, comment));
         CHECK(dungeons.empty());
+    }
+    {   // The grammar's total is exact, so a body claiming ONE dungeon while
+        // carrying an extra trailing byte is malformed and must be refused too.
+        // Accepting it would leave unread suffix data behind a successful parse.
+        uint8_t const trailing[] = {
+            0x7F, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+            0x00, 0x07, 0x00, 0x00, 0x00, 0x00, 0x00, 0x04, 0x02, 0x03, 0x01, 0x00,
+            0x06, 0xEE
+        };
+        WorldPacket packet(CMSG_LFG_JOIN, uint32(sizeof(trailing)));
+        packet.append(trailing, sizeof(trailing));
+
+        uint8 partyIndex = 0;
+        uint32 roles = 0, flag = 0;
+        std::vector<uint32> dungeons;
+        std::string comment;
+        CHECK(!MopCompactPackets::ReadLfgJoin(packet, partyIndex, roles, flag,
+                                              dungeons, comment));
     }
 }
 
