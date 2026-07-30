@@ -384,6 +384,99 @@ namespace MopCompactPackets
     /// Verified against capture-000004 seq 2506: 12 bytes consuming exactly,
     /// yielding guid 0xF1308319002275D5 (high 0xF13, HIGHGUID_UNIT) and speed
     /// 4.85.
+    /// The spline speed broadcasts. Like spline-run these carry NO counter,
+    /// only the mover and the speed, and each has its own interleave.
+    ///
+    /// All four are pinned to retail bodies from capture-000004 at catalogue
+    /// 2BE10C89 -- sequences 2510, 2507, 2508 and 2509 -- which are consecutive
+    /// packets for one mover, 0xF1308319002275D5. Their speeds are each exactly
+    /// half the base for that movement type (walk 1.25 of 2.5, run-back 2.25 of
+    /// 4.5, swim 2.36111 of 4.72222), which is that creature uniformly slowed and
+    /// a useful independent check that the layouts are not merely self-consistent.
+
+    /// SMSG_SPLINE_MOVE_SET_WALK_SPEED (0x08B2), reader sub_C8A6C4, case 28.
+    inline void BuildSplineMoveSetWalkSpeed(WorldPacket& out, uint64 moverGuid, float speed)
+    {
+        uint8 const maskOrder[] = { 4, 1, 7, 6, 3, 2, 5, 0 };
+        uint8 const byteOrder[] = { 2, 3, 1, 0, 6, 5, 4, 7 };
+
+        for (uint8 index : maskOrder)
+        {
+            out.WriteBit(SwimSpeedGuidByte(moverGuid, index) != 0);
+        }
+        out.FlushBits();
+        for (uint8 index : byteOrder)
+        {
+            out.WriteByteSeq(SwimSpeedGuidByte(moverGuid, index));
+        }
+        out << float(speed);
+    }
+
+    /// SMSG_SPLINE_MOVE_SET_RUN_BACK_SPEED (0x1F9F), reader sub_C8BBFE, case 319.
+    inline void BuildSplineMoveSetRunBackSpeed(WorldPacket& out, uint64 moverGuid, float speed)
+    {
+        uint8 const maskOrder[] = { 7, 4, 0, 3, 2, 5, 6, 1 };
+        uint8 const beforeSpeed[] = { 6, 4, 1, 5, 2, 3, 7 };
+        uint8 const afterSpeed[] = { 0 };
+
+        for (uint8 index : maskOrder)
+        {
+            out.WriteBit(SwimSpeedGuidByte(moverGuid, index) != 0);
+        }
+        out.FlushBits();
+        for (uint8 index : beforeSpeed)
+        {
+            out.WriteByteSeq(SwimSpeedGuidByte(moverGuid, index));
+        }
+        out << float(speed);
+        for (uint8 index : afterSpeed)
+        {
+            out.WriteByteSeq(SwimSpeedGuidByte(moverGuid, index));
+        }
+    }
+
+    /// SMSG_SPLINE_MOVE_SET_SWIM_SPEED (0x1D8E), reader sub_C8CD2E, case 278.
+    inline void BuildSplineMoveSetSwimSpeed(WorldPacket& out, uint64 moverGuid, float speed)
+    {
+        uint8 const maskOrder[] = { 5, 6, 7, 3, 4, 2, 1, 0 };
+        uint8 const beforeSpeed[] = { 4, 1, 6, 7, 3 };
+        uint8 const afterSpeed[] = { 5, 0, 2 };
+
+        for (uint8 index : maskOrder)
+        {
+            out.WriteBit(SwimSpeedGuidByte(moverGuid, index) != 0);
+        }
+        out.FlushBits();
+        for (uint8 index : beforeSpeed)
+        {
+            out.WriteByteSeq(SwimSpeedGuidByte(moverGuid, index));
+        }
+        out << float(speed);
+        for (uint8 index : afterSpeed)
+        {
+            out.WriteByteSeq(SwimSpeedGuidByte(moverGuid, index));
+        }
+    }
+
+    /// SMSG_SPLINE_MOVE_SET_FLIGHT_SPEED (0x1DAB), reader sub_C8E89B, case 291.
+    /// The speed leads, before the mask byte -- as with the direct flight packet.
+    inline void BuildSplineMoveSetFlightSpeed(WorldPacket& out, uint64 moverGuid, float speed)
+    {
+        uint8 const maskOrder[] = { 1, 4, 7, 3, 2, 6, 5, 0 };
+        uint8 const byteOrder[] = { 5, 1, 0, 6, 2, 4, 7, 3 };
+
+        out << float(speed);
+        for (uint8 index : maskOrder)
+        {
+            out.WriteBit(SwimSpeedGuidByte(moverGuid, index) != 0);
+        }
+        out.FlushBits();
+        for (uint8 index : byteOrder)
+        {
+            out.WriteByteSeq(SwimSpeedGuidByte(moverGuid, index));
+        }
+    }
+
     inline void BuildSplineMoveSetRunSpeed(WorldPacket& out, uint64 moverGuid,
         float speed)
     {

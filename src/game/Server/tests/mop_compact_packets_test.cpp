@@ -387,6 +387,46 @@ static void test_speed_family_full_interleaves_reader_derived()
     }
 }
 
+/// The four spline speed broadcasts, each pinned to a retail body. Sequences
+/// 2510, 2507, 2508 and 2509 of capture-000004 are consecutive packets for one
+/// mover, 0xF1308319002275D5, and every speed is exactly half its base for that
+/// movement type -- one creature uniformly slowed, decoded under four different
+/// interleaves.
+static void test_spline_speed_family_matches_retail_bodies()
+{
+    uint64 const guid = 0xF1308319002275D5ull;
+    float f;
+
+    {   // walk 1.25, speed trails everything
+        uint32 const bits = 0x3FA00000u; std::memcpy(&f, &bits, sizeof(f));
+        WorldPacket p(SMSG_SPLINE_MOVE_SET_WALK_SPEED, 13);
+        MopCompactPackets::BuildSplineMoveSetWalkSpeed(p, guid, f);
+        CHECK(BytesEqual(p, { 0xF7, 0x23, 0x74, 0xD4, 0x31, 0x82, 0x18, 0xF0,
+                              0x00, 0x00, 0xA0, 0x3F }));
+    }
+    {   // run-back 2.25, one GUID byte after the speed
+        uint32 const bits = 0x40100000u; std::memcpy(&f, &bits, sizeof(f));
+        WorldPacket p(SMSG_SPLINE_MOVE_SET_RUN_BACK_SPEED, 13);
+        MopCompactPackets::BuildSplineMoveSetRunBackSpeed(p, guid, f);
+        CHECK(BytesEqual(p, { 0xEF, 0x31, 0x18, 0x74, 0x82, 0x23, 0xF0,
+                              0x00, 0x00, 0x10, 0x40, 0xD4 }));
+    }
+    {   // swim 2.361110, three GUID bytes after the speed
+        uint32 const bits = 0x40171C6Du; std::memcpy(&f, &bits, sizeof(f));
+        WorldPacket p(SMSG_SPLINE_MOVE_SET_SWIM_SPEED, 13);
+        MopCompactPackets::BuildSplineMoveSetSwimSpeed(p, guid, f);
+        CHECK(BytesEqual(p, { 0xEF, 0x18, 0x74, 0x31, 0xF0, 0x6D, 0x1C, 0x17,
+                              0x40, 0x82, 0xD4, 0x23 }));
+    }
+    {   // flight 3.5, speed LEADS before the mask byte
+        uint32 const bits = 0x40600000u; std::memcpy(&f, &bits, sizeof(f));
+        WorldPacket p(SMSG_SPLINE_MOVE_SET_FLIGHT_SPEED, 13);
+        MopCompactPackets::BuildSplineMoveSetFlightSpeed(p, guid, f);
+        CHECK(BytesEqual(p, { 0x00, 0x00, 0x60, 0x40, 0xEF, 0x82, 0x74, 0xD4,
+                              0x31, 0x23, 0x18, 0xF0 }));
+    }
+}
+
 /// The interleave is what distinguishes run from swim: run writes one GUID byte
 /// before the counter, swim writes none. Reusing the swim builder would produce
 /// a body the client cannot parse, so pin that they differ.
@@ -866,6 +906,7 @@ int main(int /*argc*/, char** /*argv*/)
     test_speed_family_full_interleaves_reader_derived();
     test_flight_speed_scalars_precede_mask();
     test_spline_run_speed_matches_retail_body();
+    test_spline_speed_family_matches_retail_bodies();
     test_run_speed_differs_from_swim_interleave();
     test_swim_speed_guid_layouts();
     test_random_roll_guid_layouts();

@@ -175,8 +175,8 @@
  *   TOTAL SMSG rows                   925
  *
  * SUBSYSTEM CONFIDENCE: high=365, low=221, medium=182, none=157
- * STATUS TOTALS: ACTIVE=457, DOC=435, DORMANT=628
- *   SMSG: ACTIVE=272, DOC=271, DORMANT=382
+ * STATUS TOTALS: ACTIVE=461, DOC=435, DORMANT=624
+ *   SMSG: ACTIVE=276, DOC=271, DORMANT=378
  *   CMSG: ACTIVE=185, DOC=164, DORMANT=246
  */
 
@@ -1032,7 +1032,7 @@ typedef uint16_t uint16;
  *   SMSG_MOVE_UNSET_CAN_TRANSITION_BETWEEN_SWIM_AND_FLY 0x0868  DORMANT 
  *   SMSG_MOVE_LAND_WALK                            0x086A  DORMANT 
  *   SMSG_MOVE_UPDATE_RUN_BACK_SPEED                0x08A3  DORMANT
- *   SMSG_SPLINE_MOVE_SET_WALK_SPEED                0x08B2  DORMANT 
+ *   SMSG_SPLINE_MOVE_SET_WALK_SPEED                0x08B2  ACTIVE
  *   SMSG_MOVE_NORMAL_FALL                          0x08E0  DORMANT 
  *   SMSG_MOVE_SET_SWIM_BACK_SPEED                  0x0962  DORMANT 
  *   SMSG_MOVE_UPDATE_PITCH_RATE                    0x09E2  DOC     
@@ -1093,14 +1093,14 @@ typedef uint16_t uint16;
  *   SMSG_UNKNOWN_0x1C0E                            0x1C0E  DOC     
  *   SMSG_STANDSTATE_UPDATE                         0x1C12  ACTIVE
  *   SMSG_LOOT_LIST                                 0x1C3F  DORMANT 
- *   SMSG_SPLINE_MOVE_SET_SWIM_SPEED                0x1D8E  DORMANT 
- *   SMSG_SPLINE_MOVE_SET_FLIGHT_SPEED              0x1DAB  DORMANT 
+ *   SMSG_SPLINE_MOVE_SET_SWIM_SPEED                0x1D8E  ACTIVE
+ *   SMSG_SPLINE_MOVE_SET_FLIGHT_SPEED              0x1DAB  ACTIVE
  *   SMSG_MOVE_APPLY_MOVEMENT_FORCE                 0x1DBE  DORMANT
  *   SMSG_CANCEL_AUTO_REPEAT                        0x1E0F  ACTIVE   [high-conf]  direct packed-GUID reader and Unit_C auto-repeat-clear terminal; name reference-consensus
  *   SMSG_UNKNOWN_0x1E12                            0x1E12  DOC     
  *   SMSG_UNKNOWN_0x1E9F                            0x1E9F  DOC     
  *   SMSG_MOVE_WATER_WALK                           0x1F9A  DORMANT 
- *   SMSG_SPLINE_MOVE_SET_RUN_BACK_SPEED            0x1F9F  DORMANT 
+ *   SMSG_SPLINE_MOVE_SET_RUN_BACK_SPEED            0x1F9F  ACTIVE
  *   SMSG_FORCE_MOVE_UNROOT                         0x1FAE  DORMANT 
  *
  *  -- VignetteInfo.cpp (2) --

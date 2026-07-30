@@ -320,6 +320,10 @@ static bool IsEnterWorldConverted(uint16 opcode)
         case SMSG_SPLINE_MOVE_SET_RUN_SPEED:       // MopCompactPackets::BuildSplineMoveSetRunSpeed -- observers
         case SMSG_MOVE_SET_RUN_BACK_SPEED:         // MopCompactPackets::BuildMoveSetRunBackSpeed
         case SMSG_MOVE_SET_FLIGHT_SPEED:           // MopCompactPackets::BuildMoveSetFlightSpeed
+        case SMSG_SPLINE_MOVE_SET_WALK_SPEED:      // MopCompactPackets::BuildSplineMoveSetWalkSpeed
+        case SMSG_SPLINE_MOVE_SET_RUN_BACK_SPEED:  // MopCompactPackets::BuildSplineMoveSetRunBackSpeed
+        case SMSG_SPLINE_MOVE_SET_SWIM_SPEED:      // MopCompactPackets::BuildSplineMoveSetSwimSpeed
+        case SMSG_SPLINE_MOVE_SET_FLIGHT_SPEED:    // MopCompactPackets::BuildSplineMoveSetFlightSpeed
         case SMSG_SPLINE_MOVE_SET_NORMAL_FALL:     // MopMovementPackets::BuildSplineState
         case SMSG_SPLINE_MOVE_SET_WATER_WALK:      // MopMovementPackets::BuildSplineState
         case SMSG_SPLINE_MOVE_SET_FEATHER_FALL:    // MopMovementPackets::BuildSplineState

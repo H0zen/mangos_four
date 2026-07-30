@@ -364,10 +364,7 @@ void Unit::SetSpeedRate(UnitMoveType mtype, float rate, bool forced, bool ignore
             case MOVE_WALK:
             {
                 data.Initialize(SMSG_SPLINE_MOVE_SET_WALK_SPEED, 1 + 8 + 4);
-                data.WriteGuidMask<0, 6, 7, 3, 5, 1, 2, 4>(guid);
-                data.WriteGuidBytes<0, 4, 7, 1, 5, 3>(guid);
-                data << float(GetSpeed(mtype));
-                data.WriteGuidBytes<6, 2>(guid);
+                MopCompactPackets::BuildSplineMoveSetWalkSpeed(data, guid.GetRawValue(), GetSpeed(mtype));
                 break;
             }
             case MOVE_RUN:
@@ -382,19 +379,13 @@ void Unit::SetSpeedRate(UnitMoveType mtype, float rate, bool forced, bool ignore
             case MOVE_RUN_BACK:
             {
                 data.Initialize(SMSG_SPLINE_MOVE_SET_RUN_BACK_SPEED, 1 + 8 + 4);
-                data.WriteGuidMask<1, 2, 6, 0, 3, 7, 5, 4>(guid);
-                data.WriteGuidBytes<1>(guid);
-                data << float(GetSpeed(mtype));
-                data.WriteGuidBytes<2, 4, 0, 3, 6, 5, 7>(guid);
+                MopCompactPackets::BuildSplineMoveSetRunBackSpeed(data, guid.GetRawValue(), GetSpeed(mtype));
                 break;
             }
             case MOVE_SWIM:
             {
                 data.Initialize(SMSG_SPLINE_MOVE_SET_SWIM_SPEED, 1 + 8 + 4);
-                data.WriteGuidMask<4, 2, 5, 0, 7, 6, 3, 1>(guid);
-                data.WriteGuidBytes<5, 6, 1, 0, 2, 4>(guid);
-                data << float(GetSpeed(mtype));
-                data.WriteGuidBytes<7, 3>(guid);
+                MopCompactPackets::BuildSplineMoveSetSwimSpeed(data, guid.GetRawValue(), GetSpeed(mtype));
                 break;
             }
             case MOVE_SWIM_BACK:
@@ -416,10 +407,9 @@ void Unit::SetSpeedRate(UnitMoveType mtype, float rate, bool forced, bool ignore
             }
             case MOVE_FLIGHT:
             {
+                // Speed leads, before the mask byte.
                 data.Initialize(SMSG_SPLINE_MOVE_SET_FLIGHT_SPEED, 1 + 8 + 4);
-                data.WriteGuidMask<7, 4, 0, 1, 3, 6, 5, 2>(guid);
-                data.WriteGuidBytes<0, 5, 4, 7, 3, 2, 1, 6>(guid);
-                data << float(GetSpeed(mtype));
+                MopCompactPackets::BuildSplineMoveSetFlightSpeed(data, guid.GetRawValue(), GetSpeed(mtype));
                 break;
             }
             case MOVE_FLIGHT_BACK:
