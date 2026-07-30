@@ -68,16 +68,19 @@ static void test_repeat_requests_are_idempotent()
     CHECK((toggled & HIDE_HELM) != 0);
 }
 
-/// The bit is the flag BEFORE the toggle, so the server must apply its opposite.
+/// The bit is the wanted SHOWING state, so the server stores its inverse.
 ///
 /// The client routes are sub_40959D for the helm and sub_4095E0 for the cloak,
 /// identical but for the bit index:
 ///     (PLAYER_FLAGS & 0x400) != 0  ->  the bit        (helm)
 ///     (PLAYER_FLAGS & 0x800) != 0  ->  the bit        (cloak)
-/// There is no xor, not or setz on either path. An earlier reading here took the
-/// bit for the wanted end state and assigned it, which writes the flag to itself
-/// and leaves the item exactly where it was. Live testing found both toggles
-/// inert; the disassembly predicted it before the second was tried.
+/// Neither inverts, so each sends the opposite of the current hide flag -- which
+/// is the wanted showing state. The Lua setters settle it beyond doubt:
+/// ShowHelm(true) sets the bit to 1 and ShowHelm(false) to 0, through the same
+/// packet constructor, so the wire value is absolute rather than a toggle.
+///
+/// An earlier reading assigned the bit to the HIDE flag directly, which inverts
+/// and left both the console command and the UI checkbox inert. Both work now.
 static void test_toggle_applies_the_opposite_of_the_bit()
 {
     const uint32 HIDE_HELM = 0x00000400;

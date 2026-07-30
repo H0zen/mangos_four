@@ -1411,21 +1411,23 @@ void WorldSession::HandleShowingHelmOpcode(WorldPacket& recv_data)
 {
     DEBUG_LOG("CMSG_SHOWING_HELM for %s", _player->GetName());
 
-    // The single MSB-first bit is the flag's value BEFORE the toggle, not the
-    // wanted end state. The client's route sub_40959D is
-    //     (PLAYER_FLAGS & 0x400) != 0  ->  the bit
-    // with no xor, not or setz anywhere: it reports what the flag currently is
-    // and asks the server for the opposite. Assigning the bit as sent therefore
-    // writes the flag to itself and the helm never moves, which is what an
-    // earlier version of this handler did.
+    // The single MSB-first bit is the wanted SHOWING state: 1 show, 0 hide. The
+    // opcode's name is accurate, which is worth stating because the handler
+    // twice was not.
     //
-    // Inverting on receipt keeps the property that made assignment better than a
-    // toggle -- a dropped or replayed request cannot leave the flag stuck
-    // inverted for the session -- while actually changing it. It is also
-    // self-correcting: the client states its own view, so the server converges on
-    // the client's intent rather than compounding any disagreement.
-    bool const wasHidden = recv_data.ReadBit();
-    _player->ApplyModFlag(PLAYER_FLAGS, PLAYER_FLAGS_HIDE_HELM, !wasHidden);
+    // Two callers prove the semantics, and only the second settles it. The Lua
+    // setter ShowHelm(v) sends an ABSOLUTE value -- its true branch sets the bit
+    // to 1 and its false branch to 0, through the same packet constructor. The
+    // console command togglehelm sends the opposite of the current hide flag
+    // (sub_40959D reads PLAYER_FLAGS & 0x400 and sends it), which lands on the
+    // same wire meaning: hidden now, so show it.
+    //
+    // The server therefore stores the inverse, because its flag is HIDE and the
+    // wire carries SHOW. Assigning the bit directly inverts the result, which is
+    // what an earlier version did and why both the console command and the UI
+    // checkbox were inert.
+    bool const showing = recv_data.ReadBit();
+    _player->ApplyModFlag(PLAYER_FLAGS, PLAYER_FLAGS_HIDE_HELM, !showing);
 }
 
 /**
@@ -1437,10 +1439,10 @@ void WorldSession::HandleShowingCloakOpcode(WorldPacket& recv_data)
 {
     DEBUG_LOG("CMSG_SHOWING_CLOAK for %s", _player->GetName());
 
-    // Identical to the helm, and established the same way rather than by
-    // symmetry: sub_4095E0 is (PLAYER_FLAGS & 0x800) != 0 -> the bit, byte for
-    // byte the same shape as sub_40959D with only the bit index differing. So it
-    // too reports the CURRENT hide state and wants the opposite applied.
-    bool const wasHidden = recv_data.ReadBit();
-    _player->ApplyModFlag(PLAYER_FLAGS, PLAYER_FLAGS_HIDE_CLOAK, !wasHidden);
+    // Identical to the helm and established the same way rather than by symmetry:
+    // ShowCloak(v) sends the absolute value through the same constructor, and
+    // togglecloak (sub_4095E0, reading PLAYER_FLAGS & 0x800) sends the opposite
+    // of the current hide flag. Same wire meaning, so the same inversion here.
+    bool const showing = recv_data.ReadBit();
+    _player->ApplyModFlag(PLAYER_FLAGS, PLAYER_FLAGS_HIDE_CLOAK, !showing);
 }
