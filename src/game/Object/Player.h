@@ -766,6 +766,42 @@ namespace MopReputationPackets
     }
 }
 
+namespace MopCharacterPanePackets
+{
+    inline void BuildTitleUpdate(WorldPacket& out, uint32 titleMaskId, bool lost)
+    {
+        // Earned and lost use distinct 18414 opcodes with the same one-uint32
+        // body. A paired retail capture carries the same Mask_ID under both.
+        out.Initialize(lost ? SMSG_TITLE_LOST : SMSG_TITLE_EARNED, sizeof(uint32));
+        out << titleMaskId;
+    }
+
+    inline void BuildPvpCredit(WorldPacket& out, uint32 rank, uint32 honor,
+        ObjectGuid const& victimGuid)
+    {
+        // Wow.exe 18414 reader sub_6CBADE fixes both scalar and GUID order;
+        // captured bodies cover a sparse player GUID and the zero-GUID award.
+        out.Initialize(SMSG_PVP_CREDIT, 17);
+        out << rank << honor;
+        out.WriteGuidMask<4, 2, 5, 3, 0, 6, 1, 7>(victimGuid);
+        out.FlushBits();
+        out.WriteGuidBytes<6, 7, 5, 0, 1, 3, 4, 2>(victimGuid);
+    }
+
+    inline void BuildCrossedInebriationThreshold(WorldPacket& out,
+        ObjectGuid const& playerGuid, uint32 itemId, uint32 drunkState)
+    {
+        // Wow.exe 18414 reader sub_6E7A17 consumes GUID byte 3 between the
+        // mask and the item/state scalars. Three captured bodies pin the order.
+        out.Initialize(SMSG_CROSSED_INEBRIATION_THRESHOLD, 17);
+        out.WriteGuidMask<0, 4, 2, 6, 5, 1, 3, 7>(playerGuid);
+        out.FlushBits();
+        out.WriteGuidBytes<3>(playerGuid);
+        out << itemId << drunkState;
+        out.WriteGuidBytes<4, 6, 7, 0, 2, 5, 1>(playerGuid);
+    }
+}
+
 namespace MopProgressionPackets
 {
     struct ExperienceGain

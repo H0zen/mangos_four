@@ -175,8 +175,8 @@
  *   TOTAL SMSG rows                   925
  *
  * SUBSYSTEM CONFIDENCE: high=365, low=221, medium=182, none=157
- * STATUS TOTALS: ACTIVE=506, DOC=435, DORMANT=579
- *   SMSG: ACTIVE=303, DOC=271, DORMANT=351
+ * STATUS TOTALS: ACTIVE=510, DOC=435, DORMANT=575
+ *   SMSG: ACTIVE=307, DOC=271, DORMANT=347
  *   CMSG: ACTIVE=203, DOC=164, DORMANT=228
  */
 
@@ -374,7 +374,7 @@ typedef uint16_t uint16;
  *   SMSG_TEXT_EMOTE                                0x002E  ACTIVE   [medium-conf]
  *   SMSG_SERVER_FIRST_ACHIEVEMENT                  0x028B  DORMANT
  *   SMSG_USERLIST_UPDATE                           0x063A  DORMANT  [medium-conf]
- *   SMSG_TITLE_EARNED                              0x068E  DORMANT  [medium-conf]
+ *   SMSG_TITLE_EARNED                              0x068E  ACTIVE   [medium-conf]
  *   SMSG_DEFENSE_MESSAGE                           0x0A1F  DORMANT  [medium-conf]
  *   SMSG_CHAT_SERVER_RECONNECTED                   0x0A2E  DORMANT  [medium-conf]
  *   SMSG_USERLIST_REMOVE                           0x0AAB  DORMANT  [medium-conf]
@@ -383,7 +383,7 @@ typedef uint16_t uint16;
  *   SMSG_RESET_FAILED_NOTIFY                       0x10AE  DORMANT  [medium-conf]
  *   SMSG_ZONE_UNDER_ATTACK                         0x10C2  DORMANT  [medium-conf]
  *   SMSG_VOICE_CHAT_STATUS                         0x10E2  DORMANT  [medium-conf]
- *   SMSG_TITLE_LOST                                0x12BF  DORMANT  [medium-conf]
+ *   SMSG_TITLE_LOST                                0x12BF  ACTIVE   [medium-conf]
  *   SMSG_USERLIST_ADD                              0x1462  DORMANT  [medium-conf]
  *   SMSG_INSTANCE_RESET                            0x160F  DORMANT  [medium-conf]
  *   SMSG_UPDATE_LAST_INSTANCE                      0x189B  DORMANT  [medium-conf]
@@ -507,7 +507,7 @@ typedef uint16_t uint16;
  *   SMSG_UNKNOWN_0x0E2B                            0x0E2B  DOC
  *   SMSG_UNKNOWN_0x0E2E                            0x0E2E  DOC      [medium-conf]
  *   SMSG_GUILD_INVITE_CANCEL                       0x0FE1  DORMANT  [low-conf]
- *   SMSG_PVP_CREDIT                                0x100A  DORMANT
+ *   SMSG_PVP_CREDIT                                0x100A  ACTIVE
  *   SMSG_UNKNOWN_0x101F                            0x101F  DOC      [medium-conf]
  *   SMSG_STOP_MIRROR_TIMER                         0x1026  ACTIVE  [high-conf]
  *   SMSG_PLAY_SOUND                                0x102A  ACTIVE
@@ -851,7 +851,7 @@ typedef uint16_t uint16;
  *   SMSG_PET_REMOVED_SPELL                         0x1CAE  ACTIVE
  *   SMSG_SHOWTAXINODES                             0x1E1A  DORMANT  [medium-conf]
  *   SMSG_BATTLEGROUND_INFO_THROTTLED               0x1E1E  DORMANT  [medium-conf]
- *   SMSG_CROSSED_INEBRIATION_THRESHOLD             0x1E9E  DORMANT
+ *   SMSG_CROSSED_INEBRIATION_THRESHOLD             0x1E9E  ACTIVE
  *   SMSG_SPIRIT_HEALER_CONFIRM                     0x1EAA  ACTIVE   [medium-conf]
  *
  *  -- QuestCache.cpp (1) --

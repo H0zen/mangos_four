@@ -462,10 +462,9 @@ void Player::SetDrunkValue(uint8 newDrunkValue, uint32 itemId /*= 0*/)
     }
 
     // Send a packet to update the drunken state
-    WorldPacket data(SMSG_CROSSED_INEBRIATION_THRESHOLD, (8 + 4 + 4));
-    data << GetObjectGuid();
-    data << uint32(newDrunkenState);
-    data << uint32(itemId);
+    WorldPacket data;
+    MopCharacterPanePackets::BuildCrossedInebriationThreshold(data,
+        GetObjectGuid(), uint32(itemId), uint32(newDrunkenState));
 
     SendMessageToSet(&data, true);
 }
