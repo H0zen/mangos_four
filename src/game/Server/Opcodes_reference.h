@@ -175,9 +175,9 @@
  *   TOTAL SMSG rows                   925
  *
  * SUBSYSTEM CONFIDENCE: high=365, low=221, medium=182, none=157
- * STATUS TOTALS: ACTIVE=499, DOC=435, DORMANT=586
+ * STATUS TOTALS: ACTIVE=503, DOC=435, DORMANT=582
  *   SMSG: ACTIVE=300, DOC=271, DORMANT=354
- *   CMSG: ACTIVE=199, DOC=164, DORMANT=232
+ *   CMSG: ACTIVE=203, DOC=164, DORMANT=228
  */
 
 // CAVEATS -- read before trusting any single row:
@@ -1352,12 +1352,12 @@ typedef uint16_t uint16;
  *   CMSG_UNKNOWN_0x017A                            0x017A  DOC
  *   CMSG_UNKNOWN_0x01C0                            0x01C0  DOC
  *   CMSG_MOVE_START_TURN_LEFT                      0x01D0  ACTIVE
- *   CMSG_MOVE_START_DESCEND                        0x01D1  DORMANT
+ *   CMSG_MOVE_START_DESCEND                        0x01D1  ACTIVE
  *   CMSG_TIME_SYNC_RESP                            0x01DB  ACTIVE
  *   CMSG_LFG_LEAVE                                 0x01E0  DORMANT
  *   CMSG_SET_EVERYONE_IS_ASSISTANT                 0x01E1  DOC
  *   CMSG_CALENDAR_EVENT_SIGNUP                     0x01E3  DORMANT
- *   CMSG_MOVE_SET_FLY                              0x01F1  DORMANT
+ *   CMSG_MOVE_SET_FLY                              0x01F1  ACTIVE
  *   MSG_MOVE_HEARTBEAT                             0x01F2  ACTIVE
  *   CMSG_MOVE_START_STRAFE_LEFT                    0x01F8  ACTIVE
  *   CMSG_CAST_SPELL                                0x0206  ACTIVE
@@ -1706,7 +1706,7 @@ typedef uint16_t uint16;
  *   CMSG_NEXT_CINEMATIC_CAMERA                     0x1124  ACTIVE
  *   CMSG_REQUEST_VEHICLE_SWITCH_SEAT               0x1143  DORMANT
  *   CMSG_MOVE_JUMP                                 0x1153  ACTIVE
- *   CMSG_MOVE_STOP_ASCEND                          0x115A  DORMANT
+ *   CMSG_MOVE_STOP_ASCEND                          0x115A  ACTIVE
  *   CMSG_DISCARDED_TIME_SYNC_ACKS                  0x115B  ACTIVE
  *   CMSG_UNKNOWN_0x1160                            0x1160  DOC
  *   CMSG_MOVE_STOP_TURN                            0x1170  ACTIVE
@@ -1714,7 +1714,7 @@ typedef uint16_t uint16;
  *   CMSG_MOVE_GRAVITY_ENABLE_ACK                   0x11D8  DORMANT
  *   CMSG_MOVE_SPLINE_DONE                          0x11D9  DORMANT
  *   CMSG_MOVE_SET_CAN_TRANSITION_BETWEEN_SWIM_AND_FLY_ACK 0x11DB  DORMANT
- *   CMSG_MOVE_START_ASCEND                         0x11FA  DORMANT
+ *   CMSG_MOVE_START_ASCEND                         0x11FA  ACTIVE
  *   CMSG_REQUEST_CATEGORY_COOLDOWNS                0x1203  ACTIVE   [high-conf]
  *   CMSG_UNKNOWN_0x1207                            0x1207  DOC
  *   CMSG_MESSAGECHAT_WHISPER                       0x123E  ACTIVE

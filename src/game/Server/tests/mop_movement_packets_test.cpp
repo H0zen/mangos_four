@@ -354,6 +354,72 @@ static RefOp const kFallLand[] = {
     RefOp::TransportTime, RefOp::TransportX, TB(7), TB(0), RefOp::UnknownUInt32,
     RefOp::Timestamp, RefOp::SplineElevation, RefOp::Pitch, RefOp::PositionO, RefOp::End };
 
+static RefOp const kSetFly[] = {
+    RefOp::PositionY, RefOp::PositionZ, RefOp::PositionX, G(5), RefOp::HasTransport,
+    G(3), RefOp::ForceCount, RefOp::HasFlags2, RefOp::Raw149, RefOp::HasFall,
+    G(6), RefOp::Raw172, G(7), RefOp::HasTimestamp, G(0), G(2), RefOp::HasPitch,
+    RefOp::HasOrientation, G(1), RefOp::Raw148, RefOp::HasSplineElevation,
+    RefOp::HasUnknownUInt32, G(4), RefOp::HasFlags, T(1), T(3), T(5),
+    RefOp::HasTransportTime3, T(6), T(7), T(2), T(4), RefOp::HasTransportTime2,
+    T(0), RefOp::Flags2, RefOp::HasFallDirection, RefOp::Flags, GB(1), GB(6),
+    GB(5), GB(2), GB(4), GB(0), GB(7), GB(3), RefOp::ForceIds, TB(7), TB(5),
+    TB(1), RefOp::TransportTime, RefOp::TransportSeat, RefOp::TransportTime2,
+    TB(0), TB(4), RefOp::TransportY, TB(3), RefOp::TransportZ, TB(2), TB(6),
+    RefOp::TransportX, RefOp::TransportO, RefOp::TransportTime3, RefOp::FallSin,
+    RefOp::FallCos, RefOp::FallHorizontal, RefOp::FallVertical, RefOp::FallTime,
+    RefOp::Timestamp, RefOp::UnknownUInt32, RefOp::SplineElevation, RefOp::Pitch,
+    RefOp::PositionO, RefOp::End };
+
+static RefOp const kStartAscend[] = {
+    RefOp::PositionY, RefOp::PositionX, RefOp::PositionZ, RefOp::HasOrientation,
+    G(3), RefOp::HasTransport, RefOp::HasFlags, RefOp::Raw172, G(0), G(4),
+    RefOp::HasTimestamp, G(7), RefOp::Raw149, RefOp::HasPitch, G(5),
+    RefOp::HasFlags2, RefOp::Raw148, G(6), G(2), RefOp::HasUnknownUInt32,
+    RefOp::ForceCount, G(1), RefOp::HasSplineElevation, RefOp::HasFall, T(4),
+    T(0), T(3), T(5), RefOp::HasTransportTime2, T(1), RefOp::HasTransportTime3,
+    T(6), T(2), T(7), RefOp::HasFallDirection, RefOp::Flags2, RefOp::Flags,
+    GB(2), GB(5), RefOp::ForceIds, GB(1), GB(0), GB(4), GB(7), GB(6), GB(3),
+    RefOp::PositionO, RefOp::Timestamp, TB(3), RefOp::TransportTime,
+    RefOp::TransportY, RefOp::TransportO, TB(6), RefOp::TransportTime3,
+    RefOp::TransportX, TB(2), RefOp::TransportTime2, TB(1), TB(7),
+    RefOp::TransportZ, RefOp::TransportSeat, TB(0), TB(4), TB(5),
+    RefOp::SplineElevation, RefOp::FallVertical, RefOp::FallSin, RefOp::FallCos,
+    RefOp::FallHorizontal, RefOp::FallTime, RefOp::Pitch, RefOp::UnknownUInt32,
+    RefOp::End };
+
+static RefOp const kStopAscend[] = {
+    RefOp::PositionZ, RefOp::PositionX, RefOp::PositionY, RefOp::HasOrientation,
+    G(0), G(3), G(7), G(2), G(6), RefOp::HasFlags2, RefOp::HasTimestamp,
+    RefOp::HasUnknownUInt32, RefOp::HasTransport, RefOp::HasPitch, RefOp::Raw148,
+    RefOp::Raw172, G(4), RefOp::Raw149, G(5), RefOp::ForceCount, RefOp::HasFall,
+    RefOp::HasFlags, G(1), RefOp::HasSplineElevation, RefOp::HasTransportTime2,
+    T(0), T(5), T(4), T(6), T(2), T(1), RefOp::HasTransportTime3, T(3), T(7),
+    RefOp::Flags2, RefOp::Flags, RefOp::HasFallDirection, GB(0), RefOp::ForceIds,
+    GB(4), GB(5), GB(1), GB(7), GB(6), GB(3), GB(2), TB(5), RefOp::TransportY,
+    TB(4), TB(7), TB(1), TB(3), RefOp::TransportTime2, RefOp::TransportX,
+    RefOp::TransportO, TB(0), TB(2), RefOp::TransportZ, RefOp::TransportTime3,
+    RefOp::TransportTime, RefOp::TransportSeat, TB(6), RefOp::FallCos,
+    RefOp::FallHorizontal, RefOp::FallSin, RefOp::FallTime, RefOp::FallVertical,
+    RefOp::Timestamp, RefOp::SplineElevation, RefOp::Pitch, RefOp::UnknownUInt32,
+    RefOp::PositionO, RefOp::End };
+
+static RefOp const kStartDescend[] = {
+    RefOp::PositionX, RefOp::PositionY, RefOp::PositionZ, RefOp::HasFall,
+    RefOp::HasFlags, G(7), G(0), G(4), RefOp::HasFlags2, RefOp::HasPitch, G(6),
+    G(2), RefOp::Raw148, RefOp::HasUnknownUInt32, RefOp::ForceCount,
+    RefOp::HasTransport, RefOp::HasOrientation, G(1), RefOp::Raw149,
+    RefOp::Raw172, G(3), G(5), RefOp::HasSplineElevation, RefOp::HasTimestamp,
+    T(0), RefOp::HasTransportTime3, T(7), RefOp::HasTransportTime2, T(1), T(4),
+    T(5), T(3), T(6), T(2), RefOp::Flags2, RefOp::Flags,
+    RefOp::HasFallDirection, GB(4), GB(7), GB(1), GB(3), RefOp::ForceIds,
+    GB(2), GB(6), GB(0), GB(5), RefOp::TransportX, TB(0), TB(3), TB(7),
+    RefOp::TransportSeat, TB(5), TB(1), RefOp::TransportY, RefOp::TransportTime3,
+    RefOp::TransportTime, TB(4), RefOp::TransportTime2, RefOp::TransportO,
+    RefOp::TransportZ, TB(2), TB(6), RefOp::FallTime, RefOp::FallCos,
+    RefOp::FallHorizontal, RefOp::FallSin, RefOp::FallVertical, RefOp::Pitch,
+    RefOp::UnknownUInt32, RefOp::SplineElevation, RefOp::PositionO,
+    RefOp::Timestamp, RefOp::End };
+
 static RefOp const kPlayerMove[] = {
     RefOp::HasPitch, G(2), RefOp::Raw148, RefOp::Raw149, G(0), RefOp::HasOrientation,
     RefOp::HasFall, RefOp::HasUnknownUInt32, G(3), RefOp::HasFallDirection,
@@ -631,18 +697,19 @@ static MovementInfo Decode(OpcodesList opcode, RefOp const (&sequence)[N], RefSt
     return info;
 }
 
-static void test_thirteen_inbound_fixtures_and_exact_relay()
+static void test_seventeen_inbound_fixtures_and_exact_relay()
 {
     RefState const state;
     CHECK(state.hasFlags && state.hasFlags2 && state.hasTimestamp && state.hasOrientation &&
         state.hasPitch && state.hasFall && state.hasFallDirection && state.hasTransport &&
         state.hasTransportTime2 && state.hasTransportTime3 && state.hasSplineElevation);
-    std::array<OpcodesList, 13> const opcodes {{ CMSG_MOVE_START_FORWARD, CMSG_MOVE_START_BACKWARD,
+    std::array<OpcodesList, 17> const opcodes {{ CMSG_MOVE_START_FORWARD, CMSG_MOVE_START_BACKWARD,
         CMSG_MOVE_STOP, MSG_MOVE_HEARTBEAT, CMSG_MOVE_SET_FACING, CMSG_MOVE_FALL_LAND,
         CMSG_MOVE_START_STRAFE_LEFT, CMSG_MOVE_START_STRAFE_RIGHT, CMSG_MOVE_STOP_STRAFE,
-        CMSG_MOVE_JUMP, CMSG_MOVE_START_TURN_LEFT, CMSG_MOVE_START_TURN_RIGHT, CMSG_MOVE_STOP_TURN }};
-    std::array<std::vector<uint8>, 13> fixtures;
-    MovementInfo infos[13] = {
+        CMSG_MOVE_JUMP, CMSG_MOVE_START_TURN_LEFT, CMSG_MOVE_START_TURN_RIGHT, CMSG_MOVE_STOP_TURN,
+        CMSG_MOVE_SET_FLY, CMSG_MOVE_START_ASCEND, CMSG_MOVE_STOP_ASCEND, CMSG_MOVE_START_DESCEND }};
+    std::array<std::vector<uint8>, 17> fixtures;
+    MovementInfo infos[17] = {
         Decode(opcodes[0], kStartForward, state, &fixtures[0]),
         Decode(opcodes[1], kStartBackward, state, &fixtures[1]),
         Decode(opcodes[2], kStop, state, &fixtures[2]),
@@ -655,7 +722,11 @@ static void test_thirteen_inbound_fixtures_and_exact_relay()
         Decode(opcodes[9], kJump, state, &fixtures[9]),
         Decode(opcodes[10], kStartTurnLeft, state, &fixtures[10]),
         Decode(opcodes[11], kStartTurnRight, state, &fixtures[11]),
-        Decode(opcodes[12], kStopTurn, state, &fixtures[12]) };
+        Decode(opcodes[12], kStopTurn, state, &fixtures[12]),
+        Decode(opcodes[13], kSetFly, state, &fixtures[13]),
+        Decode(opcodes[14], kStartAscend, state, &fixtures[14]),
+        Decode(opcodes[15], kStopAscend, state, &fixtures[15]),
+        Decode(opcodes[16], kStartDescend, state, &fixtures[16]) };
     for (size_t i = 1; i < fixtures.size(); ++i)
         CHECK(fixtures[i] != fixtures[i - 1]);
 
@@ -674,6 +745,101 @@ static void test_thirteen_inbound_fixtures_and_exact_relay()
         }
         CHECK(Equal(relay, expectedRelay));
     }
+}
+
+static void test_flight_input_retail_bodies()
+{
+    static uint8 const startAscend[] = {
+        0xd8, 0x21, 0x64, 0x44, 0x48, 0x63, 0x04, 0x46, 0xcd, 0x66, 0x0b, 0x44,
+        0x44, 0x81, 0x80, 0x00, 0x01, 0x88, 0x00, 0x0d, 0x00, 0x00, 0x08, 0x3d,
+        0xc9, 0xe9, 0x05, 0x04, 0xfa, 0xbc, 0xc0, 0x3f, 0x9e, 0x2e, 0x0e, 0x00,
+        0x35, 0x8d, 0xa7, 0xbe,
+    };
+    static uint8 const stopAscend[] = {
+        0x0f, 0x08, 0x0c, 0x44, 0x70, 0x5f, 0x04, 0x46, 0xa1, 0x4e, 0x62, 0x44,
+        0x78, 0x80, 0x00, 0x00, 0x00, 0xc8, 0x00, 0x0c, 0x00, 0x00, 0x08, 0xe9,
+        0xc9, 0x05, 0x04, 0x3d, 0xa7, 0x2d, 0x0e, 0x00, 0x80, 0x3b, 0xaa, 0xbe,
+        0xca, 0xa1, 0xac, 0x3f,
+    };
+    static uint8 const startDescend[] = {
+        0x62, 0xf9, 0x62, 0x44, 0xf0, 0x79, 0x90, 0x43, 0x16, 0xee, 0xe6, 0x43,
+        0x32, 0xa0, 0x00, 0x00, 0x12, 0x88, 0x00, 0x0e, 0x00, 0x00, 0x00, 0x05,
+        0x28, 0x04, 0x49, 0xd0, 0x33, 0x28, 0x88, 0x40, 0x35, 0xf8, 0x87, 0x02,
+    };
+    static uint8 const setFlyTransport[] = {
+        0x42, 0xfa, 0x8c, 0x45, 0x49, 0x15, 0x8f, 0x41, 0x0d, 0xf4, 0x12, 0x45,
+        0x60, 0x00, 0x00, 0x02, 0xeb, 0x03, 0x12, 0x00, 0x03, 0x00, 0x00, 0x00,
+        0xc9, 0x3d, 0xe9, 0x05, 0x04, 0x1e, 0x20, 0x1a, 0x02, 0x00, 0xff, 0x29,
+        0x7e, 0xeb, 0x93, 0xbf, 0x60, 0xf7, 0x99, 0x41, 0xc1, 0xf8, 0xdc, 0xf0,
+        0x41, 0xec, 0xe8, 0x86, 0x40, 0x26, 0x70, 0xe4, 0x00, 0x1a, 0xcb, 0x2b,
+        0x40,
+    };
+
+    auto decode = [](OpcodesList opcode, uint8 const* body, size_t size)
+    {
+        WorldPacket packet(opcode, size);
+        packet.append(body, size);
+        MovementInfo info;
+        packet >> info;
+        CHECK(packet.rpos() == packet.size());
+        CHECK(info.GetMovementForceIds().empty());
+        CHECK(!info.HasUnknownUInt32());
+        return info;
+    };
+
+    // capture-000004/639 exercises the pitch-present start-ascend arm.
+    MovementInfo const ascend = decode(CMSG_MOVE_START_ASCEND, startAscend, sizeof(startAscend));
+    CHECK(ascend.GetGuid().GetRawValue() == UINT64_C(0x04000000053CC8E8));
+    CHECK(ascend.GetPos()->x == 8472.8203125f);
+    CHECK(ascend.GetPos()->y == 912.52880859375f);
+    CHECK(ascend.GetPos()->z == 557.60626220703125f);
+    CHECK(ascend.GetPos()->o == 1.5057671070098877f);
+    CHECK(uint32(ascend.GetMovementFlags()) == 0x01A00001u);
+    CHECK(uint16(ascend.GetMovementFlags2()) == 0x0400u);
+    CHECK(ascend.GetTime() == 929438u);
+    CHECK(ascend.GetPitch() == -0.3272491991519928f);
+
+    // capture-000004/636: pitch present and both vertical-direction bits clear.
+    MovementInfo const stop = decode(CMSG_MOVE_STOP_ASCEND, stopAscend, sizeof(stopAscend));
+    CHECK(stop.GetGuid().GetRawValue() == UINT64_C(0x04000000053CC8E8));
+    CHECK(stop.GetPos()->x == 8471.859375f);
+    CHECK(stop.GetPos()->y == 905.22857666015625f);
+    CHECK(stop.GetPos()->z == 560.12591552734375f);
+    CHECK(stop.GetPos()->o == 1.3486874103546143f);
+    CHECK(uint32(stop.GetMovementFlags()) == 0x01800001u);
+    CHECK(uint16(stop.GetMovementFlags2()) == 0x0400u);
+    CHECK(stop.GetTime() == 929191u);
+    CHECK(stop.GetPitch() == -0.33248519897460938f);
+
+    // capture-000112/251644: the client starts descending and uses no separate
+    // STOP_DESCEND opcode; STOP_ASCEND clears either vertical direction.
+    MovementInfo const descend = decode(CMSG_MOVE_START_DESCEND, startDescend, sizeof(startDescend));
+    CHECK(descend.GetGuid().GetRawValue() == UINT64_C(0x04000000054829D1));
+    CHECK(descend.GetPos()->x == 907.8966064453125f);
+    CHECK(descend.GetPos()->y == 288.95263671875f);
+    CHECK(descend.GetPos()->z == 461.86004638671875f);
+    CHECK(descend.GetPos()->o == 4.254907131195068f);
+    CHECK(uint32(descend.GetMovementFlags()) == 0x01C00000u);
+    CHECK(uint16(descend.GetMovementFlags2()) == 0x0400u);
+    CHECK(descend.GetTime() == 42465333u);
+
+    // capture-000142/325036 exercises the SET_FLY selector and transport arm.
+    MovementInfo const fly = decode(CMSG_MOVE_SET_FLY, setFlyTransport, sizeof(setFlyTransport));
+    CHECK(fly.GetGuid().GetRawValue() == UINT64_C(0x04000000053CC8E8));
+    CHECK(fly.GetPos()->x == 2351.253173828125f);
+    CHECK(fly.GetPos()->y == 4511.2822265625f);
+    CHECK(fly.GetPos()->z == 17.885393142700195f);
+    CHECK(fly.GetPos()->o == 2.6842713356018066f);
+    CHECK(uint32(fly.GetMovementFlags()) == 0x01800000u);
+    CHECK(uint16(fly.GetMovementFlags2()) == 0x0400u);
+    CHECK(fly.GetTime() == 14970918u);
+    CHECK(fly.GetTransportGuid().GetRawValue() == UINT64_C(0x1FC0000000000028));
+    CHECK(fly.GetTransportTime() == 137760u);
+    CHECK(fly.GetTransportSeat() == -1);
+    CHECK(fly.GetTransportPos()->x == 30.107894897460938f);
+    CHECK(fly.GetTransportPos()->y == -1.1556241512298584f);
+    CHECK(fly.GetTransportPos()->z == 19.24578857421875f);
+    CHECK(fly.GetTransportPos()->o == 4.215932846069336f);
 }
 
 static void test_complementary_and_empty_state()
@@ -975,6 +1141,10 @@ static void test_opcode_values_are_framable()
     CHECK(uint32(CMSG_MOVE_START_TURN_LEFT) == 0x01D0u);
     CHECK(uint32(CMSG_MOVE_START_TURN_RIGHT) == 0x107Bu);
     CHECK(uint32(CMSG_MOVE_STOP_TURN) == 0x1170u);
+    CHECK(uint32(CMSG_MOVE_SET_FLY) == 0x01F1u);
+    CHECK(uint32(CMSG_MOVE_START_ASCEND) == 0x11FAu);
+    CHECK(uint32(CMSG_MOVE_STOP_ASCEND) == 0x115Au);
+    CHECK(uint32(CMSG_MOVE_START_DESCEND) == 0x01D1u);
     CHECK(uint32(CMSG_FORCE_SWIM_SPEED_CHANGE_ACK) == 0x1853u);
     CHECK(uint32(SMSG_PLAYER_MOVE) == 0x1A32u);
     CHECK(uint32(SMSG_SPLINE_MOVE_SET_NORMAL_FALL) == 0x0B08u);
@@ -983,6 +1153,7 @@ static void test_opcode_values_are_framable()
     CHECK(uint32(SMSG_SPLINE_MOVE_SET_LAND_WALK) == 0x18B6u);
     CHECK(uint32(SMSG_PLAYER_MOVE) < uint32(OPCODE_TABLE_SIZE));
     CHECK(uint32(CMSG_FORCE_SWIM_SPEED_CHANGE_ACK) < uint32(OPCODE_TABLE_SIZE));
+    CHECK(uint32(CMSG_MOVE_START_ASCEND) < uint32(OPCODE_TABLE_SIZE));
     CHECK(uint32(SMSG_SPLINE_MOVE_SET_LAND_WALK) < uint32(OPCODE_TABLE_SIZE));
 }
 
@@ -1813,7 +1984,8 @@ static void test_gravity_family_retail_bodies()
 
 int main(int, char**)
 {
-    test_thirteen_inbound_fixtures_and_exact_relay();
+    test_seventeen_inbound_fixtures_and_exact_relay();
+    test_flight_input_retail_bodies();
     test_complementary_and_empty_state();
     test_server_built_embedded_guid();
     test_force_swim_speed_change_ack_fixture();

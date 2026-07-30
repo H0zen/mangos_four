@@ -1356,7 +1356,9 @@ foreach(mutation IN ITEMS root_then_clear_flags drop_back_speed_snare_calls spee
         force_swim_sequence force_swim_flags2_width flags2_width inbound_registration movement_gap_registration force_swim_registration
         force_swim_handler_order output_metadata heartbeat_framing mover_guid_validation
         spline_state_builder spline_state_registration monster_move_writer monster_move_registration
-        monster_move_integration monster_move_gate teleport_ack_registration)
+        monster_move_integration monster_move_gate teleport_ack_registration
+        flight_sequence_order flight_flags2_width flight_set_fly_selector
+        flight_registration_atomic flight_invent_stop_descend)
     add_test(NAME mop_movement_source_mutation_${mutation}
         COMMAND ${CMAKE_COMMAND} -DSOURCE_ROOT=${CMAKE_SOURCE_DIR}
             -DMUTATION=${mutation}

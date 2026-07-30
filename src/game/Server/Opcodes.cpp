@@ -923,6 +923,13 @@ void InitializeOpcodes()
     DefC(CMSG_MOVE_START_TURN_LEFT, "CMSG_MOVE_START_TURN_LEFT", STATUS_LOGGEDIN, PROCESS_THREADUNSAFE, &WorldSession::HandleMovementOpcodes);
     DefC(CMSG_MOVE_START_TURN_RIGHT, "CMSG_MOVE_START_TURN_RIGHT", STATUS_LOGGEDIN, PROCESS_THREADUNSAFE, &WorldSession::HandleMovementOpcodes);
     DefC(CMSG_MOVE_STOP_TURN, "CMSG_MOVE_STOP_TURN", STATUS_LOGGEDIN, PROCESS_THREADUNSAFE, &WorldSession::HandleMovementOpcodes);
+    // Flight-input snapshots use the same relocation path as ground movement,
+    // but their 18414 writers have distinct 72-element layouts. Register the
+    // four only with their matching MovementStructures.h readers.
+    DefC(CMSG_MOVE_SET_FLY, "CMSG_MOVE_SET_FLY", STATUS_LOGGEDIN, PROCESS_THREADUNSAFE, &WorldSession::HandleMovementOpcodes);
+    DefC(CMSG_MOVE_START_ASCEND, "CMSG_MOVE_START_ASCEND", STATUS_LOGGEDIN, PROCESS_THREADUNSAFE, &WorldSession::HandleMovementOpcodes);
+    DefC(CMSG_MOVE_STOP_ASCEND, "CMSG_MOVE_STOP_ASCEND", STATUS_LOGGEDIN, PROCESS_THREADUNSAFE, &WorldSession::HandleMovementOpcodes);
+    DefC(CMSG_MOVE_START_DESCEND, "CMSG_MOVE_START_DESCEND", STATUS_LOGGEDIN, PROCESS_THREADUNSAFE, &WorldSession::HandleMovementOpcodes);
     DefC(CMSG_FORCE_SWIM_SPEED_CHANGE_ACK, "CMSG_FORCE_SWIM_SPEED_CHANGE_ACK", STATUS_LOGGEDIN, PROCESS_THREADUNSAFE, &WorldSession::HandleForceSpeedChangeAckOpcodes);
     DefS(SMSG_PLAYER_MOVE, "SMSG_PLAYER_MOVE");
     DefS(SMSG_MONSTER_MOVE, "SMSG_MONSTER_MOVE");
