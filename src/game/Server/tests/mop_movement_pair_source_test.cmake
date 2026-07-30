@@ -413,11 +413,7 @@ foreach(GATED
         SMSG_FORCE_MOVE_ROOT
         SMSG_FORCE_MOVE_UNROOT
         SMSG_SPLINE_MOVE_ROOT
-        SMSG_SPLINE_MOVE_UNROOT
-        SMSG_MOVE_GRAVITY_DISABLE
-        SMSG_MOVE_GRAVITY_ENABLE
-        SMSG_SPLINE_MOVE_GRAVITY_DISABLE
-        SMSG_SPLINE_MOVE_GRAVITY_ENABLE)
+        SMSG_SPLINE_MOVE_UNROOT)
     string(FIND "${SESSION_SOURCE}" "case ${GATED}:" ADMITTED)
     if(ADMITTED EQUAL -1)
         message(FATAL_ERROR
@@ -595,5 +591,28 @@ foreach(SETTER_NAME SetRoot SetWaterWalk SetLevitate SetCanFly SetFeatherFall Se
         message(FATAL_ERROR
             "Player::${SETTER_NAME} must update m_movementInfo with ${SETTER_FLAGNAME} -- "
             "otherwise the client is told and the server's own view never changes")
+    endif()
+endforeach()
+
+# --- Gravity is held OUT of the gate on purpose -----------------------------
+#
+# Its builders are correct and fixtured, but the sense -- which opcode means
+# gravity-off -- is not decidable from the client. Admitting an inverted sense
+# would have the client and server disagree about gravity, which reaches fall
+# damage and position validation: worse than the suppressed no-op it replaces.
+#
+# This asserts the hold is deliberate rather than forgotten. When a live test
+# settles the sense, delete this block and add the four cases to the gate.
+foreach(HELD
+        SMSG_MOVE_GRAVITY_DISABLE
+        SMSG_MOVE_GRAVITY_ENABLE
+        SMSG_SPLINE_MOVE_GRAVITY_DISABLE
+        SMSG_SPLINE_MOVE_GRAVITY_ENABLE)
+    string(FIND "${SESSION_SOURCE}" "case ${HELD}:" HELD_ADMITTED)
+    if(NOT HELD_ADMITTED EQUAL -1)
+        message(FATAL_ERROR
+            "${HELD} is admitted, but the gravity SENSE is still unverified. Admitting "
+            "an inverted sense desyncs client and server on gravity. Resolve it with a "
+            "live 18414 test, then remove this guard in the same change")
     endif()
 endforeach()

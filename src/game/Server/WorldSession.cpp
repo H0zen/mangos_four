@@ -342,18 +342,22 @@ static bool IsEnterWorldConverted(uint16 opcode)
         case SMSG_SPLINE_MOVE_SET_FLYING:          // MopCompactPackets::BuildSplineMoveSetFlying
         case SMSG_SPLINE_MOVE_UNSET_FLYING:        // MopCompactPackets::BuildSplineMoveUnsetFlying
         case SMSG_SEND_MAIL_RESULT:                // MopCompactPackets::BuildSendMailResult
-        // Gravity, admitted as a complete set. The LAYOUTS are settled; the
-        // SENSE is not. Which of these the client treats as gravity-off is not
-        // decidable from the binary -- no strings, no boolean in the readers,
-        // obfuscated post-handlers -- so it needs a live test. Both halves now
-        // use one convention (levitate-on selects DISABLE), which was NOT true
-        // before: the mover and observer paths disagreed. If a live test shows
-        // the sense inverted, it is a one-line flip in two places, and the
-        // symptom would be visible immediately.
-        case SMSG_MOVE_GRAVITY_DISABLE:            // MopCompactPackets::BuildMoveGravityDisable
-        case SMSG_MOVE_GRAVITY_ENABLE:             // MopCompactPackets::BuildMoveGravityEnable
-        case SMSG_SPLINE_MOVE_GRAVITY_DISABLE:     // MopCompactPackets::BuildSplineMoveGravityDisable
-        case SMSG_SPLINE_MOVE_GRAVITY_ENABLE:      // MopCompactPackets::BuildSplineMoveGravityEnable
+        // GRAVITY IS DELIBERATELY NOT ADMITTED. Its four builders are rebuilt,
+        // fixtured against real bodies and internally consistent -- see
+        // MopCompactPackets::BuildMoveGravityDisable and its three siblings --
+        // but the SENSE is unverified: which opcode the client treats as
+        // gravity-off is not decidable from the binary. No gravity strings in
+        // either image, no boolean in either reader, generic obfuscated
+        // post-handlers.
+        //
+        // I admitted them and then withdrew it. If the hypothesis is inverted,
+        // ".levitate off" would tell the client to turn gravity OFF while the
+        // server clears MOVEFLAG_LEVITATING -- client and server disagreeing
+        // about gravity, which reaches fall damage and position validation.
+        // That is worse than the suppressed no-op it replaces, and the family is
+        // not usable until a live 18414 test resolves it either way.
+        //
+        // To admit: add the four cases here. Nothing else needs to change.
         // Rooting, admitted as a complete set. Reaches far beyond any GM
         // command: death, resurrection and vehicle boarding all root.
         case SMSG_FORCE_MOVE_ROOT:                 // MopCompactPackets::BuildForceMoveRoot

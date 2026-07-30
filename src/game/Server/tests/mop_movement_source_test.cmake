@@ -574,15 +574,6 @@ endif()
 # root path match.
 string(FIND "${spell_aura_control_source}" "SetMovementFlags(MOVEFLAG_NONE)" clear_at)
 while(NOT clear_at EQUAL -1)
-    math(EXPR clear_window_start "${clear_at} + 30")
-    string(LENGTH "${spell_aura_control_source}" sac_length)
-    math(EXPR clear_window "${sac_length} - ${clear_window_start}")
-    if(clear_window GREATER 200)
-        set(clear_window 200)
-    endif()
-    string(SUBSTRING "${spell_aura_control_source}" ${clear_window_start} ${clear_window} clear_tail)
-    string(FIND "${clear_tail}" "SetRoot(true)" root_after_clear)
-
     math(EXPR before_start "${clear_at} - 200")
     if(before_start LESS 0)
         set(before_start 0)
@@ -591,6 +582,9 @@ while(NOT clear_at EQUAL -1)
     string(SUBSTRING "${spell_aura_control_source}" ${before_start} ${before_len} clear_head)
     string(FIND "${clear_head}" "SetRoot(true)" root_before_clear)
 
+    # 200 characters back is a heuristic: a SetRoot(true) further away than that,
+    # or spelled differently, would not be seen. It catches the adjacency that
+    # actually occurred and is not a proof of absence.
     if(NOT root_before_clear EQUAL -1)
         message(FATAL_ERROR
             "a SetMovementFlags(MOVEFLAG_NONE) immediately follows SetRoot(true) -- "
