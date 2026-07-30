@@ -707,10 +707,42 @@ static void test_force_run_back_speed_change_ack_fixture()
     CheckDecoded(info, state, CMSG_FORCE_RUN_BACK_SPEED_CHANGE_ACK);
 }
 
+/// A real 18414 run-back acknowledgement, decoded through the production
+/// sequence. This is the fixture that does NOT depend on the reference encoder.
+///
+/// The reference list above was derived by mapping the production sequence, so
+/// the two would agree even if the production sequence were wrong. A review
+/// raised exactly that. This body comes from the wire instead: it must consume
+/// to the last byte, and the speed and mover that fall out must be the ones the
+/// capture recorded. A wrong element anywhere shifts the bit cursor and either
+/// over-reads or leaves a remainder.
+static void test_force_run_back_speed_change_ack_retail_body()
+{
+    static uint8 const body[] = {
+        0x00, 0x00, 0x10, 0x40, 0xEE, 0x01, 0x00, 0x00, 0x21, 0xC4, 0x0D, 0x45,
+        0x27, 0xE6, 0xC0, 0x45, 0xA6, 0xFA, 0xFA, 0x43, 0x50, 0x00, 0x00, 0x34,
+        0x0C, 0xD0, 0x00, 0x3D, 0xE9, 0x05, 0xC9, 0x04, 0x81, 0x09, 0x3C, 0x40,
+        0x9B, 0x3E, 0x1F, 0x00
+    };
+
+    WorldPacket packet(CMSG_FORCE_RUN_BACK_SPEED_CHANGE_ACK, sizeof(body));
+    packet.append(body, sizeof(body));
+
+    float speed = 0.0f;
+    MovementInfo info;
+    packet >> speed;
+    packet >> info;
+
+    CHECK(speed == 2.25f);
+    CHECK(packet.rpos() == packet.size());                  // consumes exactly
+    CHECK(info.GetGuid().GetRawValue() == UINT64_C(0x04000000053CC8E8));
+}
+
 /// The two acks must NOT share a sequence. They agree on the leading speed and
 /// nothing else -- the bit order and the GUID byte order are both their own -- so
-/// a body encoded for one must fail to round-trip through the other. Without this
-/// the run-back registration could quietly be pointed at the swim sequence.
+/// the same state must encode differently, and a body built for one must not
+/// decode cleanly through the other. Without this the run-back registration
+/// could quietly be pointed at the swim sequence and nothing would complain.
 static void test_speed_ack_sequences_are_distinct()
 {
     RefState state;
@@ -718,6 +750,31 @@ static void test_speed_ack_sequences_are_distinct()
     std::vector<uint8> const runBack = Encode(kForceRunBackSpeedChangeAck, state);
     std::vector<uint8> const swim = Encode(kForceSwimSpeedChangeAck, state);
     CHECK(runBack != swim);
+
+    // Cross-decode: a run-back body read as swim must not come out clean. The
+    // earlier version of this test only compared the two encodings, which did
+    // not actually show the sequences are not interchangeable.
+    WorldPacket crossed(CMSG_FORCE_SWIM_SPEED_CHANGE_ACK, runBack.size() + sizeof(float));
+    crossed << float(4.5f);
+    crossed.append(runBack.data(), runBack.size());
+
+    bool clean = true;
+    try
+    {
+        float speed = 0.0f;
+        MovementInfo info;
+        crossed >> speed;
+        crossed >> info;
+        if (crossed.rpos() != crossed.size())
+        {
+            clean = false;                                  // left a remainder
+        }
+    }
+    catch (...)
+    {
+        clean = false;                                      // or ran off the end
+    }
+    CHECK(!clean);
 }
 
 static void test_force_swim_speed_change_ack_fixture()
@@ -872,6 +929,7 @@ int main(int, char**)
     test_server_built_embedded_guid();
     test_force_swim_speed_change_ack_fixture();
     test_force_run_back_speed_change_ack_fixture();
+    test_force_run_back_speed_change_ack_retail_body();
     test_speed_ack_sequences_are_distinct();
     test_spline_state_packets();
     test_hostile_counts_rejected();
