@@ -895,6 +895,61 @@ namespace MopCompactPackets
         for (uint8 index : afterCounter) { out.WriteByteSeq(SwimSpeedGuidByte(moverGuid, index)); }
     }
 
+    /// Hovering. Readers sub_C89BBE (0x1802), sub_C8C65B (0x02D3),
+    /// sub_C8EFCF (0x0258) and sub_C8AC47 (0x0CE1).
+    ///
+    /// The mover pair is ASYMMETRIC on the scalar: SET writes it after two GUID
+    /// bytes, UNSET writes it second-to-last. Assuming a family is symmetric is
+    /// how the inherited builders came to be wrong in every position, so the two
+    /// are written out separately rather than parameterised.
+    ///
+    /// All four inherited orders were wrong. The old ones decode 0 of 51 real
+    /// bodies to a plausible high-GUID class.
+    inline void BuildMoveSetHover(WorldPacket& out, uint64 moverGuid, uint32 counter)
+    {
+        uint8 const maskOrder[] = { 7, 1, 0, 4, 2, 5, 6, 3 };
+        uint8 const beforeCounter[] = { 1, 6 };
+        uint8 const afterCounter[] = { 2, 4, 3, 5, 0, 7 };
+
+        for (uint8 index : maskOrder) { out.WriteBit(SwimSpeedGuidByte(moverGuid, index) != 0); }
+        out.FlushBits();
+        for (uint8 index : beforeCounter) { out.WriteByteSeq(SwimSpeedGuidByte(moverGuid, index)); }
+        out << uint32(counter);
+        for (uint8 index : afterCounter) { out.WriteByteSeq(SwimSpeedGuidByte(moverGuid, index)); }
+    }
+
+    inline void BuildMoveUnsetHover(WorldPacket& out, uint64 moverGuid, uint32 counter)
+    {
+        uint8 const maskOrder[] = { 3, 5, 6, 0, 1, 2, 7, 4 };
+        uint8 const beforeCounter[] = { 6, 4, 5, 3, 2, 1, 0 };
+
+        for (uint8 index : maskOrder) { out.WriteBit(SwimSpeedGuidByte(moverGuid, index) != 0); }
+        out.FlushBits();
+        for (uint8 index : beforeCounter) { out.WriteByteSeq(SwimSpeedGuidByte(moverGuid, index)); }
+        out << uint32(counter);
+        out.WriteByteSeq(SwimSpeedGuidByte(moverGuid, 7));
+    }
+
+    inline void BuildSplineMoveSetHover(WorldPacket& out, uint64 moverGuid)
+    {
+        uint8 const maskOrder[] = { 6, 5, 1, 3, 0, 4, 7, 2 };
+        uint8 const byteOrder[] = { 7, 1, 0, 6, 3, 2, 5, 4 };
+
+        for (uint8 index : maskOrder) { out.WriteBit(SwimSpeedGuidByte(moverGuid, index) != 0); }
+        out.FlushBits();
+        for (uint8 index : byteOrder) { out.WriteByteSeq(SwimSpeedGuidByte(moverGuid, index)); }
+    }
+
+    inline void BuildSplineMoveUnsetHover(WorldPacket& out, uint64 moverGuid)
+    {
+        uint8 const maskOrder[] = { 3, 1, 5, 7, 4, 6, 2, 0 };
+        uint8 const byteOrder[] = { 3, 5, 2, 1, 6, 7, 4, 0 };
+
+        for (uint8 index : maskOrder) { out.WriteBit(SwimSpeedGuidByte(moverGuid, index) != 0); }
+        out.FlushBits();
+        for (uint8 index : byteOrder) { out.WriteByteSeq(SwimSpeedGuidByte(moverGuid, index)); }
+    }
+
     /// The observer halves. No counter at all -- the mask and the bytes are the
     /// whole body. Landing these with the mover pair is the point: admitting one
     /// side alone is what left four other movement states telling everyone except

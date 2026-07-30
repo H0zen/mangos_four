@@ -235,4 +235,21 @@ void Player::SetHover(bool enable)
     WorldPacket data;
     BuildMoveHoverPacket(&data, enable, NextMovementCounter());
     GetSession()->SendPacket(&data);
+
+    if (!IsInWorld())
+    {
+        return;
+    }
+
+    WorldPacket spline(enable ? SMSG_SPLINE_MOVE_SET_HOVER : SMSG_SPLINE_MOVE_UNSET_HOVER, 9);
+    if (enable)
+    {
+        MopCompactPackets::BuildSplineMoveSetHover(spline, GetObjectGuid().GetRawValue());
+    }
+    else
+    {
+        MopCompactPackets::BuildSplineMoveUnsetHover(spline, GetObjectGuid().GetRawValue());
+    }
+
+    SendMessageToSet(&spline, false);
 }

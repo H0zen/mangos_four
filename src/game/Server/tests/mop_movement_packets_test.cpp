@@ -1511,6 +1511,91 @@ static void test_move_set_can_fly_ack_prefix_order()
     CHECK(info.GetPos()->o == 6.122107f);
 }
 
+/// The hover family against real 18414 bodies.
+///
+/// The mover pair is asymmetric on the scalar -- SET writes it after two GUID
+/// bytes, UNSET second-to-last -- so the two are pinned separately. That
+/// asymmetry is precisely what an assumption of symmetry would have got wrong,
+/// and the inherited builders were wrong in every position: they decode none of
+/// the 51 real bodies in the corpus to a plausible high-GUID class.
+///
+/// Honest limitation: all 17 captured SET bodies share one presence mask and one
+/// mover GUID, so the corpus does not discriminate byte order here -- brute force
+/// shows 128 orders survive every cross-check. These layouts rest on the client
+/// readers, and the readers' transcription method was validated by reproducing
+/// the two already-pinned spline water-walk/land-walk layouts in this same file
+/// byte-for-byte. The fixtures prove the builder matches the wire; the reader
+/// proves the wire is what the client wants.
+static void test_hover_family_retail_bodies()
+{
+    static uint8 const moverSet[]   = { 0xE9, 0x28, 0xD2, 0x00, 0x00, 0x00, 0x49, 0x04, 0xD0, 0x05 };
+    static uint8 const moverUnset[] = { 0x9E, 0x04, 0x49, 0x28, 0xD0, 0xD3, 0x00, 0x00, 0x00, 0x05 };
+
+    {   // SMSG_MOVE_SET_HOVER -- capture-000075 seq 1245414, counter 210
+        WorldPacket packet(SMSG_MOVE_SET_HOVER, 13);
+        MopCompactPackets::BuildMoveSetHover(packet, UINT64_C(0x04000000054829D1), 210);
+        CHECK(packet.size() == sizeof(moverSet));
+        if (packet.size() == sizeof(moverSet))
+        {
+            CHECK(std::memcmp(packet.contents(), moverSet, sizeof(moverSet)) == 0);
+        }
+    }
+    {   // SMSG_MOVE_UNSET_HOVER -- capture-000075 seq 1245582, counter 211
+        WorldPacket packet(SMSG_MOVE_UNSET_HOVER, 13);
+        MopCompactPackets::BuildMoveUnsetHover(packet, UINT64_C(0x04000000054829D1), 211);
+        CHECK(packet.size() == sizeof(moverUnset));
+        if (packet.size() == sizeof(moverUnset))
+        {
+            CHECK(std::memcmp(packet.contents(), moverUnset, sizeof(moverUnset)) == 0);
+        }
+    }
+
+    // The observer halves, on three different high-GUID classes so the presence
+    // masks genuinely differ: UNIT, VEHICLE and PET.
+    struct SplineCase { uint64 guid; uint8 const* body; size_t size; };
+    static uint8 const splineUnit[]    = { 0xE6, 0xF0, 0x02, 0x30, 0x17, 0xD8 };
+    static uint8 const splineVehicle[] = { 0xCE, 0xF0, 0x7B, 0x51, 0xF3, 0x35 };
+
+    SplineCase const splineSets[] = {
+        { UINT64_C(0xF13116D900000300), splineUnit,    sizeof(splineUnit) },
+        { UINT64_C(0xF150F2340000007A), splineVehicle, sizeof(splineVehicle) },
+    };
+    for (SplineCase const& c : splineSets)
+    {
+        WorldPacket packet(SMSG_SPLINE_MOVE_SET_HOVER, 9);
+        MopCompactPackets::BuildSplineMoveSetHover(packet, c.guid);
+        CHECK(packet.size() == c.size);
+        if (packet.size() == c.size)
+        {
+            CHECK(std::memcmp(packet.contents(), c.body, c.size) == 0);
+        }
+    }
+}
+
+/// The two mover halves must not share a layout -- they differ in mask order,
+/// byte order AND scalar position, and a copy-paste between them would keep the
+/// length identical.
+static void test_hover_mover_halves_differ()
+{
+    uint64 const guid = UINT64_C(0x8070605040302010);
+
+    WorldPacket set(SMSG_MOVE_SET_HOVER, 13);
+    MopCompactPackets::BuildMoveSetHover(set, guid, 7);
+
+    WorldPacket unset(SMSG_MOVE_UNSET_HOVER, 13);
+    MopCompactPackets::BuildMoveUnsetHover(unset, guid, 7);
+
+    CHECK(set.size() == 13);
+    CHECK(unset.size() == 13);
+    CHECK(std::memcmp(set.contents(), unset.contents(), 13) != 0);
+
+    // SET ends on GUID byte 7; UNSET ends on GUID byte 7 too, but its scalar sits
+    // immediately before it, so the byte at 8 differs.
+    CHECK(set.contents()[12] == uint8(0x80 ^ 1));
+    CHECK(unset.contents()[12] == uint8(0x80 ^ 1));
+    CHECK(set.contents()[8] != unset.contents()[8]);
+}
+
 int main(int, char**)
 {
     test_thirteen_inbound_fixtures_and_exact_relay();
@@ -1531,6 +1616,8 @@ int main(int, char**)
     test_fall_mover_retail_bodies();
     test_move_set_can_fly_ack_retail_bodies();
     test_move_set_can_fly_ack_prefix_order();
+    test_hover_family_retail_bodies();
+    test_hover_mover_halves_differ();
     test_normal_fall_counter_offset_moves();
     test_hostile_counts_rejected();
     test_opcode_values_are_framable();

@@ -342,6 +342,13 @@ static bool IsEnterWorldConverted(uint16 opcode)
         case SMSG_SPLINE_MOVE_SET_FLYING:          // MopCompactPackets::BuildSplineMoveSetFlying
         case SMSG_SPLINE_MOVE_UNSET_FLYING:        // MopCompactPackets::BuildSplineMoveUnsetFlying
         case SMSG_SEND_MAIL_RESULT:                // MopCompactPackets::BuildSendMailResult
+        // Hovering, admitted as a complete set. All four inherited bodies were
+        // wrong -- they decode none of the 51 real bodies to a plausible GUID --
+        // and none was admitted, so the family failed silently at both ends.
+        case SMSG_MOVE_SET_HOVER:                  // MopCompactPackets::BuildMoveSetHover
+        case SMSG_MOVE_UNSET_HOVER:                // MopCompactPackets::BuildMoveUnsetHover
+        case SMSG_SPLINE_MOVE_SET_HOVER:           // MopCompactPackets::BuildSplineMoveSetHover
+        case SMSG_SPLINE_MOVE_UNSET_HOVER:         // MopCompactPackets::BuildSplineMoveUnsetHover
         // Water walking, admitted as a complete set for the same reason as
         // can-fly. The observer halves were already here and correct; their
         // mover counterparts were built with the wrong mask order, byte order

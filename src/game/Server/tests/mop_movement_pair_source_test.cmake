@@ -55,6 +55,12 @@ elseif(MUTATION STREQUAL "speed_constant_counter")
     string(REPLACE "MopCompactPackets::BuildMoveSetRunSpeed(data, guid.GetRawValue(), NextMovementCounter(), GetSpeed(mtype));"
         "MopCompactPackets::BuildMoveSetRunSpeed(data, guid.GetRawValue(), 0, GetSpeed(mtype));"
         UNIT_SPEED_SOURCE "${UNIT_SPEED_SOURCE}")
+elseif(MUTATION STREQUAL "drop_hover_observer")
+    string(REGEX REPLACE "MopCompactPackets::BuildSplineMoveSetHover[(]spline, GetObjectGuid[(][)].GetRawValue[(][)][)];" ""
+        PLAYER_SOURCE "${PLAYER_SOURCE}")
+elseif(MUTATION STREQUAL "unadmitted_hover_mover")
+    string(REGEX REPLACE "case SMSG_MOVE_SET_HOVER:" ""
+        SESSION_SOURCE "${SESSION_SOURCE}")
 elseif(MUTATION STREQUAL "knockback_constant_counter")
     string(REPLACE "data << uint32(GetPlayer()->NextMovementCounter());" "data << uint32(0);"
         MOVEMENT_HANDLER_SOURCE "${MOVEMENT_HANDLER_SOURCE}")
@@ -204,6 +210,35 @@ if(FF_BUILDER EQUAL -1 OR NF_BUILDER EQUAL -1)
     message(FATAL_ERROR "Unit::BuildMoveFeatherFallPacket must use the reader-derived builders")
 endif()
 
+# --- Player::SetHover must send both halves ---------------------------------
+
+string(FIND "${PLAYER_SOURCE}" "void Player::SetHover(bool enable)" HOVER_START)
+if(HOVER_START EQUAL -1)
+    message(FATAL_ERROR "Could not locate Player::SetHover")
+endif()
+math(EXPR HOVER_REMAINING "${PLAYER_LENGTH} - ${HOVER_START}")
+if(HOVER_REMAINING GREATER 1400)
+    set(HOVER_REMAINING 1400)
+endif()
+string(SUBSTRING "${PLAYER_SOURCE}" ${HOVER_START} ${HOVER_REMAINING} HOVER_BODY)
+
+string(FIND "${HOVER_BODY}" "BuildMoveHoverPacket" HOVER_MOVER)
+string(FIND "${HOVER_BODY}" "BuildSplineMoveSetHover" HOVER_OBS_ON)
+string(FIND "${HOVER_BODY}" "BuildSplineMoveUnsetHover" HOVER_OBS_OFF)
+if(HOVER_MOVER EQUAL -1 OR HOVER_OBS_ON EQUAL -1 OR HOVER_OBS_OFF EQUAL -1)
+    message(FATAL_ERROR "Player::SetHover must send both the mover and observer halves")
+endif()
+
+# The inherited orders decoded none of the 51 real bodies to a plausible GUID.
+string(FIND "${UNIT_SOURCE_EARLY}" "MopCompactPackets::BuildMoveSetHover(" HOVER_BUILDER)
+if(HOVER_BUILDER EQUAL -1)
+    message(FATAL_ERROR "Unit::BuildMoveHoverPacket must use the reader-derived builders")
+endif()
+string(FIND "${CREATURE_SOURCE}" "MopCompactPackets::BuildSplineMoveSetHover(" CR_HOVER)
+if(CR_HOVER EQUAL -1)
+    message(FATAL_ERROR "Creature::SetHover must use the reader-derived spline builder")
+endif()
+
 # --- Creature::SetCanFly is the same pair seen from the other side ----------
 
 string(FIND "${CREATURE_SOURCE}" "void Creature::SetCanFly(bool enable)" CR_CANFLY_START)
@@ -246,7 +281,11 @@ foreach(GATED
         SMSG_MOVE_FEATHER_FALL
         SMSG_MOVE_NORMAL_FALL
         SMSG_SPLINE_MOVE_SET_FEATHER_FALL
-        SMSG_SPLINE_MOVE_SET_NORMAL_FALL)
+        SMSG_SPLINE_MOVE_SET_NORMAL_FALL
+        SMSG_MOVE_SET_HOVER
+        SMSG_MOVE_UNSET_HOVER
+        SMSG_SPLINE_MOVE_SET_HOVER
+        SMSG_SPLINE_MOVE_UNSET_HOVER)
     string(FIND "${SESSION_SOURCE}" "case ${GATED}:" ADMITTED)
     if(ADMITTED EQUAL -1)
         message(FATAL_ERROR
