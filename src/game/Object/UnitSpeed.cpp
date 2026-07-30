@@ -390,19 +390,18 @@ void Unit::SetSpeedRate(UnitMoveType mtype, float rate, bool forced, bool ignore
             }
             case MOVE_SWIM_BACK:
             {
+                // Reader-derived only, and dormant: no corpus body exists for
+                // this one, so it is built correctly but never admitted.
                 data.Initialize(SMSG_SPLINE_MOVE_SET_SWIM_BACK_SPEED, 1 + 8 + 4);
-                data.WriteGuidMask<0, 1, 3, 6, 4, 5, 7, 2>(guid);
-                data.WriteGuidBytes<5, 3, 1, 0, 7, 6>(guid);
-                data << float(GetSpeed(mtype));
-                data.WriteGuidBytes<4, 2>(guid);
+                MopCompactPackets::BuildSplineMoveSetSwimBackSpeed(data, guid.GetRawValue(), GetSpeed(mtype));
                 break;
             }
             case MOVE_TURN_RATE:
             {
+                // Reader-derived only, and dormant. Note the client reads two
+                // GUID bytes before the rate, not zero as written here before.
                 data.Initialize(SMSG_SPLINE_MOVE_SET_TURN_RATE, 1 + 8 + 4);
-                data.WriteGuidMask<2, 4, 6, 1, 3, 5, 7, 0>(guid);
-                data << float(GetSpeed(mtype));
-                data.WriteGuidBytes<1, 5, 3, 2, 7, 4, 6, 0>(guid);
+                MopCompactPackets::BuildSplineMoveSetTurnRate(data, guid.GetRawValue(), GetSpeed(mtype));
                 break;
             }
             case MOVE_FLIGHT:
@@ -414,20 +413,16 @@ void Unit::SetSpeedRate(UnitMoveType mtype, float rate, bool forced, bool ignore
             }
             case MOVE_FLIGHT_BACK:
             {
+                // Reader-derived only, and dormant.
                 data.Initialize(SMSG_SPLINE_MOVE_SET_FLIGHT_BACK_SPEED, 1 + 8 + 4);
-                data.WriteGuidMask<2, 1, 6, 5, 0, 3, 4, 7>(guid);
-                data.WriteGuidBytes<5>(guid);
-                data << float(GetSpeed(mtype));
-                data.WriteGuidBytes<6, 1, 0, 2, 3, 7, 4>(guid);
+                MopCompactPackets::BuildSplineMoveSetFlightBackSpeed(data, guid.GetRawValue(), GetSpeed(mtype));
                 break;
             }
             case MOVE_PITCH_RATE:
             {
+                // Reader-derived only, and dormant.
                 data.Initialize(SMSG_SPLINE_MOVE_SET_PITCH_RATE, 1 + 8 + 4);
-                data.WriteGuidMask<3, 5, 6, 1, 0, 4, 7, 2>(guid);
-                data.WriteGuidBytes<1, 5, 7, 0, 6, 3, 2>(guid);
-                data << float(GetSpeed(mtype));
-                data.WriteGuidBytes<4>(guid);
+                MopCompactPackets::BuildSplineMoveSetPitchRate(data, guid.GetRawValue(), GetSpeed(mtype));
                 break;
             }
             default:

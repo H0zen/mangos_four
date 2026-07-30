@@ -500,6 +500,108 @@ namespace MopCompactPackets
         }
     }
 
+    /// 4.86.
+    /// The four remaining spline speed broadcasts. These are derived from their
+    /// client readers alone: the corpus carries no observation of any of them at
+    /// 18414, so unlike the group above none can be pinned to a retail body.
+    ///
+    /// They are therefore deliberately left DORMANT -- no DefS entry, and absent
+    /// from IsEnterWorldConverted -- so the send gate drops them before they can
+    /// reach a client. Reader proof is enough to retire a body that provably
+    /// disagrees with the client; capture proof remains the bar for admission.
+    /// Promote one only once a retail body for it exists.
+    ///
+    /// The opcode-to-reader mapping was resolved through the dispatcher
+    /// sub_C80E74, whose case arithmetic reproduces all four cases of the pinned
+    /// group above exactly, and each case was then read through to its reader.
+
+    /// SMSG_SPLINE_MOVE_SET_SWIM_BACK_SPEED (0x0046), reader sub_C8BFCE, case 418.
+    inline void BuildSplineMoveSetSwimBackSpeed(WorldPacket& out, uint64 moverGuid, float speed)
+    {
+        uint8 const maskOrder[] = { 2, 6, 5, 0, 4, 3, 1, 7 };
+        uint8 const byteOrder[] = { 7, 6, 5, 3, 2, 4, 1, 0 };
+
+        for (uint8 index : maskOrder)
+        {
+            out.WriteBit(SwimSpeedGuidByte(moverGuid, index) != 0);
+        }
+        out.FlushBits();
+        for (uint8 index : byteOrder)
+        {
+            out.WriteByteSeq(SwimSpeedGuidByte(moverGuid, index));
+        }
+        out << float(speed);
+    }
+
+    /// SMSG_SPLINE_MOVE_SET_TURN_RATE (0x0832), reader sub_C8C7C7, case 12.
+    inline void BuildSplineMoveSetTurnRate(WorldPacket& out, uint64 moverGuid, float speed)
+    {
+        uint8 const maskOrder[] = { 5, 7, 4, 0, 1, 6, 3, 2 };
+        uint8 const beforeSpeed[] = { 1, 7 };
+        uint8 const afterSpeed[] = { 6, 0, 4, 2, 5, 3 };
+
+        for (uint8 index : maskOrder)
+        {
+            out.WriteBit(SwimSpeedGuidByte(moverGuid, index) != 0);
+        }
+        out.FlushBits();
+        for (uint8 index : beforeSpeed)
+        {
+            out.WriteByteSeq(SwimSpeedGuidByte(moverGuid, index));
+        }
+        out << float(speed);
+        for (uint8 index : afterSpeed)
+        {
+            out.WriteByteSeq(SwimSpeedGuidByte(moverGuid, index));
+        }
+    }
+
+    /// SMSG_SPLINE_MOVE_SET_FLIGHT_BACK_SPEED (0x0B28), reader sub_C8B0B4, case 184.
+    inline void BuildSplineMoveSetFlightBackSpeed(WorldPacket& out, uint64 moverGuid, float speed)
+    {
+        uint8 const maskOrder[] = { 6, 0, 2, 7, 5, 4, 3, 1 };
+        uint8 const beforeSpeed[] = { 7, 6, 4 };
+        uint8 const afterSpeed[] = { 1, 3, 2, 0, 5 };
+
+        for (uint8 index : maskOrder)
+        {
+            out.WriteBit(SwimSpeedGuidByte(moverGuid, index) != 0);
+        }
+        out.FlushBits();
+        for (uint8 index : beforeSpeed)
+        {
+            out.WriteByteSeq(SwimSpeedGuidByte(moverGuid, index));
+        }
+        out << float(speed);
+        for (uint8 index : afterSpeed)
+        {
+            out.WriteByteSeq(SwimSpeedGuidByte(moverGuid, index));
+        }
+    }
+
+    /// SMSG_SPLINE_MOVE_SET_PITCH_RATE (0x0AB3), reader sub_C8ED13, case 61.
+    inline void BuildSplineMoveSetPitchRate(WorldPacket& out, uint64 moverGuid, float speed)
+    {
+        uint8 const maskOrder[] = { 2, 6, 0, 5, 1, 3, 7, 4 };
+        uint8 const beforeSpeed[] = { 5 };
+        uint8 const afterSpeed[] = { 4, 0, 3, 6, 1, 2, 7 };
+
+        for (uint8 index : maskOrder)
+        {
+            out.WriteBit(SwimSpeedGuidByte(moverGuid, index) != 0);
+        }
+        out.FlushBits();
+        for (uint8 index : beforeSpeed)
+        {
+            out.WriteByteSeq(SwimSpeedGuidByte(moverGuid, index));
+        }
+        out << float(speed);
+        for (uint8 index : afterSpeed)
+        {
+            out.WriteByteSeq(SwimSpeedGuidByte(moverGuid, index));
+        }
+    }
+
     /// SMSG_MOVE_SET_RUN_BACK_SPEED (0x0A83), reader sub_C8977A, case 49.
     /// Pinned to capture-000004 seq 23260: 14 bytes consuming exactly, guid
     /// 0x04000000053CC8E8, counter 494, speed 2.25.

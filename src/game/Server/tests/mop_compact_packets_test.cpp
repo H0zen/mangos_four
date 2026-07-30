@@ -427,6 +427,80 @@ static void test_spline_speed_family_matches_retail_bodies()
     }
 }
 
+/// Every spline speed builder under an all-nonzero GUID.
+///
+/// The retail bodies above all come from mover 0xF1308319002275D5, three of
+/// whose GUID bytes are zero and so are never emitted. Those fixtures pin each
+/// absent byte's mask position -- the bit is present and clear -- but they
+/// cannot catch a byte omitted from, or misplaced within, the byte interleave.
+/// A GUID with no zero byte forces all eight through every builder and closes
+/// exactly that gap. The mask is 0xFF in each case, so this is deliberately
+/// complementary: the retail fixtures remain the evidence for mask order and
+/// opcode identity, and this pins byte order and scalar position.
+///
+/// The last four have no retail body at all and are reader-derived only, so
+/// this is their whole test. They stay dormant until a capture exists.
+static void test_spline_speed_family_full_interleaves_reader_derived()
+{
+    uint64 const guid = 0x0123456789ABCDEFull;  // guid[7]^1 is 0x00, not absent
+    float const speed = 1.0f;                   // 0x00, 0x00, 0x80, 0x3F
+
+    {   // run: one byte, speed, seven bytes
+        WorldPacket p(SMSG_SPLINE_MOVE_SET_RUN_SPEED, 13);
+        MopCompactPackets::BuildSplineMoveSetRunSpeed(p, guid, speed);
+        CHECK(BytesEqual(p, { 0xFF, 0x66, 0x00, 0x00, 0x80, 0x3F, 0xCC, 0x44,
+                              0x88, 0x00, 0x22, 0xAA, 0xEE }));
+    }
+    {   // walk: all eight bytes, then the speed
+        WorldPacket p(SMSG_SPLINE_MOVE_SET_WALK_SPEED, 13);
+        MopCompactPackets::BuildSplineMoveSetWalkSpeed(p, guid, speed);
+        CHECK(BytesEqual(p, { 0xFF, 0xAA, 0x88, 0xCC, 0xEE, 0x22, 0x44, 0x66,
+                              0x00, 0x00, 0x00, 0x80, 0x3F }));
+    }
+    {   // run back: seven bytes, speed, one byte
+        WorldPacket p(SMSG_SPLINE_MOVE_SET_RUN_BACK_SPEED, 13);
+        MopCompactPackets::BuildSplineMoveSetRunBackSpeed(p, guid, speed);
+        CHECK(BytesEqual(p, { 0xFF, 0x22, 0x66, 0xCC, 0x44, 0xAA, 0x88, 0x00,
+                              0x00, 0x00, 0x80, 0x3F, 0xEE }));
+    }
+    {   // swim: five bytes, speed, three bytes
+        WorldPacket p(SMSG_SPLINE_MOVE_SET_SWIM_SPEED, 13);
+        MopCompactPackets::BuildSplineMoveSetSwimSpeed(p, guid, speed);
+        CHECK(BytesEqual(p, { 0xFF, 0x66, 0xCC, 0x22, 0x00, 0x88, 0x00, 0x00,
+                              0x80, 0x3F, 0x44, 0xEE, 0xAA }));
+    }
+    {   // flight: the speed LEADS, before the mask byte
+        WorldPacket p(SMSG_SPLINE_MOVE_SET_FLIGHT_SPEED, 13);
+        MopCompactPackets::BuildSplineMoveSetFlightSpeed(p, guid, speed);
+        CHECK(BytesEqual(p, { 0x00, 0x00, 0x80, 0x3F, 0xFF, 0x44, 0xCC, 0xEE,
+                              0x22, 0xAA, 0x66, 0x00, 0x88 }));
+    }
+    {   // swim back: all eight bytes, then the speed
+        WorldPacket p(SMSG_SPLINE_MOVE_SET_SWIM_BACK_SPEED, 13);
+        MopCompactPackets::BuildSplineMoveSetSwimBackSpeed(p, guid, speed);
+        CHECK(BytesEqual(p, { 0xFF, 0x00, 0x22, 0x44, 0x88, 0xAA, 0x66, 0xCC,
+                              0xEE, 0x00, 0x00, 0x80, 0x3F }));
+    }
+    {   // turn rate: two bytes precede the rate, not zero as this tree once wrote
+        WorldPacket p(SMSG_SPLINE_MOVE_SET_TURN_RATE, 13);
+        MopCompactPackets::BuildSplineMoveSetTurnRate(p, guid, speed);
+        CHECK(BytesEqual(p, { 0xFF, 0xCC, 0x00, 0x00, 0x00, 0x80, 0x3F, 0x22,
+                              0xEE, 0x66, 0xAA, 0x44, 0x88 }));
+    }
+    {   // flight back: three bytes, speed, five bytes
+        WorldPacket p(SMSG_SPLINE_MOVE_SET_FLIGHT_BACK_SPEED, 13);
+        MopCompactPackets::BuildSplineMoveSetFlightBackSpeed(p, guid, speed);
+        CHECK(BytesEqual(p, { 0xFF, 0x00, 0x22, 0x66, 0x00, 0x00, 0x80, 0x3F,
+                              0xCC, 0x88, 0xAA, 0xEE, 0x44 }));
+    }
+    {   // pitch rate: one byte, speed, seven bytes
+        WorldPacket p(SMSG_SPLINE_MOVE_SET_PITCH_RATE, 13);
+        MopCompactPackets::BuildSplineMoveSetPitchRate(p, guid, speed);
+        CHECK(BytesEqual(p, { 0xFF, 0x44, 0x00, 0x00, 0x80, 0x3F, 0x66, 0xEE,
+                              0x88, 0x22, 0xCC, 0xAA, 0x00 }));
+    }
+}
+
 /// The interleave is what distinguishes run from swim: run writes one GUID byte
 /// before the counter, swim writes none. Reusing the swim builder would produce
 /// a body the client cannot parse, so pin that they differ.
@@ -907,6 +981,7 @@ int main(int /*argc*/, char** /*argv*/)
     test_flight_speed_scalars_precede_mask();
     test_spline_run_speed_matches_retail_body();
     test_spline_speed_family_matches_retail_bodies();
+    test_spline_speed_family_full_interleaves_reader_derived();
     test_run_speed_differs_from_swim_interleave();
     test_swim_speed_guid_layouts();
     test_random_roll_guid_layouts();
