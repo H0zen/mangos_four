@@ -120,6 +120,21 @@ void Player::SetLevitate(bool enable)
 /**
  * @brief Enables or disables flying movement flags for the player.
  *
+ * Flight is a PAIR of packets, and sending either alone is visibly wrong. The
+ * mover is told with SMSG_MOVE_SET_CAN_FLY / SMSG_MOVE_UNSET_CAN_FLY, which
+ * carry a movement counter and are addressed to the controlling session.
+ * Everyone else is told with SMSG_SPLINE_MOVE_SET_FLYING /
+ * SMSG_SPLINE_MOVE_UNSET_FLYING, which carry no counter because an observer has
+ * no acknowledgement to make.
+ *
+ * Only the mover half was sent here, so ".gm fly on" lifted the GM off the
+ * ground on their own screen while every other client still drew them walking.
+ * Creature::SetCanFly had the opposite half and the same defect mirrored.
+ *
+ * The observer packet must not go to the mover as well: it would arrive as a
+ * second, counter-less state change for a mover that is already mid-handshake on
+ * the first.
+ *
  * @param enable True to enable flight-related movement flags; false to clear them.
  */
 void Player::SetCanFly(bool enable)
@@ -127,6 +142,23 @@ void Player::SetCanFly(bool enable)
     WorldPacket data;
     BuildMoveSetCanFlyPacket(&data, enable, 0);
     GetSession()->SendPacket(&data);
+
+    if (!IsInWorld())
+    {
+        return;
+    }
+
+    WorldPacket spline(enable ? SMSG_SPLINE_MOVE_SET_FLYING : SMSG_SPLINE_MOVE_UNSET_FLYING, 9);
+    if (enable)
+    {
+        MopCompactPackets::BuildSplineMoveSetFlying(spline, GetObjectGuid().GetRawValue());
+    }
+    else
+    {
+        MopCompactPackets::BuildSplineMoveUnsetFlying(spline, GetObjectGuid().GetRawValue());
+    }
+
+    SendMessageToSet(&spline, false);
 }
 
 /**
