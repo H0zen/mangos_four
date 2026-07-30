@@ -175,8 +175,8 @@
  *   TOTAL SMSG rows                   925
  *
  * SUBSYSTEM CONFIDENCE: high=365, low=221, medium=182, none=157
- * STATUS TOTALS: ACTIVE=455, DOC=435, DORMANT=630
- *   SMSG: ACTIVE=270, DOC=271, DORMANT=384
+ * STATUS TOTALS: ACTIVE=457, DOC=435, DORMANT=628
+ *   SMSG: ACTIVE=272, DOC=271, DORMANT=382
  *   CMSG: ACTIVE=185, DOC=164, DORMANT=246
  */
 
@@ -997,7 +997,7 @@ typedef uint16_t uint16;
  *   SMSG_FLIGHT_SPLINE_SYNC                        0x0063  DORMANT 
  *   SMSG_MOVE_SET_TURN_RATE                        0x0069  DORMANT 
  *   SMSG_UNKNOWN_0x006B                            0x006B  DOC     
- *   SMSG_MOVE_SET_FLIGHT_SPEED                     0x006E  DORMANT 
+ *   SMSG_MOVE_SET_FLIGHT_SPEED                     0x006E  ACTIVE
  *   SMSG_AURA_UPDATE                               0x0072  ACTIVE
  *   SMSG_MOVE_UPDATE_FLIGHT_SPEED                  0x00E1  DORMANT
  *   SMSG_MOVE_UNSET_CAN_FLY                        0x0162  DORMANT 
@@ -1039,7 +1039,7 @@ typedef uint16_t uint16;
  *   SMSG_UNKNOWN_0x0A02                            0x0A02  DOC     
  *   SMSG_UNKNOWN_0x0A03                            0x0A03  DOC     
  *   SMSG_MOVE_GRAVITY_ENABLE                       0x0A27  DORMANT 
- *   SMSG_MOVE_SET_RUN_BACK_SPEED                   0x0A83  DORMANT 
+ *   SMSG_MOVE_SET_RUN_BACK_SPEED                   0x0A83  ACTIVE
  *   SMSG_SPLINE_MOVE_SET_PITCH_RATE                0x0AB3  DORMANT 
  *   SMSG_MOVE_UPDATE_APPLY_MOVEMENT_FORCE          0x0AB6  DORMANT
  *   SMSG_SPLINE_MOVE_SET_NORMAL_FALL               0x0B08  ACTIVE

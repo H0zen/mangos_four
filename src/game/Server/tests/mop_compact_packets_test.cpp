@@ -284,6 +284,43 @@ static void test_spline_run_speed_matches_retail_body()
     }));
 }
 
+/// SMSG_MOVE_SET_RUN_BACK_SPEED, reader sub_C8977A, pinned to capture-000004
+/// seq 23260. Same mover as the run, walk and flight fixtures.
+static void test_run_back_speed_matches_retail_body()
+{
+    float speed;
+    uint32 const bits = 0x40100000u;                        // 2.25f
+    std::memcpy(&speed, &bits, sizeof(speed));
+
+    WorldPacket packet(SMSG_MOVE_SET_RUN_BACK_SPEED, 17);
+    MopCompactPackets::BuildMoveSetRunBackSpeed(packet, 0x04000000053CC8E8ull, 494u, speed);
+    CHECK(BytesEqual(packet, {
+        0xF4,                                               // mask, guid order 7,1,0,2,4,3,6,5
+        0xEE, 0x01, 0x00, 0x00,                             // counter 494
+        0xE9, 0x04, 0x05, 0x3D, 0xC9,                       // guid[0,3,7,5,2,4,1] ^ 1, zeros absent
+        0x00, 0x00, 0x10, 0x40                              // 2.25f
+    }));
+}
+
+/// SMSG_MOVE_SET_FLIGHT_SPEED, reader sub_C8A820, pinned to capture-000004
+/// seq 582. This one writes the float and counter BEFORE the mask byte, which no
+/// sibling does -- the fixture exists mainly to pin that.
+static void test_flight_speed_scalars_precede_mask()
+{
+    float speed;
+    uint32 const bits = 0x41FC8F5Du;                        // 31.57f
+    std::memcpy(&speed, &bits, sizeof(speed));
+
+    WorldPacket packet(SMSG_MOVE_SET_FLIGHT_SPEED, 17);
+    MopCompactPackets::BuildMoveSetFlightSpeed(packet, 0x04000000053CC8E8ull, 68u, speed);
+    CHECK(BytesEqual(packet, {
+        0x5D, 0x8F, 0xFC, 0x41,                             // 31.57f, first
+        0x44, 0x00, 0x00, 0x00,                             // counter 68
+        0x2F,                                               // mask, guid order 6,5,0,4,1,7,3,2
+        0xE9, 0x05, 0x3D, 0x04, 0xC9                        // guid[0,7,4,5,6,2,3,1] ^ 1
+    }));
+}
+
 /// The interleave is what distinguishes run from swim: run writes one GUID byte
 /// before the counter, swim writes none. Reusing the swim builder would produce
 /// a body the client cannot parse, so pin that they differ.
@@ -758,6 +795,8 @@ int main(int /*argc*/, char** /*argv*/)
     test_attacker_state_update();
     test_run_speed_matches_retail_body();
     test_walk_speed_matches_retail_body();
+    test_run_back_speed_matches_retail_body();
+    test_flight_speed_scalars_precede_mask();
     test_spline_run_speed_matches_retail_body();
     test_run_speed_differs_from_swim_interleave();
     test_swim_speed_guid_layouts();

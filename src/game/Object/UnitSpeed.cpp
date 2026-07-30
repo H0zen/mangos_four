@@ -304,11 +304,7 @@ void Unit::SetSpeedRate(UnitMoveType mtype, float rate, bool forced, bool ignore
                 case MOVE_RUN_BACK:
                 {
                     data.Initialize(SMSG_MOVE_SET_RUN_BACK_SPEED, 1 + 8 + 4 + 4 );
-                    data.WriteGuidMask<0, 6, 2, 1, 3, 5, 4, 7>(guid);
-                    data.WriteGuidBytes<5>(guid);
-                    data << uint32(0);
-                    data << float(GetSpeed(mtype));
-                    data.WriteGuidBytes<0, 4, 7, 3, 1, 2, 6>(guid);
+                    MopCompactPackets::BuildMoveSetRunBackSpeed(data, guid.GetRawValue(), 0, GetSpeed(mtype));
                     break;
                 }
                 case MOVE_SWIM:
@@ -329,45 +325,27 @@ void Unit::SetSpeedRate(UnitMoveType mtype, float rate, bool forced, bool ignore
                 case MOVE_TURN_RATE:
                 {
                     data.Initialize(SMSG_MOVE_SET_TURN_RATE, 1 + 8 + 4 + 4 );
-                    data.WriteGuidMask<7, 2, 1, 0, 4, 5, 6, 3>(guid);
-                    data.WriteGuidBytes<5, 7, 2>(guid);
-                    data << float(GetSpeed(mtype));
-                    data.WriteGuidBytes<3, 1, 0>(guid);
-                    data << uint32(0);
-                    data.WriteGuidBytes<6, 4>(guid);
+                    MopCompactPackets::BuildMoveSetTurnRate(data, guid.GetRawValue(), 0, GetSpeed(mtype));
                     break;
                 }
                 case MOVE_FLIGHT:
                 {
                     data.Initialize(SMSG_MOVE_SET_FLIGHT_SPEED, 1 + 8 + 4 + 4 );
-                    data.WriteGuidMask<0, 5, 1, 6, 3, 2, 7, 4>(guid);
-                    data.WriteGuidBytes<0, 1, 7, 5>(guid);
-                    data << float(GetSpeed(mtype));
-                    data << uint32(0);
-                    data.WriteGuidBytes<2, 6, 3, 4>(guid);
+                    // Reads the float and counter BEFORE the mask byte; see
+                    // BuildMoveSetFlightSpeed.
+                    MopCompactPackets::BuildMoveSetFlightSpeed(data, guid.GetRawValue(), 0, GetSpeed(mtype));
                     break;
                 }
                 case MOVE_FLIGHT_BACK:
                 {
                     data.Initialize(SMSG_MOVE_SET_FLIGHT_BACK_SPEED, 1 + 8 + 4 + 4 );
-                    data.WriteGuidMask<1, 2, 6, 4, 7, 3, 0, 5>(guid);
-
-                    data.WriteGuidBytes<3>(guid);
-                    data << uint32(0);
-                    data.WriteGuidBytes<6>(guid);
-                    data << float(GetSpeed(mtype));
-                    data.WriteGuidBytes<1, 2, 4, 0, 5, 7>(guid);
+                    MopCompactPackets::BuildMoveSetFlightBackSpeed(data, guid.GetRawValue(), 0, GetSpeed(mtype));
                     break;
                 }
                 case MOVE_PITCH_RATE:
                 {
                     data.Initialize(SMSG_MOVE_SET_PITCH_RATE, 1 + 8 + 4 + 4 );
-                    data.WriteGuidMask<1, 2, 6, 7, 0, 3, 5, 4>(guid);
-
-                    data << float(GetSpeed(mtype));
-                    data.WriteGuidBytes<6, 4, 0>(guid);
-                    data << uint32(0);
-                    data.WriteGuidBytes<1, 2, 7, 3, 5>(guid);
+                    MopCompactPackets::BuildMoveSetPitchRate(data, guid.GetRawValue(), 0, GetSpeed(mtype));
                     break;
                 }
                 default:

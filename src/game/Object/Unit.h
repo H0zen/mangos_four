@@ -421,6 +421,113 @@ namespace MopCompactPackets
     /// retail body for this opcode has been decoded, so unlike walk, run and
     /// spline this one has no capture-pinned fixture and stays outside the send
     /// gate until it does.
+    /// SMSG_MOVE_SET_RUN_BACK_SPEED (0x0A83), reader sub_C8977A, case 49.
+    /// Pinned to capture-000004 seq 23260: 14 bytes consuming exactly, guid
+    /// 0x04000000053CC8E8, counter 494, speed 2.25.
+    inline void BuildMoveSetRunBackSpeed(WorldPacket& out, uint64 moverGuid,
+        uint32 counter, float speed)
+    {
+        uint8 const maskOrder[] = { 7, 1, 0, 2, 4, 3, 6, 5 };
+        uint8 const beforeSpeed[] = { 0, 3, 7, 5, 2, 4, 1 };
+        uint8 const afterSpeed[] = { 6 };
+
+        for (uint8 index : maskOrder)
+            out.WriteBit(SwimSpeedGuidByte(moverGuid, index) != 0);
+        out.FlushBits();
+        out << uint32(counter);
+        for (uint8 index : beforeSpeed)
+            out.WriteByteSeq(SwimSpeedGuidByte(moverGuid, index));
+        out << float(speed);
+        for (uint8 index : afterSpeed)
+            out.WriteByteSeq(SwimSpeedGuidByte(moverGuid, index));
+    }
+
+    /// SMSG_MOVE_SET_FLIGHT_SPEED (0x006E), reader sub_C8A820, case 482.
+    ///
+    /// The odd one out: the float and the counter are written BEFORE the mask
+    /// byte, so this cannot reuse the mask-first shape every sibling has.
+    ///
+    /// Pinned to capture-000004 seq 582: 14 bytes consuming exactly, guid
+    /// 0x04000000053CC8E8, counter 68, speed 31.57.
+    inline void BuildMoveSetFlightSpeed(WorldPacket& out, uint64 moverGuid,
+        uint32 counter, float speed)
+    {
+        uint8 const maskOrder[] = { 6, 5, 0, 4, 1, 7, 3, 2 };
+        uint8 const byteOrder[] = { 0, 7, 4, 5, 6, 2, 3, 1 };
+
+        out << float(speed);                                // scalars lead here
+        out << uint32(counter);
+        for (uint8 index : maskOrder)
+            out.WriteBit(SwimSpeedGuidByte(moverGuid, index) != 0);
+        out.FlushBits();
+        for (uint8 index : byteOrder)
+            out.WriteByteSeq(SwimSpeedGuidByte(moverGuid, index));
+    }
+
+    /// SMSG_MOVE_SET_TURN_RATE (0x0069), reader sub_C8B48D, case 401.
+    /// Reads the float first and the counter almost last.
+    /// NOT corpus-verified: zero observations at 18414. Ungated.
+    inline void BuildMoveSetTurnRate(WorldPacket& out, uint64 moverGuid,
+        uint32 counter, float rate)
+    {
+        uint8 const maskOrder[] = { 6, 5, 1, 4, 0, 7, 3, 2 };
+        uint8 const afterRate[] = { 7, 3, 5, 0, 4, 6, 2 };
+        uint8 const afterCounter[] = { 1 };
+
+        for (uint8 index : maskOrder)
+            out.WriteBit(SwimSpeedGuidByte(moverGuid, index) != 0);
+        out.FlushBits();
+        out << float(rate);
+        for (uint8 index : afterRate)
+            out.WriteByteSeq(SwimSpeedGuidByte(moverGuid, index));
+        out << uint32(counter);
+        for (uint8 index : afterCounter)
+            out.WriteByteSeq(SwimSpeedGuidByte(moverGuid, index));
+    }
+
+    /// SMSG_MOVE_SET_FLIGHT_BACK_SPEED (0x0319), reader sub_C8B650, case 149.
+    /// NOT corpus-verified: zero observations at 18414. Ungated.
+    inline void BuildMoveSetFlightBackSpeed(WorldPacket& out, uint64 moverGuid,
+        uint32 counter, float speed)
+    {
+        uint8 const maskOrder[] = { 2, 7, 6, 4, 0, 1, 5, 3 };
+        uint8 const beforeCounter[] = { 4, 1, 6, 0, 2 };
+        uint8 const beforeSpeed[] = { 7, 3, 5 };
+
+        for (uint8 index : maskOrder)
+            out.WriteBit(SwimSpeedGuidByte(moverGuid, index) != 0);
+        out.FlushBits();
+        for (uint8 index : beforeCounter)
+            out.WriteByteSeq(SwimSpeedGuidByte(moverGuid, index));
+        out << uint32(counter);
+        for (uint8 index : beforeSpeed)
+            out.WriteByteSeq(SwimSpeedGuidByte(moverGuid, index));
+        out << float(speed);
+    }
+
+    /// SMSG_MOVE_SET_PITCH_RATE (0x17AB), reader sub_C8E72B, case 259.
+    /// NOT corpus-verified: zero observations at 18414. Ungated.
+    inline void BuildMoveSetPitchRate(WorldPacket& out, uint64 moverGuid,
+        uint32 counter, float rate)
+    {
+        uint8 const maskOrder[] = { 7, 5, 4, 1, 6, 3, 2, 0 };
+        uint8 const beforeCounter[] = { 4 };
+        uint8 const beforeRate[] = { 2, 5, 6, 1 };
+        uint8 const afterRate[] = { 7, 3, 0 };
+
+        for (uint8 index : maskOrder)
+            out.WriteBit(SwimSpeedGuidByte(moverGuid, index) != 0);
+        out.FlushBits();
+        for (uint8 index : beforeCounter)
+            out.WriteByteSeq(SwimSpeedGuidByte(moverGuid, index));
+        out << uint32(counter);
+        for (uint8 index : beforeRate)
+            out.WriteByteSeq(SwimSpeedGuidByte(moverGuid, index));
+        out << float(rate);
+        for (uint8 index : afterRate)
+            out.WriteByteSeq(SwimSpeedGuidByte(moverGuid, index));
+    }
+
     inline void BuildMoveSetSwimBackSpeed(WorldPacket& out, uint64 moverGuid,
         uint32 counter, float speed)
     {
