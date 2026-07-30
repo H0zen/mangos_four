@@ -12,7 +12,11 @@ file(READ "${SOURCE_ROOT}/src/game/movement/packet_builder.cpp" spline_packet_so
 file(READ "${SOURCE_ROOT}/src/game/movement/MoveSplineInit.cpp" spline_init_source)
 file(READ "${SOURCE_ROOT}/src/game/Server/WorldSession.cpp" world_session_source)
 
-if(MUTATION STREQUAL "back_speed_early_return")
+if(MUTATION STREQUAL "speed_correction_is_noop")
+    string(REPLACE "_player->SetSpeedRate(move_type, _player->GetSpeedRate(move_type), true, true);"
+        "_player->SetSpeedRate(move_type, _player->GetSpeedRate(move_type), true);"
+        movement_handler "${movement_handler}")
+elseif(MUTATION STREQUAL "back_speed_early_return")
     string(REPLACE "        case MOVE_SWIM_BACK:" "        case MOVE_SWIM_BACK:
             return;"
         unit_speed_source "${unit_speed_source}")
@@ -449,3 +453,21 @@ foreach(BACK_TYPE MOVE_RUN_BACK MOVE_SWIM_BACK MOVE_FLIGHT_BACK)
             "computed, no packet is sent, and the GM command reports success anyway")
     endif()
 endforeach()
+
+# --- The speed correction must actually correct -----------------------------
+#
+# The mismatch branch resends the rate the player already has. SetSpeedRate opens
+# with "if (m_speed_rate[mtype] != rate || ignoreChange)", so without
+# ignoreChange=true the body is skipped entirely: no packet, no forced-change
+# registered, no correction. The client keeps the rejected speed and acknowledges
+# it again, and every acknowledgement writes another unthrottled error line --
+# a self-sustaining log flood from one forged packet, reachable by any logged-in
+# client now that the speed acknowledgements are registered.
+string(FIND "${movement_handler}"
+    "_player->SetSpeedRate(move_type, _player->GetSpeedRate(move_type), true, true);"
+    correction_is_real)
+if(correction_is_real EQUAL -1)
+    message(FATAL_ERROR
+        "the speed-mismatch correction must pass ignoreChange=true, or it resends "
+        "nothing and the mismatch repeats for the life of the session")
+endif()

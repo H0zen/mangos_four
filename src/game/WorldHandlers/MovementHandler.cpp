@@ -555,7 +555,22 @@ void WorldSession::HandleForceSpeedChangeAckOpcodes(WorldPacket& recv_data)
         {
             sLog.outError("%sSpeedChange player %s is NOT correct (must be %f instead %f), force set to correct value",
                           move_type_name[move_type], _player->GetName(), _player->GetSpeed(move_type), newspeed);
-            _player->SetSpeedRate(move_type, _player->GetSpeedRate(move_type), true);
+
+            // ignoreChange MUST be true. This resends the rate the player
+            // already has, and SetSpeedRate opens with
+            //     if (m_speed_rate[mtype] != rate || ignoreChange)
+            // so without it the entire body is skipped: no packet, no forced
+            // change registered, no correction. The client keeps the speed the
+            // server just rejected and acknowledges it again, and each
+            // acknowledgement writes another unthrottled line to the error log.
+            // A disagreement that should self-heal in one round trip instead
+            // looped for as long as the session lasted.
+            //
+            // Sending it for real also balances the books: the forced-change
+            // counter this increments is what the next acknowledgement
+            // decrements, which is the mechanism that stops the check firing on
+            // a change the server itself made.
+            _player->SetSpeedRate(move_type, _player->GetSpeedRate(move_type), true, true);
         }
         else                                                // must be lesser - cheating
         {
