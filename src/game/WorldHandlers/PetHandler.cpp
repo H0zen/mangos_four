@@ -268,8 +268,8 @@ void WorldSession::HandlePetAction(WorldPacket& recv_data)
                     // A ground-targeted pet move. This tree has no move-to
                     // behaviour, so accept and ignore it: it is ordinary player
                     // input and does not belong in the error log. The position
-                    // that would drive it is the one part of this body whose
-                    // field order is not established.
+                    // that would drive it is read as y, z, x, which the client's
+                    // writer establishes; the corpus alone could not.
                     break;
                 }
                 default:

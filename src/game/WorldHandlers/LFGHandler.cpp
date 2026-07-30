@@ -113,7 +113,8 @@ void WorldSession::HandleLfgJoinOpcode(WorldPacket& recv_data)
 
     if (!MopCompactPackets::ReadLfgJoin(recv_data, partyIndex, roles, flag, dungeons, comment))
     {
-        sLog.outError("CMSG_LFG_JOIN from %s claims more dungeons than its body can hold.",
+        sLog.outError("Malformed CMSG_LFG_JOIN body from %s: its declared dungeon "
+                      "count and comment length do not account for its size.",
                       GetPlayerName());
         return;
     }

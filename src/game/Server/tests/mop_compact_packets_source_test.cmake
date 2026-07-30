@@ -448,6 +448,43 @@ endif()
 if(NOT unit_speed MATCHES "MopCompactPackets::BuildMoveSetRunSpeed")
     message(FATAL_ERROR "run-speed sender bypasses the shared 5.4.8 serializer")
 endif()
+
+# Request/reply pairing. A request that changes state and then answers the client
+# must not be registered while its reply is still dropped by the send gate: the
+# transaction commits, the client hears nothing, and the retry is equally silent.
+# CMSG_MAIL_TAKE_ITEM is the sharp case -- it removes the attachment and settles
+# cash on delivery -- and it reached master once before being pulled back.
+#
+# So these three may only be registered together with their replies. Promote a
+# pair atomically or not at all.
+foreach(pairing IN ITEMS
+        "CMSG_GET_MAIL_LIST|SMSG_MAIL_LIST_RESULT"
+        "CMSG_MAIL_TAKE_ITEM|SMSG_SEND_MAIL_RESULT"
+        "CMSG_GUILD_BANK_QUERY_TAB|SMSG_GUILD_BANK_LIST")
+    string(REPLACE "|" ";" pairing_parts "${pairing}")
+    list(GET pairing_parts 0 request_name)
+    list(GET pairing_parts 1 reply_name)
+    if(opcode_registry MATCHES "DefC\\(${request_name},")
+        if(NOT opcode_registry MATCHES "DefS\\(${reply_name},")
+            message(FATAL_ERROR
+                "${request_name} is registered but ${reply_name} has no outbound metadata: "
+                "the request would commit and the client would never hear the result")
+        endif()
+        if(NOT world_session MATCHES "case[ \t]+${reply_name}:")
+            message(FATAL_ERROR
+                "${request_name} is registered but ${reply_name} is not admitted to the "
+                "in-world send gate, so its reply is dropped before transmission")
+        endif()
+    endif()
+endforeach()
+
+# MARK_AS_READ owes no reply and may stand alone, but exactly once: a duplicate
+# registration reached the tree already, from a script that was not atomic.
+string(REGEX MATCHALL "DefC\\(CMSG_MAIL_MARK_AS_READ," mark_as_read_registrations "${opcode_registry}")
+list(LENGTH mark_as_read_registrations mark_as_read_count)
+if(NOT mark_as_read_count EQUAL 1)
+    message(FATAL_ERROR "CMSG_MAIL_MARK_AS_READ must be registered exactly once, found ${mark_as_read_count}")
+endif()
 # Speed commands must delegate to Unit::SetSpeedRate rather than building packets.
 # Hand-built sends miss three things at once: the direct body goes to the wrong
 # audience, m_speed_rate is never updated, and m_forced_speed_changes is never

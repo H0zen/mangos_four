@@ -412,13 +412,21 @@ void WorldSession::HandleMailMarkAsRead(WorldPacket& recv_data)
 
     if (Mail* m = pl->GetMail(mailId))
     {
-        if (pl->unReadMails)
+        // Only act on a mail that is actually unread. This used to decrement on
+        // every request, so replaying it against one already-read mail walked the
+        // unread counter down past the other unread mail the player still had --
+        // a client-driven way to hide their own new mail. The opcode is
+        // registered now, so the replay is reachable.
+        if ((m->checked & MAIL_CHECK_MASK_READ) == 0)
         {
-            --pl->unReadMails;
+            if (pl->unReadMails)
+            {
+                --pl->unReadMails;
+            }
+            m->checked = m->checked | MAIL_CHECK_MASK_READ;
+            pl->m_mailsUpdated = true;
+            m->state = MAIL_STATE_CHANGED;
         }
-        m->checked = m->checked | MAIL_CHECK_MASK_READ;
-        pl->m_mailsUpdated = true;
-        m->state = MAIL_STATE_CHANGED;
     }
 }
 

@@ -117,9 +117,9 @@ namespace MopCompactPackets
     /// +40 the wire order is y, z, x -- which the coordinate bands had only
     /// supported, not established.
     ///
-    /// The middle float is z. In the one positional body it reads 246.8356,
-    /// matching the ground height in every SMSG_ON_MONSTER_MOVE body captured
-    /// beside it to four decimals. Which of the outer two is x and which is y is
+    /// The floats are y, z, x. The corpus alone could not separate the outer
+    /// pair; the client's writer settles it, emitting them from object offsets
+    /// +36, +40 and +32. Which of the outer two is x and which is y is
     /// NOT established: no observed body distinguishes them, so that pairing is
     /// a hypothesis and is named here only for readability. Nothing consumes the
     /// position, so no behaviour depends on it.
