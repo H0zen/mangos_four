@@ -1437,9 +1437,10 @@ void WorldSession::HandleShowingCloakOpcode(WorldPacket& recv_data)
     // symmetry: the client's toggle route sub_4095E0 reads PLAYER_FLAGS & 0x800
     // (PLAYER_FLAGS_HIDE_CLOAK) and hands it to the same one-bit serializer.
     //
-    // The handler is repaired here but CMSG_SHOWING_CLOAK stays unregistered:
-    // unlike the helm it has zero corpus observations, so nothing independently
-    // confirms the client actually sends this opcode in 18414.
+    // Registered on that binary proof. It was once held back because nothing
+    // independently showed the client sending it, but silence in what was
+    // recorded is not evidence the client stays silent, and dropping the request
+    // leaves the player unable to toggle their cloak at all.
     bool const hidden = recv_data.ReadBit();
     _player->ApplyModFlag(PLAYER_FLAGS, PLAYER_FLAGS_HIDE_CLOAK, hidden);
 }

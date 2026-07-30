@@ -1217,11 +1217,16 @@ void InitializeOpcodes()
     // CMSG_SHOWING_CLOAK (0x02F2) carried the identical defect and its handler
     // has been repaired the same way, from the same kind of evidence rather than
     // by symmetry: sub_4095E0 reads PLAYER_FLAGS & 0x800 and hands it to the same
-    // one-bit serializer. Its ENCODING is therefore proven; what is unproven is
-    // its OCCURRENCE -- the opcode has zero corpus observations, so nothing
-    // independently confirms the 18414 client sends it. It stays dormant on that
-    // ground alone.
+    // one-bit serializer as the helm.
+    //
+    // It was previously left dormant because its ENCODING was proven but its
+    // OCCURRENCE was not -- no observation showed the client sending it. That is
+    // no longer sufficient grounds: an unobserved opcode is a gap in what was
+    // recorded, not evidence the client stays silent. The binary shows the route
+    // exists, the handler touches one PLAYER_FLAGS bit and nothing else, and a
+    // dropped request leaves the player unable to toggle their cloak at all.
     DefC(CMSG_SHOWING_HELM, "CMSG_SHOWING_HELM", STATUS_LOGGEDIN, PROCESS_THREADUNSAFE, &WorldSession::HandleShowingHelmOpcode);
+    DefC(CMSG_SHOWING_CLOAK, "CMSG_SHOWING_CLOAK", STATUS_LOGGEDIN, PROCESS_THREADUNSAFE, &WorldSession::HandleShowingCloakOpcode);
 
     // CMSG_CONTACT_LIST (0x0BB4, 4,122 observed) is deliberately NOT registered,
     // and this note exists because it looks safe and is not.

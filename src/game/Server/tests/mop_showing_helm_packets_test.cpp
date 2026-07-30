@@ -68,11 +68,49 @@ static void test_repeat_requests_are_idempotent()
     CHECK((toggled & HIDE_HELM) != 0);
 }
 
+/// The cloak is the same one-bit shape, and its polarity is proven the same way
+/// rather than assumed from the helm: the client's toggle route sub_4095E0 reads
+/// PLAYER_FLAGS & 0x800 and serializes that boolean as the body's only bit. So a
+/// set bit means HIDE here too, despite the opcode being named "showing".
+static void test_showing_cloak_opcode_value()
+{
+    WorldPacket request(CMSG_SHOWING_CLOAK, 1);
+    CHECK(uint32(request.GetOpcode()) == 0x02F2u);
+}
+
+static void test_showing_cloak_bodies()
+{
+    WorldPacket hide(CMSG_SHOWING_CLOAK, 1);
+    hide << uint8(0x80);
+    CHECK(hide.size() == 1);
+    CHECK(hide.ReadBit() == true);                          // set bit == hide cloak
+
+    WorldPacket show(CMSG_SHOWING_CLOAK, 1);
+    show << uint8(0x00);
+    CHECK(show.size() == 1);
+    CHECK(show.ReadBit() == false);                         // clear bit == show cloak
+}
+
+/// The cloak and helm must not share a flag bit, or one toggle would move both.
+static void test_cloak_and_helm_flags_are_distinct()
+{
+    const uint32 HIDE_HELM = 0x00000400;                    // PLAYER_FLAGS_HIDE_HELM
+    const uint32 HIDE_CLOAK = 0x00000800;                   // PLAYER_FLAGS_HIDE_CLOAK
+    CHECK((HIDE_HELM & HIDE_CLOAK) == 0);
+
+    uint32 flags = 0;
+    flags |= HIDE_CLOAK;
+    CHECK((flags & HIDE_HELM) == 0);                        // hiding the cloak leaves the helm shown
+}
+
 int main(int /*argc*/, char** /*argv*/)
 {
     test_showing_helm_opcode_value();
     test_showing_helm_bodies();
     test_repeat_requests_are_idempotent();
+    test_showing_cloak_opcode_value();
+    test_showing_cloak_bodies();
+    test_cloak_and_helm_flags_are_distinct();
 
     if (g_fail)
     {
