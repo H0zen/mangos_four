@@ -556,8 +556,11 @@ static void test_cancel_combat()
 // The previous version of this test pinned exact bytes for one killer/victim pair. That locks the
 // wire layout, but the expected bytes had themselves been generated from the builder, so it was
 // asserting the builder against itself: it could not distinguish killer from victim and stayed
-// green while the two were transposed. A live client reading "Hogger killed you" was what caught
-// it. Decoding restores the property the byte fixture was missing.
+// green while the two were transposed. A combat log the wrong way round in live play on 18414 is
+// what prompted the look; the roles themselves are settled from the client binary, cited in
+// BuildPartyKillLog. No particular client string is being claimed here -- an earlier version of
+// this comment quoted one, which was not substantiated. Decoding restores the property the byte
+// fixture was missing.
 //
 // Both tables are read out of reader sub_6F2FE4 itself, NOT out of the builder -- otherwise this
 // would be circular again and a transposition would still pass. Taking slot A as this+16..23 and
@@ -655,6 +658,51 @@ static void test_party_kill_log()
         DecodePartyKillLog(sparse, sparseA, sparseB);
         CHECK(sparseB == sparseKiller);
         CHECK(sparseA == sparseVictim);
+    }
+
+    // The two cases above still do not pin kMaskOrder UNIQUELY. Two positions that are absent in
+    // the sparse case and present in the dense one have identical presence in both, so exchanging
+    // them in the mask order is invisible -- 60 such pairs exist.
+    //
+    // These four cases fix that by giving each of the 16 (slot, byte) positions its own 4-bit
+    // presence SIGNATURE: a position's id is slot * 8 + byteIndex, and in case k it is present iff
+    // bit k of that id is set. No two positions share a signature, so exchanging any two of them
+    // changes the decode in at least one of the four -- presence lands on the wrong position, the
+    // absent side reconstructs as zero, and the GUID no longer matches.
+    //
+    // Byte values are 0x10 + id, so every present byte is nonzero (required, or the builder would
+    // treat it as absent) and distinct, which keeps kByteOrder constrained at the same time.
+    for (int k = 0; k < 4; ++k)
+    {
+        uint64_t killerBits = 0;
+        uint64_t victimBits = 0;
+        size_t   present    = 0;
+
+        for (int i = 0; i < 8; ++i)
+        {
+            if (((8 + i) >> k) & 1)                         // killer occupies ids 8..15
+            {
+                killerBits |= uint64_t(0x18 + i) << (8 * i);
+                ++present;
+            }
+
+            if ((i >> k) & 1)                               // victim occupies ids 0..7
+            {
+                victimBits |= uint64_t(0x10 + i) << (8 * i);
+                ++present;
+            }
+        }
+
+        WorldPacket signature;
+        MopCompactPackets::BuildPartyKillLog(signature, ObjectGuid(killerBits), ObjectGuid(victimBits));
+        CHECK(signature.GetOpcode() == SMSG_PARTYKILLLOG);
+        CHECK(signature.size() == 2 + present);
+
+        uint64_t sigA = 0;
+        uint64_t sigB = 0;
+        DecodePartyKillLog(signature, sigA, sigB);
+        CHECK(sigB == killerBits);
+        CHECK(sigA == victimBits);
     }
 }
 
