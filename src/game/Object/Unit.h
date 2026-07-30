@@ -322,6 +322,119 @@ namespace MopCompactPackets
         return true;
     }
 
+    /// The mailbox family, and the guild-bank tab query that shares its shape.
+    ///
+    /// All four carry one packed GUID and differ only in where the scalars sit
+    /// and how the presence bits are ordered. Each inherited reader took a raw
+    /// ObjectGuid first, which matches none of them.
+    ///
+    /// The GUID orders here are constrained by more than presence masks. In five
+    /// sessions the mailbox GUID recovered from MARK_AS_READ and TAKE_ITEM is
+    /// byte-identical to the one GET_MAIL_LIST yields seconds earlier through a
+    /// different mask order AND a different byte order. A wrong byte order
+    /// permutes distinct byte values, so three independent orders agreeing on the
+    /// same GUID is evidence no single opcode's fixtures could give.
+    inline ObjectGuid ReadMailboxGuid(WorldPacket& in,
+        uint8 const (&maskOrder)[8], uint8 const (&byteOrder)[8])
+    {
+        uint8 guid[8] = { 0, 0, 0, 0, 0, 0, 0, 0 };
+        for (uint8 index = 0; index < 8; ++index)
+        {
+            guid[maskOrder[index]] = in.ReadBit();
+        }
+        for (uint8 index = 0; index < 8; ++index)
+        {
+            in.ReadByteSeq(guid[byteOrder[index]]);
+        }
+
+        uint64 raw = 0;
+        for (uint8 index = 0; index < 8; ++index)
+        {
+            raw |= uint64(guid[index]) << (8 * index);
+        }
+        return ObjectGuid(raw);
+    }
+
+    /// CMSG_GET_MAIL_LIST (0x077A): the mask, then the present bytes. Nothing else.
+    inline ObjectGuid ReadGetMailList(WorldPacket& in)
+    {
+        uint8 const maskOrder[] = { 6, 3, 7, 5, 4, 1, 2, 0 };
+        uint8 const byteOrder[] = { 7, 1, 6, 5, 4, 2, 3, 0 };
+        in.ResetBitReader();
+        return ReadMailboxGuid(in, maskOrder, byteOrder);
+    }
+
+    /// CMSG_MAIL_MARK_AS_READ (0x0241): the mail id leads, then NINE mask bits
+    /// spanning two bytes -- eight GUID bits plus one that belongs to no GUID
+    /// byte and is zero in every observed body -- then the present bytes.
+    inline ObjectGuid ReadMailMarkAsRead(WorldPacket& in, uint32& mailId)
+    {
+        uint8 const byteOrder[] = { 1, 7, 2, 5, 6, 3, 4, 0 };
+        in >> mailId;
+
+        uint8 guid[8] = { 0, 0, 0, 0, 0, 0, 0, 0 };
+        in.ResetBitReader();
+        guid[0] = in.ReadBit();  guid[2] = in.ReadBit();
+        guid[3] = in.ReadBit();  in.ReadBit();               // not a GUID bit
+        guid[4] = in.ReadBit();  guid[6] = in.ReadBit();
+        guid[7] = in.ReadBit();  guid[1] = in.ReadBit();
+        guid[5] = in.ReadBit();                              // opens the second byte
+
+        for (uint8 index = 0; index < 8; ++index)
+        {
+            in.ReadByteSeq(guid[byteOrder[index]]);
+        }
+
+        uint64 raw = 0;
+        for (uint8 index = 0; index < 8; ++index)
+        {
+            raw |= uint64(guid[index]) << (8 * index);
+        }
+        return ObjectGuid(raw);
+    }
+
+    /// CMSG_MAIL_TAKE_ITEM (0x1371): mail id, then the item's low GUID, then the
+    /// mask and the present bytes.
+    inline ObjectGuid ReadMailTakeItem(WorldPacket& in, uint32& mailId, uint32& itemId)
+    {
+        uint8 const maskOrder[] = { 6, 5, 2, 3, 0, 1, 4, 7 };
+        uint8 const byteOrder[] = { 0, 1, 4, 2, 5, 6, 3, 7 };
+        in >> mailId;
+        in >> itemId;
+        in.ResetBitReader();
+        return ReadMailboxGuid(in, maskOrder, byteOrder);
+    }
+
+    /// CMSG_GUILD_BANK_QUERY_TAB (0x1372): the tab id leads, then nine mask bits
+    /// over two bytes of which one is a standalone boolean, then the bytes. That
+    /// boolean is proven by two bodies of equal length differing only in it.
+    inline ObjectGuid ReadGuildBankQueryTab(WorldPacket& in, uint8& tabId, bool& sendAllSlots)
+    {
+        uint8 const byteOrder[] = { 3, 7, 6, 4, 2, 5, 0, 1 };
+        in >> tabId;
+
+        uint8 guid[8] = { 0, 0, 0, 0, 0, 0, 0, 0 };
+        in.ResetBitReader();
+        guid[7] = in.ReadBit();  guid[3] = in.ReadBit();
+        sendAllSlots = in.ReadBit();
+        guid[0] = in.ReadBit();  guid[2] = in.ReadBit();
+        guid[4] = in.ReadBit();  guid[1] = in.ReadBit();
+        guid[6] = in.ReadBit();
+        guid[5] = in.ReadBit();                              // opens the second byte
+
+        for (uint8 index = 0; index < 8; ++index)
+        {
+            in.ReadByteSeq(guid[byteOrder[index]]);
+        }
+
+        uint64 raw = 0;
+        for (uint8 index = 0; index < 8; ++index)
+        {
+            raw |= uint64(guid[index]) << (8 * index);
+        }
+        return ObjectGuid(raw);
+    }
+
     inline void BuildAttackStart(WorldPacket& out, uint64 attackerGuid,
         uint64 victimGuid)
     {

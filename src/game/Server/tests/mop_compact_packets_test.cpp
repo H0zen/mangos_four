@@ -1445,6 +1445,125 @@ static void test_lfg_join_matches_retail_bodies()
     }
 }
 
+/// The mailbox family and the guild-bank tab query, pinned to real 18414 bodies.
+///
+/// The cross-opcode evidence is what makes these strong. capture-000879 and
+/// capture-000025 each show one session where the SAME mailbox is recovered from
+/// GET_MAIL_LIST, MARK_AS_READ and TAKE_ITEM -- three different mask orders and
+/// three different byte orders -- and all three yield the same GUID byte for
+/// byte. A wrong byte order permutes distinct byte values, so agreement across
+/// three independent orders is evidence no single opcode's fixtures could give.
+/// The mail id likewise matches between MARK_AS_READ and TAKE_ITEM.
+///
+/// 0x1372 also settles a naming disagreement. The reference overlay carried it
+/// as CMSG_LFG_GET_PARTY_INFO; its bodies decode to a HIGHGUID_GAMEOBJECT guid,
+/// a tab index and a send-all-slots boolean, which is a guild bank query and is
+/// nothing an LFG party-info request would carry.
+static void test_mail_family_matches_retail_bodies()
+{
+    {   // GET_MAIL_LIST: three distinct masks, three body lengths.
+        struct Case { char const* what; uint8_t body[8]; size_t length; uint64 guid; };
+        Case const cases[] = {
+            { "get mail list B9", { 0xB9, 0xF0, 0x12, 0x5A, 0xA5, 0x31 }, 6,
+              UINT64_C(0xF1135BA400000030) },
+            { "get mail list B5", { 0xB5, 0xF0, 0x05, 0x12, 0x39, 0x04 }, 6,
+              UINT64_C(0xF113380000000405) },
+            { "get mail list BD", { 0xBD, 0xF0, 0x06, 0x12, 0x3D, 0x96, 0x14 }, 7,
+              UINT64_C(0xF1133C9700000715) },
+        };
+        for (size_t i = 0; i < sizeof(cases) / sizeof(cases[0]); ++i)
+        {
+            WorldPacket p(CMSG_GET_MAIL_LIST, uint32(cases[i].length));
+            p.append(cases[i].body, cases[i].length);
+            ObjectGuid const guid = MopCompactPackets::ReadGetMailList(p);
+            if (guid.GetRawValue() != cases[i].guid || p.rpos() != p.size())
+            {
+                std::fprintf(stderr, "FAIL %s: 0x%016llX consumed %u/%u\n", cases[i].what,
+                             (unsigned long long)guid.GetRawValue(),
+                             unsigned(p.rpos()), unsigned(p.size()));
+                ++g_fail;
+            }
+        }
+    }
+    {   // MARK_AS_READ, same two mailboxes as above through a different order.
+        uint8_t const a[] = { 0x1F, 0x37, 0x7C, 0x57, 0x8E, 0x80, 0xF0, 0x5A, 0x12, 0xA5, 0x31 };
+        WorldPacket p(CMSG_MAIL_MARK_AS_READ, sizeof(a));
+        p.append(a, sizeof(a));
+        uint32 mailId = 0;
+        ObjectGuid const guid = MopCompactPackets::ReadMailMarkAsRead(p, mailId);
+        CHECK(mailId == 1467758367u);
+        CHECK(guid.GetRawValue() == UINT64_C(0xF1135BA400000030));
+        CHECK(p.rpos() == p.size());
+
+        uint8_t const b[] = { 0x16, 0xC5, 0x7C, 0x57, 0x8F, 0x80, 0x06, 0xF0, 0x3D, 0x12, 0x96, 0x14 };
+        WorldPacket q(CMSG_MAIL_MARK_AS_READ, sizeof(b));
+        q.append(b, sizeof(b));
+        uint32 mailIdB = 0;
+        ObjectGuid const guidB = MopCompactPackets::ReadMailMarkAsRead(q, mailIdB);
+        CHECK(mailIdB == 1467794710u);
+        CHECK(guidB.GetRawValue() == UINT64_C(0xF1133C9700000715));
+        CHECK(q.rpos() == q.size());
+    }
+    {   // TAKE_ITEM: same mailboxes and the same mail ids again, third order.
+        uint8_t const a[] = { 0x1F, 0x37, 0x7C, 0x57, 0xBE, 0x6D, 0x86, 0x39,
+                              0xCB, 0x31, 0xA5, 0x5A, 0x12, 0xF0 };
+        WorldPacket p(CMSG_MAIL_TAKE_ITEM, sizeof(a));
+        p.append(a, sizeof(a));
+        uint32 mailId = 0, itemId = 0;
+        ObjectGuid const guid = MopCompactPackets::ReadMailTakeItem(p, mailId, itemId);
+        CHECK(mailId == 1467758367u);                       // as MARK_AS_READ above
+        CHECK(itemId == 965111230u);
+        CHECK(guid.GetRawValue() == UINT64_C(0xF1135BA400000030));
+        CHECK(p.rpos() == p.size());
+
+        uint8_t const b[] = { 0x16, 0xC5, 0x7C, 0x57, 0xCE, 0x00, 0x87, 0x39,
+                              0xCF, 0x14, 0x06, 0x96, 0x3D, 0x12, 0xF0 };
+        WorldPacket q(CMSG_MAIL_TAKE_ITEM, sizeof(b));
+        q.append(b, sizeof(b));
+        uint32 mailIdB = 0, itemIdB = 0;
+        ObjectGuid const guidB = MopCompactPackets::ReadMailTakeItem(q, mailIdB, itemIdB);
+        CHECK(mailIdB == 1467794710u);
+        CHECK(itemIdB == 965148878u);
+        CHECK(guidB.GetRawValue() == UINT64_C(0xF1133C9700000715));
+        CHECK(q.rpos() == q.size());
+    }
+    {   // GUILD_BANK_QUERY_TAB. The first two differ ONLY in the send-all-slots
+        // bit and the tab id, which is what proves that bit is a standalone
+        // boolean and not a ninth GUID presence bit.
+        uint8_t const noSlots[] = { 0x00, 0x97, 0x80, 0xF0, 0x12, 0x70, 0x43, 0x11, 0x06 };
+        WorldPacket p(CMSG_GUILD_BANK_QUERY_TAB, sizeof(noSlots));
+        p.append(noSlots, sizeof(noSlots));
+        uint8 tabId = 0xFF;
+        bool sendAll = true;
+        ObjectGuid const guid = MopCompactPackets::ReadGuildBankQueryTab(p, tabId, sendAll);
+        CHECK(tabId == 0);
+        CHECK(sendAll == false);
+        CHECK(guid.GetRawValue() == UINT64_C(0xF113427100000710));
+        CHECK(p.rpos() == p.size());
+
+        uint8_t const allSlots[] = { 0x03, 0xB7, 0x80, 0xF0, 0x12, 0x70, 0x43, 0x11, 0x06 };
+        WorldPacket q(CMSG_GUILD_BANK_QUERY_TAB, sizeof(allSlots));
+        q.append(allSlots, sizeof(allSlots));
+        uint8 tabIdB = 0xFF;
+        bool sendAllB = false;
+        ObjectGuid const guidB = MopCompactPackets::ReadGuildBankQueryTab(q, tabIdB, sendAllB);
+        CHECK(tabIdB == 3);
+        CHECK(sendAllB == true);
+        CHECK(guidB.GetRawValue() == UINT64_C(0xF113427100000710));  // same bank
+        CHECK(q.rpos() == q.size());
+
+        uint8_t const other[] = { 0x00, 0x9F, 0x80, 0xF0, 0x12, 0x0B, 0x12, 0x26, 0x74, 0xD6 };
+        WorldPacket r(CMSG_GUILD_BANK_QUERY_TAB, sizeof(other));
+        r.append(other, sizeof(other));
+        uint8 tabIdC = 0xFF;
+        bool sendAllC = true;
+        ObjectGuid const guidC = MopCompactPackets::ReadGuildBankQueryTab(r, tabIdC, sendAllC);
+        CHECK(tabIdC == 0);
+        CHECK(guidC.GetRawValue() == UINT64_C(0xF113270A0013D775));
+        CHECK(r.rpos() == r.size());
+    }
+}
+
 static void test_opcode_values_are_framable()
 {
     CHECK(uint32_t(SMSG_ATTACKSWING_ERROR) == 0x11E1u);
@@ -1532,6 +1651,7 @@ int main(int /*argc*/, char** /*argv*/)
     test_pet_action_matches_retail_bodies();
     test_pet_name_query_matches_retail_bodies();
     test_lfg_join_matches_retail_bodies();
+    test_mail_family_matches_retail_bodies();
     test_run_speed_differs_from_swim_interleave();
     test_swim_speed_guid_layouts();
     test_random_roll_guid_layouts();

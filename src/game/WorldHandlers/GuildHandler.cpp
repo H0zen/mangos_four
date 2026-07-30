@@ -1282,9 +1282,11 @@ void WorldSession::HandleGuildBankerActivate(WorldPacket& recv_data)
 /* Called when opening guild bank tab only (first one) */
 void WorldSession::HandleGuildBankQueryTab(WorldPacket& recv_data)
 {
-    ObjectGuid goGuid;
-    uint8 TabId, unk1;
-    recv_data >> goGuid >> TabId >> unk1;
+    // 18414 leads with the tab id; the "unk1" that followed the raw GUID is a
+    // single bit inside the mask, asking for every slot rather than a page.
+    uint8 TabId;
+    bool sendAllSlots = false;
+    ObjectGuid goGuid = MopCompactPackets::ReadGuildBankQueryTab(recv_data, TabId, sendAllSlots);
 
     DEBUG_LOG("WORLD: Received (CMSG_GUILD_BANK_QUERY_TAB) TabId %u", TabId);
 

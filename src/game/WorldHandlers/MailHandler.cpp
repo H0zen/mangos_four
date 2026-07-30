@@ -399,10 +399,9 @@ void WorldSession::HandleSendMail(WorldPacket& recv_data)
  */
 void WorldSession::HandleMailMarkAsRead(WorldPacket& recv_data)
 {
-    ObjectGuid mailboxGuid;
+    // 18414 leads with the mail id and packs the mailbox GUID behind it.
     uint32 mailId;
-    recv_data >> mailboxGuid;
-    recv_data >> mailId;
+    ObjectGuid mailboxGuid = MopCompactPackets::ReadMailMarkAsRead(recv_data, mailId);
 
     if (!CheckMailBox(mailboxGuid))
     {
@@ -537,12 +536,11 @@ void WorldSession::HandleMailReturnToSender(WorldPacket& recv_data)
  */
 void WorldSession::HandleMailTakeItem(WorldPacket& recv_data)
 {
-    ObjectGuid mailboxGuid;
+    // 18414 leads with the mail id and the item's low GUID, then packs the
+    // mailbox GUID; the inherited read had all three in the opposite order.
     uint32 mailId;
-    uint32 itemId;
-    recv_data >> mailboxGuid;
-    recv_data >> mailId;
-    recv_data >> itemId;                                    // item guid low
+    uint32 itemId;                                          // item guid low
+    ObjectGuid mailboxGuid = MopCompactPackets::ReadMailTakeItem(recv_data, mailId, itemId);
 
     if (!CheckMailBox(mailboxGuid))
     {
@@ -688,8 +686,8 @@ void WorldSession::HandleMailTakeMoney(WorldPacket& recv_data)
  */
 void WorldSession::HandleGetMailList(WorldPacket& recv_data)
 {
-    ObjectGuid mailboxGuid;
-    recv_data >> mailboxGuid;
+    // 18414 packs the mailbox GUID; the inherited read took it raw.
+    ObjectGuid mailboxGuid = MopCompactPackets::ReadGetMailList(recv_data);
 
     if (!CheckMailBox(mailboxGuid))
     {

@@ -1235,6 +1235,26 @@ void InitializeOpcodes()
     // length before anything is allocated from it.
     DefC(CMSG_LFG_JOIN, "CMSG_LFG_JOIN", STATUS_LOGGEDIN, PROCESS_THREADUNSAFE, &WorldSession::HandleLfgJoinOpcode);
 
+    // The mailbox family and the guild-bank tab query. Each inherited reader
+    // took a raw ObjectGuid first; at 18414 all four pack it and the scalars
+    // lead. Beyond per-opcode bodies the GUID orders cross-check each other: the
+    // same mailbox recovered through three different mask and byte orders comes
+    // out byte-identical.
+    DefC(CMSG_GET_MAIL_LIST, "CMSG_GET_MAIL_LIST", STATUS_LOGGEDIN, PROCESS_THREADUNSAFE, &WorldSession::HandleGetMailList);
+    DefC(CMSG_MAIL_MARK_AS_READ, "CMSG_MAIL_MARK_AS_READ", STATUS_LOGGEDIN, PROCESS_THREADUNSAFE, &WorldSession::HandleMailMarkAsRead);
+    DefC(CMSG_MAIL_TAKE_ITEM, "CMSG_MAIL_TAKE_ITEM", STATUS_LOGGEDIN, PROCESS_THREADUNSAFE, &WorldSession::HandleMailTakeItem);
+    DefC(CMSG_GUILD_BANK_QUERY_TAB, "CMSG_GUILD_BANK_QUERY_TAB", STATUS_LOGGEDIN, PROCESS_THREADUNSAFE, &WorldSession::HandleGuildBankQueryTab);
+
+    // The mailbox family and the guild-bank tab query. Each inherited reader
+    // took a raw ObjectGuid first; at 18414 all four pack it, and the scalars
+    // lead. Beyond per-opcode bodies, the GUID orders are cross-checked against
+    // each other: the same mailbox recovered through three different mask and
+    // byte orders comes out byte-identical.
+    DefC(CMSG_GET_MAIL_LIST, "CMSG_GET_MAIL_LIST", STATUS_LOGGEDIN, PROCESS_THREADUNSAFE, &WorldSession::HandleGetMailList);
+    DefC(CMSG_MAIL_MARK_AS_READ, "CMSG_MAIL_MARK_AS_READ", STATUS_LOGGEDIN, PROCESS_THREADUNSAFE, &WorldSession::HandleMailMarkAsRead);
+    DefC(CMSG_MAIL_TAKE_ITEM, "CMSG_MAIL_TAKE_ITEM", STATUS_LOGGEDIN, PROCESS_THREADUNSAFE, &WorldSession::HandleMailTakeItem);
+    DefC(CMSG_GUILD_BANK_QUERY_TAB, "CMSG_GUILD_BANK_QUERY_TAB", STATUS_LOGGEDIN, PROCESS_THREADUNSAFE, &WorldSession::HandleGuildBankQueryTab);
+
     // CMSG_CONTACT_LIST (0x0BB4, 4,122 observed) is deliberately NOT registered,
     // and this note exists because it looks safe and is not.
     //
