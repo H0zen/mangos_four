@@ -180,6 +180,31 @@ float NormalizeOrientation(float o)
     return fmod(o, 2.0f * M_PI_F);
 }
 
+void StripRealmSuffix(std::string& name, std::string const& realmName)
+{
+    if (realmName.empty())
+    {
+        return;
+    }
+
+    std::string const suffix = "-" + realmName;
+    if (name.size() <= suffix.size())                       // "-Realm" alone is not a name
+    {
+        return;
+    }
+
+    size_t const at = name.size() - suffix.size();
+    for (size_t i = 0; i < suffix.size(); ++i)
+    {
+        if (std::tolower(static_cast<unsigned char>(name[at + i])) !=
+            std::tolower(static_cast<unsigned char>(suffix[i])))
+        {
+            return;
+        }
+    }
+    name.resize(at);
+}
+
 void stripLineInvisibleChars(std::string& str)
 {
     static std::string invChars = " \t\7\n";

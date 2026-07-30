@@ -843,6 +843,17 @@ std::string const& CachedRealmName();
 /// The client's cross-realm link form of a realm name, which is space-free.
 std::string NormalizeRealmName(std::string const& name);
 
+/// StripRealmSuffix against this realm. The 18414 client appends the suffix to
+/// a TARGET name it did not get typed by hand -- a whisper reply, a chat link, a
+/// who-list or guild-roster click -- so a handler resolving a target encoded as
+/// "Name-Realm" must call this before normalizePlayerName.
+///
+/// This does not apply to every client-supplied name. A proposed NEW name, as in
+/// CMSG_CHAR_CUSTOMIZE, is validated rather than resolved and carries no suffix.
+/// A packet with its own separate realm field, as group invite has, must
+/// validate that field instead of suffix-stripping the name.
+void StripHomeRealmSuffix(std::string& name);
+
 #define sWorld MaNGOS::Singleton<World>::Instance()
 #endif
 /// @}

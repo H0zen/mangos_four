@@ -159,6 +159,11 @@ void WorldSession::HandleGuildInviteOpcode(WorldPacket& recvPacket)
         return;
     }
 
+    // The 18414 roster and who-list hand GuildInvite a realm-qualified name, so
+    // the same home-realm suffix that broke whisper replies has to come off here
+    // before the lookup.
+    StripHomeRealmSuffix(Invitedname);
+
     if (normalizePlayerName(Invitedname))
     {
         player = sObjectAccessor.FindPlayerByName(Invitedname.c_str());

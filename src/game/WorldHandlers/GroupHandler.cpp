@@ -141,6 +141,13 @@ void WorldSession::HandleGroupInviteOpcode(WorldPacket& recv_data)
 
     std::string membername = recv_data.ReadString(nameLength);
     std::string realmname = recv_data.ReadString(realmLength);
+    // TODO before CMSG_GROUP_INVITE is registered: this field is read and then
+    // dropped, so an invite naming a character on another realm would resolve
+    // against a LOCAL character of the same name and invite the wrong player.
+    // Unlike whisper and guild invite, which carry the realm inside the name as
+    // a "-Realm" suffix and strip it (StripHomeRealmSuffix), this packet has its
+    // own realm field and must instead REJECT anything that is neither empty nor
+    // this realm. The opcode is currently unregistered, so it is unreachable.
 
     // attempt add selected player
 

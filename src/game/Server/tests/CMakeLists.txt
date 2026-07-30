@@ -1006,7 +1006,7 @@ add_test(NAME mop_guild_packets_source
         -P ${CMAKE_CURRENT_SOURCE_DIR}/mop_guild_packets_source_test.cmake)
 
 foreach(mutation IN ITEMS login_builder broadcast_builder outbound_registration opcode_value
-        tabard_reader tabard_builder save_reader save_builder tabard_registration
+        tabard_reader tabard_builder save_reader save_builder tabard_registration invite_realm_suffix
         save_registration tabard_allowlist design_bounds joined_builder presence_builder
         rank_builder leader_builder left_builder disband_builder event_registration
         event_allowlist event_opcode presence_calls removed_member_copy legacy_info legacy_event
@@ -1956,3 +1956,12 @@ target_include_directories(mop_showing_helm_packets_test PRIVATE
 set_target_properties(mop_showing_helm_packets_test PROPERTIES CXX_STANDARD 17 CXX_STANDARD_REQUIRED ON)
 target_link_libraries(mop_showing_helm_packets_test PRIVATE shared)
 add_test(NAME mop_showing_helm_packets COMMAND mop_showing_helm_packets_test)
+
+add_executable(mop_realm_suffix_test mop_realm_suffix_test.cpp)
+target_include_directories(mop_realm_suffix_test PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}/..
+    ${CMAKE_SOURCE_DIR}/src/shared
+    ${CMAKE_SOURCE_DIR}/src/shared/Utilities)
+set_target_properties(mop_realm_suffix_test PROPERTIES CXX_STANDARD 17 CXX_STANDARD_REQUIRED ON)
+target_link_libraries(mop_realm_suffix_test PRIVATE shared)
+add_test(NAME mop_realm_suffix COMMAND mop_realm_suffix_test)

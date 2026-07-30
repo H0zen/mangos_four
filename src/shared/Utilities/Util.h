@@ -81,6 +81,17 @@ float NormalizeOrientation(float o);
  */
 void stripLineInvisibleChars(std::string& src);
 
+/// Removes a trailing "-<realmName>" from a client-supplied character name,
+/// comparing case insensitively. The 18414 client appends its space-free realm
+/// name to any name it did not get typed by hand -- a whisper reply, a chat
+/// link, a who-list or guild-roster click -- so this has to run before
+/// normalizePlayerName or the lookup fails.
+///
+/// A suffix naming any OTHER realm is left in place deliberately: this build
+/// has no cross-realm support, and quietly matching a local character of the
+/// same name would act on the wrong player.
+void StripRealmSuffix(std::string& name, std::string const& realmName);
+
 struct tm* localtime_r(const time_t* time, struct tm* result);
 
 /**

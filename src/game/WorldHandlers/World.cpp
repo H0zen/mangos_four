@@ -2140,3 +2140,46 @@ void World::AutoBroadcast()
         SendWorldText(LANG_AUTOBROADCAST, it->text.c_str());
     }
 }
+
+/// This world's realm name, loaded once from the login DB (realmd's realmlist).
+/// The realm-name query needs it, and so does every handler that resolves a
+/// character name the client supplied. C++11 function-local static init is
+/// thread-safe.
+std::string const& CachedRealmName()
+{
+    static std::string const realmName = []() -> std::string
+    {
+        std::string name;
+        if (QueryResult* result = LoginDatabase.PQuery("SELECT `name` FROM `realmlist` WHERE `id` = '%u'", realmID))
+        {
+            name = (*result)[0].GetCppString();
+            delete result;
+        }
+        if (name.empty())
+        {
+            name = "MaNGOS";
+        }
+        return name;
+    }();
+    return realmName;
+}
+
+/// The client's cross-realm link form uses a space-free realm name.
+std::string NormalizeRealmName(std::string const& name)
+{
+    std::string out;
+    out.reserve(name.size());
+    for (char c : name)
+    {
+        if (c != ' ')
+        {
+            out.push_back(c);
+        }
+    }
+    return out;
+}
+
+void StripHomeRealmSuffix(std::string& name)
+{
+    StripRealmSuffix(name, NormalizeRealmName(CachedRealmName()));
+}

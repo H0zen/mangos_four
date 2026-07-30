@@ -13,6 +13,11 @@ if(MUTATION STREQUAL "login_builder")
         "MopGuildPackets::BuildGuildMotd(data, guild->GetMOTD())"
         "false /* removed login MOTD builder */"
         login_sender "${login_sender}")
+elseif(MUTATION STREQUAL "invite_realm_suffix")
+    string(REPLACE
+        "    StripHomeRealmSuffix(Invitedname);\n\n    if (normalizePlayerName(Invitedname))"
+        "    if (normalizePlayerName(Invitedname))"
+        guild_handler "${guild_handler}")
 elseif(MUTATION STREQUAL "broadcast_builder")
     string(REPLACE
         "MopGuildPackets::BuildGuildMotd(data, motd)"
@@ -560,3 +565,10 @@ require_once("${packet_builder}"
 require_once("${guild_sender}"
     "MopGuildPackets::BuildGuildQueryResponse(data, GetObjectGuid().GetRawValue(),"
     "guild-query production builder call")
+
+# The 18414 roster and who-list pass GuildInvite a realm-qualified name, so the
+# home-realm suffix has to come off BEFORE normalizePlayerName lowercases it.
+# The token spans both statements so the ordering is pinned, not just the call.
+require_once("${guild_handler}"
+    "    StripHomeRealmSuffix(Invitedname);\n\n    if (normalizePlayerName(Invitedname))"
+    "guild invite strips the home-realm suffix before normalizing")
