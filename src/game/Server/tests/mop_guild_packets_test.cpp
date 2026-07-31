@@ -409,6 +409,72 @@ static void test_guild_invite_request()
     CHECK(uint32(CMSG_GUILD_INVITE) == 0x0869u);
 }
 
+static void test_guild_achievement_tracking_request()
+{
+    // Deployed 18414 smoke capture (2026-07-31): the client sent an empty
+    // tracking snapshot as exactly three zero bytes. This proves the empty
+    // encoding only; the non-empty shape below comes from the client writer.
+    WorldPacket capturedEmpty(CMSG_GUILD_SET_ACHIEVEMENT_TRACKING, 3);
+    Append(capturedEmpty, { 0x00, 0x00, 0x00 });
+    std::vector<uint32> achievementIds = { 0xFFFFFFFFu };
+    CHECK(MopGuildPackets::ReadGuildAchievementTracking(capturedEmpty, achievementIds));
+    CHECK(achievementIds.empty());
+    CHECK(capturedEmpty.rpos() == capturedEmpty.size());
+
+    // Synthetic fixture derived from Wow.exe's 22-bit MSB-first count writer
+    // and little-endian uint32 loop. Distinct scalars discriminate width,
+    // padding, byte order, and element order; it is not a retail capture.
+    WorldPacket nonEmpty(CMSG_GUILD_SET_ACHIEVEMENT_TRACKING, 11);
+    Append(nonEmpty, {
+        0x00, 0x00, 0x08,
+        0x44, 0x33, 0x22, 0x11,
+        0xD4, 0xC3, 0xB2, 0xA1
+    });
+    CHECK(MopGuildPackets::ReadGuildAchievementTracking(nonEmpty, achievementIds));
+    CHECK(achievementIds.size() == 2);
+    CHECK(achievementIds[0] == 0x11223344u);
+    CHECK(achievementIds[1] == 0xA1B2C3D4u);
+    CHECK(nonEmpty.rpos() == nonEmpty.size());
+
+    WorldPacket maximum(CMSG_GUILD_SET_ACHIEVEMENT_TRACKING, 43);
+    Append(maximum, { 0x00, 0x00, 0x28 });
+    for (uint32 id = 1; id <= 10; ++id)
+        maximum << id;
+    CHECK(MopGuildPackets::ReadGuildAchievementTracking(maximum, achievementIds));
+    CHECK(achievementIds.size() == 10);
+    CHECK(achievementIds.front() == 1);
+    CHECK(achievementIds.back() == 10);
+
+    // The client enforces ten tracked achievements overall. Reject hostile
+    // counts before reserving or reading their claimed scalar array.
+    WorldPacket hostile(CMSG_GUILD_SET_ACHIEVEMENT_TRACKING, 47);
+    Append(hostile, { 0x00, 0x00, 0x2C });
+    for (uint32 id = 1; id <= 11; ++id)
+        hostile << id;
+    CHECK(!MopGuildPackets::ReadGuildAchievementTracking(hostile, achievementIds));
+    CHECK(achievementIds.empty());
+
+    WorldPacket shortHeader(CMSG_GUILD_SET_ACHIEVEMENT_TRACKING, 2);
+    Append(shortHeader, { 0x00, 0x00 });
+    achievementIds.push_back(7);
+    CHECK(!MopGuildPackets::ReadGuildAchievementTracking(shortHeader, achievementIds));
+    CHECK(achievementIds.empty());
+
+    WorldPacket truncated(CMSG_GUILD_SET_ACHIEVEMENT_TRACKING, 3);
+    Append(truncated, { 0x00, 0x00, 0x04 });
+    achievementIds.push_back(7);
+    CHECK(!MopGuildPackets::ReadGuildAchievementTracking(truncated, achievementIds));
+    CHECK(achievementIds.empty());
+
+    WorldPacket trailing(CMSG_GUILD_SET_ACHIEVEMENT_TRACKING, 7);
+    Append(trailing, { 0x00, 0x00, 0x00, 0x44, 0x33, 0x22, 0x11 });
+    achievementIds.push_back(7);
+    CHECK(!MopGuildPackets::ReadGuildAchievementTracking(trailing, achievementIds));
+    CHECK(achievementIds.empty());
+
+    CHECK(uint32(CMSG_GUILD_SET_ACHIEVEMENT_TRACKING) == 0x0CF0u);
+}
+
 /*
  * The three guild read-only queries. Every fixture below is a byte-for-byte retail
  * capture from the 18414 corpus (catalogue 2BE10C89), not a hand-rolled guess, and
@@ -819,6 +885,7 @@ int main(int /*argc*/, char** /*argv*/)
     test_guild_bank_text_bounds();
     test_guild_command_result();
     test_guild_invite_request();
+    test_guild_achievement_tracking_request();
     test_guild_query_ranks_request();
     test_guild_roster_request();
     test_guild_permissions_response();

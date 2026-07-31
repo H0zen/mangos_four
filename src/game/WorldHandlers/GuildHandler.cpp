@@ -1773,6 +1773,18 @@ void WorldSession::HandleGuildQueryRanksOpcode(WorldPacket& recv_data)
     }
 }
 
+void WorldSession::HandleGuildSetAchievementTracking(WorldPacket& recvPacket)
+{
+    std::vector<uint32> achievementIds;
+    if (!MopGuildPackets::ReadGuildAchievementTracking(recvPacket, achievementIds))
+        return;
+
+    // The current core has no guild-achievement tracking backend. Parse the
+    // client's complete snapshot only as a bounded compatibility sink.
+    // Intentionally no persistence or gameplay side effects.
+    (void)achievementIds;
+}
+
 void WorldSession::HandleGuildAutoDeclineToggleOpcode(WorldPacket& recv_data)
 {
     DEBUG_LOG("WORLD: Received CMSG_GUILD_AUTO_DECLINE_TOGGLE");

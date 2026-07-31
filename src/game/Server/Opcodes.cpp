@@ -1026,6 +1026,10 @@ void InitializeOpcodes()
     DefC(CMSG_GUILD_QUERY_RANKS, "CMSG_GUILD_QUERY_RANKS", STATUS_LOGGEDIN, PROCESS_THREADUNSAFE, &WorldSession::HandleGuildQueryRanksOpcode);
     DefS(SMSG_GUILD_QUERY_RANKS_RESULT, "SMSG_GUILD_QUERY_RANKS_RESULT");
 
+    // Full client-side guild-achievement tracking snapshot. The core has no
+    // matching backend, so the handler validates and consumes it without state.
+    DefC(CMSG_GUILD_SET_ACHIEVEMENT_TRACKING, "CMSG_GUILD_SET_ACHIEVEMENT_TRACKING", STATUS_LOGGEDIN, PROCESS_THREADUNSAFE, &WorldSession::HandleGuildSetAchievementTracking);
+
     // Guild roster. The reader takes its two interleaved guid orders from the client's
     // send serializer sub_C85E7C, and the reply is byte-exact against retail:
     // mop_guild_packets rebuilds capture-000019 seq 923 in full, all 235 bytes of a

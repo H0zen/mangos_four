@@ -5,6 +5,8 @@ file(READ "${SOURCE_ROOT}/src/game/Object/GuildBank.cpp" guild_bank_sender)
 file(READ "${SOURCE_ROOT}/src/game/Server/Opcodes.cpp" opcode_registry)
 file(READ "${SOURCE_ROOT}/src/game/Server/Opcodes.h" opcode_header)
 file(READ "${SOURCE_ROOT}/src/game/Server/WorldSession.cpp" world_session)
+file(READ "${SOURCE_ROOT}/src/game/Server/WorldSession.h" world_session_header)
+file(READ "${SOURCE_ROOT}/src/game/Server/Opcodes_reference.h" opcode_reference)
 file(READ "${SOURCE_ROOT}/src/game/WorldHandlers/NPCHandler.cpp" npc_handler)
 file(READ "${SOURCE_ROOT}/src/game/WorldHandlers/GuildHandler.cpp" guild_handler)
 
@@ -187,6 +189,65 @@ elseif(MUTATION STREQUAL "invite_opcode")
         "CMSG_GUILD_INVITE                            = 0x0869"
         "CMSG_GUILD_INVITE                            = 0x0868"
         opcode_header "${opcode_header}")
+elseif(MUTATION STREQUAL "tracking_count_bits_21")
+    string(REPLACE
+        "uint32 const count = in.ReadBits(22);"
+        "uint32 const count = in.ReadBits(21);"
+        packet_builder "${packet_builder}")
+elseif(MUTATION STREQUAL "tracking_count_bits_24")
+    string(REPLACE
+        "uint32 const count = in.ReadBits(22);"
+        "uint32 const count = in.ReadBits(24);"
+        packet_builder "${packet_builder}")
+elseif(MUTATION STREQUAL "tracking_ids_big_endian")
+    string(REPLACE
+        "in >> achievementId; // little-endian uint32"
+        "in >> achievementId;
+            achievementId = ((achievementId & 0x000000FFu) << 24) |
+                ((achievementId & 0x0000FF00u) << 8) |
+                ((achievementId & 0x00FF0000u) >> 8) |
+                ((achievementId & 0xFF000000u) >> 24); // mutated big-endian scalar"
+        packet_builder "${packet_builder}")
+elseif(MUTATION STREQUAL "tracking_remove_count_limit")
+    string(REPLACE
+        "if (count > 10)"
+        "if (false /* removed client count limit */)"
+        packet_builder "${packet_builder}")
+elseif(MUTATION STREQUAL "tracking_allow_truncated")
+    string(REPLACE
+        "if (remaining < expected)"
+        "if (false /* allowed truncated body */)"
+        packet_builder "${packet_builder}")
+elseif(MUTATION STREQUAL "tracking_allow_trailing")
+    string(REPLACE
+        "if (remaining > expected)"
+        "if (false /* allowed trailing body */)"
+        packet_builder "${packet_builder}")
+elseif(MUTATION STREQUAL "tracking_wrong_opcode_value")
+    string(REPLACE
+        "CMSG_GUILD_SET_ACHIEVEMENT_TRACKING          = 0x0CF0"
+        "CMSG_GUILD_SET_ACHIEVEMENT_TRACKING          = 0x0CF1"
+        opcode_header "${opcode_header}")
+elseif(MUTATION STREQUAL "tracking_remove_defc")
+    string(REPLACE
+        "DefC(CMSG_GUILD_SET_ACHIEVEMENT_TRACKING, \"CMSG_GUILD_SET_ACHIEVEMENT_TRACKING\", STATUS_LOGGEDIN, PROCESS_THREADUNSAFE, &WorldSession::HandleGuildSetAchievementTracking);"
+        "/* removed guild-achievement-tracking registration */"
+        opcode_registry "${opcode_registry}")
+elseif(MUTATION STREQUAL "tracking_wrong_handler")
+    string(REPLACE
+        "&WorldSession::HandleGuildSetAchievementTracking);"
+        "&WorldSession::Handle_NULL);"
+        opcode_registry "${opcode_registry}")
+elseif(MUTATION STREQUAL "tracking_wrong_reference_state")
+    string(REPLACE
+        "CMSG_GUILD_SET_ACHIEVEMENT_TRACKING            0x0CF0  ACTIVE"
+        "CMSG_GUILD_SET_ACHIEVEMENT_TRACKING            0x0CF0  DOC"
+        opcode_reference "${opcode_reference}")
+elseif(MUTATION STREQUAL "tracking_add_persistence")
+    string(REPLACE
+        "(void)achievementIds;"
+        "GetPlayer()->SaveToDB(); // mutated persistence side effect"
+        guild_handler "${guild_handler}")
 endif()
 
 function(require_once source token context)
@@ -355,6 +416,42 @@ require_once("${packet_builder}"
 require_once("${opcode_header}"
     "CMSG_GUILD_INVITE                            = 0x0869"
     "guild-invite opcode value")
+require_once("${packet_builder}"
+    "uint32 const count = in.ReadBits(22);"
+    "guild-achievement-tracking 22-bit count")
+require_once("${packet_builder}"
+    "if (count > 10)"
+    "guild-achievement-tracking hostile-count guard")
+require_once("${packet_builder}"
+    "if (remaining < expected)"
+    "guild-achievement-tracking truncated-body guard")
+require_once("${packet_builder}"
+    "if (remaining > expected)"
+    "guild-achievement-tracking trailing-body guard")
+require_once("${packet_builder}"
+    "in >> achievementId; // little-endian uint32"
+    "guild-achievement-tracking little-endian scalar read")
+require_once("${guild_handler}"
+    "MopGuildPackets::ReadGuildAchievementTracking(recvPacket, achievementIds)"
+    "guild-achievement-tracking parser wiring")
+require_once("${guild_handler}"
+    "Intentionally no persistence or gameplay side effects."
+    "guild-achievement-tracking compatibility-sink semantics")
+require_once("${guild_handler}"
+    "(void)achievementIds;"
+    "guild-achievement-tracking no-persistence sink boundary")
+require_once("${world_session_header}"
+    "void HandleGuildSetAchievementTracking(WorldPacket& recvPacket);"
+    "guild-achievement-tracking handler declaration")
+require_once("${opcode_registry}"
+    "DefC(CMSG_GUILD_SET_ACHIEVEMENT_TRACKING, \"CMSG_GUILD_SET_ACHIEVEMENT_TRACKING\", STATUS_LOGGEDIN, PROCESS_THREADUNSAFE, &WorldSession::HandleGuildSetAchievementTracking);"
+    "guild-achievement-tracking request registration")
+require_once("${opcode_header}"
+    "CMSG_GUILD_SET_ACHIEVEMENT_TRACKING          = 0x0CF0"
+    "guild-achievement-tracking opcode value")
+require_once("${opcode_reference}"
+    "CMSG_GUILD_SET_ACHIEVEMENT_TRACKING            0x0CF0  ACTIVE"
+    "guild-achievement-tracking reference state")
 
 foreach(token IN ITEMS
         "CMSG_TABARD_VENDOR_ACTIVATE                 = 0x11C3"

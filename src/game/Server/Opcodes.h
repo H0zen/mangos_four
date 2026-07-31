@@ -163,6 +163,7 @@ enum OpcodesList
     CMSG_GUILD_PROMOTE                           = 0x0571, // 5.4.8 18414 (Wow.exe binary)
     CMSG_GUILD_SET_RANK                          = 0x0C7A, // 5.4.8 18414 (Wow.exe binary, via CMSG_GUILD_SET_RANK_PERMISSIONS)
     CMSG_GUILD_SWITCH_RANK                       = 0x0CD1, // 5.4.8 18414 (Wow.exe binary)
+    CMSG_GUILD_SET_ACHIEVEMENT_TRACKING          = 0x0CF0, // 5.4.8 18414 (Wow.exe binary writer)
     CMSG_GUILD_DEMOTE                            = 0x1553, // 5.4.8 18414 (Wow.exe binary)
     CMSG_GUILD_LEAVE                             = 0x04D8, // 5.4.8 18414 (Wow.exe binary)
     CMSG_GUILD_REMOVE                            = 0x0CD8, // 5.4.8 18414 (Wow.exe binary)

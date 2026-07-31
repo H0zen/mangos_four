@@ -38,6 +38,7 @@
 #include "WorldPacket.h"
 
 #include <string>
+#include <vector>
 
 class WorldPacket;
 
@@ -514,6 +515,37 @@ namespace MopGuildPackets
             return false;
 
         name = in.ReadString(nameLength);
+        return in.rpos() == in.size();
+    }
+
+    inline bool ReadGuildAchievementTracking(WorldPacket& in,
+        std::vector<uint32>& achievementIds)
+    {
+        achievementIds.clear();
+        if (in.size() - in.rpos() < 3)
+            return false;
+
+        // Wow.exe 5.4.8.18414 writes a 22-bit MSB-first count, flushes the
+        // remaining two bits, then writes each achievement ID as uint32 LE.
+        uint32 const count = in.ReadBits(22);
+        if (count > 10)
+            return false;
+
+        size_t const remaining = in.size() - in.rpos();
+        size_t const expected = size_t(count) * sizeof(uint32);
+        if (remaining < expected)
+            return false;
+        if (remaining > expected)
+            return false;
+
+        achievementIds.reserve(count);
+        for (uint32 i = 0; i < count; ++i)
+        {
+            uint32 achievementId;
+            in >> achievementId; // little-endian uint32
+            achievementIds.push_back(achievementId);
+        }
+
         return in.rpos() == in.size();
     }
 

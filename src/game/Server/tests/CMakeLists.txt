@@ -1105,7 +1105,11 @@ foreach(mutation IN ITEMS login_builder broadcast_builder outbound_registration 
         event_allowlist event_opcode presence_calls removed_member_copy legacy_info legacy_event
         money_client_registration money_server_registration money_gate command_builder
         command_registration command_allowlist command_opcode invite_reader
-        invite_registration invite_length_width invite_opcode)
+        invite_registration invite_length_width invite_opcode
+        tracking_count_bits_21 tracking_count_bits_24 tracking_ids_big_endian
+        tracking_remove_count_limit tracking_allow_truncated tracking_allow_trailing
+        tracking_wrong_opcode_value tracking_remove_defc tracking_wrong_handler
+        tracking_wrong_reference_state tracking_add_persistence)
     add_test(NAME mop_guild_packets_source_mutation_${mutation}
         COMMAND ${CMAKE_COMMAND} -DSOURCE_ROOT=${CMAKE_SOURCE_DIR}
             -DMUTATION=${mutation}
