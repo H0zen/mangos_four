@@ -215,7 +215,7 @@ typedef uint16_t uint16;
  *  -- AchievementInfo.cpp (13) --
  *   SMSG_RESPOND_INSPECT_ACHIEVEMENTS              0x009E  DORMANT  [low-conf]
  *   SMSG_ALL_ACCOUNT_CRITERIA                      0x0A9E  DORMANT  [low-conf]
- *   SMSG_CRITERIA_UPDATE                           0x0E9B  DORMANT  [low-conf]
+ *   SMSG_CRITERIA_UPDATE                           0x0E9B  ACTIVE   [low-conf]
  *   SMSG_GUILD_ACHIEVEMENT_DATA                    0x0EF8  DORMANT  [medium-conf]
  *   SMSG_ALL_ACHIEVEMENT_DATA                      0x180A  ACTIVE   [low-conf]
  *   SMSG_ACCOUNT_CRITERIA_UPDATE                   0x189E  DORMANT  [low-conf]

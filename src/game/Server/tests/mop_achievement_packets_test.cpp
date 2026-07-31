@@ -291,6 +291,105 @@ static void test_achievement_deleted_preserves_caller_opcode()
     CHECK(packet.GetOpcode() == SMSG_TITLE_EARNED);
 }
 
+static void test_criteria_update_captured_mode_9_body()
+{
+    // Captured retail body: build 18414, catalogue 2BE10C89,
+    // capture-000692 sequence 34066. Independent decode consumed 34/34.
+    // It proves this exact removal/reset body and grammar, not a universal
+    // producer selector.
+    WorldPacket packet(SMSG_CRITERIA_UPDATE, 34);
+    MopAchievementPackets::BuildCriteriaUpdate(packet,
+        UINT64_C(0x06000000072D4F03), 20976u, UINT64_C(0), 9u,
+        0x0E06334Au, 1411156734u, 59940u);
+    CHECK(ExpectBytes(packet, {
+        0x3D, 0x06, 0x2C, 0xF0, 0x51, 0x00, 0x00, 0x09, 0x00, 0x00,
+        0x00, 0x4E, 0x4A, 0x33, 0x06, 0x0E, 0xFE, 0x8A, 0x1C, 0x54,
+        0x24, 0xEA, 0x00, 0x00, 0x07, 0x02, 0x00, 0x00, 0x00, 0x00,
+        0x00, 0x00, 0x00, 0x00
+    }));
+}
+
+static void test_criteria_update_captured_mode_8_body()
+{
+    // Captured retail removal body: build 18414, catalogue 2BE10C89,
+    // capture-000006 sequence 49022. Independent decode consumed 34/34. The
+    // preceding same-ID row had flags 0 and counter 4. This proves one retail
+    // removal transition, not a universal producer policy.
+    WorldPacket packet(SMSG_CRITERIA_UPDATE, 34);
+    MopAchievementPackets::BuildCriteriaUpdate(packet,
+        UINT64_C(0x04000000053CC8E8), 15992u, UINT64_C(0), 8u,
+        241388435u, 1405347600u, 10u);
+    CHECK(ExpectBytes(packet, {
+        0x3D, 0x04, 0x3D, 0x78, 0x3E, 0x00, 0x00, 0x08, 0x00, 0x00,
+        0x00, 0xC9, 0x93, 0x4B, 0x63, 0x0E, 0x10, 0xE7, 0xC3, 0x53,
+        0x0A, 0x00, 0x00, 0x00, 0x05, 0xE9, 0x00, 0x00, 0x00, 0x00,
+        0x00, 0x00, 0x00, 0x00
+    }));
+}
+
+static void test_criteria_update_full_interleave_and_scalars()
+{
+    // Binary-derived synthetic coverage. Every GUID byte and every scalar are
+    // nonzero, and the counter locks the plain little-endian uint64 width.
+    WorldPacket packet(SMSG_CRITERIA_UPDATE, 37);
+    MopAchievementPackets::BuildCriteriaUpdate(packet,
+        UINT64_C(0x0807060504030201), 0x11223344u,
+        UINT64_C(0x99AABBCCDDEEFF88), 0x55667788u, 0xA1A2A3A4u,
+        0xB1B2B3B4u, 0xC1C2C3C4u);
+    CHECK(ExpectBytes(packet, {
+        0xFF, 0x05, 0x06, 0x02, 0x44, 0x33, 0x22, 0x11, 0x88, 0x77,
+        0x66, 0x55, 0x07, 0x03, 0xA4, 0xA3, 0xA2, 0xA1, 0x04, 0xB4,
+        0xB3, 0xB2, 0xB1, 0xC4, 0xC3, 0xC2, 0xC1, 0x09, 0x00, 0x88,
+        0xFF, 0xEE, 0xDD, 0xCC, 0xBB, 0xAA, 0x99
+    }));
+}
+
+static void test_criteria_update_mask_order_complements()
+{
+    // Synthetic coverage: one zero byte at a time uniquely assigns all eight
+    // presence-mask bits.
+    uint64 const guid = UINT64_C(0x0807060504030201);
+    std::array<uint8_t, 8> const masks = {{
+        0xFE, 0xFB, 0xDF, 0xEF, 0x7F, 0xFD, 0xBF, 0xF7
+    }};
+
+    for (size_t index = 0; index < 8; ++index)
+    {
+        uint64 const byteMask = ~(UINT64_C(0xFF) << (8 * index));
+        WorldPacket packet(SMSG_CRITERIA_UPDATE, 36);
+        MopAchievementPackets::BuildCriteriaUpdate(packet, guid & byteMask,
+            0, 0, 0, 0, 0, 0);
+        CHECK(packet.size() == 36);
+        CHECK(packet.contents()[0] == masks[index]);
+    }
+}
+
+static void test_criteria_update_expiry_policy_body()
+{
+    // Synthetic production-policy coverage, not a captured retail body:
+    // removal bit 8, zero counter, and deliberately zero Timer2 while Timer1
+    // remains absolute/nonzero.
+    WorldPacket packet(SMSG_CRITERIA_UPDATE, 37);
+    MopAchievementPackets::BuildCriteriaUpdate(packet,
+        UINT64_C(0x0807060504030201), 0x11223344u, UINT64_C(0), 8u,
+        0xA1A2A3A4u, 0xB1B2B3B4u, 0u);
+    CHECK(ExpectBytes(packet, {
+        0xFF, 0x05, 0x06, 0x02, 0x44, 0x33, 0x22, 0x11, 0x08, 0x00,
+        0x00, 0x00, 0x07, 0x03, 0xA4, 0xA3, 0xA2, 0xA1, 0x04, 0xB4,
+        0xB3, 0xB2, 0xB1, 0x00, 0x00, 0x00, 0x00, 0x09, 0x00, 0x00,
+        0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00
+    }));
+}
+
+static void test_criteria_update_preserves_caller_opcode()
+{
+    // This proves only the body-builder contract: the caller owns opcode choice.
+    WorldPacket packet(SMSG_TITLE_EARNED, 37);
+    MopAchievementPackets::BuildCriteriaUpdate(packet,
+        UINT64_C(0x0807060504030201), 0, 0, 8, 0, 0, 0);
+    CHECK(packet.GetOpcode() == SMSG_TITLE_EARNED);
+}
+
 static void test_opcode_values_are_framable()
 {
     CHECK(uint32_t(SMSG_ALL_ACHIEVEMENT_DATA) == 0x180Au);
@@ -299,6 +398,8 @@ static void test_opcode_values_are_framable()
     CHECK(uint32_t(SMSG_ACHIEVEMENT_EARNED) <= 0x1FFFu);
     CHECK(uint32_t(SMSG_ACHIEVEMENT_DELETED) == 0x1A2Fu);
     CHECK(uint32_t(SMSG_ACHIEVEMENT_DELETED) <= 0x1FFFu);
+    CHECK(uint32_t(SMSG_CRITERIA_UPDATE) == 0x0E9Bu);
+    CHECK(uint32_t(SMSG_CRITERIA_UPDATE) <= 0x1FFFu);
 }
 
 int main(int /*argc*/, char** /*argv*/)
@@ -315,6 +416,12 @@ int main(int /*argc*/, char** /*argv*/)
     test_achievement_earned_preserves_caller_opcode();
     test_achievement_deleted_body();
     test_achievement_deleted_preserves_caller_opcode();
+    test_criteria_update_captured_mode_9_body();
+    test_criteria_update_captured_mode_8_body();
+    test_criteria_update_full_interleave_and_scalars();
+    test_criteria_update_mask_order_complements();
+    test_criteria_update_expiry_policy_body();
+    test_criteria_update_preserves_caller_opcode();
     test_opcode_values_are_framable();
 
     if (g_fail)

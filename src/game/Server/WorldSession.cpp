@@ -273,6 +273,7 @@ static bool IsEnterWorldConverted(uint16 opcode)
         case SMSG_SET_PROFICIENCY:
         case SMSG_WEATHER:
         case SMSG_ALL_ACHIEVEMENT_DATA:  // Wave 5 Task 2 -- converted 6908c5f9e (MopAchievementPackets)
+        case SMSG_CRITERIA_UPDATE:       // Isolated timed-expiry tombstone (MopAchievementPackets)
             return true;
 
         // Control/transition packets that must ALWAYS reach the client while suppression is active:

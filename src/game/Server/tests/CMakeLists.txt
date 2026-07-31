@@ -550,6 +550,16 @@ foreach(mutation IN ITEMS
         earned_producer_mapping earned_sender_opcode earned_broadcast_scope
         earned_legacy_body earned_opcode_value earned_registration
         earned_admission earned_reference
+        criteria_update_mask_order criteria_update_byte_order
+        criteria_update_scalar_order criteria_update_timer_order
+        criteria_update_counter_width criteria_update_expiry_player_guid
+        criteria_update_expiry_id
+        criteria_update_expiry_counter criteria_update_expiry_flags
+        criteria_update_expiry_packed_date criteria_update_expiry_timer1
+        criteria_update_expiry_timer2 criteria_update_expiry_sender_opcode
+        criteria_update_expiry_delivery criteria_update_expiry_callsite
+        criteria_update_expiry_loading_gate criteria_update_generic_send
+        criteria_update_generic_callsite_count
         deleted_body_second_word deleted_reset_producer deleted_incomplete_producer
         deleted_reset_loading_gate deleted_incomplete_loading_gate
         criteria_deleted_loading_gate criteria_deleted_reset_escape

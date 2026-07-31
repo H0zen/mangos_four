@@ -400,6 +400,15 @@ void AchievementMgr::SendCriteriaUpdate(uint32 id, CriteriaProgress const* progr
     (void)data;                                             // built-but-not-sent until 18414 format lands
 }
 
+void AchievementMgr::SendCriteriaExpired(uint32 id, CriteriaProgress const* progress, time_t now)
+{
+    WorldPacket data(SMSG_CRITERIA_UPDATE, 37);
+    MopAchievementPackets::BuildCriteriaUpdate(data,
+        GetPlayer()->GetObjectGuid().GetRawValue(), id, uint64(0), uint32(8),
+        uint32(secsToTimeBitFields(progress->date)), uint32(now), uint32(0));
+    GetPlayer()->SendDirectMessage(&data);
+}
+
 /*
  * called at player login. The player might have fulfilled some achievements when the achievement system wasn't working yet
  */
@@ -513,6 +522,11 @@ void AchievementMgr::StartTimedAchievementCriteria(AchievementCriteriaTypes type
  */
 void AchievementMgr::DoFailedTimedAchievementCriterias()
 {
+    if (m_player->GetSession()->PlayerLoading())
+    {
+        return;
+    }
+
     if (m_criteriaFailTimes.empty())
     {
         return;
@@ -544,7 +558,7 @@ void AchievementMgr::DoFailedTimedAchievementCriterias()
 
             // Set to failed, and send to client
             progress->timedCriteriaFailed = true;
-            SendCriteriaUpdate(criteria->ID, progress);
+            SendCriteriaExpired(criteria->ID, progress, now);
 
             // Remove failed progress
             m_criteriaProgress.erase(pro_iter);

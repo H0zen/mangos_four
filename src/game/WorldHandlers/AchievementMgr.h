@@ -109,6 +109,27 @@ namespace MopAchievementPackets
         out << achievementId << uint32(0);
     }
 
+    // Writes only the 18414 SMSG_CRITERIA_UPDATE body; the caller owns opcode
+    // selection and supplies every wire field explicitly.
+    inline void BuildCriteriaUpdate(WorldPacket& out, uint64 playerGuid,
+        uint32 criterionId, uint64 counter, uint32 flags, uint32 packedDate,
+        uint32 timer1, uint32 timer2)
+    {
+        ObjectGuid guid(playerGuid);
+
+        out.WriteGuidMask<4, 6, 2, 3, 7, 1, 5, 0>(guid);
+        out.FlushBits();
+
+        out.WriteGuidBytes<3, 6, 2>(guid);
+        out << criterionId << flags;
+        out.WriteGuidBytes<5, 1>(guid);
+        out << packedDate;
+        out.WriteGuidBytes<4>(guid);
+        out << timer1 << timer2;
+        out.WriteGuidBytes<7, 0>(guid);
+        out << counter;
+    }
+
     inline void BuildAllAchievementData(WorldPacket& out,
         std::vector<CompletedAchievement> const& completed,
         std::vector<CriteriaProgress> const& progress)
@@ -460,6 +481,7 @@ class AchievementMgr
     private:
         void SendAchievementEarned(AchievementEntry const* achievement);
         void SendCriteriaUpdate(uint32 id, CriteriaProgress const* progress);
+        void SendCriteriaExpired(uint32 id, CriteriaProgress const* progress, time_t now);
         void CompletedCriteriaFor(AchievementEntry const* achievement);
         void CompletedAchievement(AchievementEntry const* entry);
         void IncompletedAchievement(AchievementEntry const* entry);

@@ -30,8 +30,8 @@ elseif(MUTATION STREQUAL "earned_byte_order")
         achievement_header "${achievement_header}")
 elseif(MUTATION STREQUAL "earned_scalar_order")
     string(REPLACE
-        "out << packedDate;"
-        "out << achievementId;"
+        "out.WriteGuidBytes<6>(firstGuid);\n        out << packedDate;\n        out.WriteGuidBytes<1>(secondGuid);"
+        "out.WriteGuidBytes<6>(firstGuid);\n        out << achievementId;\n        out.WriteGuidBytes<1>(secondGuid);"
         achievement_header "${achievement_header}")
 elseif(MUTATION STREQUAL "earned_producer_mapping")
     string(REPLACE
@@ -72,6 +72,110 @@ elseif(MUTATION STREQUAL "earned_reference")
     string(REGEX REPLACE
         "(SMSG_ACHIEVEMENT_EARNED[ \t]+0x080B[ \t]+)ACTIVE"
         "\\1DORMANT" opcode_reference "${opcode_reference}")
+elseif(MUTATION STREQUAL "criteria_update_mask_order")
+    string(REPLACE
+        "out.WriteGuidMask<4, 6, 2, 3, 7, 1, 5, 0>(guid);"
+        "out.WriteGuidMask<6, 4, 2, 3, 7, 1, 5, 0>(guid);"
+        achievement_header "${achievement_header}")
+elseif(MUTATION STREQUAL "criteria_update_byte_order")
+    string(REPLACE
+        "out.WriteGuidBytes<3, 6, 2>(guid);"
+        "out.WriteGuidBytes<3, 2, 6>(guid);"
+        achievement_header "${achievement_header}")
+elseif(MUTATION STREQUAL "criteria_update_scalar_order")
+    string(REPLACE
+        "out << criterionId << flags;"
+        "out << flags << criterionId;"
+        achievement_header "${achievement_header}")
+elseif(MUTATION STREQUAL "criteria_update_timer_order")
+    string(REPLACE
+        "out << timer1 << timer2;"
+        "out << timer2 << timer1;"
+        achievement_header "${achievement_header}")
+elseif(MUTATION STREQUAL "criteria_update_counter_width")
+    string(REPLACE
+        "out << counter;"
+        "out << uint32(counter);"
+        achievement_header "${achievement_header}")
+elseif(MUTATION STREQUAL "criteria_update_expiry_player_guid")
+    string(REPLACE
+        "GetPlayer()->GetObjectGuid().GetRawValue(), id, uint64(0), uint32(8),"
+        "uint64(0), id, uint64(0), uint32(8),"
+        achievement_source "${achievement_source}")
+elseif(MUTATION STREQUAL "criteria_update_expiry_id")
+    string(REPLACE
+        "GetPlayer()->GetObjectGuid().GetRawValue(), id, uint64(0), uint32(8),"
+        "GetPlayer()->GetObjectGuid().GetRawValue(), 0, uint64(0), uint32(8),"
+        achievement_source "${achievement_source}")
+elseif(MUTATION STREQUAL "criteria_update_expiry_counter")
+    string(REPLACE
+        "id, uint64(0), uint32(8),"
+        "id, uint64(progress->counter), uint32(8),"
+        achievement_source "${achievement_source}")
+elseif(MUTATION STREQUAL "criteria_update_expiry_flags")
+    string(REPLACE
+        "id, uint64(0), uint32(8),"
+        "id, uint64(0), uint32(0),"
+        achievement_source "${achievement_source}")
+elseif(MUTATION STREQUAL "criteria_update_expiry_packed_date")
+    string(REPLACE
+        "uint32(secsToTimeBitFields(progress->date)), uint32(now), uint32(0));"
+        "uint32(secsToTimeBitFields(now)), uint32(now), uint32(0));"
+        achievement_source "${achievement_source}")
+elseif(MUTATION STREQUAL "criteria_update_expiry_timer1")
+    string(REPLACE
+        "uint32(secsToTimeBitFields(progress->date)), uint32(now), uint32(0));"
+        "uint32(secsToTimeBitFields(progress->date)), uint32(0), uint32(0));"
+        achievement_source "${achievement_source}")
+elseif(MUTATION STREQUAL "criteria_update_expiry_timer2")
+    string(REPLACE
+        "uint32(secsToTimeBitFields(progress->date)), uint32(now), uint32(0));"
+        "uint32(secsToTimeBitFields(progress->date)), uint32(now), uint32(now));"
+        achievement_source "${achievement_source}")
+elseif(MUTATION STREQUAL "criteria_update_expiry_sender_opcode")
+    string(REPLACE
+        "WorldPacket data(SMSG_CRITERIA_UPDATE, 37);"
+        "WorldPacket data(SMSG_ALL_ACHIEVEMENT_DATA, 37);"
+        achievement_source "${achievement_source}")
+elseif(MUTATION STREQUAL "criteria_update_expiry_delivery")
+    string(REPLACE
+        "        uint32(secsToTimeBitFields(progress->date)), uint32(now), uint32(0));\n    GetPlayer()->SendDirectMessage(&data);"
+        "        uint32(secsToTimeBitFields(progress->date)), uint32(now), uint32(0));\n    GetPlayer()->SendMessageToSet(&data, true);"
+        achievement_source "${achievement_source}")
+elseif(MUTATION STREQUAL "criteria_update_expiry_callsite")
+    string(REPLACE
+        "SendCriteriaExpired(criteria->ID, progress, now);"
+        "SendCriteriaUpdate(criteria->ID, progress);"
+        achievement_source "${achievement_source}")
+elseif(MUTATION STREQUAL "criteria_update_expiry_loading_gate")
+    string(REPLACE
+        "if (m_player->GetSession()->PlayerLoading())\n    {\n        return;\n    }"
+        "if (false)\n    {\n        return;\n    }"
+        achievement_source "${achievement_source}")
+elseif(MUTATION STREQUAL "criteria_update_generic_send")
+    string(REPLACE
+        "    (void)data;                                             // built-but-not-sent until 18414 format lands"
+        "    GetPlayer()->SendDirectMessage(&data);"
+        achievement_source "${achievement_source}")
+elseif(MUTATION STREQUAL "criteria_update_generic_callsite_count")
+    string(REPLACE
+        "SendCriteriaUpdate(achievementCriteria->ID, progress);"
+        "/* suppressed timed-start notification */"
+        achievement_source "${achievement_source}")
+elseif(MUTATION STREQUAL "criteria_update_registration")
+    string(REPLACE
+        "DefS(SMSG_CRITERIA_UPDATE, \"SMSG_CRITERIA_UPDATE\");"
+        "/* removed criteria-update logging metadata */"
+        opcode_registry "${opcode_registry}")
+elseif(MUTATION STREQUAL "criteria_update_admission")
+    string(REPLACE
+        "case SMSG_CRITERIA_UPDATE:"
+        "/* removed criteria-update admission */"
+        world_session "${world_session}")
+elseif(MUTATION STREQUAL "criteria_update_reference")
+    string(REGEX REPLACE
+        "(SMSG_CRITERIA_UPDATE[ \t]+0x0E9B[ \t]+)ACTIVE"
+        "\\1DORMANT" opcode_reference "${opcode_reference}")
 elseif(MUTATION STREQUAL "deleted_body_second_word")
     string(REPLACE
         "out << achievementId << uint32(0);"
@@ -111,11 +215,8 @@ elseif(MUTATION STREQUAL "criteria_deleted_reset_escape")
         "        }\n    }\n\n    m_completedAchievements.clear();"
         "        }\n\n    m_completedAchievements.clear();"
         achievement_source "${achievement_source}")
-elseif(MUTATION MATCHES "^(criteria_update|criteria_deleted|achievement_deleted)_(registration|admission|reference)$")
-    if(CMAKE_MATCH_1 STREQUAL "criteria_update")
-        set(blocked_opcode SMSG_CRITERIA_UPDATE)
-        set(blocked_value 0x0E9B)
-    elseif(CMAKE_MATCH_1 STREQUAL "criteria_deleted")
+elseif(MUTATION MATCHES "^(criteria_deleted|achievement_deleted)_(registration|admission|reference)$")
+    if(CMAKE_MATCH_1 STREQUAL "criteria_deleted")
         set(blocked_opcode SMSG_CRITERIA_DELETED)
         set(blocked_value 0x1C33)
     else()
@@ -165,6 +266,23 @@ function(require_literal_none text needle label)
     endif()
 endfunction()
 
+function(require_literal_count text needle expected label)
+    set(count 0)
+    set(remaining "${text}")
+    while(TRUE)
+        string(FIND "${remaining}" "${needle}" found)
+        if(found EQUAL -1)
+            break()
+        endif()
+        math(EXPR count "${count} + 1")
+        math(EXPR next "${found} + 1")
+        string(SUBSTRING "${remaining}" ${next} -1 remaining)
+    endwhile()
+    if(NOT count EQUAL expected)
+        message(FATAL_ERROR "${label}: expected ${expected}, found ${count}")
+    endif()
+endfunction()
+
 function(require_regex_once text needle label)
     string(REGEX MATCHALL "${needle}" matches "${text}")
     list(LENGTH matches count)
@@ -195,9 +313,6 @@ set(mask_sequence "        out.WriteGuidMask<6, 2>(secondGuid);
         out.FlushBits();")
 require_literal_once("${achievement_header}" "${mask_sequence}"
     "achievement-earned 17-bit mask order")
-require_literal_once("${achievement_header}" "out << packedDate;"
-    "achievement-earned scalar order")
-
 set(byte_sequence "        out.WriteGuidBytes<5>(secondGuid);
         out.WriteGuidBytes<3>(firstGuid);
         out.WriteGuidBytes<6>(secondGuid);
@@ -253,6 +368,128 @@ require_literal_once("${world_session}" "case SMSG_ACHIEVEMENT_EARNED:"
 require_regex_once("${opcode_reference}"
     "SMSG_ACHIEVEMENT_EARNED[ \t]+0x080B[ \t]+ACTIVE"
     "achievement-earned active catalogue row")
+
+set(criteria_update_builder "        out.WriteGuidMask<4, 6, 2, 3, 7, 1, 5, 0>(guid);
+        out.FlushBits();
+
+        out.WriteGuidBytes<3, 6, 2>(guid);
+        out << criterionId << flags;
+        out.WriteGuidBytes<5, 1>(guid);
+        out << packedDate;
+        out.WriteGuidBytes<4>(guid);
+        out << timer1 << timer2;
+        out.WriteGuidBytes<7, 0>(guid);
+        out << counter;")
+require_literal_once("${achievement_header}" "${criteria_update_builder}"
+    "criteria-update 18414 mask byte interleave and scalar widths")
+require_literal_once("${achievement_header}"
+    "void SendCriteriaExpired(uint32 id, CriteriaProgress const* progress, time_t now);"
+    "criteria-update private expiry sender declaration")
+
+string(FIND "${achievement_source}"
+    "void AchievementMgr::SendCriteriaUpdate" criteria_generic_start)
+string(FIND "${achievement_source}"
+    "void AchievementMgr::SendCriteriaExpired" criteria_expiry_sender_start)
+string(FIND "${achievement_source}"
+    "void AchievementMgr::CheckAllAchievementCriteria" criteria_sender_end)
+if(criteria_generic_start EQUAL -1 OR criteria_expiry_sender_start EQUAL -1 OR
+        criteria_sender_end EQUAL -1 OR criteria_expiry_sender_start LESS criteria_generic_start OR
+        criteria_sender_end LESS criteria_expiry_sender_start)
+    message(FATAL_ERROR "criteria-update sender function bounds are missing")
+endif()
+math(EXPR criteria_generic_length "${criteria_expiry_sender_start} - ${criteria_generic_start}")
+string(SUBSTRING "${achievement_source}" ${criteria_generic_start}
+    ${criteria_generic_length} criteria_generic_source)
+math(EXPR criteria_expiry_sender_length "${criteria_sender_end} - ${criteria_expiry_sender_start}")
+string(SUBSTRING "${achievement_source}" ${criteria_expiry_sender_start}
+    ${criteria_expiry_sender_length} criteria_expiry_sender_source)
+
+require_literal_none("${criteria_generic_source}" "\n    GetPlayer()->SendDirectMessage(&data);"
+    "ordinary criteria-update sender remains send-free")
+require_literal_once("${criteria_generic_source}"
+    "(void)data;                                             // built-but-not-sent until 18414 format lands"
+    "ordinary criteria-update suppression marker")
+
+set(criteria_expiry_mapping "    WorldPacket data(SMSG_CRITERIA_UPDATE, 37);
+    MopAchievementPackets::BuildCriteriaUpdate(data,
+        GetPlayer()->GetObjectGuid().GetRawValue(), id, uint64(0), uint32(8),
+        uint32(secsToTimeBitFields(progress->date)), uint32(now), uint32(0));")
+require_literal_once("${criteria_expiry_sender_source}" "${criteria_expiry_mapping}"
+    "criteria-update expiry field mapping")
+require_literal_once("${criteria_expiry_sender_source}"
+    "GetPlayer()->SendDirectMessage(&data);"
+    "criteria-update owner-only direct delivery")
+require_literal_none("${criteria_expiry_sender_source}" "SendMessageToSet"
+    "criteria-update expiry is not broadcast")
+
+string(FIND "${achievement_source}"
+    "void AchievementMgr::DoFailedTimedAchievementCriterias" criteria_expiry_pass_start)
+string(FIND "${achievement_source}"
+    "void AchievementMgr::UpdateAchievementCriteria" criteria_expiry_pass_end)
+if(criteria_expiry_pass_start EQUAL -1 OR criteria_expiry_pass_end EQUAL -1 OR
+        criteria_expiry_pass_end LESS criteria_expiry_pass_start)
+    message(FATAL_ERROR "criteria-update expiry pass bounds are missing")
+endif()
+math(EXPR criteria_expiry_pass_length "${criteria_expiry_pass_end} - ${criteria_expiry_pass_start}")
+string(SUBSTRING "${achievement_source}" ${criteria_expiry_pass_start}
+    ${criteria_expiry_pass_length} criteria_expiry_pass_source)
+set(criteria_loading_guard "void AchievementMgr::DoFailedTimedAchievementCriterias()
+{
+    if (m_player->GetSession()->PlayerLoading())
+    {
+        return;
+    }")
+require_literal_once("${criteria_expiry_pass_source}" "${criteria_loading_guard}"
+    "criteria-update full expiry-pass loading deferral")
+require_literal_once("${criteria_expiry_pass_source}"
+    "SendCriteriaExpired(criteria->ID, progress, now);"
+    "criteria-update expiry-only call site")
+require_literal_none("${criteria_expiry_pass_source}" "SendCriteriaUpdate("
+    "criteria-update generic sender excluded from expiry pass")
+
+string(FIND "${achievement_source}"
+    "void AchievementMgr::StartTimedAchievementCriteria" criteria_start_start)
+if(criteria_start_start EQUAL -1 OR criteria_expiry_pass_start LESS criteria_start_start)
+    message(FATAL_ERROR "criteria-update explicit start bounds are missing")
+endif()
+math(EXPR criteria_start_length "${criteria_expiry_pass_start} - ${criteria_start_start}")
+string(SUBSTRING "${achievement_source}" ${criteria_start_start}
+    ${criteria_start_length} criteria_start_source)
+string(FIND "${achievement_source}"
+    "void AchievementMgr::SetCriteriaProgress" criteria_progress_start)
+string(FIND "${achievement_source}"
+    "void AchievementMgr::CompletedAchievement" criteria_progress_end)
+if(criteria_progress_start EQUAL -1 OR criteria_progress_end EQUAL -1 OR
+        criteria_progress_end LESS criteria_progress_start)
+    message(FATAL_ERROR "criteria-update progress call-site bounds are missing")
+endif()
+math(EXPR criteria_progress_length "${criteria_progress_end} - ${criteria_progress_start}")
+string(SUBSTRING "${achievement_source}" ${criteria_progress_start}
+    ${criteria_progress_length} criteria_progress_source)
+string(CONCAT criteria_suppressed_call_sources
+    "${criteria_start_source}" "${criteria_progress_source}")
+require_literal_count("${criteria_suppressed_call_sources}"
+    "SendCriteriaUpdate(" 3
+    "criteria-update suppressed start/progress call sites")
+require_literal_count("${achievement_source}" "SendCriteriaExpired(" 2
+    "criteria-update one private sender and one production call")
+require_literal_count("${achievement_source}"
+    "MopAchievementPackets::BuildCriteriaUpdate(" 1
+    "criteria-update one production body-builder call")
+require_literal_count("${achievement_source}" "SendCriteriaUpdate(" 4
+    "criteria-update one generic sender and three suppressed production calls")
+
+require_literal_once("${opcode_registry}"
+    "DefS(SMSG_CRITERIA_UPDATE, \"SMSG_CRITERIA_UPDATE\");"
+    "criteria-update logging metadata")
+require_literal_once("${world_session}" "case SMSG_CRITERIA_UPDATE:"
+    "criteria-update admission")
+require_regex_once("${opcode_reference}"
+    "SMSG_CRITERIA_UPDATE[ \t]+0x0E9B[ \t]+ACTIVE"
+    "criteria-update active catalogue row")
+require_regex_none("${opcode_reference}"
+    "SMSG_CRITERIA_UPDATE[ \t]+0x0E9B[ \t]+DORMANT"
+    "criteria-update no longer dormant")
 
 require_literal_once("${achievement_header}"
     "out << achievementId << uint32(0);"
@@ -312,13 +549,10 @@ require_literal_once("${incomplete_source}"
     "achievement-deleted incomplete producer mapping")
 
 set(blocked_opcodes
-    SMSG_CRITERIA_UPDATE
     SMSG_CRITERIA_DELETED
     SMSG_ACHIEVEMENT_DELETED)
 foreach(blocked_opcode IN LISTS blocked_opcodes)
-    if(blocked_opcode STREQUAL "SMSG_CRITERIA_UPDATE")
-        set(blocked_value 0x0E9B)
-    elseif(blocked_opcode STREQUAL "SMSG_CRITERIA_DELETED")
+    if(blocked_opcode STREQUAL "SMSG_CRITERIA_DELETED")
         set(blocked_value 0x1C33)
     else()
         set(blocked_value 0x1A2F)
