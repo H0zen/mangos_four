@@ -289,15 +289,15 @@ void WorldSession::HandleGroupInviteResponseOpcode(WorldPacket& recv_data)
 
     if (response.accepted)
     {
-        // remove in from invites in any case
-        group->RemoveInvite(GetPlayer());
-
         if (group->GetLeaderGuid() == GetPlayer()->GetObjectGuid())
         {
             sLog.outError("HandleGroupInviteResponseOpcode: %s tried to accept an invite to his own group",
                           GetPlayer()->GetGuidStr().c_str());
             return;
         }
+
+        // remove from invites only after authority checks
+        group->RemoveInvite(GetPlayer());
 
         /** error handling **/
         /********************/

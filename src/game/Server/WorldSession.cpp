@@ -1151,12 +1151,12 @@ void WorldSession::LogoutPlayer(bool Save)
         ///- Leave all channels before player delete...
         _player->CleanupChannels();
 
-        // An initiator that logs out cannot keep the group in an active check.
+        // Pending invites always own raw Player pointers, including in
+        // PLAYERBOTS builds, so clear them before the player is destroyed.
+        // An initiator that logs out also cannot keep a ready check active.
         _player->ReadyCheckComplete();
-#ifndef ENABLE_PLAYERBOTS
-        ///- If the player is in a group (or invited), remove him. If the group if then only 1 person, disband the group.
         _player->UninviteFromGroup();
-
+#ifndef ENABLE_PLAYERBOTS
         // remove player from the group if he is:
         // a) in group; b) not in raid group; c) logging out normally (not being kicked or disconnected)
         if (_player->GetGroup() && !_player->GetGroup()->isRaidGroup() && m_Socket)

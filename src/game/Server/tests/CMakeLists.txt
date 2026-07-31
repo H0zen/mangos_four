@@ -574,6 +574,8 @@ foreach(mutation IN ITEMS
         group_invite_response_side_effect_before_parse
         group_invite_response_branch_on_has_roles
         group_invite_response_decline_group_uaf
+        group_invite_response_self_accept_after_remove
+        group_invite_response_bot_logout_skip_invite_cleanup
         group_invite_response_unexpected_smsg_activation)
     add_test(NAME mop_group_invite_response_source_mutation_${mutation}
         COMMAND ${CMAKE_COMMAND} -DSOURCE_ROOT=${CMAKE_SOURCE_DIR}

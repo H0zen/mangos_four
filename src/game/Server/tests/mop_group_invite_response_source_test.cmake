@@ -65,6 +65,16 @@ elseif(MUTATION STREQUAL "group_invite_response_decline_group_uaf")
         "ObjectGuid const leaderGuid = group->GetLeaderGuid();\n\n        // uninvite, group can be deleted\n        GetPlayer()->UninviteFromGroup();\n\n        // remember leader if online\n        Player* leader = sObjectMgr.GetPlayer(leaderGuid);"
         "// uninvite, group can be deleted\n        GetPlayer()->UninviteFromGroup();\n\n        // remember leader if online\n        Player* leader = sObjectMgr.GetPlayer(group->GetLeaderGuid());"
         "decline group lifetime")
+elseif(MUTATION STREQUAL "group_invite_response_self_accept_after_remove")
+    mutate(group_handler
+        "if (group->GetLeaderGuid() == GetPlayer()->GetObjectGuid())\n        {\n            sLog.outError(\"HandleGroupInviteResponseOpcode: %s tried to accept an invite to his own group\",\n                          GetPlayer()->GetGuidStr().c_str());\n            return;\n        }\n\n        // remove from invites only after authority checks\n        group->RemoveInvite(GetPlayer());"
+        "// remove from invites before authority checks\n        group->RemoveInvite(GetPlayer());\n\n        if (group->GetLeaderGuid() == GetPlayer()->GetObjectGuid())\n        {\n            sLog.outError(\"HandleGroupInviteResponseOpcode: %s tried to accept an invite to his own group\",\n                          GetPlayer()->GetGuidStr().c_str());\n            return;\n        }"
+        "self-accept ordering")
+elseif(MUTATION STREQUAL "group_invite_response_bot_logout_skip_invite_cleanup")
+    mutate(world_session
+        "_player->ReadyCheckComplete();\n        _player->UninviteFromGroup();\n#ifndef ENABLE_PLAYERBOTS"
+        "_player->ReadyCheckComplete();\n#ifndef ENABLE_PLAYERBOTS\n        _player->UninviteFromGroup();"
+        "playerbot invite cleanup")
 elseif(MUTATION STREQUAL "group_invite_response_unexpected_smsg_activation")
     string(APPEND opcode_registry
         "\nDefS(SMSG_GROUP_DECLINE, \"SMSG_GROUP_DECLINE\");\n")
@@ -188,6 +198,21 @@ string(SUBSTRING "${handler}" ${uninvite_pos} -1 after_uninvite)
 if(after_uninvite MATCHES "group->")
     message(FATAL_ERROR "decline path dereferences group after destructive uninvite")
 endif()
+
+string(FIND "${handler}"
+    "if (group->GetLeaderGuid() == GetPlayer()->GetObjectGuid())"
+    self_accept_check_pos)
+string(FIND "${handler}" "group->RemoveInvite(GetPlayer());"
+    accepted_remove_pos)
+if(self_accept_check_pos EQUAL -1 OR
+        accepted_remove_pos LESS_EQUAL self_accept_check_pos)
+    message(FATAL_ERROR
+        "self-accept authority must precede invite-state mutation")
+endif()
+
+require_text("${world_session}"
+    "_player->ReadyCheckComplete();\n        _player->UninviteFromGroup();\n#ifndef ENABLE_PLAYERBOTS"
+    "playerbot-independent invite cleanup")
 
 foreach(name IN ITEMS SMSG_GROUP_INVITE SMSG_PARTY_COMMAND_RESULT SMSG_GROUP_DECLINE)
     if(opcode_registry MATCHES "DefS[(]${name},")
