@@ -284,7 +284,7 @@ foreach(mutation IN ITEMS
         stop_mask_order stop_byte_order stop_exact_length stop_canonical_byte
         stop_empty_guid stop_handler_route stop_restore_raw_guid
         stop_registration stop_reference stop_drop_owner
-        stop_drop_slot_membership stop_bypass_slot_membership stop_drop_alive
+        stop_drop_slot_membership stop_bypass_slot_membership stop_weaken_conjunction stop_drop_alive
         stop_move_attack_before_owner stop_move_attack_before_membership stop_not_found_error
         stop_not_controlled_error stop_log_shape action_not_found_error
         action_not_controlled_error action_unknown_command_error

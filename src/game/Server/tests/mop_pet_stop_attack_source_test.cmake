@@ -64,6 +64,11 @@ elseif(MUTATION STREQUAL "stop_bypass_slot_membership")
         "(petGuid != GetPlayer()->GetPetGuid() &&\n            petGuid != GetPlayer()->GetCharmGuid())"
         "false"
         pet_handler "${pet_handler}")
+elseif(MUTATION STREQUAL "stop_weaken_conjunction")
+    string(REPLACE
+        "petGuid != GetPlayer()->GetCharmGuid()) ||\n        GetPlayer()->GetObjectGuid() != pet->GetCharmerOrOwnerGuid()"
+        "petGuid != GetPlayer()->GetCharmGuid()) &&\n        GetPlayer()->GetObjectGuid() != pet->GetCharmerOrOwnerGuid()"
+        pet_handler "${pet_handler}")
 elseif(MUTATION STREQUAL "stop_drop_alive")
     string(REPLACE "if (!pet->IsAlive())" "if (false)"
         pet_handler "${pet_handler}")
@@ -273,6 +278,10 @@ if(reader_call EQUAL -1 OR object_lookup LESS_EQUAL reader_call OR
     message(FATAL_ERROR
         "stop handler order guard: reader, lookup, active slot, owner, alive, AttackStop")
 endif()
+
+require_once("${stop_handler}"
+    "petGuid != GetPlayer()->GetCharmGuid()) ||\n        GetPlayer()->GetObjectGuid() != pet->GetCharmerOrOwnerGuid()"
+    "stop authority conjunction")
 
 require_once("${stop_handler}"
     "DEBUG_LOG(\"PET_CONTROL_REJECT opcode=CMSG_PET_STOP_ATTACK reason=malformed account=%u player=%s\",\n            GetAccountId(), GetPlayer()->GetGuidStr().c_str());"
