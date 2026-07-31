@@ -1703,6 +1703,7 @@ foreach(mutation IN ITEMS use_item_opcode_value use_item_registration
         use_item_movement_force_width_and_bound use_item_transport_guid3_mask
         use_item_movement_byte_order use_item_tail_scalar_order
         use_item_target_string_bound use_item_exact_tail use_item_parse_before_binding
+        use_item_target_initialization use_item_cast_item_arguments
         use_item_self_mover_guard use_item_item_guid_match use_item_glyph_bound)
     add_test(NAME ${mutation}
         COMMAND ${CMAKE_COMMAND} -DSOURCE_ROOT=${CMAKE_SOURCE_DIR}
