@@ -616,6 +616,7 @@ void InitializeOpcodes()
     DefS(SMSG_DISMOUNT, "SMSG_DISMOUNT");
     DefS(SMSG_PRE_RESURRECT, "SMSG_PRE_RESURRECT");
     DefS(SMSG_UPDATE_COMBO_POINTS, "SMSG_UPDATE_COMBO_POINTS");
+    DefS(SMSG_ACHIEVEMENT_EARNED, "SMSG_ACHIEVEMENT_EARNED");
     // Staging UI packets admitted together after their 18414 bodies were
     // re-verified. These rows provide logging metadata; admission is the
     // separate IsEnterWorldConverted policy.

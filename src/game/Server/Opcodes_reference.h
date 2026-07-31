@@ -175,8 +175,8 @@
  *   TOTAL SMSG rows                   925
  *
  * SUBSYSTEM CONFIDENCE: high=365, low=221, medium=182, none=157
- * STATUS TOTALS: ACTIVE=510, DOC=435, DORMANT=575
- *   SMSG: ACTIVE=307, DOC=271, DORMANT=347
+ * STATUS TOTALS: ACTIVE=511, DOC=435, DORMANT=574
+ *   SMSG: ACTIVE=308, DOC=271, DORMANT=346
  *   CMSG: ACTIVE=203, DOC=164, DORMANT=228
  */
 
@@ -451,7 +451,7 @@ typedef uint16_t uint16;
  *   SMSG_DUEL_COMPLETE                             0x1C0A  ACTIVE   [high-conf]
  *
  *  -- Effect_C.cpp (1) --
- *   SMSG_ACHIEVEMENT_EARNED                        0x080B  DORMANT  [medium-conf]
+ *   SMSG_ACHIEVEMENT_EARNED                        0x080B  ACTIVE   [medium-conf]
  *
  *  -- EncounterJournal.cpp (1) --
  *   SMSG_UNKNOWN_0x182E                            0x182E  DOC      [unattributed]

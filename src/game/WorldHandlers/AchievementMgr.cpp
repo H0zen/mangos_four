@@ -358,11 +358,12 @@ void AchievementMgr::SendAchievementEarned(AchievementEntry const* achievement)
         Cell::VisitWorldObjects(GetPlayer(), say_worker, sWorld.getConfig(CONFIG_FLOAT_LISTEN_RANGE_SAY));
     }
 
-    WorldPacket data(SMSG_ACHIEVEMENT_EARNED, 8 + 4 + 8);
-    data << GetPlayer()->GetPackGUID();
-    data << uint32(achievement->ID);
-    data << uint32(secsToTimeBitFields(time(NULL)));
-    data << uint32(0);
+    uint64 const playerGuid = GetPlayer()->GetObjectGuid().GetRawValue();
+    uint32 const packedDate = uint32(secsToTimeBitFields(time(NULL)));
+    WorldPacket data(SMSG_ACHIEVEMENT_EARNED, 35);
+    MopAchievementPackets::BuildAchievementEarned(data,
+        playerGuid, playerGuid, false, packedDate, uint32(achievement->ID),
+        realmID, realmID);
     GetPlayer()->SendMessageToSetInRange(&data, sWorld.getConfig(CONFIG_FLOAT_LISTEN_RANGE_SAY), true);
 }
 

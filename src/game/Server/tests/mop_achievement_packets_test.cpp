@@ -24,13 +24,14 @@
  */
 
 /**
- * Byte-exact tests for the 5.4.8 ALL_ACHIEVEMENT_DATA packet body.
+ * Byte-exact tests for the 5.4.8 achievement packet bodies.
  */
 
 #include "AchievementMgr.h"
 #include "Opcodes.h"
 #include "WorldPacket.h"
 
+#include <array>
 #include <cstdint>
 #include <cstdio>
 #include <vector>
@@ -43,6 +44,27 @@ static bool ExpectBytes(WorldPacket const& packet, std::vector<uint8_t> const& e
     if (packet.size() != expected.size())
     {
         std::fprintf(stderr, "  size %u, wanted %u\n", unsigned(packet.size()), unsigned(expected.size()));
+        return false;
+    }
+
+    for (size_t i = 0; i < expected.size(); ++i)
+    {
+        if (packet.contents()[i] != expected[i])
+        {
+            std::fprintf(stderr, "  byte %u = 0x%02X, wanted 0x%02X\n",
+                         unsigned(i), packet.contents()[i], expected[i]);
+            return false;
+        }
+    }
+    return true;
+}
+
+static bool ExpectPrefix(WorldPacket const& packet, std::array<uint8_t, 3> const& expected)
+{
+    if (packet.size() < expected.size())
+    {
+        std::fprintf(stderr, "  size %u, wanted at least %u\n",
+                     unsigned(packet.size()), unsigned(expected.size()));
         return false;
     }
 
@@ -146,13 +168,115 @@ static void test_all_guid_bytes_nonzero()
     }));
 }
 
-static void test_opcode_value_is_framable()
+static void test_achievement_earned_captured_bodies()
 {
-    WorldPacket packet(SMSG_ALL_ACHIEVEMENT_DATA, 5);
-    MopAchievementPackets::BuildAllAchievementData(packet, {}, {});
+    // Captured retail body: build 18414, catalogue 2BE10C89,
+    // capture-000006 sequence 48502. Independent reader decode consumed 29/29.
+    // Because g1 == g2, this fixture does not distinguish the two GUID roles.
+    WorldPacket first(SMSG_ACHIEVEMENT_EARNED, 29);
+    MopAchievementPackets::BuildAchievementEarned(first,
+        UINT64_C(0x04000000054829D1), UINT64_C(0x04000000054829D1), false,
+        0x0E634C13u, 5291u, 0x03010018u, 0x0304000Du);
+    CHECK(ExpectBytes(first, {
+        0x4D, 0xF3, 0x00, 0x04, 0x13, 0x4C, 0x63, 0x0E, 0x28, 0x49,
+        0xD0, 0x05, 0x04, 0x05, 0xAB, 0x14, 0x00, 0x00, 0x28, 0xD0,
+        0x18, 0x00, 0x01, 0x03, 0x0D, 0x00, 0x04, 0x03, 0x49
+    }));
+
+    // Captured retail body: build 18414, catalogue 2BE10C89,
+    // capture-000135 sequence 26505. Independent reader decode consumed 24/24.
+    // It distinguishes g1 from g2, but does not establish their semantic names.
+    WorldPacket second(SMSG_ACHIEVEMENT_EARNED, 24);
+    MopAchievementPackets::BuildAchievementEarned(second,
+        0, UINT64_C(0x04000000053CC8E8), false,
+        0x0E675AB2u, 6616u, 0, 0);
+    CHECK(ExpectBytes(second, {
+        0x41, 0x32, 0x00, 0xB2, 0x5A, 0x67, 0x0E, 0xC9, 0x04, 0x05,
+        0xD8, 0x19, 0x00, 0x00, 0xE9, 0x00, 0x00, 0x00, 0x00, 0x00,
+        0x00, 0x00, 0x00, 0x3D
+    }));
+}
+
+static void test_achievement_earned_full_interleave_and_scalars()
+{
+    // Binary-derived synthetic coverage, not captured retail evidence. Distinct,
+    // all-nonzero GUIDs exercise every XOR-1 byte and scalar boundary.
+    WorldPacket packet(SMSG_ACHIEVEMENT_EARNED, 35);
+    MopAchievementPackets::BuildAchievementEarned(packet,
+        UINT64_C(0x0807060504030201), UINT64_C(0x1817161514131211), true,
+        0x11223344u, 0x55667788u, 0x99AABBCCu, 0xDDEEFF00u);
+    CHECK(ExpectBytes(packet, {
+        0xFF, 0xFF, 0x80, 0x17, 0x05, 0x16, 0x06, 0x44, 0x33, 0x22,
+        0x11, 0x13, 0x02, 0x00, 0x09, 0x15, 0x04, 0x19, 0x88, 0x77,
+        0x66, 0x55, 0x14, 0x03, 0x10, 0x07, 0xCC, 0xBB, 0xAA, 0x99,
+        0x00, 0xFF, 0xEE, 0xDD, 0x12
+    }));
+}
+
+static void test_achievement_earned_boolean_bit()
+{
+    // Binary-derived synthetic coverage. No captured fixture exercises true;
+    // holding every other input constant isolates alreadyEarned at mask bit 6.
+    WorldPacket packet(SMSG_ACHIEVEMENT_EARNED, 35);
+    MopAchievementPackets::BuildAchievementEarned(packet,
+        UINT64_C(0x0807060504030201), UINT64_C(0x1817161514131211), false,
+        0x11223344u, 0x55667788u, 0x99AABBCCu, 0xDDEEFF00u);
+    CHECK(ExpectPrefix(packet, { 0xFD, 0xFF, 0x80 }));
+}
+
+static void test_achievement_earned_mask_order_complements()
+{
+    // Synthetic coverage cases. One zero byte at a time uniquely assigns all
+    // sixteen GUID presence bits; the all-nonzero fixture alone cannot do that.
+    uint64 const guid1 = UINT64_C(0x0807060504030201);
+    uint64 const guid2 = UINT64_C(0x1817161514131211);
+    std::array<std::array<uint8_t, 3>, 8> const guid1Masks = {{
+        {{ 0xF5, 0xFF, 0x80 }}, {{ 0xFD, 0xBF, 0x80 }},
+        {{ 0xFD, 0xFE, 0x80 }}, {{ 0xF9, 0xFF, 0x80 }},
+        {{ 0xDD, 0xFF, 0x80 }}, {{ 0xED, 0xFF, 0x80 }},
+        {{ 0xFD, 0xFB, 0x80 }}, {{ 0xFD, 0x7F, 0x80 }}
+    }};
+    std::array<std::array<uint8_t, 3>, 8> const guid2Masks = {{
+        {{ 0xFD, 0xEF, 0x80 }}, {{ 0xFD, 0xFD, 0x80 }},
+        {{ 0xBD, 0xFF, 0x80 }}, {{ 0xFD, 0xDF, 0x80 }},
+        {{ 0xFD, 0xF7, 0x80 }}, {{ 0xFD, 0xFF, 0x00 }},
+        {{ 0x7D, 0xFF, 0x80 }}, {{ 0xFC, 0xFF, 0x80 }}
+    }};
+
+    for (size_t index = 0; index < 8; ++index)
+    {
+        uint64 const byteMask = ~(UINT64_C(0xFF) << (8 * index));
+
+        WorldPacket first(SMSG_ACHIEVEMENT_EARNED, 34);
+        MopAchievementPackets::BuildAchievementEarned(first,
+            guid1 & byteMask, guid2, false, 0, 0, 0, 0);
+        CHECK(first.size() == 34);
+        CHECK(ExpectPrefix(first, guid1Masks[index]));
+
+        WorldPacket second(SMSG_ACHIEVEMENT_EARNED, 34);
+        MopAchievementPackets::BuildAchievementEarned(second,
+            guid1, guid2 & byteMask, false, 0, 0, 0, 0);
+        CHECK(second.size() == 34);
+        CHECK(ExpectPrefix(second, guid2Masks[index]));
+    }
+}
+
+static void test_achievement_earned_preserves_caller_opcode()
+{
+    // This proves only the body-builder contract: the caller owns opcode choice.
+    WorldPacket packet(SMSG_TITLE_EARNED, 35);
+    MopAchievementPackets::BuildAchievementEarned(packet,
+        UINT64_C(0x0807060504030201), UINT64_C(0x1817161514131211), false,
+        0x11223344u, 0x55667788u, 0x99AABBCCu, 0xDDEEFF00u);
+    CHECK(packet.GetOpcode() == SMSG_TITLE_EARNED);
+}
+
+static void test_opcode_values_are_framable()
+{
     CHECK(uint32_t(SMSG_ALL_ACHIEVEMENT_DATA) == 0x180Au);
-    CHECK(uint32_t(packet.GetOpcode()) == 0x180Au);
-    CHECK(uint32_t(packet.GetOpcode()) <= 0x1FFFu);
+    CHECK(uint32_t(SMSG_ALL_ACHIEVEMENT_DATA) <= 0x1FFFu);
+    CHECK(uint32_t(SMSG_ACHIEVEMENT_EARNED) == 0x080Bu);
+    CHECK(uint32_t(SMSG_ACHIEVEMENT_EARNED) <= 0x1FFFu);
 }
 
 int main(int /*argc*/, char** /*argv*/)
@@ -162,7 +286,12 @@ int main(int /*argc*/, char** /*argv*/)
     test_progress_sparse_guids();
     test_completed_bytes_precede_progress_bytes_with_zero_guids();
     test_all_guid_bytes_nonzero();
-    test_opcode_value_is_framable();
+    test_achievement_earned_captured_bodies();
+    test_achievement_earned_full_interleave_and_scalars();
+    test_achievement_earned_boolean_bit();
+    test_achievement_earned_mask_order_complements();
+    test_achievement_earned_preserves_caller_opcode();
+    test_opcode_values_are_framable();
 
     if (g_fail)
     {

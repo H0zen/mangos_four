@@ -466,6 +466,7 @@ static bool IsEnterWorldConverted(uint16 opcode)
         case SMSG_DISMOUNT:                          // MopCompactPackets::BuildDismount
         case SMSG_PRE_RESURRECT:                     // MopCompactPackets::BuildPreResurrect
         case SMSG_UPDATE_COMBO_POINTS:               // MopComboPointPackets::BuildUpdate
+        case SMSG_ACHIEVEMENT_EARNED:                // MopAchievementPackets::BuildAchievementEarned
         // Staging UI. SHOW_BANK and the calendar lockout removal use dedicated
         // 18414 packed-GUID builders; the other four already matched their
         // client readers and needed admission only. SHOW_MAILBOX has no corpus

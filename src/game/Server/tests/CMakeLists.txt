@@ -541,6 +541,25 @@ set_target_properties(mop_achievement_packets_test PROPERTIES CXX_STANDARD 17 CX
 target_link_libraries(mop_achievement_packets_test PRIVATE game)
 add_test(NAME mop_achievement_packets COMMAND mop_achievement_packets_test)
 
+add_test(NAME mop_achievement_packets_source
+    COMMAND ${CMAKE_COMMAND} -DSOURCE_ROOT=${CMAKE_SOURCE_DIR}
+        -P ${CMAKE_CURRENT_SOURCE_DIR}/mop_achievement_packets_source_test.cmake)
+
+foreach(mutation IN ITEMS
+        earned_mask_order earned_boolean earned_byte_order earned_scalar_order
+        earned_producer_mapping earned_sender_opcode earned_broadcast_scope
+        earned_legacy_body earned_opcode_value earned_registration
+        earned_admission earned_reference
+        criteria_update_registration criteria_update_admission criteria_update_reference
+        criteria_deleted_registration criteria_deleted_admission criteria_deleted_reference
+        achievement_deleted_registration achievement_deleted_admission achievement_deleted_reference)
+    add_test(NAME mop_achievement_packets_source_mutation_${mutation}
+        COMMAND ${CMAKE_COMMAND} -DSOURCE_ROOT=${CMAKE_SOURCE_DIR}
+            -DMUTATION=${mutation}
+            -P ${CMAKE_CURRENT_SOURCE_DIR}/mop_achievement_packets_source_test.cmake)
+    set_tests_properties(mop_achievement_packets_source_mutation_${mutation} PROPERTIES WILL_FAIL TRUE)
+endforeach()
+
 add_test(NAME mop_ui_envelope_source
     COMMAND ${CMAKE_COMMAND}
         -DSOURCE_ROOT=${CMAKE_SOURCE_DIR}

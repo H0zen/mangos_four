@@ -61,6 +61,47 @@ namespace MopAchievementPackets
         uint32 timer2 = 0;
     };
 
+    // Writes only the 18414 SMSG_ACHIEVEMENT_EARNED body; the caller owns
+    // opcode selection. The client exposes two GUID/realm roles, but the
+    // protected handler does not provide stable semantic names for them.
+    inline void BuildAchievementEarned(WorldPacket& out, uint64 guid1,
+        uint64 guid2, bool alreadyEarned, uint32 packedDate,
+        uint32 achievementId, uint32 realm1, uint32 realm2)
+    {
+        ObjectGuid firstGuid(guid1);
+        ObjectGuid secondGuid(guid2);
+
+        out.WriteGuidMask<6, 2>(secondGuid);
+        out.WriteGuidMask<4, 5, 0, 3>(firstGuid);
+        out.WriteBit(alreadyEarned);
+        out.WriteGuidMask<7>(secondGuid);
+        out.WriteGuidMask<7, 1>(firstGuid);
+        out.WriteGuidMask<3, 0, 4>(secondGuid);
+        out.WriteGuidMask<6>(firstGuid);
+        out.WriteGuidMask<1>(secondGuid);
+        out.WriteGuidMask<2>(firstGuid);
+        out.WriteGuidMask<5>(secondGuid);
+        out.FlushBits();
+
+        out.WriteGuidBytes<5>(secondGuid);
+        out.WriteGuidBytes<3>(firstGuid);
+        out.WriteGuidBytes<6>(secondGuid);
+        out.WriteGuidBytes<6>(firstGuid);
+        out << packedDate;
+        out.WriteGuidBytes<1>(secondGuid);
+        out.WriteGuidBytes<2, 0, 7>(firstGuid);
+        out.WriteGuidBytes<3>(secondGuid);
+        out.WriteGuidBytes<4>(firstGuid);
+        out.WriteGuidBytes<7>(secondGuid);
+        out << achievementId;
+        out.WriteGuidBytes<4>(secondGuid);
+        out.WriteGuidBytes<1>(firstGuid);
+        out.WriteGuidBytes<0>(secondGuid);
+        out.WriteGuidBytes<5>(firstGuid);
+        out << realm1 << realm2;
+        out.WriteGuidBytes<2>(secondGuid);
+    }
+
     inline void BuildAllAchievementData(WorldPacket& out,
         std::vector<CompletedAchievement> const& completed,
         std::vector<CriteriaProgress> const& progress)
