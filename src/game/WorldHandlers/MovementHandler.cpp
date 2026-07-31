@@ -699,19 +699,12 @@ void WorldSession::SendKnockBack(float angle, float horizontalSpeed, float verti
     float vsin = sin(angle);
     float vcos = cos(angle);
 
-    WorldPacket data(SMSG_MOVE_KNOCK_BACK, 9 + 4 + 4 + 4 + 4 + 4 + 1 + 8);
-    data.WriteGuidMask<0, 3, 6, 7, 2, 5, 1, 4>(guid);
-    data.WriteGuidBytes<1>(guid);
-    data << float(vsin);                                // y direction
+    WorldPacket data(SMSG_MOVE_KNOCK_BACK, 29);
     // Not 0: the client reads counter == 0 as "this change originated here",
     // because its own local entry points pass 0. Knockback is server-originated.
-    data << uint32(GetPlayer()->NextMovementCounter());  // Sequence
-    data.WriteGuidBytes<6, 7>(guid);
-    data << float(horizontalSpeed);                     // Horizontal speed
-    data.WriteGuidBytes<4, 5, 3>(guid);
-    data << float(-verticalSpeed);                      // Z Movement speed (vertical)
-    data << float(vcos);                                // x direction
-    data.WriteGuidBytes<2, 0>(guid);
+    uint32 const counter = GetPlayer()->NextMovementCounter();
+    MopCompactPackets::BuildMoveKnockBack(data, guid.GetRawValue(), counter,
+        horizontalSpeed, verticalSpeed, vcos, vsin);
     SendPacket(&data);
 }
 

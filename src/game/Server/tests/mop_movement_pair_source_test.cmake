@@ -77,7 +77,7 @@ elseif(MUTATION STREQUAL "unadmitted_hover_mover")
     string(REGEX REPLACE "case SMSG_MOVE_SET_HOVER:" ""
         SESSION_SOURCE "${SESSION_SOURCE}")
 elseif(MUTATION STREQUAL "knockback_constant_counter")
-    string(REPLACE "data << uint32(GetPlayer()->NextMovementCounter());" "data << uint32(0);"
+    string(REPLACE "uint32 const counter = GetPlayer()->NextMovementCounter();" "uint32 const counter = 0;"
         MOVEMENT_HANDLER_SOURCE "${MOVEMENT_HANDLER_SOURCE}")
 elseif(MUTATION STREQUAL "collision_height_constant_counter")
     string(REPLACE "data << uint32(NextMovementCounter());" "data << uint32(sWorld.GetGameTime());"
@@ -539,11 +539,16 @@ endforeach()
 # Knockback previously sent a literal 0, which the client reads as
 # "client-originated". Collision height sent sWorld.GetGameTime(), which is not a
 # per-mover sequence at all: it is shared by every unit in the world.
-string(FIND "${MOVEMENT_HANDLER_SOURCE}" "data << uint32(GetPlayer()->NextMovementCounter());" KNOCKBACK_COUNTER)
+string(FIND "${MOVEMENT_HANDLER_SOURCE}" "uint32 const counter = GetPlayer()->NextMovementCounter();" KNOCKBACK_COUNTER)
 if(KNOCKBACK_COUNTER EQUAL -1)
     message(FATAL_ERROR
         "SMSG_MOVE_KNOCK_BACK must stamp NextMovementCounter() -- a literal 0 tells the "
         "client the knockback originated on the client")
+endif()
+string(FIND "${MOVEMENT_HANDLER_SOURCE}"
+    "BuildMoveKnockBack(data, guid.GetRawValue(), counter," KNOCKBACK_COUNTER_USE)
+if(KNOCKBACK_COUNTER_USE EQUAL -1)
+    message(FATAL_ERROR "SMSG_MOVE_KNOCK_BACK must serialize the advancing counter")
 endif()
 
 string(FIND "${UNIT_SOURCE_EARLY}" "data << uint32(NextMovementCounter());  // Packet counter" COLLISION_COUNTER)

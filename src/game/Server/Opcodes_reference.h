@@ -175,9 +175,9 @@
  *   TOTAL SMSG rows                   925
  *
  * SUBSYSTEM CONFIDENCE: high=365, low=221, medium=182, none=157
- * STATUS TOTALS: ACTIVE=514, DOC=435, DORMANT=571
- *   SMSG: ACTIVE=310, DOC=271, DORMANT=344
- *   CMSG: ACTIVE=204, DOC=164, DORMANT=227
+ * STATUS TOTALS: ACTIVE=517, DOC=435, DORMANT=568
+ *   SMSG: ACTIVE=312, DOC=271, DORMANT=342
+ *   CMSG: ACTIVE=205, DOC=164, DORMANT=226
  */
 
 // CAVEATS -- read before trusting any single row:
@@ -1005,7 +1005,7 @@ typedef uint16_t uint16;
  *   SMSG_MOVE_UPDATE_SWIM_SPEED                    0x01E2  DORMANT
  *   SMSG_UNKNOWN_0x023B                            0x023B  DOC
  *   SMSG_MOVE_SET_COLLISION_HGT                    0x0250  DORMANT
- *   SMSG_MOVE_UPDATE_KNOCK_BACK                    0x0251  DORMANT
+ *   SMSG_MOVE_UPDATE_KNOCK_BACK                    0x0251  ACTIVE
  *   SMSG_SPLINE_MOVE_SET_HOVER                     0x0258  DORMANT
  *   SMSG_MOVE_UPDATE_SWIM_BACK_SPEED               0x025A  DORMANT
  *   SMSG_UNKNOWN_0x02BB                            0x02BB  DOC
@@ -1019,7 +1019,7 @@ typedef uint16_t uint16;
  *   SMSG_MOVE_SET_WALK_SPEED                       0x0469  ACTIVE
  *   SMSG_MIRROR_IMAGE_CREATURE_DATA                0x04D0  DORMANT
  *   SMSG_MIRROR_IMAGE_COMPONENTED_DATA             0x04D9  DORMANT
- *   SMSG_MOVE_KNOCK_BACK                           0x0562  DORMANT
+ *   SMSG_MOVE_KNOCK_BACK                           0x0562  ACTIVE
  *   SMSG_PLAY_SPELL_VISUAL                         0x061E  DORMANT
  *   SMSG_THREAT_UPDATE                             0x0632  ACTIVE   [high-conf]
  *   SMSG_AI_REACTION                               0x06AF  ACTIVE
@@ -1338,7 +1338,7 @@ typedef uint16_t uint16;
  *   CMSG_CHAR_ENUM                                 0x00E0  ACTIVE
  *   CMSG_UNKNOWN_0x00E3                            0x00E3  ACTIVE   server-binding=CMSG_LFG_LFR_LEAVE
  *   CMSG_UNKNOWN_0x00F0                            0x00F0  DOC
- *   CMSG_MOVE_KNOCK_BACK_ACK                       0x00F2  DORMANT
+ *   CMSG_MOVE_KNOCK_BACK_ACK                       0x00F2  ACTIVE
  *   CMSG_ITEM_TEXT_QUERY                           0x0123  DORMANT
  *   CMSG_OPENING_CINEMATIC                         0x0130  DORMANT
  *   CMSG_QUERY_VOID_STORAGE                        0x0140  DOC

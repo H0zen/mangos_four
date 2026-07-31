@@ -321,6 +321,10 @@ static bool IsEnterWorldConverted(uint16 opcode)
         case SMSG_MOVE_SET_ACTIVE_MOVER:           // MopControlPackets::BuildSetActiveMover
         case SMSG_PLAYER_MOVE:                     // MovementInfo relay serializer
         case SMSG_MONSTER_MOVE:                    // PacketBuilder 18414 spline serializer (transport data is embedded)
+        // Knockback is admitted atomically: the owner receives the direct body,
+        // then its ack is relayed to nearby observers through MovementInfo.
+        case SMSG_MOVE_KNOCK_BACK:                 // MopCompactPackets::BuildMoveKnockBack
+        case SMSG_MOVE_UPDATE_KNOCK_BACK:          // MovementInfo relay serializer
         case SMSG_MOVE_SET_SWIM_SPEED:             // MopCompactPackets::BuildMoveSetSwimSpeed
         case SMSG_MOVE_SET_RUN_SPEED:              // MopCompactPackets::BuildMoveSetRunSpeed
         case SMSG_MOVE_SET_WALK_SPEED:             // MopCompactPackets::BuildMoveSetWalkSpeed

@@ -502,6 +502,45 @@ static RefOp const kForceFlightBackSpeedChangeAck[] = {
     RefOp::UnknownUInt32, RefOp::Timestamp, RefOp::SplineElevation, RefOp::PositionO,
     RefOp::End };
 
+// CMSG_MOVE_KNOCK_BACK_ACK. Independent transcription of the 18414 client
+// writer; the production reader already carries this recovered order.
+static RefOp const kMoveKnockBackAck[] = {
+    RefOp::MovementCounter, RefOp::PositionX, RefOp::PositionZ, RefOp::PositionY,
+    G(5), RefOp::HasUnknownUInt32, RefOp::HasTimestamp, RefOp::HasFlags2,
+    RefOp::Raw172, RefOp::HasTransport, RefOp::HasSplineElevation, G(3),
+    RefOp::HasPitch, RefOp::ForceCount, G(1), RefOp::HasFlags, G(7), G(6),
+    G(4), G(0), RefOp::HasOrientation, G(2), RefOp::Raw149, RefOp::HasFall,
+    RefOp::Raw148, RefOp::Flags, T(2), RefOp::HasTransportTime3, T(3), T(1),
+    T(4), T(6), T(0), RefOp::HasTransportTime2, T(5), T(7),
+    RefOp::HasFallDirection, RefOp::Flags2, GB(4), GB(1), GB(0), GB(2), GB(5),
+    GB(3), RefOp::ForceIds, GB(7), GB(6), RefOp::TransportTime3,
+    RefOp::TransportTime2, RefOp::TransportTime, RefOp::TransportX,
+    RefOp::TransportY, TB(7), RefOp::TransportSeat, TB(1), RefOp::TransportZ,
+    RefOp::TransportO, TB(6), TB(2), TB(3), TB(0), TB(4), TB(5),
+    RefOp::FallHorizontal, RefOp::FallSin, RefOp::FallCos, RefOp::FallVertical,
+    RefOp::FallTime, RefOp::SplineElevation, RefOp::Pitch, RefOp::Timestamp,
+    RefOp::PositionO, RefOp::UnknownUInt32, RefOp::End };
+
+// SMSG_MOVE_UPDATE_KNOCK_BACK. Independent transcription of the 18414 client
+// reader, including its 22-bit movement-force count and 13-bit flags2 field.
+static RefOp const kMoveUpdateKnockBack[] = {
+    G(5), RefOp::HasSplineElevation, RefOp::HasTimestamp, RefOp::ForceCount,
+    RefOp::HasFlags2, G(2), G(4), G(6), G(1), G(0), RefOp::Raw149,
+    RefOp::HasOrientation, RefOp::Raw148, RefOp::HasTransport,
+    T(5), T(2), T(0), T(7), T(1), T(6), T(4), RefOp::HasTransportTime2,
+    T(3), RefOp::HasTransportTime3, G(3), RefOp::HasFall,
+    RefOp::HasUnknownUInt32, RefOp::HasFallDirection, G(7), RefOp::Raw172,
+    RefOp::HasPitch, RefOp::Flags2, RefOp::HasFlags, RefOp::Flags,
+    GB(1), TB(5), RefOp::TransportTime3, TB(3), TB(1), TB(4),
+    RefOp::TransportZ, TB(7), TB(6), TB(2), RefOp::TransportY, TB(0),
+    RefOp::TransportSeat, RefOp::TransportO, RefOp::TransportX,
+    RefOp::TransportTime2, RefOp::TransportTime, GB(2),
+    RefOp::SplineElevation, RefOp::FallSin, RefOp::FallHorizontal,
+    RefOp::FallCos, RefOp::FallVertical, RefOp::FallTime, RefOp::PositionY,
+    RefOp::PositionO, RefOp::ForceIds, GB(7), GB(6), GB(4), RefOp::PositionZ,
+    RefOp::UnknownUInt32, GB(3), GB(0), RefOp::PositionX, RefOp::Pitch, GB(5),
+    RefOp::Timestamp, RefOp::End };
+
 #undef G
 #undef GB
 #undef T
@@ -595,6 +634,13 @@ static bool Equal(WorldPacket const& packet, std::vector<uint8> const& expected)
 {
     return packet.size() == expected.size() &&
         std::memcmp(packet.contents(), expected.data(), expected.size()) == 0;
+}
+
+static float FloatFromBits(uint32 bits)
+{
+    float value = 0.0f;
+    std::memcpy(&value, &bits, sizeof(value));
+    return value;
 }
 
 static std::vector<uint8> EncodePackedGuid(uint64 guid,
@@ -1122,6 +1168,9 @@ static void test_hostile_counts_rejected()
     CHECK(Rejects(CMSG_MOVE_START_TURN_LEFT, kStartTurnLeft, state, (1u << 22) - 1u, 0, false));
     CHECK(Rejects(CMSG_MOVE_START_TURN_RIGHT, kStartTurnRight, state, (1u << 22) - 1u, 0, false));
     CHECK(Rejects(CMSG_MOVE_STOP_TURN, kStopTurn, state, (1u << 22) - 1u, 0, false));
+    CHECK(Rejects(CMSG_MOVE_KNOCK_BACK_ACK, kMoveKnockBackAck, state,
+        (1u << 22) - 1u, 0, false));
+    CHECK(Rejects(CMSG_MOVE_KNOCK_BACK_ACK, kMoveKnockBackAck, state, 2, 1, true));
     CHECK(RejectsForceSwim(state, (1u << 22) - 1u, 0, false));
     CHECK(RejectsForceSwim(state, 2, 1, true));
 }
@@ -1145,6 +1194,9 @@ static void test_opcode_values_are_framable()
     CHECK(uint32(CMSG_MOVE_START_ASCEND) == 0x11FAu);
     CHECK(uint32(CMSG_MOVE_STOP_ASCEND) == 0x115Au);
     CHECK(uint32(CMSG_MOVE_START_DESCEND) == 0x01D1u);
+    CHECK(uint32(SMSG_MOVE_KNOCK_BACK) == 0x0562u);
+    CHECK(uint32(CMSG_MOVE_KNOCK_BACK_ACK) == 0x00F2u);
+    CHECK(uint32(SMSG_MOVE_UPDATE_KNOCK_BACK) == 0x0251u);
     CHECK(uint32(CMSG_FORCE_SWIM_SPEED_CHANGE_ACK) == 0x1853u);
     CHECK(uint32(SMSG_PLAYER_MOVE) == 0x1A32u);
     CHECK(uint32(SMSG_SPLINE_MOVE_SET_NORMAL_FALL) == 0x0B08u);
@@ -1196,6 +1248,113 @@ static void test_linear_monster_move_fixture()
     CHECK(Equal(packet, expected));
 }
 
+static void test_move_update_knock_back_retail_bodies()
+{
+    // Captured retail bodies prove the ordinary, fall-direction, orientation,
+    // and transport arms. They contain no force IDs or rare scalar optionals;
+    // the independent synthetic relay below covers those separately.
+    static uint8 const body52[] = {
+        0x40, 0x00, 0x00, 0x26, 0x9F, 0xC4, 0x00, 0x00,
+        0x00, 0xA0, 0x04, 0x28, 0x49, 0x00, 0x00, 0x80,
+        0xBF, 0x00, 0x00, 0x00, 0x00, 0x2E, 0xBD, 0x3B,
+        0xB3, 0x00, 0x00, 0xA0, 0xC0, 0x00, 0x00, 0x00,
+        0x00, 0x92, 0xEB, 0x95, 0xC2, 0x05, 0x51, 0x6F,
+        0x20, 0x44, 0x04, 0xD0, 0x02, 0xC3, 0x38, 0xC4,
+        0xD6, 0x41, 0x4E, 0x35
+    };
+    static uint8 const body56[] = {
+        0x40, 0x00, 0x00, 0x26, 0x1F, 0xD0, 0x00, 0x00,
+        0x00, 0xA0, 0x24, 0x28, 0x49, 0x5A, 0xCF, 0x0F,
+        0x3D, 0x00, 0x00, 0x70, 0x41, 0x98, 0xD7, 0x7F,
+        0xBF, 0x59, 0x97, 0x37, 0xBF, 0x00, 0x00, 0x00,
+        0x00, 0x85, 0x77, 0xA3, 0xC4, 0xBC, 0x68, 0xE9,
+        0x3F, 0x05, 0x6B, 0x6D, 0x2D, 0x41, 0x04, 0xD0,
+        0x78, 0x8F, 0x2B, 0xC6, 0xEE, 0x90, 0x42, 0x35
+    };
+    static uint8 const body82[] = {
+        0x40, 0x00, 0x00, 0x26, 0x27, 0x87, 0xF4, 0x00,
+        0x00, 0x00, 0x28, 0x01, 0x1C, 0x05, 0x50, 0x4B,
+        0x11, 0x42, 0x1E, 0xC1, 0x58, 0x5E, 0x30, 0xBE,
+        0xC4, 0xFF, 0x06, 0xED, 0x20, 0x40, 0x27, 0x27,
+        0x04, 0x42, 0xFF, 0xFF, 0x00, 0x00, 0x8A, 0x85,
+        0xBE, 0xED, 0x3E, 0x00, 0x00, 0x58, 0x41, 0x47,
+        0xBA, 0x62, 0xBF, 0x2E, 0x8E, 0x90, 0xC1, 0x00,
+        0x00, 0x00, 0x00, 0x5D, 0x8B, 0xEF, 0x44, 0x70,
+        0x3E, 0xB5, 0x40, 0x04, 0xAD, 0xEF, 0x58, 0x43,
+        0x04, 0xB8, 0x7E, 0x5A, 0xF0, 0xC3, 0x61, 0x15,
+        0x05, 0x80
+    };
+
+    auto decode = [](uint8 const* body, size_t size, MovementInfo& info)
+    {
+        WorldPacket packet(SMSG_MOVE_UPDATE_KNOCK_BACK, size);
+        packet.append(body, size);
+        try
+        {
+            packet >> info;
+        }
+        catch (ByteBufferException const&)
+        {
+            return false;
+        }
+        return packet.rpos() == packet.size();
+    };
+
+    MovementInfo ordinary;
+    CHECK(decode(body52, sizeof(body52), ordinary));
+    CHECK(ordinary.GetGuid().GetRawValue() == UINT64_C(0x04000000054829D1));
+    CHECK(uint32(ordinary.GetMovementFlags()) == 0x2801u);
+    CHECK(uint16(ordinary.GetMovementFlags2()) == 0x0200u);
+    CHECK(ordinary.GetTime() == 894321110u);
+    CHECK(ordinary.GetPos()->x == -739.0469970703125f);
+    CHECK(ordinary.GetPos()->y == -74.960098266601562f);
+    CHECK(ordinary.GetPos()->z == 641.73931884765625f);
+    CHECK(ordinary.GetJumpInfo().sinAngle == -1.0f);
+    CHECK(ordinary.GetJumpInfo().xyspeed == 0.0f);
+    CHECK(ordinary.GetJumpInfo().velocity == -5.0f);
+
+    MovementInfo oriented;
+    CHECK(decode(body56, sizeof(body56), oriented));
+    CHECK(oriented.GetGuid().GetRawValue() == UINT64_C(0x04000000054829D1));
+    CHECK(uint32(oriented.GetMovementFlags()) == 0x2809u);
+    CHECK(uint16(oriented.GetMovementFlags2()) == 0x0800u);
+    CHECK(oriented.GetTime() == 893554926u);
+    CHECK(oriented.GetPos()->x == -10979.8671875f);
+    CHECK(oriented.GetPos()->y == -1307.7349853515625f);
+    CHECK(oriented.GetPos()->z == 10.839213371276855f);
+    CHECK(oriented.GetPos()->o == 1.8235087394714355f);
+    CHECK(oriented.GetJumpInfo().xyspeed == 15.0f);
+
+    MovementInfo transported;
+    CHECK(decode(body82, sizeof(body82), transported));
+    CHECK(transported.GetGuid().GetRawValue() == UINT64_C(0x05000000058B1DB9));
+    CHECK(transported.GetTransportGuid().GetRawValue() == UINT64_C(0x1FC00000000004C5));
+    CHECK(uint32(transported.GetMovementFlags()) == 0x2801u);
+    CHECK(uint16(transported.GetMovementFlags2()) == 0x0800u);
+    CHECK(transported.GetTime() == 2147816801u);
+    CHECK(transported.GetTransportSeat() == -1);
+    CHECK(transported.GetTransportTime() == 65535u);
+    CHECK(transported.GetTransportPos()->x == 33.038234710693359f);
+    CHECK(transported.GetTransportPos()->y == -0.1722348928451538f);
+    CHECK(transported.GetTransportPos()->z == 36.32354736328125f);
+    CHECK(transported.GetTransportPos()->o == 2.5144667625427246f);
+}
+
+static void test_move_update_knock_back_full_state_relay()
+{
+    // Binary-derived synthetic coverage: retail captures omit force IDs and
+    // rare optionals, so this pins every recovered writer arm without claiming
+    // that these values were observed together on the wire.
+    RefState const state;
+    std::vector<uint8> expected;
+    MovementInfo const info = Decode(SMSG_MOVE_UPDATE_KNOCK_BACK,
+        kMoveUpdateKnockBack, state, &expected);
+
+    WorldPacket relay(SMSG_MOVE_UPDATE_KNOCK_BACK, expected.size());
+    relay << info;
+    CHECK(Equal(relay, expected));
+}
+
 /// CMSG_MOVE_KNOCK_BACK_ACK against a real 18414 body.
 ///
 /// The sequence this tree carried for this opcode was wrong for the build: it
@@ -1222,11 +1381,114 @@ static void test_move_knock_back_ack_retail_body()
     MovementInfo info;
     packet >> info;
 
+    uint32 counter = 0;
+    std::memcpy(&counter, body, sizeof(counter));
+    CHECK(counter == 214u);
     CHECK(packet.rpos() == packet.size());
     CHECK(info.GetGuid().GetRawValue() == UINT64_C(0x04000000053CC8E8));
     CHECK(info.GetPos()->x == -10983.669922f);
     CHECK(info.GetPos()->y == -1290.659058f);
     CHECK(info.GetPos()->z == 10.814133f);
+    CHECK(info.GetPos()->o == FloatFromBits(0x4079F106u));
+    CHECK(info.GetTime() == 16880556u);
+    CHECK(info.GetJumpInfo().xyspeed == FloatFromBits(0x41700000u));
+    CHECK(info.GetJumpInfo().sinAngle == FloatFromBits(0xBF7E8093u));
+    CHECK(info.GetJumpInfo().cosAngle == FloatFromBits(0xBDDD3703u));
+    CHECK(info.GetJumpInfo().velocity == FloatFromBits(0xC0D57B25u));
+}
+
+static void test_move_knock_back_retail_bodies()
+{
+    struct Case
+    {
+        uint64 guid;
+        uint32 counter;
+        uint32 horizontalBits;
+        uint32 directionYBits;
+        uint32 negativeVerticalBits;
+        uint32 directionXBits;
+        uint8 const* body;
+        size_t size;
+    };
+
+    // Captured retail bodies. Together they prove the scalar-first shape and
+    // three distinct GUID masks; synthetic cases below finish discrimination.
+    static uint8 const body26[] = {
+        0x00, 0x00, 0x70, 0x41, 0x93, 0x80, 0x7E, 0xBF,
+        0x25, 0x7B, 0xD5, 0xC0, 0xD6, 0x00, 0x00, 0x00,
+        0x03, 0x37, 0xDD, 0xBD, 0xF1, 0xE9, 0x05, 0x04,
+        0xC9, 0x3D
+    };
+    static uint8 const body27[] = {
+        0x00, 0x00, 0x00, 0x00, 0x19, 0x62, 0x77, 0xBF,
+        0x00, 0x00, 0x20, 0xC1, 0x3B, 0x00, 0x00, 0x00,
+        0x6E, 0xB8, 0x83, 0x3E, 0xF5, 0x81, 0x07, 0x00,
+        0x05, 0x23, 0xB3
+    };
+    static uint8 const body28[] = {
+        0x00, 0x00, 0xF0, 0x41, 0x22, 0xFE, 0x54, 0xBE,
+        0x00, 0x00, 0xF0, 0xC1, 0x31, 0x01, 0x00, 0x00,
+        0xA6, 0x66, 0x7A, 0xBF, 0xFE, 0x51, 0x23, 0xF0,
+        0xFE, 0x22, 0xD0, 0x5B
+    };
+    Case const cases[] = {
+        { UINT64_C(0x04000000053CC8E8), 214, 0x41700000u,
+          0xBF7E8093u, 0xC0D57B25u, 0xBDDD3703u,
+          body26, sizeof(body26) },
+        { UINT64_C(0x0180000004B22206), 59, 0x00000000u,
+          0xBF776219u, 0xC1200000u, 0x3E83B86Eu,
+          body27, sizeof(body27) },
+        { UINT64_C(0xF150FF23005AD122), 305, 0x41F00000u,
+          0xBE54FE22u, 0xC1F00000u, 0xBF7A66A6u,
+          body28, sizeof(body28) }
+    };
+
+    for (Case const& c : cases)
+    {
+        WorldPacket packet(SMSG_MOVE_KNOCK_BACK, c.size);
+        MopCompactPackets::BuildMoveKnockBack(packet, c.guid, c.counter,
+            FloatFromBits(c.horizontalBits),
+            -FloatFromBits(c.negativeVerticalBits),
+            FloatFromBits(c.directionXBits),
+            FloatFromBits(c.directionYBits));
+        CHECK(packet.GetOpcode() == SMSG_MOVE_KNOCK_BACK);
+        CHECK(packet.size() == c.size);
+        if (packet.size() == c.size)
+            CHECK(std::memcmp(packet.contents(), c.body, c.size) == 0);
+    }
+}
+
+static void test_move_knock_back_guid_discrimination()
+{
+    WorldPacket empty(SMSG_MOVE_KNOCK_BACK, 21);
+    MopCompactPackets::BuildMoveKnockBack(empty, 0, 0, 0.0f, 0.0f,
+        0.0f, 0.0f);
+    CHECK(empty.size() == 21);
+    CHECK(empty.contents()[20] == 0x00);
+
+    uint64 const allBytes = UINT64_C(0x0807060504030201);
+    WorldPacket full(SMSG_MOVE_KNOCK_BACK, 29);
+    MopCompactPackets::BuildMoveKnockBack(full, allBytes, 0, 0.0f, 0.0f,
+        0.0f, 0.0f);
+    static uint8 const fullTail[] = {
+        0xFF, 0x06, 0x00, 0x09, 0x07, 0x04, 0x05, 0x03, 0x02
+    };
+    CHECK(full.size() == 29);
+    CHECK(std::memcmp(full.contents() + 20, fullTail, sizeof(fullTail)) == 0);
+
+    uint8 const expectedMasks[] = {
+        0xBF, 0xEF, 0x7F, 0xFE, 0xF7, 0xFD, 0xFB, 0xDF
+    };
+    for (size_t zeroByte = 0; zeroByte < 8; ++zeroByte)
+    {
+        uint64 const guid = allBytes &
+            ~(UINT64_C(0xFF) << (zeroByte * 8));
+        WorldPacket packet(SMSG_MOVE_KNOCK_BACK, 28);
+        MopCompactPackets::BuildMoveKnockBack(packet, guid, 0, 0.0f, 0.0f,
+            0.0f, 0.0f);
+        CHECK(packet.size() == 28);
+        CHECK(packet.contents()[20] == expectedMasks[zeroByte]);
+    }
 }
 
 /// The three acknowledgements whose speed is NOT first in the body.
@@ -1992,6 +2254,10 @@ int main(int, char**)
     test_force_run_back_speed_change_ack_fixture();
     test_force_run_back_speed_change_ack_retail_body();
     test_back_speed_change_ack_round_trips();
+    test_move_knock_back_retail_bodies();
+    test_move_knock_back_guid_discrimination();
+    test_move_update_knock_back_retail_bodies();
+    test_move_update_knock_back_full_state_relay();
     test_move_knock_back_ack_retail_body();
     test_speed_embedded_acks_retail_bodies();
     test_speed_embedded_ack_write_arm();

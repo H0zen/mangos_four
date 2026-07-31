@@ -79,6 +79,19 @@
 
 namespace MopCompactPackets
 {
+    /// Body-only 18414 SMSG_MOVE_KNOCK_BACK serializer. The caller selects the
+    /// opcode and supplies the already-computed horizontal direction vector.
+    inline void BuildMoveKnockBack(WorldPacket& out, uint64 moverGuid,
+        uint32 counter, float horizontalSpeed, float verticalSpeed,
+        float directionX, float directionY)
+    {
+        ObjectGuid const guid(moverGuid);
+        out << horizontalSpeed << directionY << -verticalSpeed << counter
+            << directionX;
+        out.WriteGuidMask<2, 0, 7, 1, 4, 6, 5, 3>(guid);
+        out.WriteGuidBytes<6, 0, 7, 5, 4, 3, 1, 2>(guid);
+    }
+
     inline uint8 AttackGuidByte(uint64 guid, uint8 index)
     {
         return uint8(guid >> (8 * index));

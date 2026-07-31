@@ -2087,6 +2087,23 @@ foreach(mutation IN ITEMS drop_observer_half drop_mover_half observer_half_to_se
         PROPERTIES WILL_FAIL TRUE)
 endforeach()
 
+add_test(NAME mop_knockback_packets_source
+    COMMAND ${CMAKE_COMMAND} -DSOURCE_ROOT=${CMAKE_SOURCE_DIR}
+        -P ${CMAKE_CURRENT_SOURCE_DIR}/mop_knockback_packets_source_test.cmake)
+
+foreach(mutation IN ITEMS direct_scalar_order direct_vertical_sign direct_mask_order direct_byte_order
+        direct_builder_bypass direct_producer_mapping direct_route update_sequence
+        update_drop_force_count update_drop_force_ids update_flags2_width registration_direct
+        registration_ack registration_update admission_direct admission_update reference_atomic
+        observer_route skip_mover_validation)
+    add_test(NAME mop_knockback_packets_source_mutation_${mutation}
+        COMMAND ${CMAKE_COMMAND} -DSOURCE_ROOT=${CMAKE_SOURCE_DIR}
+            -DMUTATION=${mutation}
+            -P ${CMAKE_CURRENT_SOURCE_DIR}/mop_knockback_packets_source_test.cmake)
+    set_tests_properties(mop_knockback_packets_source_mutation_${mutation}
+        PROPERTIES WILL_FAIL TRUE)
+endforeach()
+
 add_test(NAME mop_showing_helm_source
     COMMAND ${CMAKE_COMMAND} -DSOURCE_ROOT=${CMAKE_SOURCE_DIR}
         -P ${CMAKE_CURRENT_SOURCE_DIR}/mop_showing_helm_source_test.cmake)

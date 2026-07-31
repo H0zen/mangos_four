@@ -939,6 +939,11 @@ void InitializeOpcodes()
     DefC(CMSG_MOVE_START_ASCEND, "CMSG_MOVE_START_ASCEND", STATUS_LOGGEDIN, PROCESS_THREADUNSAFE, &WorldSession::HandleMovementOpcodes);
     DefC(CMSG_MOVE_STOP_ASCEND, "CMSG_MOVE_STOP_ASCEND", STATUS_LOGGEDIN, PROCESS_THREADUNSAFE, &WorldSession::HandleMovementOpcodes);
     DefC(CMSG_MOVE_START_DESCEND, "CMSG_MOVE_START_DESCEND", STATUS_LOGGEDIN, PROCESS_THREADUNSAFE, &WorldSession::HandleMovementOpcodes);
+    // Knockback is one protocol transaction: the owner request, client ack,
+    // and observer relay become reachable only with all three 18414 layouts.
+    DefS(SMSG_MOVE_KNOCK_BACK, "SMSG_MOVE_KNOCK_BACK");
+    DefC(CMSG_MOVE_KNOCK_BACK_ACK, "CMSG_MOVE_KNOCK_BACK_ACK", STATUS_LOGGEDIN, PROCESS_THREADUNSAFE, &WorldSession::HandleMoveKnockBackAck);
+    DefS(SMSG_MOVE_UPDATE_KNOCK_BACK, "SMSG_MOVE_UPDATE_KNOCK_BACK");
     DefC(CMSG_FORCE_SWIM_SPEED_CHANGE_ACK, "CMSG_FORCE_SWIM_SPEED_CHANGE_ACK", STATUS_LOGGEDIN, PROCESS_THREADUNSAFE, &WorldSession::HandleForceSpeedChangeAckOpcodes);
     DefS(SMSG_PLAYER_MOVE, "SMSG_PLAYER_MOVE");
     DefS(SMSG_MONSTER_MOVE, "SMSG_MONSTER_MOVE");
