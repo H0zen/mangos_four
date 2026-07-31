@@ -1048,6 +1048,7 @@ namespace MopComboPointPackets
 
 namespace MopTaxiPackets
 {
+    // Wow.exe 18414 enum table off_F4B0B8 defines these four wire values.
     enum class TaxiNodeStatus : uint8
     {
         NotEligible = 0,
@@ -1087,6 +1088,7 @@ namespace MopTaxiPackets
 
     inline bool ParseStatusQuery(WorldPacket& in, ObjectGuid& guid)
     {
+        // Client request writer sub_688B75 emits only this packed GUID.
         size_t const remaining = in.size() - in.rpos();
         if (remaining < 1)
         {
@@ -1101,6 +1103,7 @@ namespace MopTaxiPackets
         }
 
         ObjectGuid parsed;
+        in.ResetBitReader();
         in.ReadGuidMask<7, 4, 1, 3, 0, 5, 2, 6>(parsed);
         in.ReadGuidBytes<7, 1, 5, 2, 4, 0, 6, 3>(parsed);
         if (in.rpos() != in.size())
@@ -1120,6 +1123,7 @@ namespace MopTaxiPackets
     inline void BuildStatusBody(WorldPacket& out, ObjectGuid guid,
         TaxiNodeStatus status)
     {
+        // Reader sub_6D3D26 and validation twin sub_6E843D consume this body.
         out.WriteGuidMask<6, 2, 7, 5, 4, 1>(guid);
         out.WriteBits(uint8(status), 2);
         out.WriteGuidMask<3, 0>(guid);

@@ -1506,7 +1506,7 @@ foreach(mutation IN ITEMS
         reply_byte_adj_0 reply_byte_adj_1 reply_byte_adj_2
         reply_byte_adj_3 reply_byte_adj_4 reply_byte_adj_5 reply_byte_adj_6
         status_before_first_mask status_after_second_mask status_width
-        request_xor reply_xor unlearned_mapping request_opcode reply_opcode
+        request_xor request_bit_reset reply_xor unlearned_mapping request_opcode reply_opcode
         request_registration reply_registration reply_admission
         request_reference reply_reference handler_parser
         query_producer learn_producer spell_producer exact_tail authority_lookup)

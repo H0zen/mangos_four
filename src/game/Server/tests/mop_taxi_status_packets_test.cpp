@@ -108,9 +108,14 @@ static void test_maximum_observed_bodies()
 
 static void test_dense_and_single_zero_requests()
 {
+    WorldPacket empty = MakePacket(CMSG_TAXINODE_STATUS_QUERY, { 0x00 });
+    ObjectGuid guid;
+    CHECK(MopTaxiPackets::ParseStatusQuery(empty, guid));
+    CHECK(guid.IsEmpty());
+    CHECK(empty.rpos() == empty.size());
+
     WorldPacket dense = MakePacket(CMSG_TAXINODE_STATUS_QUERY,
         { 0xFF, 0x09, 0x03, 0x07, 0x02, 0x04, 0x00, 0x06, 0x05 });
-    ObjectGuid guid;
     CHECK(MopTaxiPackets::ParseStatusQuery(dense, guid));
     CHECK(guid.GetRawValue() == UINT64_C(0x0807060504030201));
 
@@ -137,6 +142,10 @@ static void test_dense_and_single_zero_requests()
 
 static void test_dense_and_single_zero_replies()
 {
+    WorldPacket empty = BuildStatus(ObjectGuid(),
+        MopTaxiPackets::TaxiNodeStatus::Learned);
+    CHECK(ExpectBytes(empty, { 0x01, 0x00 }));
+
     ObjectGuid const denseGuid(UINT64_C(0x0807060504030201));
     WorldPacket dense = BuildStatus(denseGuid,
         MopTaxiPackets::TaxiNodeStatus::Learned);

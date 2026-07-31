@@ -92,6 +92,11 @@ elseif(MUTATION STREQUAL "status_width")
 elseif(MUTATION STREQUAL "request_xor")
     mutate(player_header "in.ReadGuidBytes<7, 1, 5, 2, 4, 0, 6, 3>(parsed);"
         "in >> parsed;" "request XOR")
+elseif(MUTATION STREQUAL "request_bit_reset")
+    mutate(player_header
+        "in.ResetBitReader();\n        in.ReadGuidMask<7, 4, 1, 3, 0, 5, 2, 6>(parsed);"
+        "in.ReadGuidMask<7, 4, 1, 3, 0, 5, 2, 6>(parsed);"
+        "request bit-reader reset")
 elseif(MUTATION STREQUAL "reply_xor")
     mutate(player_header "out.WriteGuidBytes<0, 5, 2, 1, 4, 6, 7, 3>(guid);"
         "out << guid;" "reply XOR")
@@ -176,6 +181,9 @@ string(SUBSTRING "${player_header}" ${packets_start} ${packets_length} packets)
 
 require_once("${packets}" "ReadGuidMask<7, 4, 1, 3, 0, 5, 2, 6>"
     "request mask order")
+require_text("${packets}"
+    "in.ResetBitReader();\n        in.ReadGuidMask<7, 4, 1, 3, 0, 5, 2, 6>(parsed);"
+    "request bit-reader reset")
 require_once("${packets}" "ReadGuidBytes<7, 1, 5, 2, 4, 0, 6, 3>"
     "request byte order and XOR")
 require_once("${packets}" "remaining != 1 [+] guidByteCount"
