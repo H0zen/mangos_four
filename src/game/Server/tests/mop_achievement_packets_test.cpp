@@ -327,6 +327,24 @@ static void test_criteria_update_captured_mode_8_body()
     }));
 }
 
+static void test_criteria_update_captured_sparse_mode_8_body()
+{
+    // Captured retail removal body: build 18414, catalogue 2BE10C89,
+    // capture-000020 sequence 28709. Direct payload retrieval and independent
+    // decode consumed 35/35. This fixture exercises GUID byte 6; it proves this
+    // exact sparse body, not a universal producer policy.
+    WorldPacket packet(SMSG_CRITERIA_UPDATE, 35);
+    MopAchievementPackets::BuildCriteriaUpdate(packet,
+        UINT64_C(0x0180000004B22206), 12183u, UINT64_C(0), 8u,
+        243520847u, 1410902123u, 3u);
+    CHECK(ExpectBytes(packet, {
+        0x7D, 0x05, 0x81, 0xB3, 0x97, 0x2F, 0x00, 0x00, 0x08, 0x00,
+        0x00, 0x00, 0x23, 0x4F, 0xD5, 0x83, 0x0E, 0x6B, 0xA8, 0x18,
+        0x54, 0x03, 0x00, 0x00, 0x00, 0x00, 0x07, 0x00, 0x00, 0x00,
+        0x00, 0x00, 0x00, 0x00, 0x00
+    }));
+}
+
 static void test_criteria_update_full_interleave_and_scalars()
 {
     // Binary-derived synthetic coverage. Every GUID byte and every scalar are
@@ -418,6 +436,7 @@ int main(int /*argc*/, char** /*argv*/)
     test_achievement_deleted_preserves_caller_opcode();
     test_criteria_update_captured_mode_9_body();
     test_criteria_update_captured_mode_8_body();
+    test_criteria_update_captured_sparse_mode_8_body();
     test_criteria_update_full_interleave_and_scalars();
     test_criteria_update_mask_order_complements();
     test_criteria_update_expiry_policy_body();
