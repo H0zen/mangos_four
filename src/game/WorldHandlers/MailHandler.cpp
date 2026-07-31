@@ -53,6 +53,7 @@
 #include "WorldSession.h"
 #include "Opcodes.h"
 #include "Chat.h"
+#include "MopMailPackets.h"
 
 /**
  * @brief Verifies that the player can legally access the requested mailbox.
@@ -707,113 +708,83 @@ void WorldSession::HandleGetMailList(WorldPacket& recv_data)
         return;
     }
 
-    // client can't work with packets > max int16 value
-    const uint32 maxPacketSize = 32767;
-
-    uint32 mailsCount = 0;                                  // send to client mails amount
-    uint32 realCount = 0;                                   // real mails amount
-
-    WorldPacket data(SMSG_MAIL_LIST_RESULT, 200);           // guess size
-    data << uint32(0);                                      // real mail's count
-    data << uint8(0);                                       // mail's count
-    time_t cur_time = time(NULL);
+    std::vector<MopMailPackets::MailRecord> stagedMails;
+    stagedMails.reserve(MopMailPackets::MAX_MAIL_COUNT);
+    uint32 realCount = 0;
+    time_t const curTime = time(NULL);
 
     for (PlayerMails::iterator itr = _player->GetMailBegin(); itr != _player->GetMailEnd(); ++itr)
     {
-        // packet send mail count as uint8, prevent overflow
-        if (mailsCount >= 254)
-        {
-            realCount += 1;
-            continue;
-        }
+        Mail const* mail = *itr;
 
         // skip deleted or not delivered (deliver delay not expired) mails
-        if ((*itr)->state == MAIL_STATE_DELETED || cur_time < (*itr)->deliver_time)
-        {
+        if (mail->state == MAIL_STATE_DELETED || curTime < mail->deliver_time)
             continue;
-        }
-
-        uint8 item_count = (*itr)->items.size();            // max count is MAX_MAIL_ITEMS (12)
-
-        size_t next_mail_size = 2 + 4 + 1 + ((*itr)->messageType == MAIL_NORMAL ? 8 : 4) + 4 * 8 + ((*itr)->subject.size() + 1) + ((*itr)->body.size() + 1) + 1 + item_count * (1 + 4 + 4 + 7 * 3 * 4 + 4 + 4 + 4 + 4 + 4 + 4 + 1);
-
-        if (data.wpos() + next_mail_size > maxPacketSize)
-        {
-            realCount += 1;
+        ++realCount;
+        if (stagedMails.size() >= MopMailPackets::MAX_MAIL_COUNT)
             continue;
-        }
 
-        data << uint16(next_mail_size);                     // Message size
-        data << uint32((*itr)->messageID);                  // Message ID
-        data << uint8((*itr)->messageType);                 // Message Type
+        MopMailPackets::MailRecord record;
+        record.senderIsNotPlayer = mail->messageType != MAIL_NORMAL;
+        record.subject = MopMailPackets::TruncateUtf8(mail->subject,
+            MopMailPackets::MAX_SUBJECT_BYTES);
+        record.body = MopMailPackets::TruncateUtf8(mail->body,
+            MopMailPackets::MAX_BODY_BYTES);
+        record.senderGuid = mail->messageType == MAIL_NORMAL ?
+            MopMailPackets::BuildPlayerSenderGuid(mail->sender) : 0;
+        record.messageId = mail->messageID;
+        record.mailTemplateId = mail->mailTemplateId;
+        record.cod = mail->COD;
+        record.stationery = mail->stationery;
+        record.daysLeft = float(mail->expire_time - curTime) / float(DAY);
+        record.money = mail->money;
+        record.checkedFlags = mail->checked;
+        record.senderEntry = record.senderIsNotPlayer &&
+            mail->messageType != MAIL_CALENDAR ? mail->sender : 0;
+        record.messageType = mail->messageType;
 
-        switch ((*itr)->messageType)
+        size_t const itemCount = std::min(mail->items.size(),
+            size_t(MAX_MAIL_ITEMS));
+        record.items.reserve(itemCount);
+        for (size_t i = 0; i < itemCount; ++i)
         {
-            case MAIL_NORMAL:                               // sender guid
-                data << ObjectGuid(HIGHGUID_PLAYER, (*itr)->sender);
-                break;
-            case MAIL_CREATURE:
-            case MAIL_GAMEOBJECT:
-            case MAIL_AUCTION:
-                data << uint32((*itr)->sender);             // creature/gameobject entry, auction id
-                break;
-            case MAIL_CALENDAR:
-                data << uint32(0);                          // unknown
-                break;
-        }
+            Item* item = _player->GetMItem(mail->items[i].item_guid);
+            if (!item)
+                continue;
 
-        data << uint64((*itr)->COD);                        // COD
-        data << uint32(0);                                  // unknown, probably changed in 3.3.3
-        data << uint32((*itr)->stationery);                 // stationery (Stationery.dbc)
-        data << uint64((*itr)->money);                      // copper
-        data << uint32((*itr)->checked);                    // flags
-        data << float(float((*itr)->expire_time - time(NULL)) / float(DAY));// Time
-        data << uint32((*itr)->mailTemplateId);             // mail template (MailTemplate.dbc)
-        data << (*itr)->subject;                            // Subject string - once 00, when mail type = 3, max 256
-        data << (*itr)->body;                               // message? max 8000
-
-        data << uint8(item_count);                          // client limit is 0x10
-
-        for (uint8 i = 0; i < item_count; ++i)
-        {
-            Item* item = _player->GetMItem((*itr)->items[i].item_guid);
-            // item index (0-6?)
-            data << uint8(i);
-            // item guid low?
-            data << uint32(item ? item->GetGUIDLow() : 0);
-            // entry
-            data << uint32(item ? item->GetEntry() : 0);
-            for (uint8 j = 0; j < MAX_INSPECTED_ENCHANTMENT_SLOT; ++j)
+            MopMailPackets::ItemRecord itemRecord;
+            itemRecord.guidLow = item->GetGUIDLow();
+            itemRecord.durability =
+                item->GetUInt32Value(ITEM_FIELD_DURABILITY);
+            itemRecord.unknown = item->GetItemSuffixFactor();
+            for (uint8 j = 0; j < MopMailPackets::ENCHANT_GROUP_COUNT; ++j)
             {
-                // unsure
-                data << uint32(item ? item->GetEnchantmentCharges((EnchantmentSlot)j) : 0);
-                // unsure
-                data << uint32(item ? item->GetEnchantmentDuration((EnchantmentSlot)j) : 0);
-                // unsure
-                data << uint32(item ? item->GetEnchantmentId((EnchantmentSlot)j) : 0);
+                MopMailPackets::EnchantGroup& enchant = itemRecord.enchants[j];
+                enchant.fieldAtPlus8 =
+                    item->GetEnchantmentCharges((EnchantmentSlot)j);
+                enchant.fieldAtPlus4 =
+                    item->GetEnchantmentDuration((EnchantmentSlot)j);
+                enchant.fieldAtPlus0 =
+                    item->GetEnchantmentId((EnchantmentSlot)j);
             }
-            // can be negative
-            data << uint32(item ? item->GetItemRandomPropertyId() : 0);
-            // unk
-            data << uint32(item ? item->GetItemSuffixFactor() : 0);
-            // stack count
-            data << uint32(item ? item->GetCount() : 0);
-            // charges
-            data << uint32(item ? item->GetSpellCharges() : 0);
-            // durability
-            data << uint32(item ? item->GetUInt32Value(ITEM_FIELD_MAXDURABILITY) : 0);
-            // durability
-            data << uint32(item ? item->GetUInt32Value(ITEM_FIELD_DURABILITY) : 0);
-            // unknown wotlk
-            data << uint8(0);
+            itemRecord.randomPropertyId = item->GetItemRandomPropertyId();
+            itemRecord.spellCharges = item->GetSpellCharges();
+            itemRecord.maxDurability =
+                item->GetUInt32Value(ITEM_FIELD_MAXDURABILITY);
+            itemRecord.stackCount = item->GetCount();
+            itemRecord.index = uint8(i);
+            itemRecord.entry = item->GetEntry();
+            record.items.push_back(itemRecord);
         }
-
-        mailsCount += 1;
-        realCount += 1;
+        stagedMails.push_back(record);
     }
 
-    data.put<uint32>(0, realCount);                         // this will display warning about undelivered mail to player if realCount > mailsCount
-    data.put<uint8>(4, mailsCount);                         // set real send mails to client
+    WorldPacket data;
+    if (!MopMailPackets::BuildList(data, realCount, stagedMails))
+    {
+        sLog.outError("HandleGetMailList: failed to build a bounded mail list");
+        return;
+    }
     SendPacket(&data);
 
     // recalculate m_nextMailDelivereTime and unReadMails
@@ -910,7 +881,7 @@ void WorldSession::HandleQueryNextMailTime(WorldPacket & /**recv_data*/)
 
         MopQueryPackets::MailNextTimeEntry record;
         if (mail->messageType == MAIL_NORMAL)
-            record.senderGuid = ObjectGuid(HIGHGUID_PLAYER, mail->sender).GetRawValue();
+            record.senderGuid = MopMailPackets::BuildPlayerSenderGuid(mail->sender);
         else
             record.nonPlayerSender = mail->sender;
         record.messageType = uint8(mail->messageType);

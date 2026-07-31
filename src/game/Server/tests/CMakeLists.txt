@@ -276,6 +276,33 @@ target_compile_definitions(mop_compact_packets_test PRIVATE
 target_link_libraries(mop_compact_packets_test PRIVATE shared)
 add_test(NAME mop_compact_packets COMMAND mop_compact_packets_test)
 
+add_executable(mop_mail_packets_test mop_mail_packets_test.cpp)
+target_include_directories(mop_mail_packets_test PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}/..
+    ${CMAKE_SOURCE_DIR}/src/shared
+    $<TARGET_PROPERTY:game,INTERFACE_INCLUDE_DIRECTORIES>)
+set_target_properties(mop_mail_packets_test PROPERTIES CXX_STANDARD 17 CXX_STANDARD_REQUIRED ON)
+target_compile_definitions(mop_mail_packets_test PRIVATE
+    $<TARGET_PROPERTY:game,INTERFACE_COMPILE_DEFINITIONS>)
+target_link_libraries(mop_mail_packets_test PRIVATE shared)
+add_test(NAME mop_mail_packets COMMAND mop_mail_packets_test)
+
+add_test(NAME mop_mail_packets_source
+    COMMAND ${CMAKE_COMMAND}
+        -DSOURCE_ROOT=${CMAKE_SOURCE_DIR}
+        -P ${CMAKE_CURRENT_SOURCE_DIR}/mop_mail_packets_source_test.cmake)
+
+foreach(mutation IN ITEMS builder_route registration allowlist reference
+        missing_item utf8_bounds enchant_count legacy_limit mail_count item_cap
+        player_guid_domain)
+    add_test(NAME mop_mail_packets_source_mutation_${mutation}
+        COMMAND ${CMAKE_COMMAND} -DSOURCE_ROOT=${CMAKE_SOURCE_DIR}
+            -DMUTATION=${mutation}
+            -P ${CMAKE_CURRENT_SOURCE_DIR}/mop_mail_packets_source_test.cmake)
+    set_tests_properties(mop_mail_packets_source_mutation_${mutation}
+        PROPERTIES WILL_FAIL TRUE)
+endforeach()
+
 add_test(NAME mop_compact_packets_source
     COMMAND ${CMAKE_COMMAND}
         -DSOURCE_ROOT=${CMAKE_SOURCE_DIR}

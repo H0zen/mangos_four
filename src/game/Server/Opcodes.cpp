@@ -1282,12 +1282,12 @@ void InitializeOpcodes()
     // result at all; TAKE_ITEM was promoted together with SMSG_SEND_MAIL_RESULT
     // once that reply was rebuilt to its 18414 body and admitted.
     //
-    // GET_MAIL_LIST and GUILD_BANK_QUERY_TAB are still HELD, because
-    // SMSG_MAIL_LIST_RESULT and SMSG_GUILD_BANK_LIST remain legacy serializers
-    // that the send gate drops. Wiring a request without its reply is worse than
-    // dropping the request: the work commits, the client hears nothing, and the
-    // retry is equally silent. Promote each pair together, which the source
-    // policy enforces rather than leaving to this note.
+    // GET_MAIL_LIST is promoted with its rebuilt 18414 two-pass reply. The
+    // guild-bank query remains held because SMSG_GUILD_BANK_LIST is still a
+    // legacy serializer that the send gate drops. Wiring a request without its
+    // reply is worse than dropping it, so the source policy enforces each pair.
+    DefC(CMSG_GET_MAIL_LIST, "CMSG_GET_MAIL_LIST", STATUS_LOGGEDIN, PROCESS_THREADUNSAFE, &WorldSession::HandleGetMailList);
+    DefS(SMSG_MAIL_LIST_RESULT, "SMSG_MAIL_LIST_RESULT");
     DefC(CMSG_MAIL_MARK_AS_READ, "CMSG_MAIL_MARK_AS_READ", STATUS_LOGGEDIN, PROCESS_THREADUNSAFE, &WorldSession::HandleMailMarkAsRead);
 
     // CMSG_MAIL_TAKE_ITEM is promoted WITH its reply, which is the whole point of

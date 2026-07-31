@@ -349,6 +349,7 @@ static bool IsEnterWorldConverted(uint16 opcode)
         case SMSG_SPLINE_MOVE_SET_FLYING:          // MopCompactPackets::BuildSplineMoveSetFlying
         case SMSG_SPLINE_MOVE_UNSET_FLYING:        // MopCompactPackets::BuildSplineMoveUnsetFlying
         case SMSG_SEND_MAIL_RESULT:                // MopCompactPackets::BuildSendMailResult
+        case SMSG_MAIL_LIST_RESULT:                // MopMailPackets::BuildList
         // Gravity. The MOVER pair 0x159F/0x0A27 is confirmed against a live 18414
         // client: the mover floats and holds altitude, stops sending
         // CMSG_MOVE_JUMP rather than having one rejected, and acknowledges each
