@@ -223,7 +223,7 @@ foreach(active_row IN ITEMS
         "CMSG_MOVE_KNOCK_BACK_ACK                       0x00F2  ACTIVE")
     require_text("${opcode_reference}" "${active_row}" "atomic ACTIVE reference rows")
 endforeach()
-require_text("${opcode_reference}" "STATUS TOTALS: ACTIVE=517, DOC=435, DORMANT=568"
+require_text("${opcode_reference}" "STATUS TOTALS: ACTIVE=520, DOC=435, DORMANT=565"
     "reference totals")
 
 string(REGEX MATCH "void WorldSession::HandleMoveKnockBackAck[(].*void WorldSession::SendKnockBack" ack_body "${movement_handler}")
