@@ -37,6 +37,21 @@ inline MailItemInfo const* FindAttachment(Mail const& mail, uint32 itemGuidLow)
     return NULL;
 }
 
+inline bool HasTemplateCoherenceDrift(Mail const& mail,
+    ObjectGuid const& playerGuid,
+    uint32 requestedItemGuidLow,
+    MailItemInfo const* attachment,
+    ResolvedItem const& item)
+{
+    return mail.receiverGuid == playerGuid &&
+        attachment != NULL &&
+        attachment->item_guid == requestedItemGuidLow &&
+        item.exists &&
+        item.guidLow == requestedItemGuidLow &&
+        mail.COD == 0 &&
+        item.itemTemplate != attachment->item_template;
+}
+
 inline Decision Evaluate(Mail const& mail,
     ObjectGuid const& playerGuid,
     uint32 requestedItemGuidLow,

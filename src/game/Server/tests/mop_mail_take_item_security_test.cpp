@@ -117,6 +117,44 @@ static void test_missing_or_mismatched_item_is_rejected()
     }
 }
 
+// Break caught: real non-COD template drift being rejected without a diagnostic.
+static void test_non_cod_template_drift_is_diagnostic()
+{
+    Mail mailB = MakeMailB();
+    mailB.COD = 0;
+    MailItemInfo const* const attachment =
+        MailTakeItemPolicy::FindAttachment(mailB, 0xBB02u);
+    MailTakeItemPolicy::ResolvedItem const driftedItem = {
+        true, 0xBB02u, 0x2003u
+    };
+
+    CHECK(MailTakeItemPolicy::HasTemplateCoherenceDrift(mailB, receiver,
+        0xBB02u, attachment, driftedItem));
+}
+
+// Break caught: attacker-driven cross-mail/COD/authority rejects reaching logs.
+static void test_attacker_driven_rejections_are_not_diagnostic()
+{
+    Mail mailA = MakeMailA();
+    Mail mailB = MakeMailB();
+    MailItemInfo const* const attachmentB =
+        MailTakeItemPolicy::FindAttachment(mailB, 0xBB02u);
+    MailTakeItemPolicy::ResolvedItem const driftedItem = {
+        true, 0xBB02u, 0x2003u
+    };
+
+    CHECK(!MailTakeItemPolicy::HasTemplateCoherenceDrift(mailA, receiver,
+        0xBB02u, MailTakeItemPolicy::FindAttachment(mailA, 0xBB02u), driftedItem));
+    CHECK(!MailTakeItemPolicy::HasTemplateCoherenceDrift(mailB, receiver,
+        0xBB02u, attachmentB, driftedItem));
+
+    mailB.COD = 0;
+    CHECK(!MailTakeItemPolicy::HasTemplateCoherenceDrift(mailB,
+        ObjectGuid(HIGHGUID_PLAYER, 0x43u), 0xBB02u, attachmentB, driftedItem));
+    CHECK(!MailTakeItemPolicy::HasTemplateCoherenceDrift(mailB, receiver,
+        0xBB02u, attachmentB, { true, 0xBB03u, 0x2003u }));
+}
+
 int main()
 {
     test_cross_mail_item_is_rejected();
@@ -124,5 +162,7 @@ int main()
     test_valid_non_cod_item_proceeds();
     test_receiver_mismatch_is_rejected();
     test_missing_or_mismatched_item_is_rejected();
+    test_non_cod_template_drift_is_diagnostic();
+    test_attacker_driven_rejections_are_not_diagnostic();
     return g_fail == 0 ? 0 : 1;
 }

@@ -574,6 +574,13 @@ void WorldSession::HandleMailTakeItem(WorldPacket& recv_data)
         it ? it->GetGUIDLow() : 0,
         it ? it->GetEntry() : 0
     };
+    if (MailTakeItemPolicy::HasTemplateCoherenceDrift(*m, pl->GetObjectGuid(),
+            itemId, attachment, resolved))
+    {
+        sLog.outError("CMSG_MAIL_TAKE_ITEM: mail %u item %u has attachment template %u but resolved item template %u",
+            mailId, itemId, attachment->item_template, resolved.itemTemplate);
+    }
+
     if (MailTakeItemPolicy::Evaluate(*m, pl->GetObjectGuid(), itemId,
             attachment, resolved) == MailTakeItemPolicy::Decision::RejectInternal)
     {

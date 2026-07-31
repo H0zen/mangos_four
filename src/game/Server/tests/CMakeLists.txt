@@ -320,7 +320,9 @@ foreach(mutation IN ITEMS
         drop_receiver_check allow_cod ignore_remove_result
         restore_cod_send_mail restore_cod_modify_money
         cod_reply_item_zero cod_reply_count_one
-        remove_before_can_store success_before_commit)
+        remove_before_can_store remove_in_failure_branch success_before_commit
+        drop_template_drift_diagnostic log_cross_mail_reject
+        log_cod_reject log_receiver_reject)
     add_test(NAME mop_mail_take_item_security_source_mutation_${mutation}
         COMMAND ${CMAKE_COMMAND} -DSOURCE_ROOT=${CMAKE_SOURCE_DIR}
             -DMUTATION=${mutation}
@@ -328,6 +330,14 @@ foreach(mutation IN ITEMS
     set_tests_properties(mop_mail_take_item_security_source_mutation_${mutation}
         PROPERTIES WILL_FAIL TRUE)
 endforeach()
+
+add_test(NAME mop_mail_take_item_security_mutation_harness_target_drift
+    COMMAND ${CMAKE_COMMAND} -DSOURCE_ROOT=${CMAKE_SOURCE_DIR}
+        -DMUTATION=allow_cod -DMUTATION_TARGET_DRIFT_PROBE=ON
+        -P ${CMAKE_CURRENT_SOURCE_DIR}/mop_mail_take_item_security_source_test.cmake)
+set_tests_properties(mop_mail_take_item_security_mutation_harness_target_drift
+    PROPERTIES PASS_REGULAR_EXPRESSION
+        "mutation target unavailable or wrong guard: allow_cod")
 
 add_test(NAME mop_guild_banker_activate_source
     COMMAND ${CMAKE_COMMAND}
