@@ -575,7 +575,7 @@ add_test(NAME mop_achievement_packets_source
 foreach(mutation IN ITEMS
         earned_mask_order earned_boolean earned_byte_order earned_scalar_order
         earned_producer_mapping earned_sender_opcode earned_broadcast_scope
-        earned_legacy_body earned_opcode_value earned_registration
+        earned_chat_sender_name earned_legacy_body earned_opcode_value earned_registration
         earned_admission earned_reference
         criteria_update_mask_order criteria_update_byte_order
         criteria_update_scalar_order criteria_update_timer_order

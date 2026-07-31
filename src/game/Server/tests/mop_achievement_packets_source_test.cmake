@@ -48,6 +48,11 @@ elseif(MUTATION STREQUAL "earned_broadcast_scope")
         "GetPlayer()->SendMessageToSetInRange(&data, sWorld.getConfig(CONFIG_FLOAT_LISTEN_RANGE_SAY), true);"
         "GetPlayer()->GetSession()->SendPacket(&data);"
         achievement_source "${achievement_source}")
+elseif(MUTATION STREQUAL "earned_chat_sender_name")
+    string(REPLACE
+        "i_player.GetObjectGuid(), i_player.GetName(), i_player.GetObjectGuid()"
+        "i_player.GetObjectGuid(), NULL, i_player.GetObjectGuid()"
+        achievement_source "${achievement_source}")
 elseif(MUTATION STREQUAL "earned_legacy_body")
     string(REPLACE
         "uint64 const playerGuid = GetPlayer()->GetObjectGuid().GetRawValue();"
@@ -354,6 +359,9 @@ require_literal_once("${earned_source}"
 require_literal_once("${earned_source}"
     "GetPlayer()->SendMessageToSetInRange(&data, sWorld.getConfig(CONFIG_FLOAT_LISTEN_RANGE_SAY), true);"
     "achievement-earned nearby broadcast")
+require_literal_once("${achievement_source}"
+    "i_player.GetObjectGuid(), i_player.GetName(), i_player.GetObjectGuid()"
+    "achievement chat GM sender name")
 require_literal_none("${earned_source}" "GetPlayer()->GetPackGUID()"
     "legacy achievement-earned inline body")
 
