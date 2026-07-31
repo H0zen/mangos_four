@@ -583,6 +583,7 @@ void InitializeOpcodes()
     // agreement: the action leads, then the position, then sixteen presence
     // bits interleaved across the pet and target GUIDs.
     DefC(CMSG_PET_ACTION, "CMSG_PET_ACTION", STATUS_LOGGEDIN, PROCESS_THREADUNSAFE, &WorldSession::HandlePetAction);
+    DefC(CMSG_PET_STOP_ATTACK, "CMSG_PET_STOP_ATTACK", STATUS_LOGGEDIN, PROCESS_THREADUNSAFE, &WorldSession::HandlePetStopAttack);
     // Request and response both recovered from decoded 18414 payloads. One
     // response answers a request decoded separately and echoes its pet number,
     // which ties the pair together.

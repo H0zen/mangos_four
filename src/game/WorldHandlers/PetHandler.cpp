@@ -462,7 +462,10 @@ void WorldSession::HandlePetStopAttack(WorldPacket& recv_data)
     DEBUG_LOG("WORLD: Received opcode CMSG_PET_STOP_ATTACK");
 
     ObjectGuid petGuid;
-    recv_data >> petGuid;
+    if (!MopCompactPackets::ReadPetStopAttack(recv_data, petGuid))
+    {
+        return;
+    }
 
     Unit* pet = GetPlayer()->GetMap()->GetUnit(petGuid);    // pet or controlled creature/player
     if (!pet)

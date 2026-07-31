@@ -171,6 +171,57 @@ namespace MopCompactPackets
         targetGuid = ObjectGuid(targetRaw);
     }
 
+    /// CMSG_PET_STOP_ATTACK (0x065B), the 18414 body: one packed
+    /// controlled-unit GUID and no trailing fields.
+    inline bool ReadPetStopAttack(WorldPacket& in, ObjectGuid& petGuid)
+    {
+        size_t const remaining = in.size() - in.rpos();
+        if (remaining < 1)
+        {
+            in.rfinish();
+            return false;
+        }
+
+        uint8 const mask = in[in.rpos()];
+        size_t guidByteCount = 0;
+        for (uint8 bits = mask; bits; bits >>= 1)
+        {
+            guidByteCount += bits & 1;
+        }
+        if (remaining != 1 + guidByteCount)
+        {
+            in.rfinish();
+            return false;
+        }
+
+        uint8 guid[8] = { 0, 0, 0, 0, 0, 0, 0, 0 };
+        in.ResetBitReader();
+        guid[7] = in.ReadBit();  guid[5] = in.ReadBit();
+        guid[1] = in.ReadBit();  guid[6] = in.ReadBit();
+        guid[0] = in.ReadBit();  guid[2] = in.ReadBit();
+        guid[4] = in.ReadBit();  guid[3] = in.ReadBit();
+
+        uint8 const byteOrder[] = { 2, 5, 0, 4, 1, 7, 6, 3 };
+        for (uint8 index = 0; index < 8; ++index)
+        {
+            in.ReadByteSeq(guid[byteOrder[index]]);
+        }
+
+        uint64 raw = 0;
+        for (uint8 index = 0; index < 8; ++index)
+        {
+            raw |= uint64(guid[index]) << (8 * index);
+        }
+        if (raw == 0)
+        {
+            in.rfinish();
+            return false;
+        }
+
+        petGuid = ObjectGuid(raw);
+        return true;
+    }
+
     /// CMSG_PET_NAME_QUERY (0x1C62), the 18414 body.
     ///
     /// Sixteen presence bits interleaved across the pet GUID and the pet number,

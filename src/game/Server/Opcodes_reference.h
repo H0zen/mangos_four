@@ -1496,7 +1496,7 @@ typedef uint16_t uint16;
  *   CMSG_SWAP_VOID_ITEM                            0x0655  DOC
  *   CMSG_UNKNOWN_0x0656                            0x0656  DOC
  *   CMSG_QUESTGIVER_COMPLETE_QUEST                 0x0659  ACTIVE
- *   CMSG_PET_STOP_ATTACK                           0x065B  DORMANT
+ *   CMSG_PET_STOP_ATTACK                           0x065B  ACTIVE
  *   CMSG_BUYBACK_ITEM                              0x0661  ACTIVE
  *   CMSG_GRANT_LEVEL                               0x0662  DORMANT
  *   CMSG_SAVE_EQUIPMENT_SET                        0x0669  DORMANT
