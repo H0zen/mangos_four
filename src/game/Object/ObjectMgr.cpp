@@ -1336,7 +1336,7 @@ void ObjectMgr::LoadQuestPOI()
         uint32 floorId          = fields[5].GetUInt32();
         uint32 unk3             = fields[6].GetUInt32();
         uint32 unk4             = fields[7].GetUInt32();
-		uint32 blobId           = fields[8].GetUInt32();
+        uint32 blobId           = fields[8].GetUInt32();
 
         // An out-of-range floorId crashes the 5.4.8 client the moment it reads
         // SMSG_QUEST_POI_QUERY_RESPONSE, which is sent on quest accept - so one

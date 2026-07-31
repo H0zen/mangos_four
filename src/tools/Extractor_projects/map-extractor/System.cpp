@@ -1320,9 +1320,9 @@ void ExtractMapsFromMpq(uint32 build, const int locale)
 
     printf("\nExtracting maps...\n");
     if (build==17520)
-	{
-		build = 17538;
-	}
+    {
+        build = 17538;
+    }
 
     uint32 map_count = ReadMapDBC(locale);
 

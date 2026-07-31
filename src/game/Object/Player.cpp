@@ -4435,7 +4435,7 @@ void Player::SendInitialPacketsBeforeAddToMap()
 
     //SetMover(this);
 
-	    /// Pass 'this' as argument because we're not stored in ObjectAccessor yet
+        /// Pass 'this' as argument because we're not stored in ObjectAccessor yet
     GetSocial()->SendSocialList();
 
     // guild bank list wtf?
