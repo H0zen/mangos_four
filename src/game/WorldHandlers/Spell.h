@@ -647,12 +647,21 @@ namespace MopSpellPackets
         float elevation = 0.0f;
     };
 
+    struct UseItemRequest
+    {
+        uint8 slot = 0;
+        uint8 bagIndex = 0;
+        ObjectGuid itemGuid;
+        CastSpellRequest cast;
+    };
+
     uint32 ToClientCastResult(SpellCastResult result);
     void BuildCastFailed(WorldPacket& out, uint32 spellId, SpellCastResult result,
         uint8 castCount, bool isPetCastResult, CastFailedArguments const& arguments);
     bool BuildSpellStart(WorldPacket& out, SpellStartPacket const& spell);
     bool BuildSpellGo(WorldPacket& out, SpellGoPacket const& spell);
     bool ReadCastSpellRequest(WorldPacket& in, CastSpellRequest& request);
+    bool ReadUseItemRequest(WorldPacket& in, UseItemRequest& request);
 }
 
 inline ByteBuffer& operator<< (ByteBuffer& buf, SpellCastTargets const& targets)

@@ -587,6 +587,285 @@ bool MopSpellPackets::ReadCastSpellRequest(WorldPacket& in, CastSpellRequest& re
     }
 }
 
+namespace
+{
+    struct UseItemMovement
+    {
+        ObjectGuid guid;
+        ObjectGuid transportGuid;
+        uint32 forceCount = 0;
+        bool hasPitch = false;
+        bool hasTransport = false;
+        bool hasTransportTime3 = false;
+        bool hasTransportTime2 = false;
+        bool hasMovementFlags2 = false;
+        bool hasFallData = false;
+        bool hasSplineElevation = false;
+        bool hasFallDirection = false;
+        bool hasOrientation = false;
+        bool hasTimestamp = false;
+        bool hasUnknownUInt32 = false;
+        bool hasMovementFlags = false;
+    };
+
+    void ReadUseItemMovementBits(WorldPacket& in, UseItemMovement& movement)
+    {
+        movement.hasPitch = !in.ReadBit();
+        movement.hasTransport = in.ReadBit();
+        in.ReadBit();
+        if (movement.hasTransport)
+        {
+            in.ReadGuidMask<7, 2, 4, 5, 6, 0, 1>(movement.transportGuid);
+            movement.hasTransportTime3 = in.ReadBit();
+            in.ReadGuidMask<3>(movement.transportGuid);
+            movement.hasTransportTime2 = in.ReadBit();
+        }
+        in.ReadGuidMask<6, 2, 1>(movement.guid);
+        movement.forceCount = in.ReadBits(22);
+        in.ReadBit();
+        movement.hasMovementFlags2 = !in.ReadBit();
+        movement.hasFallData = in.ReadBit();
+        in.ReadGuidMask<5>(movement.guid);
+        movement.hasSplineElevation = !in.ReadBit();
+        in.ReadBit();
+        in.ReadGuidMask<7, 0>(movement.guid);
+        if (movement.hasFallData)
+            movement.hasFallDirection = in.ReadBit();
+        movement.hasOrientation = !in.ReadBit();
+        in.ReadGuidMask<4, 3>(movement.guid);
+        movement.hasTimestamp = !in.ReadBit();
+        movement.hasUnknownUInt32 = !in.ReadBit();
+        movement.hasMovementFlags = !in.ReadBit();
+        if (movement.hasMovementFlags2)
+            in.ReadBits(13);
+        if (movement.hasMovementFlags)
+            in.ReadBits(30);
+    }
+
+    void ReadUseItemMovementBytes(WorldPacket& in, UseItemMovement& movement)
+    {
+        if (movement.forceCount > (in.size() - in.rpos()) / sizeof(uint32))
+            throw ByteBufferException(false, in.rpos(), movement.forceCount * sizeof(uint32), in.size());
+        for (uint32 i = 0; i < movement.forceCount; ++i)
+            in.read_skip<uint32>();
+
+        if (movement.hasTransport)
+        {
+            in.read_skip<float>();
+            in.read_skip<float>();
+            in.ReadGuidBytes<1>(movement.transportGuid);
+            if (movement.hasTransportTime3)
+                in.read_skip<uint32>();
+            in.ReadGuidBytes<7, 5, 2, 4>(movement.transportGuid);
+            in.read_skip<float>();
+            in.read_skip<float>();
+            in.ReadGuidBytes<0>(movement.transportGuid);
+            in.read_skip<int8>();
+            in.read_skip<uint32>();
+            in.ReadGuidBytes<6, 3>(movement.transportGuid);
+            if (movement.hasTransportTime2)
+                in.read_skip<uint32>();
+        }
+
+        if (movement.hasFallData)
+        {
+            in.read_skip<float>();
+            if (movement.hasFallDirection)
+            {
+                in.read_skip<float>();
+                in.read_skip<float>();
+                in.read_skip<float>();
+            }
+            in.read_skip<uint32>();
+        }
+
+        in.ReadGuidBytes<3, 7, 6, 1>(movement.guid);
+        in.read_skip<float>();
+        if (movement.hasSplineElevation)
+            in.read_skip<float>();
+        if (movement.hasUnknownUInt32)
+            in.read_skip<uint32>();
+        if (movement.hasOrientation)
+            in.read_skip<float>();
+        in.ReadGuidBytes<2>(movement.guid);
+        in.read_skip<float>();
+        if (movement.hasTimestamp)
+            in.read_skip<uint32>();
+        in.read_skip<float>();
+        in.ReadGuidBytes<5, 0>(movement.guid);
+        if (movement.hasPitch)
+            in.read_skip<float>();
+        in.ReadGuidBytes<4>(movement.guid);
+    }
+}
+
+bool MopSpellPackets::ReadUseItemRequest(WorldPacket& in, UseItemRequest& request)
+{
+    request = UseItemRequest();
+
+    try
+    {
+        uint8 slot = 0;
+        uint8 bagIndex = 0;
+        ObjectGuid itemGuid;
+        ObjectGuid targetGuid;
+        ObjectGuid itemTargetGuid;
+        ObjectGuid sourceTransportGuid;
+        ObjectGuid destinationTransportGuid;
+        UseItemMovement movement;
+        uint8 castCount = 0;
+        uint8 castFlags = 0;
+        uint32 spellId = 0;
+        uint32 glyphIndex = 0;
+        uint32 targetMask = 0;
+        std::string targetString;
+        float missileSpeed = 0.0f;
+        float elevation = 0.0f;
+        float sourceX = 0.0f;
+        float sourceY = 0.0f;
+        float sourceZ = 0.0f;
+        float destinationX = 0.0f;
+        float destinationY = 0.0f;
+        float destinationZ = 0.0f;
+
+        in >> slot >> bagIndex;
+        bool const hasElevation = !in.ReadBit();
+        in.ReadGuidMask<6>(itemGuid);
+        bool const hasTargetString = !in.ReadBit();
+        in.ReadGuidMask<1>(itemGuid);
+        bool const hasCastFlags = !in.ReadBit();
+        bool const hasDestinationLocation = in.ReadBit();
+        in.ReadGuidMask<2, 7, 0>(itemGuid);
+        bool const hasTargetMask = !in.ReadBit();
+        bool const hasMissileSpeed = !in.ReadBit();
+        bool const hasMovement = in.ReadBit();
+        bool const hasCastCount = !in.ReadBit();
+        bool const hasSpellId = !in.ReadBit();
+        bool const itemTargetGuidIsZero = in.ReadBit();
+        bool const hasGlyphIndex = !in.ReadBit();
+        bool const targetGuidIsZero = in.ReadBit();
+        in.ReadGuidMask<4>(itemGuid);
+        bool const hasSourceLocation = in.ReadBit();
+        in.ReadGuidMask<3, 5>(itemGuid);
+        uint8 const researchCount = uint8(in.ReadBits(2));
+
+        for (uint8 i = 0; i < researchCount; ++i)
+            in.ReadBits(2);
+        if (hasMovement)
+            ReadUseItemMovementBits(in, movement);
+        if (hasSourceLocation)
+            in.ReadGuidMask<3, 1, 7, 4, 2, 0, 6, 5>(sourceTransportGuid);
+        if (hasDestinationLocation)
+            in.ReadGuidMask<2, 4, 1, 7, 6, 0, 3, 5>(destinationTransportGuid);
+        uint8 const targetStringLength = hasTargetString ? uint8(in.ReadBits(7)) : 0;
+        in.ReadGuidMask<1, 0, 5, 3, 6, 4, 7, 2>(targetGuid);
+        in.ReadGuidMask<4, 5, 0, 1, 3, 7, 6, 2>(itemTargetGuid);
+        if (hasCastFlags)
+            castFlags = uint8(in.ReadBits(5));
+        if (hasTargetMask)
+            targetMask = in.ReadBits(20);
+
+        in.ReadGuidBytes<0, 5, 6, 3, 4, 2, 1>(itemGuid);
+        for (uint8 i = 0; i < researchCount; ++i)
+        {
+            in.read_skip<uint32>();
+            in.read_skip<uint32>();
+        }
+        in.ReadGuidBytes<7>(itemGuid);
+
+        if (hasMovement)
+            ReadUseItemMovementBytes(in, movement);
+
+        if (hasDestinationLocation)
+        {
+            in.ReadGuidBytes<7>(destinationTransportGuid);
+            in >> destinationX;
+            in.ReadGuidBytes<0, 6, 1, 3>(destinationTransportGuid);
+            in >> destinationY;
+            in.ReadGuidBytes<5>(destinationTransportGuid);
+            in >> destinationZ;
+            in.ReadGuidBytes<4, 2>(destinationTransportGuid);
+        }
+
+        in.ReadGuidBytes<6, 7, 2, 0, 3, 4, 1, 5>(itemTargetGuid);
+
+        if (hasSourceLocation)
+        {
+            in.ReadGuidBytes<7>(sourceTransportGuid);
+            in >> sourceX;
+            in.ReadGuidBytes<1, 5, 4>(sourceTransportGuid);
+            in >> sourceZ;
+            in.ReadGuidBytes<6, 0, 3>(sourceTransportGuid);
+            in >> sourceY;
+            in.ReadGuidBytes<2>(sourceTransportGuid);
+        }
+
+        if (hasSpellId)
+            in >> spellId;
+        in.ReadGuidBytes<1, 4, 3, 6, 2, 0, 7, 5>(targetGuid);
+
+        if (targetStringLength > in.size() - in.rpos())
+            throw ByteBufferException(false, in.rpos(), targetStringLength, in.size());
+        if (targetStringLength)
+        {
+            targetString.assign(reinterpret_cast<char const*>(in.contents() + in.rpos()), targetStringLength);
+            in.read_skip(targetStringLength);
+        }
+        if (hasElevation)
+            in >> elevation;
+        if (hasGlyphIndex)
+            in >> glyphIndex;
+        if (hasMissileSpeed)
+            in >> missileSpeed;
+        if (hasCastCount)
+            in >> castCount;
+
+        if (itemTargetGuid.IsEmpty() != itemTargetGuidIsZero ||
+            targetGuid.IsEmpty() != targetGuidIsZero)
+        {
+            in.rfinish();
+            return false;
+        }
+
+        if (in.rpos() != in.size())
+        {
+            in.rfinish();
+            return false;
+        }
+
+        UseItemRequest parsed;
+        parsed.slot = slot;
+        parsed.bagIndex = bagIndex;
+        parsed.itemGuid = itemGuid;
+        parsed.cast.castCount = castCount;
+        parsed.cast.castFlags = castFlags;
+        parsed.cast.spellId = spellId;
+        parsed.cast.glyphIndex = glyphIndex;
+        parsed.cast.targetMask = targetMask;
+        parsed.cast.targetGuid = targetGuid;
+        parsed.cast.itemTargetGuid = itemTargetGuid;
+        parsed.cast.sourceTransportGuid = sourceTransportGuid;
+        parsed.cast.destinationTransportGuid = destinationTransportGuid;
+        parsed.cast.sourceX = sourceX;
+        parsed.cast.sourceY = sourceY;
+        parsed.cast.sourceZ = sourceZ;
+        parsed.cast.destinationX = destinationX;
+        parsed.cast.destinationY = destinationY;
+        parsed.cast.destinationZ = destinationZ;
+        parsed.cast.targetString = targetString;
+        parsed.cast.missileSpeed = missileSpeed;
+        parsed.cast.elevation = elevation;
+
+        request = parsed;
+        return true;
+    }
+    catch (ByteBufferException const&)
+    {
+        in.rfinish();
+        return false;
+    }
+}
+
 /**
  * @brief Deserializes spell cast targets from a packet buffer.
  *

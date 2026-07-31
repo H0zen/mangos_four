@@ -64,16 +64,10 @@
  */
 void WorldSession::HandleUseItemOpcode(WorldPacket& recvPacket)
 {
-    uint8 bagIndex, slot;
-    uint8 cast_flags;                                       // flags (if 0x02 - some additional data are received)
-    uint8 cast_count;                                       // next cast if exists (single or not)
-    ObjectGuid itemGuid;
-    uint32 glyphIndex;                                      // something to do with glyphs?
-    uint32 spellid;                                         // casted spell id
+    MopSpellPackets::UseItemRequest request;
+    if (!MopSpellPackets::ReadUseItemRequest(recvPacket, request))
+        return;
 
-    recvPacket >> bagIndex >> slot >> cast_count >> spellid >> itemGuid >> glyphIndex >> cast_flags;
-
-    // TODO: add targets.read() check
     Player* pUser = _player;
 
     // ignore for remote control state
@@ -84,14 +78,18 @@ void WorldSession::HandleUseItemOpcode(WorldPacket& recvPacket)
     }
 
     // reject fake data
-    if (glyphIndex >= MAX_GLYPH_SLOT_INDEX)
+    if (request.cast.glyphIndex >= MAX_GLYPH_SLOT_INDEX)
     {
         recvPacket.rpos(recvPacket.wpos());                 // prevent spam at not read packet tail
         pUser->SendEquipError(EQUIP_ERR_ITEM_NOT_FOUND, NULL, NULL);
         return;
     }
 
-    Item* pItem = pUser->GetItemByPos(bagIndex, slot);
+    SpellCastTargets targets;
+    if (!targets.InitializeForCastRequest(pUser, request.cast))
+        return;
+
+    Item* pItem = pUser->GetItemByPos(request.bagIndex, request.slot);
     if (!pItem)
     {
         recvPacket.rpos(recvPacket.wpos());                 // prevent spam at not read packet tail
@@ -99,14 +97,14 @@ void WorldSession::HandleUseItemOpcode(WorldPacket& recvPacket)
         return;
     }
 
-    if (pItem->GetObjectGuid() != itemGuid)
+    if (pItem->GetObjectGuid() != request.itemGuid)
     {
         recvPacket.rpos(recvPacket.wpos());                 // prevent spam at not read packet tail
         pUser->SendEquipError(EQUIP_ERR_ITEM_NOT_FOUND, NULL, NULL);
         return;
     }
 
-    DETAIL_LOG("WORLD: CMSG_USE_ITEM packet, bagIndex: %u, slot: %u, cast_count: %u, spellid: %u, Item: %u, glyphIndex: %u, unk_flags: %u, data length = %zu", bagIndex, slot, cast_count, spellid, pItem->GetEntry(), glyphIndex, cast_flags, recvPacket.size());
+    DETAIL_LOG("WORLD: CMSG_USE_ITEM packet, bagIndex: %u, slot: %u, cast_count: %u, spellid: %u, Item: %u, glyphIndex: %u, unk_flags: %u, data length = %zu", request.bagIndex, request.slot, request.cast.castCount, request.cast.spellId, pItem->GetEntry(), request.cast.glyphIndex, request.cast.castFlags, recvPacket.size());
 
     ItemPrototype const* proto = pItem->GetProto();
     if (!proto)
@@ -184,31 +182,23 @@ void WorldSession::HandleUseItemOpcode(WorldPacket& recvPacket)
         }
     }
 
-    SpellCastTargets targets;
-
-    recvPacket >> targets.ReadForCaster(pUser);
-
-    targets.Update(pUser);
-
-    targets.ReadAdditionalData(recvPacket, cast_flags);
-
     if (!pItem->IsTargetValidForItemUse(targets.getUnitTarget()))
     {
         // free gray item after use fail
         pUser->SendEquipError(EQUIP_ERR_NONE, pItem, NULL);
 
         // send spell error
-        if (SpellEntry const* spellInfo = sSpellStore.LookupEntry(spellid))
+        if (SpellEntry const* spellInfo = sSpellStore.LookupEntry(request.cast.spellId))
         {
             SpellEffectEntry const* spellEffect = spellInfo->GetSpellEffect(EFFECT_INDEX_0);
             // for implicit area/coord target spells
             if (spellEffect && (IsPointEffectTarget(Targets(spellEffect->EffectImplicitTargetA)) ||
                 IsAreaEffectTarget(Targets(spellEffect->EffectImplicitTargetA))))
-                Spell::SendCastResult(_player,spellInfo,cast_count,SPELL_FAILED_NO_VALID_TARGETS);
+                Spell::SendCastResult(_player,spellInfo,request.cast.castCount,SPELL_FAILED_NO_VALID_TARGETS);
             // for explicit target spells
             else
             {
-                Spell::SendCastResult(_player, spellInfo, cast_count, SPELL_FAILED_BAD_TARGETS);
+                Spell::SendCastResult(_player, spellInfo, request.cast.castCount, SPELL_FAILED_BAD_TARGETS);
             }
         }
         return;
@@ -218,7 +208,7 @@ void WorldSession::HandleUseItemOpcode(WorldPacket& recvPacket)
     if (!sScriptMgr.OnItemUse(pUser, pItem, targets))
     {
         // no script or script not process request by self
-        pUser->CastItemUseSpell(pItem, targets, cast_count, glyphIndex);
+        pUser->CastItemUseSpell(pItem, targets, request.cast.castCount, request.cast.glyphIndex);
     }
 }
 

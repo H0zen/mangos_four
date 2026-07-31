@@ -1678,9 +1678,41 @@ target_include_directories(mop_spell_cast_packets_test PRIVATE
 set_target_properties(mop_spell_cast_packets_test PROPERTIES CXX_STANDARD 17 CXX_STANDARD_REQUIRED ON)
 target_link_libraries(mop_spell_cast_packets_test PRIVATE game)
 add_test(NAME mop_spell_cast_packets COMMAND mop_spell_cast_packets_test)
+
+add_executable(mop_use_item_packets_test mop_use_item_packets_test.cpp)
+target_include_directories(mop_use_item_packets_test PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}/..
+    ${CMAKE_SOURCE_DIR}/src/shared
+    $<TARGET_PROPERTY:game,INTERFACE_INCLUDE_DIRECTORIES>)
+set_target_properties(mop_use_item_packets_test PROPERTIES CXX_STANDARD 17 CXX_STANDARD_REQUIRED ON)
+target_compile_definitions(mop_use_item_packets_test PRIVATE
+    $<TARGET_PROPERTY:game,INTERFACE_COMPILE_DEFINITIONS>)
+target_link_libraries(mop_use_item_packets_test PRIVATE game shared)
+add_test(NAME mop_use_item_packets COMMAND mop_use_item_packets_test)
+add_test(NAME mop_use_item_packets_source
+    COMMAND ${CMAKE_COMMAND} -DSOURCE_ROOT=${CMAKE_SOURCE_DIR}
+        -P ${CMAKE_CURRENT_SOURCE_DIR}/mop_use_item_packets_source_test.cmake)
+foreach(mutation IN ITEMS use_item_opcode_value use_item_registration
+        use_item_reference_state use_item_handler_reader_route use_item_legacy_prefix
+        use_item_swap_slot_bag use_item_header_order use_item_target_mask_width
+        use_item_cast_flags_width_order use_item_item_guid_mask_order
+        use_item_item_guid_split use_item_target_guid_mask_order
+        use_item_target_guid_byte_order use_item_item_target_guid_orders
+        use_item_source_guid_and_xyz_order use_item_destination_guid_and_xyz_order
+        use_item_research_count_width use_item_research_payload_order
+        use_item_movement_force_width_and_bound use_item_transport_guid3_mask
+        use_item_movement_byte_order use_item_tail_scalar_order
+        use_item_target_string_bound use_item_exact_tail use_item_parse_before_binding
+        use_item_self_mover_guard use_item_item_guid_match use_item_glyph_bound)
+    add_test(NAME ${mutation}
+        COMMAND ${CMAKE_COMMAND} -DSOURCE_ROOT=${CMAKE_SOURCE_DIR}
+            -DMUTATION=${mutation}
+            -P ${CMAKE_CURRENT_SOURCE_DIR}/mop_use_item_packets_source_test.cmake)
+    set_tests_properties(${mutation} PROPERTIES WILL_FAIL TRUE)
+endforeach()
 if(WIN32)
     get_filename_component(MOP_SPELL_CAST_MYSQL_RUNTIME_DIR "${MySQL_LIBRARY}" DIRECTORY)
-    set_tests_properties(mop_spell_cast_packets PROPERTIES
+    set_tests_properties(mop_spell_cast_packets mop_use_item_packets PROPERTIES
         ENVIRONMENT_MODIFICATION "PATH=path_list_prepend:${MOP_SPELL_CAST_MYSQL_RUNTIME_DIR}")
 endif()
 

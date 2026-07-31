@@ -175,9 +175,9 @@
  *   TOTAL SMSG rows                   925
  *
  * SUBSYSTEM CONFIDENCE: high=365, low=221, medium=182, none=157
- * STATUS TOTALS: ACTIVE=529, DOC=434, DORMANT=557
+ * STATUS TOTALS: ACTIVE=530, DOC=434, DORMANT=556
  *   SMSG: ACTIVE=316, DOC=271, DORMANT=338
- *   CMSG: ACTIVE=213, DOC=163, DORMANT=219
+ *   CMSG: ACTIVE=214, DOC=163, DORMANT=218
  */
 
 // CAVEATS -- read before trusting any single row:
@@ -1866,7 +1866,7 @@ typedef uint16_t uint16;
  *   CMSG_CHALLENGE_MODE_REQUEST_MAP_STATS          0x1C5A  DOC
  *   CMSG_PET_NAME_QUERY                            0x1C62  ACTIVE
  *   CMSG_UNKNOWN_0x1C63                            0x1C63  DOC
- *   CMSG_USE_ITEM                                  0x1CC1  DORMANT
+ *   CMSG_USE_ITEM                                  0x1CC1  ACTIVE
  *   CMSG_BATTLE_PET_QUERY_NAME                     0x1CE0  DOC
  *   CMSG_LOOT                                      0x1CE2  ACTIVE
  *   CMSG_BEGIN_TRADE                               0x1CE3  ACTIVE
