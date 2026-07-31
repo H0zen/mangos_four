@@ -669,6 +669,10 @@ void InitializeOpcodes()
     DefS(SMSG_BUY_FAILED, "SMSG_BUY_FAILED");
     DefS(SMSG_ITEM_PUSH_RESULT, "SMSG_ITEM_PUSH_RESULT");
 
+    // Directly verified 18414 flight-master status request/reply pair.
+    DefC(CMSG_TAXINODE_STATUS_QUERY, "CMSG_TAXINODE_STATUS_QUERY", STATUS_LOGGEDIN, PROCESS_THREADUNSAFE, &WorldSession::HandleTaxiNodeStatusQueryOpcode);
+    DefS(SMSG_TAXINODE_STATUS, "SMSG_TAXINODE_STATUS");
+
     // Directly verified 18414 inventory-movement requests. Each handler
     // decodes the packed request before reusing the established item logic.
     DefC(CMSG_SWAP_INV_ITEM, "CMSG_SWAP_INV_ITEM", STATUS_LOGGEDIN, PROCESS_THREADUNSAFE, &WorldSession::HandleSwapInvItemOpcode);

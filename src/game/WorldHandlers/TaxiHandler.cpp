@@ -45,8 +45,11 @@ void WorldSession::HandleTaxiNodeStatusQueryOpcode(WorldPacket& recv_data)
     DEBUG_LOG("WORLD: Received opcode CMSG_TAXINODE_STATUS_QUERY");
 
     ObjectGuid guid;
+    if (!MopTaxiPackets::ParseStatusQuery(recv_data, guid))
+    {
+        return;
+    }
 
-    recv_data >> guid;
     SendTaxiStatus(guid);
 }
 
@@ -75,9 +78,10 @@ void WorldSession::SendTaxiStatus(ObjectGuid guid)
 
     DEBUG_LOG("WORLD: current location %u ", curloc);
 
-    WorldPacket data(SMSG_TAXINODE_STATUS, 9);
-    data << ObjectGuid(guid);
-    data << uint8(GetPlayer()->m_taxi.IsTaximaskNodeKnown(curloc) ? 1 : 0);
+    WorldPacket data(SMSG_TAXINODE_STATUS, 10);
+    MopTaxiPackets::BuildStatusBody(data, guid,
+        MopTaxiPackets::StatusForKnown(
+            GetPlayer()->m_taxi.IsTaximaskNodeKnown(curloc)));
     SendPacket(&data);
 
     DEBUG_LOG("WORLD: Sent SMSG_TAXINODE_STATUS");
@@ -193,9 +197,9 @@ bool WorldSession::SendLearnNewTaxiNode(Creature* unit)
         WorldPacket msg(SMSG_NEW_TAXI_PATH, 0);
         SendPacket(&msg);
 
-        WorldPacket update(SMSG_TAXINODE_STATUS, 9);
-        update << ObjectGuid(unit->GetObjectGuid());
-        update << uint8(1);
+        WorldPacket update(SMSG_TAXINODE_STATUS, 10);
+        MopTaxiPackets::BuildStatusBody(update, unit->GetObjectGuid(),
+            MopTaxiPackets::TaxiNodeStatus::Learned);
         SendPacket(&update);
 
         return true;

@@ -1046,6 +1046,88 @@ namespace MopComboPointPackets
     }
 }
 
+namespace MopTaxiPackets
+{
+    enum class TaxiNodeStatus : uint8
+    {
+        NotEligible = 0,
+        Learned = 1,
+        None = 2,
+        Unlearned = 3
+    };
+
+    inline bool RejectMalformedRequest(WorldPacket& in)
+    {
+        in.rfinish();
+        return false;
+    }
+
+    inline size_t PackedGuidByteCount(uint8 mask)
+    {
+        size_t byteCount = 0;
+        for (; mask; mask >>= 1)
+        {
+            byteCount += mask & 1;
+        }
+        return byteCount;
+    }
+
+    inline bool HasCanonicalPackedGuidBytes(WorldPacket const& in,
+        size_t byteOffset, size_t byteCount)
+    {
+        for (size_t i = 0; i < byteCount; ++i)
+        {
+            if (in[byteOffset + i] == 1)
+            {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    inline bool ParseStatusQuery(WorldPacket& in, ObjectGuid& guid)
+    {
+        size_t const remaining = in.size() - in.rpos();
+        if (remaining < 1)
+        {
+            return RejectMalformedRequest(in);
+        }
+
+        size_t const guidByteCount = PackedGuidByteCount(in[in.rpos()]);
+        if (remaining != 1 + guidByteCount ||
+            !HasCanonicalPackedGuidBytes(in, in.rpos() + 1, guidByteCount))
+        {
+            return RejectMalformedRequest(in);
+        }
+
+        ObjectGuid parsed;
+        in.ReadGuidMask<7, 4, 1, 3, 0, 5, 2, 6>(parsed);
+        in.ReadGuidBytes<7, 1, 5, 2, 4, 0, 6, 3>(parsed);
+        if (in.rpos() != in.size())
+        {
+            return RejectMalformedRequest(in);
+        }
+
+        guid = parsed;
+        return true;
+    }
+
+    inline TaxiNodeStatus StatusForKnown(bool known)
+    {
+        return known ? TaxiNodeStatus::Learned : TaxiNodeStatus::Unlearned;
+    }
+
+    inline void BuildStatusBody(WorldPacket& out, ObjectGuid guid,
+        TaxiNodeStatus status)
+    {
+        out.WriteGuidMask<6, 2, 7, 5, 4, 1>(guid);
+        out.WriteBits(uint8(status), 2);
+        out.WriteGuidMask<3, 0>(guid);
+        out.FlushBits();
+        out.WriteGuidBytes<0, 5, 2, 1, 4, 6, 7, 3>(guid);
+    }
+}
+
 namespace MopDuelPackets
 {
     inline void BuildRequested(WorldPacket& out, ObjectGuid arbiter,

@@ -1484,6 +1484,40 @@ foreach(mutation IN ITEMS root_then_clear_flags drop_back_speed_snare_calls spee
     set_tests_properties(mop_movement_source_mutation_${mutation} PROPERTIES WILL_FAIL TRUE)
 endforeach()
 
+add_executable(mop_taxi_status_packets_test mop_taxi_status_packets_test.cpp)
+target_include_directories(mop_taxi_status_packets_test PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}/..
+    ${CMAKE_SOURCE_DIR}/src/shared)
+set_target_properties(mop_taxi_status_packets_test PROPERTIES CXX_STANDARD 17 CXX_STANDARD_REQUIRED ON)
+target_link_libraries(mop_taxi_status_packets_test PRIVATE game)
+add_test(NAME mop_taxi_status_packets COMMAND mop_taxi_status_packets_test)
+
+add_test(NAME mop_taxi_status_packets_source
+    COMMAND ${CMAKE_COMMAND} -DSOURCE_ROOT=${CMAKE_SOURCE_DIR}
+        -P ${CMAKE_CURRENT_SOURCE_DIR}/mop_taxi_status_packets_source_test.cmake)
+
+foreach(mutation IN ITEMS
+        request_mask_adj_0 request_mask_adj_1 request_mask_adj_2
+        request_mask_adj_3 request_mask_adj_4 request_mask_adj_5 request_mask_adj_6
+        request_byte_adj_0 request_byte_adj_1 request_byte_adj_2
+        request_byte_adj_3 request_byte_adj_4 request_byte_adj_5 request_byte_adj_6
+        reply_mask_adj_0 reply_mask_adj_1 reply_mask_adj_2
+        reply_mask_adj_3 reply_mask_adj_4 reply_mask_adj_5
+        reply_byte_adj_0 reply_byte_adj_1 reply_byte_adj_2
+        reply_byte_adj_3 reply_byte_adj_4 reply_byte_adj_5 reply_byte_adj_6
+        status_before_first_mask status_after_second_mask status_width
+        request_xor reply_xor unlearned_mapping request_opcode reply_opcode
+        request_registration reply_registration reply_admission
+        request_reference reply_reference handler_parser
+        query_producer learn_producer spell_producer exact_tail authority_lookup)
+    add_test(NAME mop_taxi_status_packets_source_mutation_${mutation}
+        COMMAND ${CMAKE_COMMAND} -DSOURCE_ROOT=${CMAKE_SOURCE_DIR}
+            -DMUTATION=${mutation}
+            -P ${CMAKE_CURRENT_SOURCE_DIR}/mop_taxi_status_packets_source_test.cmake)
+    set_tests_properties(mop_taxi_status_packets_source_mutation_${mutation}
+        PROPERTIES WILL_FAIL TRUE)
+endforeach()
+
 add_executable(mop_death_packets_test mop_death_packets_test.cpp)
 target_include_directories(mop_death_packets_test PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/..

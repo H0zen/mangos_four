@@ -1000,9 +1000,9 @@ void Spell::EffectTeachTaxiNode(SpellEffectEntry const* effect)
         WorldPacket data(SMSG_NEW_TAXI_PATH, 0);
         player->SendDirectMessage(&data);
 
-        data.Initialize(SMSG_TAXINODE_STATUS, 9);
-        data << m_caster->GetObjectGuid();
-        data << uint8(1);
+        data.Initialize(SMSG_TAXINODE_STATUS, 10);
+        MopTaxiPackets::BuildStatusBody(data, m_caster->GetObjectGuid(),
+            MopTaxiPackets::TaxiNodeStatus::Learned);
         player->SendDirectMessage(&data);
     }
 }

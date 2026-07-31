@@ -175,9 +175,9 @@
  *   TOTAL SMSG rows                   925
  *
  * SUBSYSTEM CONFIDENCE: high=365, low=221, medium=182, none=157
- * STATUS TOTALS: ACTIVE=530, DOC=434, DORMANT=556
- *   SMSG: ACTIVE=316, DOC=271, DORMANT=338
- *   CMSG: ACTIVE=214, DOC=163, DORMANT=218
+ * STATUS TOTALS: ACTIVE=532, DOC=434, DORMANT=554
+ *   SMSG: ACTIVE=317, DOC=271, DORMANT=337
+ *   CMSG: ACTIVE=215, DOC=163, DORMANT=217
  */
 
 // CAVEATS -- read before trusting any single row:
@@ -953,7 +953,7 @@ typedef uint16_t uint16;
  *  -- TaxiMapFrame.cpp (3) --
  *   SMSG_ACTIVATETAXIREPLY                         0x02A7  DORMANT  [low-conf]
  *   SMSG_NEW_TAXI_PATH                             0x141B  DORMANT  [low-conf]
- *   SMSG_TAXINODE_STATUS                           0x169E  DORMANT
+ *   SMSG_TAXINODE_STATUS                           0x169E  ACTIVE
  *
  *  -- TradeFrame.cpp (3) --
  *   SMSG_STABLE_RESULT                             0x14BE  ACTIVE   [low-conf]
@@ -1401,7 +1401,7 @@ typedef uint16_t uint16;
  *   CMSG_AUCTION_LIST_PENDING_SALES                0x02DA  DORMANT
  *   CMSG_QUESTGIVER_HELLO                          0x02DB  ACTIVE   [high-conf]
  *   CMSG_WRAP_ITEM                                 0x02DF  DORMANT
- *   CMSG_TAXINODE_STATUS_QUERY                     0x02E1  DORMANT
+ *   CMSG_TAXINODE_STATUS_QUERY                     0x02E1  ACTIVE
  *   CMSG_BUY_ITEM                                  0x02E2  ACTIVE
  *   CMSG_TAXIQUERYAVAILABLENODES                   0x02E3  DORMANT
  *   CMSG_ATTACKSWING                               0x02E7  ACTIVE
