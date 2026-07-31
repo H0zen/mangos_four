@@ -22,6 +22,7 @@ namespace MopMailPackets
     static size_t const MAX_MAIL_COUNT = 50;
     static size_t const MAX_SUBJECT_BYTES = 255;
     static size_t const MAX_BODY_BYTES = 7999;
+    static size_t const MAX_POST_CRYPT_PAYLOAD_BYTES = 0x7FFFF;
     static size_t const ENCHANT_GROUP_COUNT = 8;
 
     inline uint64 BuildPlayerSenderGuid(uint32 lowGuid)
@@ -151,7 +152,7 @@ namespace MopMailPackets
             if (mail.hasOptionalB)
                 out << mail.optionalB;
         }
-        return true;
+        return out.size() <= MAX_POST_CRYPT_PAYLOAD_BYTES;
     }
 }
 

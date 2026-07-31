@@ -41,6 +41,9 @@ elseif(MUTATION STREQUAL "player_guid_domain")
     string(REPLACE "MopMailPackets::BuildPlayerSenderGuid(mail->sender)"
         "ObjectGuid(HIGHGUID_PLAYER, mail->sender).GetRawValue()"
         mail_handler "${mail_handler}")
+elseif(MUTATION STREQUAL "frame_limit")
+    string(REPLACE "return out.size() <= MAX_POST_CRYPT_PAYLOAD_BYTES;"
+        "return true;" builder "${builder}")
 endif()
 
 set(ws "[ \t\r\n]")
@@ -91,6 +94,12 @@ string(REGEX MATCHALL
 list(LENGTH player_guid_conversions player_guid_conversion_count)
 if(NOT player_guid_conversion_count EQUAL 2)
     message(FATAL_ERROR "mail producers do not convert stored LowGUIDs to the 18414 player domain")
+endif()
+if(NOT builder MATCHES
+        "MAX_POST_CRYPT_PAYLOAD_BYTES${ws}*=${ws}*0x7FFFF" OR
+        NOT builder MATCHES
+        "return${ws}+out[.]size[(][)]${ws}*<=${ws}*MAX_POST_CRYPT_PAYLOAD_BYTES")
+    message(FATAL_ERROR "mail builder does not enforce the final post-crypt frame limit")
 endif()
 if(handler_code MATCHES "modifierBlob${ws}*=")
     message(FATAL_ERROR "production invents item-modifier data without a backend")

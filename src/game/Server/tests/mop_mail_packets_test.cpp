@@ -364,6 +364,11 @@ static void test_item_layout_and_two_pass_order()
 
 static void test_bounds_and_large_body()
 {
+    CHECK(MopMailPackets::MAX_SUBJECT_BYTES == 255);
+    CHECK(MopMailPackets::MAX_BODY_BYTES == 7999);
+    CHECK(MopMailPackets::MAX_MAIL_COUNT == 50);
+    CHECK(MopMailPackets::MAX_POST_CRYPT_PAYLOAD_BYTES == 0x7FFFF);
+
     MopMailPackets::MailRecord mail;
     mail.subject.assign(MopMailPackets::MAX_SUBJECT_BYTES, 's');
     mail.body.assign(MopMailPackets::MAX_BODY_BYTES, 'b');
@@ -393,6 +398,12 @@ static void test_bounds_and_large_body()
     mails.assign(5, large);
     CHECK(MopMailPackets::BuildList(packet, 5, mails));
     CHECK(packet.size() > 32767);
+
+    MopMailPackets::MailRecord oversized;
+    oversized.items.resize(1);
+    oversized.items[0].modifierBlob.resize(
+        MopMailPackets::MAX_POST_CRYPT_PAYLOAD_BYTES);
+    CHECK(!MopMailPackets::BuildList(packet, 1, { oversized }));
 }
 
 static void test_utf8_truncation_keeps_complete_codepoints()

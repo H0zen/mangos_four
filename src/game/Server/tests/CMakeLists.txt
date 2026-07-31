@@ -294,7 +294,7 @@ add_test(NAME mop_mail_packets_source
 
 foreach(mutation IN ITEMS builder_route registration allowlist reference
         missing_item utf8_bounds enchant_count legacy_limit mail_count item_cap
-        player_guid_domain)
+        player_guid_domain frame_limit)
     add_test(NAME mop_mail_packets_source_mutation_${mutation}
         COMMAND ${CMAKE_COMMAND} -DSOURCE_ROOT=${CMAKE_SOURCE_DIR}
             -DMUTATION=${mutation}
