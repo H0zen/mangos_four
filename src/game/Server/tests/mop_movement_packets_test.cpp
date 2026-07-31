@@ -72,6 +72,7 @@ enum class RefOp
 struct RefState
 {
     uint64 guid = 0x8070605040302010ull;
+    uint32 movementCounter = 0xCAFEBABEu;
     uint32 flags = 0x12345678u;
     uint16 flags2 = 0x1ABCu;
     uint32 timestamp = 0x11223344u;
@@ -541,6 +542,63 @@ static RefOp const kMoveUpdateKnockBack[] = {
     RefOp::UnknownUInt32, GB(3), GB(0), RefOp::PositionX, RefOp::Pitch, GB(5),
     RefOp::Timestamp, RefOp::End };
 
+// CMSG_FORCE_MOVE_ROOT_ACK. Independent transcription of the build-18414
+// client writer sub_67E304. The captured bodies below establish the exercised
+// arms; the synthetic cases exercise every writer branch.
+static RefOp const kForceMoveRootAck[] = {
+    RefOp::PositionX, RefOp::MovementCounter, RefOp::PositionY, RefOp::PositionZ,
+    RefOp::Raw149, RefOp::HasTimestamp, RefOp::HasSplineElevation, RefOp::Raw148,
+    G(3), RefOp::Raw172, G(4), RefOp::HasFlags2, G(6), RefOp::HasUnknownUInt32,
+    RefOp::HasPitch, RefOp::HasFall, G(2), G(1), G(7), RefOp::HasTransport,
+    RefOp::ForceCount, RefOp::HasFlags, G(0), RefOp::HasOrientation, G(5),
+    T(1), RefOp::HasTransportTime3, RefOp::HasTransportTime2, T(2), T(6), T(3),
+    T(0), T(4), T(7), T(5), RefOp::Flags, RefOp::HasFallDirection, RefOp::Flags2,
+    GB(1), GB(0), GB(5), GB(7), GB(3), GB(4), GB(2), GB(6), RefOp::ForceIds,
+    RefOp::UnknownUInt32, RefOp::FallCos, RefOp::FallSin, RefOp::FallHorizontal,
+    RefOp::FallTime, RefOp::FallVertical, TB(5), TB(0), TB(3), TB(2),
+    RefOp::TransportX, TB(6), RefOp::TransportY, RefOp::TransportTime2,
+    RefOp::TransportTime, RefOp::TransportZ, TB(7), RefOp::TransportO, TB(1),
+    RefOp::TransportSeat, RefOp::TransportTime3, TB(4), RefOp::Pitch,
+    RefOp::Timestamp, RefOp::PositionO, RefOp::SplineElevation, RefOp::End };
+
+// CMSG_FORCE_MOVE_UNROOT_ACK. Independent transcription of sub_6850F1.
+static RefOp const kForceMoveUnrootAck[] = {
+    RefOp::PositionX, RefOp::PositionY, RefOp::MovementCounter, RefOp::PositionZ,
+    G(0), RefOp::HasPitch, RefOp::HasFall, RefOp::HasSplineElevation, RefOp::Raw148,
+    G(6), G(4), G(1), G(3), RefOp::Raw172, G(7), G(5), RefOp::Raw149,
+    RefOp::HasTimestamp, RefOp::HasUnknownUInt32, RefOp::HasFlags,
+    RefOp::HasTransport, G(2), RefOp::ForceCount, RefOp::HasFlags2,
+    RefOp::HasOrientation, RefOp::HasTransportTime3, T(0), T(2),
+    RefOp::HasTransportTime2, T(6), T(4), T(1), T(7), T(5), T(3),
+    RefOp::Flags2, RefOp::HasFallDirection, RefOp::Flags, GB(1), GB(0),
+    RefOp::ForceIds, GB(6), GB(2), GB(5), GB(3), GB(4), GB(7),
+    RefOp::UnknownUInt32, RefOp::TransportSeat, TB(7), TB(4),
+    RefOp::TransportTime, TB(1), RefOp::TransportTime2, RefOp::TransportZ,
+    RefOp::TransportTime3, TB(5), RefOp::TransportY, TB(6), TB(2),
+    RefOp::TransportX, TB(0), TB(3), RefOp::TransportO, RefOp::FallCos,
+    RefOp::FallHorizontal, RefOp::FallSin, RefOp::FallTime, RefOp::FallVertical,
+    RefOp::Timestamp, RefOp::SplineElevation, RefOp::PositionO, RefOp::Pitch,
+    RefOp::End };
+
+// CMSG_MOVE_WATER_WALK_ACK. Independent transcription of sub_675FB7.
+static RefOp const kMoveWaterWalkAck[] = {
+    RefOp::PositionX, RefOp::PositionY, RefOp::MovementCounter, RefOp::PositionZ,
+    RefOp::Raw172, G(3), RefOp::HasFall, G(2), RefOp::HasFlags, G(0),
+    RefOp::HasPitch, RefOp::Raw149, RefOp::HasFlags2, G(7), G(6),
+    RefOp::HasTimestamp, RefOp::Raw148, RefOp::HasSplineElevation,
+    RefOp::HasTransport, G(1), G(4), RefOp::HasUnknownUInt32,
+    RefOp::ForceCount, G(5), RefOp::HasOrientation, T(1),
+    RefOp::HasTransportTime2, T(7), RefOp::HasTransportTime3, T(4), T(5),
+    T(2), T(3), T(0), T(6), RefOp::Flags, RefOp::HasFallDirection,
+    RefOp::Flags2, GB(7), RefOp::ForceIds, GB(0), GB(5), GB(3), GB(4),
+    GB(1), GB(6), GB(2), RefOp::TransportTime2, TB(1), RefOp::TransportTime,
+    RefOp::TransportY, TB(4), RefOp::TransportX, TB(5), TB(7), TB(3),
+    RefOp::TransportO, TB(2), RefOp::TransportSeat, RefOp::TransportTime3,
+    TB(6), TB(0), RefOp::TransportZ, RefOp::FallCos, RefOp::FallSin,
+    RefOp::FallHorizontal, RefOp::FallVertical, RefOp::FallTime,
+    RefOp::UnknownUInt32, RefOp::PositionO, RefOp::Pitch, RefOp::Timestamp,
+    RefOp::SplineElevation, RefOp::End };
+
 #undef G
 #undef GB
 #undef T
@@ -577,7 +635,7 @@ static std::vector<uint8> Encode(RefOp const (&sequence)[N], RefState const& s,
             case RefOp::HasTransportTime3: if (s.hasTransport) w.Bit(s.hasTransportTime3); break;
             case RefOp::HasSplineElevation: w.Bit(!s.hasSplineElevation); break;
             case RefOp::ForceCount: w.Bits(count, 22); break;
-            case RefOp::MovementCounter: w.U32(0xCAFEBABEu); break;
+            case RefOp::MovementCounter: w.U32(s.movementCounter); break;
             case RefOp::HasUnknownUInt32: w.Bit(!s.hasUnknownUInt32); break;
             case RefOp::PositionX: w.F32(s.x); break;
             case RefOp::PositionY: w.F32(s.y); break;
@@ -686,8 +744,12 @@ static void test_spline_state_packets()
 
 static void CheckDecoded(MovementInfo const& info, RefState const& s, OpcodesList opcode)
 {
-    (void)opcode;
     CHECK(info.GetGuid().GetRawValue() == s.guid);
+    if (opcode == CMSG_FORCE_MOVE_ROOT_ACK || opcode == CMSG_FORCE_MOVE_UNROOT_ACK ||
+        opcode == CMSG_MOVE_WATER_WALK_ACK || opcode == CMSG_MOVE_KNOCK_BACK_ACK)
+    {
+        CHECK(info.GetMovementCounter() == s.movementCounter);
+    }
     CHECK(uint32(info.GetMovementFlags()) == (s.hasFlags ? s.flags : 0));
     CHECK(uint16(info.GetMovementFlags2()) == (s.hasFlags2 ? s.flags2 : 0));
     CHECK(info.GetTime() == (s.hasTimestamp ? s.timestamp : 0));
@@ -708,6 +770,7 @@ static void CheckDecoded(MovementInfo const& info, RefState const& s, OpcodesLis
     CHECK(info.GetTransportPos()->o == (s.hasTransport ? s.to : 0.0f));
     CHECK(info.GetTransportTime() == (s.hasTransport ? s.transportTime : 0));
     CHECK(info.GetTransportTime2() == (s.hasTransport && s.hasTransportTime2 ? s.transportTime2 : 0));
+    CHECK(info.GetTransportTime3() == (s.hasTransport && s.hasTransportTime3 ? s.transportTime3 : 0));
     CHECK(info.GetTransportSeat() == (s.hasTransport ? s.transportSeat : -1));
     CHECK(info.GetPitch() == (s.hasPitch ? s.pitch : 0.0f));
     CHECK(info.GetFallTime() == (s.hasFall ? s.fallTime : 0));
@@ -1175,6 +1238,240 @@ static void test_hostile_counts_rejected()
     CHECK(RejectsForceSwim(state, 2, 1, true));
 }
 
+static MovementInfo DecodeRetailAck(OpcodesList opcode, uint8 const* body, size_t size)
+{
+    WorldPacket packet(opcode, size);
+    packet.append(body, size);
+    MovementInfo info;
+    packet >> info;
+    CHECK(packet.rpos() == packet.size());
+    return info;
+}
+
+static void test_forced_movement_ack_retail_bodies()
+{
+    // Captured retail bodies; unlike the binary-derived synthetic fixtures
+    // below, none of these bytes was produced by this test.
+    // capture-000004/2069: ordinary player mover.
+    static uint8 const rootOrdinary[] = {
+        0x66, 0xE7, 0x05, 0x46, 0x78, 0x00, 0x00, 0x00, 0xA1, 0x06, 0x27, 0x44,
+        0x72, 0xDA, 0x08, 0x44, 0x28, 0x6E, 0x00, 0x00, 0x01, 0x00, 0x00, 0x06,
+        0x00, 0x40, 0x00, 0xC9, 0xE9, 0x05, 0x04, 0x3D, 0x89, 0x92, 0x0F, 0x00,
+        0x0E, 0x04, 0x90, 0x40 };
+    // capture-000006/64719: fall-direction arm.
+    static uint8 const rootFall[] = {
+        0xD4, 0x9E, 0x2B, 0xC6, 0xD7, 0x00, 0x00, 0x00, 0x11, 0x60, 0xA1, 0xC4,
+        0x47, 0x66, 0x2F, 0x41, 0x29, 0x7E, 0x00, 0x00, 0x01, 0x00, 0x08, 0x08,
+        0x00, 0x80, 0xC9, 0xE9, 0x05, 0x04, 0x3D, 0x03, 0x37, 0xDD, 0xBD, 0x93,
+        0x80, 0x7E, 0xBF, 0x00, 0x00, 0x00, 0x00, 0x17, 0x00, 0x00, 0x00, 0x25,
+        0x7B, 0xD5, 0xC0, 0xC3, 0x93, 0x01, 0x01, 0x06, 0xF1, 0x79, 0x40 };
+    // capture-000183/110806: transport arm.
+    static uint8 const rootTransport[] = {
+        0xFE, 0xBD, 0xD4, 0xC3, 0x33, 0x00, 0x00, 0x00, 0xF6, 0xAE, 0x17, 0x45,
+        0xCE, 0x4F, 0xEC, 0x43, 0x28, 0xEF, 0x00, 0x00, 0x01, 0x22, 0xA0, 0x00,
+        0x01, 0x80, 0x10, 0x00, 0x23, 0x07, 0x00, 0x05, 0xB3, 0x81, 0xC4, 0xAE,
+        0x9C, 0x8B, 0x41, 0xC1, 0x68, 0x96, 0xE3, 0x41, 0x8D, 0xD2, 0x00, 0x00,
+        0xA8, 0x79, 0x10, 0x42, 0x1E, 0x5D, 0x03, 0xD7, 0x3F, 0x05, 0xFF, 0x18,
+        0x12, 0xEF, 0x15, 0xB0, 0x7E, 0xEB, 0x3F };
+    // capture-000086/92717: minimum body with controlled-vehicle mover.
+    static uint8 const unrootVehicle[] = {
+        0x7D, 0x9F, 0x26, 0xC3, 0x39, 0x6C, 0x22, 0x44, 0x1F, 0x02, 0x00, 0x00,
+        0xC7, 0x68, 0x25, 0x43, 0xD7, 0x33, 0x40, 0x00, 0x00, 0xC0, 0xDF, 0xEE,
+        0x51, 0x00, 0xEA, 0x18, 0xF0, 0x71, 0x65, 0x28, 0x00 };
+    // capture-000006/65133: fall-direction arm.
+    static uint8 const unrootFall[] = {
+        0xD4, 0x9E, 0x2B, 0xC6, 0x11, 0x60, 0xA1, 0xC4, 0xD9, 0x00, 0x00, 0x00,
+        0x0F, 0x0C, 0x2D, 0x41, 0xF1, 0xA2, 0x40, 0x00, 0x00, 0x10, 0x01, 0x00,
+        0x00, 0x20, 0x00, 0xC9, 0xE9, 0x3D, 0x04, 0x05, 0x67, 0x4F, 0x73, 0xBF,
+        0x00, 0x00, 0x00, 0x00, 0x38, 0x33, 0x9F, 0x3E, 0x00, 0x00, 0x00, 0x00,
+        0x00, 0x00, 0x00, 0x00, 0xE6, 0xAE, 0x01, 0x01, 0x92, 0xD3, 0x34, 0x40 };
+    // capture-000004/9778: vehicle transport plus fall.
+    static uint8 const unrootTransportFall[] = {
+        0xBD, 0x4F, 0x03, 0x46, 0xA7, 0xF3, 0x75, 0x44, 0xE1, 0x00, 0x00, 0x00,
+        0xEC, 0xAB, 0x08, 0x44, 0xF1, 0xA2, 0xC0, 0x00, 0x00, 0x1B, 0xE4, 0x00,
+        0x40, 0x00, 0x08, 0x00, 0xC9, 0xE9, 0x3D, 0x04, 0x05, 0x00, 0xF0, 0x24,
+        0x00, 0x00, 0x00, 0x00, 0x1E, 0x00, 0x00, 0xD0, 0x3F, 0x83, 0x00, 0x00,
+        0x00, 0x00, 0x51, 0x22, 0xDA, 0xAC, 0x0A, 0xBF, 0xD6, 0x00, 0x00, 0x00,
+        0x00, 0x00, 0x00, 0x80, 0x3F, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+        0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0xB4, 0x2B, 0x14,
+        0x00, 0x5C, 0xE6, 0xB8, 0x40 };
+    // capture-000261/688214: minimum-shaped land/water ACK.
+    static uint8 const waterMinimum[] = {
+        0xE1, 0x22, 0x86, 0x44, 0xAE, 0x3D, 0xB0, 0xC5, 0x7F, 0x00, 0x00, 0x00,
+        0x6A, 0xBC, 0x9E, 0xC3, 0x56, 0x45, 0x40, 0x00, 0x00, 0x44, 0x00, 0x00,
+        0x00, 0x40, 0x00, 0x05, 0x70, 0x04, 0xBC, 0x3D, 0x66, 0xAA, 0xE2, 0x02 };
+    // capture-000020/27534: oriented water-walk pair.
+    static uint8 const waterOriented[] = {
+        0x5D, 0xA8, 0x34, 0x44, 0x7B, 0x4F, 0x09, 0x45, 0x19, 0x00, 0x00, 0x00,
+        0xAC, 0xD9, 0xC0, 0x43, 0x56, 0x65, 0x40, 0x00, 0x00, 0x04, 0x00, 0x00,
+        0x00, 0x40, 0x00, 0x00, 0x07, 0x05, 0x23, 0x81, 0xB3, 0xE9, 0x8F, 0xCB,
+        0x3F, 0xA9, 0xD6, 0x39, 0x16 };
+    // capture-000019/112577: land-walk pair with fall direction.
+    static uint8 const landFall[] = {
+        0x20, 0x0D, 0x78, 0x44, 0x2F, 0x9B, 0x65, 0x44, 0x2C, 0x02, 0x00, 0x00,
+        0xBA, 0xE9, 0xC1, 0x43, 0x76, 0x45, 0x40, 0x00, 0x00, 0x00, 0x80, 0x08,
+        0x00, 0xB0, 0x00, 0x07, 0x02, 0x06, 0x4E, 0x2C, 0x59, 0x8B, 0x49, 0xBF,
+        0x01, 0xD9, 0x1D, 0xBF, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+        0x00, 0x00, 0x00, 0x00, 0x80, 0x95, 0x73, 0x40, 0x80, 0x4F, 0x86, 0x00 };
+    // capture-000360/504821: maximum observed transport/fall body.
+    static uint8 const waterMaximum[] = {
+        0x1B, 0x5D, 0xA5, 0x44, 0xAF, 0xF6, 0xA4, 0xC5, 0x1F, 0x02, 0x00, 0x00,
+        0x12, 0xB2, 0x04, 0x41, 0x76, 0x47, 0x40, 0x00, 0x00, 0x28, 0x30, 0x00,
+        0x02, 0x00, 0x28, 0x00, 0x05, 0x70, 0x04, 0xBC, 0x3D, 0x0C, 0x00, 0x00,
+        0x00, 0x00, 0x88, 0xD0, 0xD1, 0xBF, 0x12, 0x78, 0xBD, 0xC0, 0x1E, 0xB2,
+        0x1D, 0x0F, 0x40, 0xFF, 0xC1, 0x36, 0xDC, 0x74, 0xA9, 0x40, 0xC1, 0x0B,
+        0x1E, 0xBF, 0x8F, 0x63, 0x49, 0x3F, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+        0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0xD0, 0xEE, 0x43, 0x3F, 0x94, 0x42,
+        0xB1, 0x02 };
+
+    MovementInfo const r0 = DecodeRetailAck(CMSG_FORCE_MOVE_ROOT_ACK, rootOrdinary, sizeof(rootOrdinary));
+    CHECK(r0.GetMovementCounter() == 120u);
+    CHECK(r0.GetGuid().GetRawValue() == UINT64_C(0x04000000053CC8E8));
+    CHECK(r0.GetPos()->x == 8569.849609375f && r0.GetPos()->y == 668.10357666015625f && r0.GetPos()->z == 547.4132080078125f);
+    CHECK(uint32(r0.GetMovementFlags()) == 0x00000600u && uint16(r0.GetMovementFlags2()) == 0x0800u);
+    CHECK(r0.GetTime() == 1020553u && r0.GetPos()->o == 4.500494956970215f);
+
+    MovementInfo const r1 = DecodeRetailAck(CMSG_FORCE_MOVE_ROOT_ACK, rootFall, sizeof(rootFall));
+    CHECK(r1.GetMovementCounter() == 215u);
+    CHECK(r1.GetGuid().GetRawValue() == UINT64_C(0x04000000053CC8E8));
+    CHECK(uint32(r1.GetMovementFlags()) == 0x00080800u && uint16(r1.GetMovementFlags2()) == 0u);
+    CHECK(r1.GetJumpInfo().cosAngle == -0.10801508277654648f);
+    CHECK(r1.GetJumpInfo().sinAngle == -0.994149386882782f);
+    CHECK(r1.GetJumpInfo().xyspeed == 0.0f && r1.GetFallTime() == 23u);
+    CHECK(r1.GetJumpInfo().velocity == -6.6712822914123535f);
+    CHECK(r1.GetTime() == 16880579u && r1.GetPos()->o == 3.9053359031677246f);
+
+    MovementInfo const r2 = DecodeRetailAck(CMSG_FORCE_MOVE_ROOT_ACK, rootTransport, sizeof(rootTransport));
+    CHECK(r2.GetMovementCounter() == 51u);
+    CHECK(r2.GetGuid().GetRawValue() == UINT64_C(0x0180000004B22206));
+    CHECK(r2.GetTransportGuid().GetRawValue() == UINT64_C(0x1FC00000000004C5));
+    CHECK(r2.GetTransportSeat() == -1 && r2.GetTransportTime() == 53901u);
+    CHECK(r2.GetTransportPos()->x == 17.45150375366211f && r2.GetTransportPos()->y == 28.448440551757812f);
+    CHECK(r2.GetTransportPos()->z == 36.118804931640625f && r2.GetTransportPos()->o == 1.67979014f);
+
+    MovementInfo const u0 = DecodeRetailAck(CMSG_FORCE_MOVE_UNROOT_ACK, unrootVehicle, sizeof(unrootVehicle));
+    CHECK(u0.GetMovementCounter() == 543u);
+    CHECK(u0.GetGuid().GetRawValue() == UINT64_C(0xF150EB190001DEEF));
+    CHECK(u0.GetPos()->x == -166.6230010986328f && u0.GetPos()->y == 649.6909790039062f && u0.GetPos()->z == 165.40928649902344f);
+    CHECK(u0.GetTime() == 2647409u);
+
+    MovementInfo const u1 = DecodeRetailAck(CMSG_FORCE_MOVE_UNROOT_ACK, unrootFall, sizeof(unrootFall));
+    CHECK(u1.GetMovementCounter() == 217u);
+    CHECK(u1.GetGuid().GetRawValue() == UINT64_C(0x04000000053CC8E8));
+    CHECK(u1.GetJumpInfo().cosAngle == -0.9504303336143494f);
+    CHECK(u1.GetJumpInfo().sinAngle == 0.31093764305114746f);
+    CHECK(u1.GetFallTime() == 0u && u1.GetJumpInfo().velocity == 0.0f);
+    CHECK(u1.GetTime() == 16887526u && u1.GetPos()->o == 2.825413227081299f);
+
+    MovementInfo const u2 = DecodeRetailAck(CMSG_FORCE_MOVE_UNROOT_ACK, unrootTransportFall, sizeof(unrootTransportFall));
+    CHECK(u2.GetMovementCounter() == 225u);
+    CHECK(u2.GetTransportGuid().GetRawValue() == UINT64_C(0xF150822500231FD7));
+    CHECK(u2.GetTransportSeat() == 0 && u2.GetTransportTime() == 0u);
+    CHECK(u2.GetTransportPos()->x == -0.541700005531311f && u2.GetTransportPos()->z == 1.625f);
+    CHECK(u2.GetJumpInfo().cosAngle == 1.0f && u2.GetJumpInfo().sinAngle == 0.0f);
+    CHECK(u2.GetJumpInfo().xyspeed == 0.0f && u2.GetJumpInfo().velocity == 0.0f);
+    CHECK(u2.GetTime() == 1321908u && u2.GetPos()->o == 5.778120040893555f);
+
+    MovementInfo const w0 = DecodeRetailAck(CMSG_MOVE_WATER_WALK_ACK, waterMinimum, sizeof(waterMinimum));
+    CHECK(w0.GetMovementCounter() == 127u);
+    CHECK(w0.GetGuid().GetRawValue() == UINT64_C(0x04000000053CBD71));
+    CHECK(uint32(w0.GetMovementFlags()) == 0x04000000u && uint16(w0.GetMovementFlags2()) == 0x0800u);
+    CHECK(w0.GetTime() == 48409190u);
+
+    MovementInfo const w1 = DecodeRetailAck(CMSG_MOVE_WATER_WALK_ACK, waterOriented, sizeof(waterOriented));
+    CHECK(w1.GetMovementCounter() == 25u);
+    CHECK(w1.GetGuid().GetRawValue() == UINT64_C(0x0180000004B22206));
+    CHECK(w1.GetPos()->o == 1.5903292894363403f && w1.GetTime() == 372889257u);
+
+    MovementInfo const w2 = DecodeRetailAck(CMSG_MOVE_WATER_WALK_ACK, landFall, sizeof(landFall));
+    CHECK(w2.GetMovementCounter() == 556u);
+    CHECK(w2.GetGuid().GetRawValue() == UINT64_C(0x06000000072D4F03));
+    CHECK(uint32(w2.GetMovementFlags()) == 0x00800800u && uint16(w2.GetMovementFlags2()) == 0x0C00u);
+    CHECK(w2.GetStatusInfo().hasFallDirection && w2.GetPos()->o == 3.805999755859375f);
+    CHECK(w2.GetTime() == 8802176u);
+
+    MovementInfo const w3 = DecodeRetailAck(CMSG_MOVE_WATER_WALK_ACK, waterMaximum, sizeof(waterMaximum));
+    CHECK(w3.GetMovementCounter() == 543u);
+    CHECK(w3.GetGuid().GetRawValue() == UINT64_C(0x04000000053CBD71));
+    CHECK(w3.GetTransportGuid().GetRawValue() == UINT64_C(0x1FC0000000000D37));
+    CHECK(w3.GetTransportPos()->x == -5.9209070205688477f);
+    CHECK(w3.GetTransportPos()->y == -1.6391763687133789f);
+    CHECK(w3.GetTransportPos()->z == 5.2955150604248047f);
+    CHECK(w3.GetTransportPos()->o == 2.2361874580383301f);
+    CHECK(uint32(w3.GetMovementFlags()) == 0x00000800u && uint16(w3.GetMovementFlags2()) == 0x0800u);
+    CHECK(w3.GetStatusInfo().hasFallDirection);
+}
+
+template <size_t N>
+static void CheckForcedAckSyntheticCoverage(OpcodesList opcode, RefOp const (&sequence)[N])
+{
+    RefState full;
+    Decode(opcode, sequence, full);
+
+    for (size_t byte = 0; byte < 8; ++byte)
+    {
+        RefState state = full;
+        state.guid &= ~(UINT64_C(0xFF) << (byte * 8));
+        Decode(opcode, sequence, state);
+    }
+    for (size_t byte = 0; byte < 8; ++byte)
+    {
+        RefState state = full;
+        state.transportGuid &= ~(UINT64_C(0xFF) << (byte * 8));
+        Decode(opcode, sequence, state);
+    }
+}
+
+static void test_forced_movement_ack_synthetic_coverage()
+{
+    // Binary-derived synthetic fixtures: these cover writer arms absent from
+    // the selected captures (force IDs, unknown uint32, pitch, spline, both
+    // optional transport times) and discriminate every mover/transport byte.
+    CheckForcedAckSyntheticCoverage(CMSG_FORCE_MOVE_ROOT_ACK, kForceMoveRootAck);
+    CheckForcedAckSyntheticCoverage(CMSG_FORCE_MOVE_UNROOT_ACK, kForceMoveUnrootAck);
+    CheckForcedAckSyntheticCoverage(CMSG_MOVE_WATER_WALK_ACK, kMoveWaterWalkAck);
+
+    RefState const state;
+    CHECK(Rejects(CMSG_FORCE_MOVE_ROOT_ACK, kForceMoveRootAck, state, (1u << 22) - 1u, 0, false));
+    CHECK(Rejects(CMSG_FORCE_MOVE_ROOT_ACK, kForceMoveRootAck, state, 2, 1, true));
+    CHECK(Rejects(CMSG_FORCE_MOVE_UNROOT_ACK, kForceMoveUnrootAck, state, (1u << 22) - 1u, 0, false));
+    CHECK(Rejects(CMSG_FORCE_MOVE_UNROOT_ACK, kForceMoveUnrootAck, state, 2, 1, true));
+    CHECK(Rejects(CMSG_MOVE_WATER_WALK_ACK, kMoveWaterWalkAck, state, (1u << 22) - 1u, 0, false));
+    CHECK(Rejects(CMSG_MOVE_WATER_WALK_ACK, kMoveWaterWalkAck, state, 2, 1, true));
+
+    struct Route { OpcodesList opcode; std::vector<uint8> body; };
+    Route routes[] = {
+        { CMSG_FORCE_MOVE_ROOT_ACK, Encode(kForceMoveRootAck, state) },
+        { CMSG_FORCE_MOVE_UNROOT_ACK, Encode(kForceMoveUnrootAck, state) },
+        { CMSG_MOVE_WATER_WALK_ACK, Encode(kMoveWaterWalkAck, state) },
+    };
+    for (Route const& route : routes)
+    {
+        std::vector<uint8> truncated = route.body;
+        truncated.pop_back();
+        WorldPacket packet(route.opcode, truncated.size());
+        packet.append(truncated.data(), truncated.size());
+        bool threw = false;
+        try
+        {
+            MovementInfo info;
+            packet >> info;
+        }
+        catch (ByteBufferException const&)
+        {
+            threw = true;
+        }
+        CHECK(threw);
+
+        WorldPacket trailing(route.opcode, route.body.size() + 1);
+        trailing.append(route.body.data(), route.body.size());
+        trailing << uint8(0xA5);
+        MovementInfo info;
+        trailing >> info;
+        CHECK(trailing.rpos() + 1 == trailing.size());
+    }
+}
+
 static void test_opcode_values_are_framable()
 {
     CHECK(uint32(MSG_MOVE_HEARTBEAT) == 0x01F2u);
@@ -1198,6 +1495,13 @@ static void test_opcode_values_are_framable()
     CHECK(uint32(CMSG_MOVE_KNOCK_BACK_ACK) == 0x00F2u);
     CHECK(uint32(SMSG_MOVE_UPDATE_KNOCK_BACK) == 0x0251u);
     CHECK(uint32(CMSG_FORCE_SWIM_SPEED_CHANGE_ACK) == 0x1853u);
+    CHECK(uint32(CMSG_FORCE_MOVE_ROOT_ACK) == 0x107Au);
+    CHECK(uint32(CMSG_FORCE_MOVE_UNROOT_ACK) == 0x1051u);
+    CHECK(uint32(CMSG_MOVE_WATER_WALK_ACK) == 0x10F2u);
+    CHECK(uint32(SMSG_FORCE_MOVE_ROOT) == 0x15AEu);
+    CHECK(uint32(SMSG_FORCE_MOVE_UNROOT) == 0x1FAEu);
+    CHECK(uint32(SMSG_MOVE_WATER_WALK) == 0x1F9Au);
+    CHECK(uint32(SMSG_MOVE_LAND_WALK) == 0x086Au);
     CHECK(uint32(SMSG_PLAYER_MOVE) == 0x1A32u);
     CHECK(uint32(SMSG_SPLINE_MOVE_SET_NORMAL_FALL) == 0x0B08u);
     CHECK(uint32(SMSG_SPLINE_MOVE_SET_WATER_WALK) == 0x1823u);
@@ -2276,6 +2580,8 @@ int main(int, char**)
     test_gravity_family_retail_bodies();
     test_normal_fall_counter_offset_moves();
     test_hostile_counts_rejected();
+    test_forced_movement_ack_retail_bodies();
+    test_forced_movement_ack_synthetic_coverage();
     test_opcode_values_are_framable();
     test_transport_stop_monster_move_fixture();
     test_linear_monster_move_fixture();

@@ -175,9 +175,9 @@
  *   TOTAL SMSG rows                   925
  *
  * SUBSYSTEM CONFIDENCE: high=365, low=221, medium=182, none=157
- * STATUS TOTALS: ACTIVE=521, DOC=434, DORMANT=565
- *   SMSG: ACTIVE=312, DOC=271, DORMANT=342
- *   CMSG: ACTIVE=209, DOC=163, DORMANT=223
+ * STATUS TOTALS: ACTIVE=528, DOC=434, DORMANT=558
+ *   SMSG: ACTIVE=316, DOC=271, DORMANT=338
+ *   CMSG: ACTIVE=212, DOC=163, DORMANT=220
  */
 
 // CAVEATS -- read before trusting any single row:
@@ -1030,7 +1030,7 @@ typedef uint16_t uint16;
  *   SMSG_MOVE_SET_VEHICLE_REC_ID                   0x0861  DORMANT
  *   SMSG_SPLINE_MOVE_GRAVITY_ENABLE                0x0865  ACTIVE
  *   SMSG_MOVE_UNSET_CAN_TRANSITION_BETWEEN_SWIM_AND_FLY 0x0868  DORMANT
- *   SMSG_MOVE_LAND_WALK                            0x086A  DORMANT
+ *   SMSG_MOVE_LAND_WALK                            0x086A  ACTIVE
  *   SMSG_MOVE_UPDATE_RUN_BACK_SPEED                0x08A3  DORMANT
  *   SMSG_SPLINE_MOVE_SET_WALK_SPEED                0x08B2  ACTIVE
  *   SMSG_MOVE_NORMAL_FALL                          0x08E0  DORMANT
@@ -1068,7 +1068,7 @@ typedef uint16_t uint16;
  *   SMSG_MOVE_UPDATE_RUN_SPEED                     0x158E  DORMANT
  *   SMSG_MOVE_GRAVITY_DISABLE                      0x159F  ACTIVE
  *   SMSG_MOVE_UPDATE_TELEPORT                      0x15A9  DOC
- *   SMSG_FORCE_MOVE_ROOT                           0x15AE  DORMANT
+ *   SMSG_FORCE_MOVE_ROOT                           0x15AE  ACTIVE
  *   SMSG_MOVE_COLLISION_DISABLE                    0x15B8  DORMANT
  *   SMSG_PET_ACTION_SOUND                          0x15E2  ACTIVE
  *   SMSG_MOVE_SET_CAN_FLY                          0x178D  ACTIVE
@@ -1099,9 +1099,9 @@ typedef uint16_t uint16;
  *   SMSG_CANCEL_AUTO_REPEAT                        0x1E0F  ACTIVE   [high-conf]  direct packed-GUID reader and Unit_C auto-repeat-clear terminal; name reference-consensus
  *   SMSG_UNKNOWN_0x1E12                            0x1E12  DOC
  *   SMSG_UNKNOWN_0x1E9F                            0x1E9F  DOC
- *   SMSG_MOVE_WATER_WALK                           0x1F9A  DORMANT
+ *   SMSG_MOVE_WATER_WALK                           0x1F9A  ACTIVE
  *   SMSG_SPLINE_MOVE_SET_RUN_BACK_SPEED            0x1F9F  ACTIVE
- *   SMSG_FORCE_MOVE_UNROOT                         0x1FAE  DORMANT
+ *   SMSG_FORCE_MOVE_UNROOT                         0x1FAE  ACTIVE
  *
  *  -- VignetteInfo.cpp (2) --
  *   SMSG_UNKNOWN_0x088F                            0x088F  DOC      [low-conf]
@@ -1675,14 +1675,14 @@ typedef uint16_t uint16;
  *   CMSG_MESSAGECHAT_EMOTE                         0x103E  ACTIVE
  *   CMSG_ITEM_UPGRADE                              0x1042  DOC
  *   CMSG_MOVE_SET_FACING                           0x1050  ACTIVE
- *   CMSG_FORCE_MOVE_UNROOT_ACK                     0x1051  DORMANT
+ *   CMSG_FORCE_MOVE_UNROOT_ACK                     0x1051  ACTIVE
  *   CMSG_MOVE_SET_CAN_FLY_ACK                      0x1052  ACTIVE
  *   CMSG_MOVE_START_STRAFE_RIGHT                   0x1058  ACTIVE
  *   CMSG_UNKNOWN_0x105A                            0x105A  DOC
  *   CMSG_FORCE_FLIGHT_BACK_SPEED_CHANGE_ACK        0x105B  ACTIVE
  *   CMSG_OBJECT_UPDATE_FAILED                      0x1061  DORMANT
  *   CMSG_PET_BATTLE_FINAL_NOTIFY                   0x1063  DOC
- *   CMSG_FORCE_MOVE_ROOT_ACK                       0x107A  DORMANT
+ *   CMSG_FORCE_MOVE_ROOT_ACK                       0x107A  ACTIVE
  *   CMSG_MOVE_START_TURN_RIGHT                     0x107B  ACTIVE
  *   CMSG_SCENE_PLAYBACK_CANCELED                   0x1087  DOC
  *   CMSG_QUEUED_MESSAGES_END                       0x1093  DOC
@@ -1700,7 +1700,7 @@ typedef uint16_t uint16;
  *   MSG_MOVE_SET_SWIM_SPEED_CHEAT                  0x10D3  ACTIVE   server-binding=CMSG_TIME_SYNC_RESPONSE_DROPPED
  *   CMSG_MOVE_REMOVE_MOVEMENT_FORCE_ACK            0x10DB  DOC
  *   CMSG_UNKNOWN_0x10E3                            0x10E3  DOC      cand CMSG_CANCEL_MOUNT_AURA bound to 0x1552
- *   CMSG_MOVE_WATER_WALK_ACK                       0x10F2  DORMANT
+ *   CMSG_MOVE_WATER_WALK_ACK                       0x10F2  ACTIVE
  *   CMSG_FORCE_RUN_SPEED_CHANGE_ACK                0x10F3  ACTIVE
  *   CMSG_DEL_FRIEND                                0x1103  DORMANT
  *   CMSG_NEXT_CINEMATIC_CAMERA                     0x1124  ACTIVE

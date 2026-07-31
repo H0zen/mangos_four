@@ -2129,6 +2129,32 @@ foreach(mutation IN ITEMS drop_observer_half drop_mover_half observer_half_to_se
         PROPERTIES WILL_FAIL TRUE)
 endforeach()
 
+add_test(NAME mop_forced_movement_ack_source
+    COMMAND ${CMAKE_COMMAND} -DSOURCE_ROOT=${CMAKE_SOURCE_DIR}
+        -P ${CMAKE_CURRENT_SOURCE_DIR}/mop_forced_movement_ack_source_test.cmake)
+
+foreach(mutation IN ITEMS
+        root_prefix_order unroot_prefix_order root_bit_order unroot_bit_order
+        root_guid_byte_order unroot_guid_byte_order root_transport_order unroot_transport_order
+        root_fall_order unroot_fall_order root_flags_order unroot_flags_order flags2_13_width
+        root_sequence_route unroot_sequence_route root_registration unroot_registration
+        root_handler_parser unroot_handler_parser root_hostile_force_count unroot_hostile_force_count
+        water_ack_prefix_order water_ack_bit_order water_ack_flags_order water_ack_flags2_width
+        water_ack_guid_byte_order water_ack_transport_order water_ack_transport_position_orientation_order
+        water_ack_fall_order water_ack_force_elements
+        water_ack_sequence_route water_ack_handler_parser water_ack_mover_validation
+        water_ack_forbid_state_mutation water_ack_registration water_pair_metadata water_reference_atomic
+        active_mover_verify exact_tail_consumption movement_counter_storage no_relocation
+        no_flag_assignment no_aura_mutation no_observer_broadcast allocation_before_resize
+        paired_smsg_metadata reference_triplet_atomic)
+    add_test(NAME mop_forced_movement_ack_source_mutation_${mutation}
+        COMMAND ${CMAKE_COMMAND} -DSOURCE_ROOT=${CMAKE_SOURCE_DIR}
+            -DMUTATION=${mutation}
+            -P ${CMAKE_CURRENT_SOURCE_DIR}/mop_forced_movement_ack_source_test.cmake)
+    set_tests_properties(mop_forced_movement_ack_source_mutation_${mutation}
+        PROPERTIES WILL_FAIL TRUE)
+endforeach()
+
 add_test(NAME mop_knockback_packets_source
     COMMAND ${CMAKE_COMMAND} -DSOURCE_ROOT=${CMAKE_SOURCE_DIR}
         -P ${CMAKE_CURRENT_SOURCE_DIR}/mop_knockback_packets_source_test.cmake)

@@ -2514,7 +2514,7 @@ class MovementInfo
     public:
         MovementInfo() : moveFlags(MOVEFLAG_NONE), moveFlags2(MOVEFLAG2_NONE), time(0),
             t_time(0), t_seat(-1), t_time2(0), t_time3(0), s_pitch(0.0f), fallTime(0), splineElevation(0.0f),
-            unknownBit148(false), unknownBit149(false), unknownBit172(false), movementForceCount(0),
+            unknownBit148(false), unknownBit149(false), unknownBit172(false), movementCounter(0), movementForceCount(0),
             hasUnknownUInt32(false), unknownUInt32(0), byteParam(0), speedFloat(0.0f) {}
 
         // Read/Write methods
@@ -2570,6 +2570,8 @@ class MovementInfo
         uint32 GetTime() const { return time; }
         uint32 GetTransportTime() const { return t_time; }
         uint32 GetTransportTime2() const { return t_time2; }
+        uint32 GetTransportTime3() const { return t_time3; }
+        uint32 GetMovementCounter() const { return movementCounter; }
         uint32 GetFallTime() const { return fallTime; }
         int8 GetByteParam() const { return byteParam; }
         /// The forced speed carried INSIDE the movement block. Four of the nine
@@ -2641,6 +2643,7 @@ class MovementInfo
         bool unknownBit148;
         bool unknownBit149;
         bool unknownBit172;
+        uint32 movementCounter;
         uint32 movementForceCount;
         std::vector<uint32> movementForceIds;
         bool hasUnknownUInt32;

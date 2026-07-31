@@ -294,7 +294,7 @@ void MovementInfo::Read(ByteBuffer& data, uint16 opcode)
                 }
                 break;
             case MSEMovementCounter:
-                data.read_skip<uint32>();
+                data >> movementCounter;
                 break;
             case MSEMovementForceCount:
                 movementForceCount = data.ReadBits(22);

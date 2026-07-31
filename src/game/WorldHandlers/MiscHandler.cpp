@@ -1274,11 +1274,17 @@ void WorldSession::HandleFeatherFallAck(WorldPacket& recv_data)
  */
 void WorldSession::HandleMoveUnRootAck(WorldPacket& recv_data)
 {
-    // not used
-    recv_data.rfinish();                                    // prevent warnings spam
-    /*
-        bitsream packet
-    */
+    MovementInfo movementInfo;
+    recv_data >> movementInfo;
+
+    if (recv_data.rpos() != recv_data.size() ||
+        !VerifyMovementInfo(movementInfo, movementInfo.GetGuid()))
+    {
+        return;
+    }
+
+    DEBUG_LOG("CMSG_FORCE_MOVE_UNROOT_ACK: mover %s counter %u",
+        movementInfo.GetGuid().GetString().c_str(), movementInfo.GetMovementCounter());
 }
 
 /**
@@ -1288,11 +1294,17 @@ void WorldSession::HandleMoveUnRootAck(WorldPacket& recv_data)
  */
 void WorldSession::HandleMoveRootAck(WorldPacket& recv_data)
 {
-    // not used
-    recv_data.rfinish();                                    // prevent warnings spam
-    /*
-        bitsream packet
-    */
+    MovementInfo movementInfo;
+    recv_data >> movementInfo;
+
+    if (recv_data.rpos() != recv_data.size() ||
+        !VerifyMovementInfo(movementInfo, movementInfo.GetGuid()))
+    {
+        return;
+    }
+
+    DEBUG_LOG("CMSG_FORCE_MOVE_ROOT_ACK: mover %s counter %u",
+        movementInfo.GetGuid().GetString().c_str(), movementInfo.GetMovementCounter());
 }
 
 /**

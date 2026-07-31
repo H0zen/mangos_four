@@ -737,14 +737,17 @@ void WorldSession::HandleMoveHoverAck(WorldPacket& recv_data)
  */
 void WorldSession::HandleMoveWaterWalkAck(WorldPacket& recv_data)
 {
-    DEBUG_LOG("CMSG_MOVE_WATER_WALK_ACK");
-
-    recv_data.rfinish();
-
-    /*
     MovementInfo movementInfo;
     recv_data >> movementInfo;
-    */
+
+    if (recv_data.rpos() != recv_data.size() ||
+        !VerifyMovementInfo(movementInfo, movementInfo.GetGuid()))
+    {
+        return;
+    }
+
+    DEBUG_LOG("CMSG_MOVE_WATER_WALK_ACK: mover %s counter %u",
+        movementInfo.GetGuid().GetString().c_str(), movementInfo.GetMovementCounter());
 }
 
 /**
