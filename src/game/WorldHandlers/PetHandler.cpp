@@ -99,7 +99,9 @@ void WorldSession::HandlePetAction(WorldPacket& recv_data)
         return;
     }
 
-    if (_player->GetObjectGuid() != pet->GetCharmerOrOwnerGuid())
+    if ((petGuid != _player->GetPetGuid() &&
+            petGuid != _player->GetCharmGuid()) ||
+        _player->GetObjectGuid() != pet->GetCharmerOrOwnerGuid())
     {
         DEBUG_LOG("PET_CONTROL_REJECT opcode=CMSG_PET_ACTION reason=not_controlled account=%u player=%s pet=%s",
             GetAccountId(), _player->GetGuidStr().c_str(), petGuid.GetString().c_str());

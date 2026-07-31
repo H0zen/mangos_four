@@ -286,7 +286,9 @@ foreach(mutation IN ITEMS
         stop_registration stop_reference stop_drop_owner
         stop_drop_slot_membership stop_bypass_slot_membership stop_weaken_conjunction stop_drop_alive
         stop_move_attack_before_owner stop_move_attack_before_membership stop_not_found_error
-        stop_not_controlled_error stop_log_shape action_not_found_error
+        stop_not_controlled_error stop_log_shape action_drop_owner
+        action_drop_slot_membership action_bypass_slot_membership
+        action_move_side_effect_before_membership action_not_found_error
         action_not_controlled_error action_unknown_command_error
         action_unknown_spell_error action_unknown_action_error
         action_drop_charminfo_error)

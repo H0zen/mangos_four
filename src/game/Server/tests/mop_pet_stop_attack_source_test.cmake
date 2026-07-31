@@ -105,6 +105,26 @@ elseif(MUTATION STREQUAL "stop_log_shape")
         "PET_CONTROL_REJECT opcode=CMSG_PET_STOP_ATTACK reason=malformed"
         "PET_CONTROL_REJECT opcode=CMSG_PET_STOP_ATTACK reason=bad_packet"
         pet_handler "${pet_handler}")
+elseif(MUTATION STREQUAL "action_drop_owner")
+    string(REPLACE
+        "_player->GetObjectGuid() != pet->GetCharmerOrOwnerGuid()"
+        "false"
+        pet_handler "${pet_handler}")
+elseif(MUTATION STREQUAL "action_drop_slot_membership")
+    string(REPLACE
+        "(petGuid != _player->GetPetGuid() &&\n            petGuid != _player->GetCharmGuid()) ||\n        "
+        ""
+        pet_handler "${pet_handler}")
+elseif(MUTATION STREQUAL "action_bypass_slot_membership")
+    string(REPLACE
+        "(petGuid != _player->GetPetGuid() &&\n            petGuid != _player->GetCharmGuid())"
+        "false"
+        pet_handler "${pet_handler}")
+elseif(MUTATION STREQUAL "action_move_side_effect_before_membership")
+    string(REPLACE
+        "    if ((petGuid != _player->GetPetGuid()"
+        "    pet->AttackStop();\n\n    if ((petGuid != _player->GetPetGuid()"
+        pet_handler "${pet_handler}")
 elseif(MUTATION STREQUAL "action_not_found_error")
     string(REPLACE
         "DEBUG_LOG(\"PET_CONTROL_REJECT opcode=CMSG_PET_ACTION reason=not_found"
@@ -234,6 +254,38 @@ endif()
 math(EXPR action_length "${action_end} - ${action_start}")
 string(SUBSTRING "${pet_handler}" ${action_start} ${action_length}
     action_handler)
+
+require_once("${action_handler}"
+    "(petGuid != _player->GetPetGuid() &&\n            petGuid != _player->GetCharmGuid())"
+    "action active-slot membership")
+require_once("${action_handler}"
+    "_player->GetObjectGuid() != pet->GetCharmerOrOwnerGuid()"
+    "action reverse relationship")
+
+string(FIND "${action_handler}"
+    "MopCompactPackets::ReadPetAction" action_reader)
+string(FIND "${action_handler}"
+    "_player->GetMap()->GetUnit(petGuid)" action_lookup)
+string(FIND "${action_handler}"
+    "petGuid != _player->GetPetGuid()" action_slot)
+string(FIND "${action_handler}"
+    "_player->GetObjectGuid() != pet->GetCharmerOrOwnerGuid()" action_owner)
+string(FIND "${action_handler}" "if (!pet->IsAlive())" action_alive)
+string(FIND "${action_handler}"
+    "CharmInfo* charmInfo = pet->GetCharmInfo();" action_charminfo)
+string(FIND "${action_handler}" "switch (flag)" action_dispatch)
+string(FIND "${action_handler}" "pet->AttackStop();" action_first_attack_stop)
+
+if(action_reader EQUAL -1 OR action_lookup LESS_EQUAL action_reader OR
+        action_slot LESS_EQUAL action_lookup OR
+        action_owner LESS_EQUAL action_slot OR
+        action_alive LESS_EQUAL action_owner OR
+        action_charminfo LESS_EQUAL action_alive OR
+        action_dispatch LESS_EQUAL action_charminfo OR
+        action_first_attack_stop LESS_EQUAL action_owner)
+    message(FATAL_ERROR
+        "action authority order: reader, lookup, active slot, owner, alive, CharmInfo, dispatch/side effects")
+endif()
 
 string(FIND "${pet_handler}"
     "void WorldSession::HandlePetStopAttack" stop_start)
