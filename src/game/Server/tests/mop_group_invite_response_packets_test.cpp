@@ -64,13 +64,20 @@ static void CheckFailure(std::initializer_list<uint8> bytes,
     CHECK(response.roles == 0xA5A55A5A);
 }
 
-static void test_retail_and_synthetic_successes()
+static void test_retail_corpus_successes()
 {
+    // Build 18414 CMSG 0x0D61, catalogue generation
+    // 2BE10C899585BAECD237705AC13BBF9262D81B6BDC085B462808C6869CE88752.
+    // Exact bodies: capture-000019/13339, capture-000197/880536,
+    // and capture-000112/1062523 respectively.
     CheckSuccess({ 0x7F, 0x00 }, false, false, 0);
     CheckSuccess({ 0x7F, 0x40 }, false, true, 0);
     CheckSuccess({ 0x7F, 0xC0, 0x0A, 0x00, 0x00, 0x00 },
         true, true, 0x0000000A);
+}
 
+static void test_synthetic_successes()
+{
     CheckSuccess({ 0x7F, 0x80, 0x0A, 0x00, 0x00, 0x00 },
         true, false, 0x0000000A);
     CheckSuccess({ 0x7F, 0xC0, 0x02, 0x04, 0x08, 0x10 },
@@ -103,7 +110,8 @@ static void test_malformed_bodies_fail_atomically()
 
 int main(int, char**)
 {
-    test_retail_and_synthetic_successes();
+    test_retail_corpus_successes();
+    test_synthetic_successes();
     test_malformed_bodies_fail_atomically();
     if (g_fail)
         return 1;

@@ -69,6 +69,8 @@
 
 bool MopGroupInvitePackets::ParseResponse(WorldPacket& in, Response& out)
 {
+    // Build 18414 writer sub_903D69/sub_903DC7 and serializer sub_66AA95:
+    // marker byte, has-roles bit, accepted bit, then optional uint32 roles.
     auto fail = [&in]()
     {
         in.rfinish();

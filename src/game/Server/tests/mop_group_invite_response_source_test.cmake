@@ -169,6 +169,9 @@ string(SUBSTRING "${group_handler}" ${handler_start} ${handler_length} handler)
 require_once("${handler}"
     "MopGroupInvitePackets::ParseResponse[(]recv_data,${ws}*response[)]"
     "handler parser route")
+require_text("${handler}"
+    "A response therefore applies to\n    // the authenticated player's current pending invite."
+    "current-invite response policy")
 require_once("${handler}" "if${ws}*[(]response[.]accepted[)]"
     "accepted branch authority")
 string(FIND "${handler}" "MopGroupInvitePackets::ParseResponse(recv_data, response)" parse_pos)

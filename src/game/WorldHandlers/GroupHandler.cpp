@@ -281,6 +281,8 @@ void WorldSession::HandleGroupInviteResponseOpcode(WorldPacket& recv_data)
     if (!MopGroupInvitePackets::ParseResponse(recv_data, response))
         return;
 
+    // Build 18414 sends no invite identity. A response therefore applies to
+    // the authenticated player's current pending invite.
     Group* group = GetPlayer()->GetGroupInvite();
     if (!group)
     {
