@@ -50,9 +50,9 @@ elseif(MUTATION STREQUAL "dynamic_flags_producer")
         "record.dynamicFlags = pItem->GetUInt32Value(OBJECT_FIELD_DYNAMICFLAGS);"
         guild_bank "${guild_bank}")
 elseif(MUTATION STREQUAL "dynamic_flags_hold")
-    string(REPLACE
-        "SMSG_GUILD_BANK_LIST                            0x0B79  DORMANT"
-        "SMSG_GUILD_BANK_LIST                            0x0B79  ACTIVE"
+    string(REGEX REPLACE
+        "(SMSG_GUILD_BANK_LIST[ \t]+0x0B79[ \t]+)DORMANT"
+        "\\1ACTIVE"
         reference "${reference}")
 elseif(MUTATION STREQUAL "socket_order")
     string(REPLACE "staged << socket.index << socket.enchantmentId"
@@ -92,7 +92,8 @@ endif()
 
 set(mutated_all "${guild_bank}${builder}${guild_handler}${registry}${world_session}${reference}")
 if(DEFINED MUTATION AND NOT MUTATION STREQUAL "" AND original_all STREQUAL mutated_all)
-    message(FATAL_ERROR "mutation setup failed: ${MUTATION}")
+    message(STATUS "MUTATION '${MUTATION}' changed nothing -- dead arm, exiting 0 so WILL_FAIL reports it")
+    return()
 endif()
 
 set(ws "[ \t\r\n]")
