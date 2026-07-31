@@ -4,16 +4,32 @@ endif()
 
 file(READ "${SOURCE_ROOT}/src/game/WorldHandlers/AchievementMgr.h" achievement_header)
 file(READ "${SOURCE_ROOT}/src/game/WorldHandlers/AchievementMgr.cpp" achievement_source)
+file(READ "${SOURCE_ROOT}/src/game/Object/Unit.cpp" unit_source)
 file(READ "${SOURCE_ROOT}/src/game/Server/Opcodes.h" opcode_header)
 file(READ "${SOURCE_ROOT}/src/game/Server/Opcodes.cpp" opcode_registry)
 file(READ "${SOURCE_ROOT}/src/game/Server/WorldSession.cpp" world_session)
 file(READ "${SOURCE_ROOT}/src/game/Server/Opcodes_reference.h" opcode_reference)
 
 string(CONCAT original_sources
-    "${achievement_header}" "${achievement_source}" "${opcode_header}"
+    "${achievement_header}" "${achievement_source}" "${unit_source}" "${opcode_header}"
     "${opcode_registry}" "${world_session}" "${opcode_reference}")
 
-if(MUTATION STREQUAL "earned_mask_order")
+if(MUTATION STREQUAL "special_pvp_allow_self_kill")
+    string(REPLACE
+        "if (player_tap && player_tap != playerVictim)"
+        "if (player_tap)"
+        unit_source "${unit_source}")
+elseif(MUTATION STREQUAL "special_pvp_allow_empty_requirements")
+    string(REPLACE
+        "if (!data || data->Empty())"
+        "if (!data)"
+        achievement_source "${achievement_source}")
+elseif(MUTATION STREQUAL "special_pvp_empty_query_inverted")
+    string(REPLACE
+        "bool Empty() const { return storage.empty(); }"
+        "bool Empty() const { return !storage.empty(); }"
+        achievement_header "${achievement_header}")
+elseif(MUTATION STREQUAL "earned_mask_order")
     string(REPLACE
         "out.WriteGuidMask<6, 2>(secondGuid);"
         "out.WriteGuidMask<2, 6>(secondGuid);"
@@ -243,7 +259,7 @@ endif()
 
 if(MUTATION)
     string(CONCAT mutated_sources
-        "${achievement_header}" "${achievement_source}" "${opcode_header}"
+        "${achievement_header}" "${achievement_source}" "${unit_source}" "${opcode_header}"
         "${opcode_registry}" "${world_session}" "${opcode_reference}")
     if(mutated_sources STREQUAL original_sources)
         message(STATUS "MUTATION '${MUTATION}' changed nothing -- dead arm, exiting 0 so WILL_FAIL reports it")
@@ -577,3 +593,44 @@ foreach(blocked_opcode IN LISTS blocked_opcodes)
         "${blocked_opcode}[ \t]+${blocked_value}[ \t]+ACTIVE"
         "${blocked_opcode} remains dormant")
 endforeach()
+
+string(FIND "${unit_source}"
+    "player_tap->UpdateAchievementCriteria(ACHIEVEMENT_CRITERIA_TYPE_SPECIAL_PVP_KILL"
+    special_pvp_call)
+if(special_pvp_call EQUAL -1)
+    message(FATAL_ERROR "special-PvP achievement call site is missing")
+endif()
+string(SUBSTRING "${unit_source}" 0 ${special_pvp_call} special_pvp_prefix)
+string(FIND "${special_pvp_prefix}"
+    "if (player_tap && player_tap != playerVictim)" special_pvp_self_guard REVERSE)
+if(special_pvp_self_guard EQUAL -1)
+    message(FATAL_ERROR "special-PvP self-kill guard: expected before call site")
+endif()
+math(EXPR special_pvp_guard_distance "${special_pvp_call} - ${special_pvp_self_guard}")
+if(special_pvp_guard_distance GREATER 160)
+    message(FATAL_ERROR "special-PvP self-kill guard: not attached to call site")
+endif()
+require_literal_once("${unit_source}"
+    "if (player_tap && player_tap != playerVictim)"
+    "special-PvP self-kill guard")
+
+require_literal_once("${achievement_header}"
+    "bool Empty() const { return storage.empty(); }"
+    "achievement requirement-set empty query")
+string(FIND "${achievement_source}"
+    "case ACHIEVEMENT_CRITERIA_TYPE_SPECIAL_PVP_KILL:" special_pvp_case_start)
+string(FIND "${achievement_source}"
+    "case ACHIEVEMENT_CRITERIA_TYPE_FISH_IN_GAMEOBJECT:" special_pvp_case_end)
+if(special_pvp_case_start EQUAL -1 OR special_pvp_case_end EQUAL -1 OR
+        special_pvp_case_end LESS special_pvp_case_start)
+    message(FATAL_ERROR "special-PvP criteria evaluator bounds are missing")
+endif()
+math(EXPR special_pvp_case_length
+    "${special_pvp_case_end} - ${special_pvp_case_start}")
+string(SUBSTRING "${achievement_source}" ${special_pvp_case_start}
+    ${special_pvp_case_length} special_pvp_case_source)
+require_literal_once("${special_pvp_case_source}"
+    "if (!data || data->Empty())"
+    "special-PvP empty requirement-set rejection")
+require_literal_count("${achievement_source}" "data->Empty()" 1
+    "special-PvP-only empty requirement-set rejection")

@@ -573,6 +573,8 @@ add_test(NAME mop_achievement_packets_source
         -P ${CMAKE_CURRENT_SOURCE_DIR}/mop_achievement_packets_source_test.cmake)
 
 foreach(mutation IN ITEMS
+        special_pvp_allow_self_kill special_pvp_allow_empty_requirements
+        special_pvp_empty_query_inverted
         earned_mask_order earned_boolean earned_byte_order earned_scalar_order
         earned_producer_mapping earned_sender_opcode earned_broadcast_scope
         earned_chat_sender_name earned_legacy_body earned_opcode_value earned_registration
