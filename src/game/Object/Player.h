@@ -667,6 +667,139 @@ namespace MopDeathPackets
 {
     static size_t const CEMETERY_LIST_MAX = 16;
 
+    inline bool RejectMalformedRequest(WorldPacket& in)
+    {
+        in.rfinish();
+        return false;
+    }
+
+    inline size_t PackedGuidByteCount(uint8 mask)
+    {
+        size_t byteCount = 0;
+        for (; mask; mask >>= 1)
+        {
+            byteCount += mask & 1;
+        }
+        return byteCount;
+    }
+
+    inline bool HasCanonicalPackedGuidBytes(WorldPacket const& in,
+        size_t byteOffset, size_t byteCount)
+    {
+        // ReadByteSeq XORs present bytes with one. A raw one would encode a
+        // zero byte despite its presence mask and is therefore non-canonical.
+        for (size_t i = 0; i < byteCount; ++i)
+        {
+            if (in[byteOffset + i] == 1)
+            {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    inline std::string TruncateUtf8Bytes(std::string const& value, size_t limit)
+    {
+        if (value.size() <= limit)
+        {
+            return value;
+        }
+
+        size_t end = limit;
+        while (end > 0 && (uint8(value[end]) & 0xC0) == 0x80)
+        {
+            --end;
+        }
+        return value.substr(0, end);
+    }
+
+    inline bool ParseReclaimCorpseRequest(WorldPacket& in, ObjectGuid& guid)
+    {
+        size_t const remaining = in.size() - in.rpos();
+        if (remaining < 1)
+        {
+            return RejectMalformedRequest(in);
+        }
+
+        size_t const byteCount = PackedGuidByteCount(in[in.rpos()]);
+        if (remaining != 1 + byteCount ||
+            !HasCanonicalPackedGuidBytes(in, in.rpos() + 1, byteCount))
+        {
+            return RejectMalformedRequest(in);
+        }
+
+        ObjectGuid parsed;
+        in.ReadGuidMask<1, 5, 7, 2, 6, 3, 0, 4>(parsed);
+        in.ReadGuidBytes<2, 5, 4, 6, 1, 0, 7, 3>(parsed);
+        if (in.rpos() != in.size())
+        {
+            return RejectMalformedRequest(in);
+        }
+
+        guid = parsed;
+        return true;
+    }
+
+    struct ResurrectResponse
+    {
+        uint32 response = 0;
+        ObjectGuid resurrectorGuid;
+    };
+
+    inline bool ParseResurrectResponse(WorldPacket& in,
+        ResurrectResponse& response)
+    {
+        size_t const remaining = in.size() - in.rpos();
+        if (remaining < 5)
+        {
+            return RejectMalformedRequest(in);
+        }
+
+        size_t const byteCount = PackedGuidByteCount(in[in.rpos() + 4]);
+        if (remaining != 5 + byteCount ||
+            !HasCanonicalPackedGuidBytes(in, in.rpos() + 5, byteCount))
+        {
+            return RejectMalformedRequest(in);
+        }
+
+        ResurrectResponse parsed;
+        in >> parsed.response;
+        in.ReadGuidMask<3, 0, 6, 4, 5, 2, 1, 7>(parsed.resurrectorGuid);
+        in.ReadGuidBytes<7, 0, 1, 3, 4, 6, 2, 5>(parsed.resurrectorGuid);
+        if (in.rpos() != in.size())
+        {
+            return RejectMalformedRequest(in);
+        }
+
+        response = parsed;
+        return true;
+    }
+
+    inline bool BuildResurrectRequest(WorldPacket& out,
+        ObjectGuid const& offererGuid, uint32 spellId,
+        std::string const& offererName, bool hasSickness, bool hasTimer,
+        uint32 context0, uint32 context1)
+    {
+        std::string const wireName = TruncateUtf8Bytes(offererName, 48);
+
+        out.Initialize(SMSG_RESURRECT_REQUEST,
+            22 + wireName.size());
+        out << context0 << context1 << spellId;
+        out.WriteGuidMask<3>(offererGuid);
+        out.WriteBit(hasSickness);
+        out.WriteBit(hasTimer);
+        out.WriteGuidMask<1, 5, 2, 6, 0, 4, 7>(offererGuid);
+        out.WriteBits(uint32(wireName.size()), 6);
+        out.FlushBits();
+        out.WriteGuidBytes<7, 3, 5>(offererGuid);
+        if (!wireName.empty())
+        {
+            out.append(wireName.data(), wireName.size());
+        }
+        out.WriteGuidBytes<2, 4, 1, 6, 0>(offererGuid);
+        return true;
+    }
+
     inline void BuildDurabilityDamageDeath(WorldPacket& out)
     {
         // Wow.exe 18414 route 0x1E3E reaches sub_CE083A without consuming

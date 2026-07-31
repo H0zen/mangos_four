@@ -47,6 +47,49 @@ class Group;
 class BattleGround;
 class Map;
 
+namespace MopTerrain
+{
+    static size_t const AREA_PARENT_LIMIT = 32;
+
+    template<class Lookup>
+    inline uint32 ResolveRootAreaId(AreaTableEntry const* entry, Lookup lookup)
+    {
+        if (!entry)
+        {
+            return 0;
+        }
+
+        uint32 visited[AREA_PARENT_LIMIT] = {};
+        size_t visitedCount = 1;
+        visited[0] = entry->ID;
+        uint32 zoneId = entry->ID;
+
+        while (entry->ParentAreaID != 0 && visitedCount < AREA_PARENT_LIMIT)
+        {
+            uint32 const parentId = entry->ParentAreaID;
+            for (size_t i = 0; i < visitedCount; ++i)
+            {
+                if (visited[i] == parentId)
+                {
+                    return zoneId;
+                }
+            }
+
+            AreaTableEntry const* parent = lookup(parentId);
+            if (!parent)
+            {
+                return parentId;
+            }
+
+            entry = parent;
+            zoneId = entry->ID;
+            visited[visitedCount++] = zoneId;
+        }
+
+        return zoneId;
+    }
+}
+
 struct GridMapFileHeader
 {
     uint32 mapMagic;

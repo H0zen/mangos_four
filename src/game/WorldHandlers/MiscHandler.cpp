@@ -662,8 +662,12 @@ void WorldSession::HandleReclaimCorpseOpcode(WorldPacket& recv_data)
 {
     DETAIL_LOG("WORLD: Received opcode CMSG_RECLAIM_CORPSE");
 
-    ObjectGuid guid;
-    recv_data >> guid;
+    ObjectGuid corpseGuid;
+    if (!MopDeathPackets::ParseReclaimCorpseRequest(recv_data, corpseGuid))
+    {
+        DEBUG_LOG("WORLD: Ignoring malformed CMSG_RECLAIM_CORPSE");
+        return;
+    }
 
     if (GetPlayer()->IsAlive())
     {
@@ -716,23 +720,25 @@ void WorldSession::HandleResurrectResponseOpcode(WorldPacket& recv_data)
 {
     DETAIL_LOG("WORLD: Received opcode CMSG_RESURRECT_RESPONSE");
 
-    ObjectGuid guid;
-    uint8 status;
-    recv_data >> guid;
-    recv_data >> status;
+    MopDeathPackets::ResurrectResponse response;
+    if (!MopDeathPackets::ParseResurrectResponse(recv_data, response))
+    {
+        DEBUG_LOG("WORLD: Ignoring malformed CMSG_RESURRECT_RESPONSE");
+        return;
+    }
+
+    if (response.response != 0)
+    {
+        GetPlayer()->clearResurrectRequestData();
+        return;
+    }
 
     if (GetPlayer()->IsAlive())
     {
         return;
     }
 
-    if (status == 0)
-    {
-        GetPlayer()->clearResurrectRequestData();           // reject
-        return;
-    }
-
-    if (!GetPlayer()->isRessurectRequestedBy(guid))
+    if (!GetPlayer()->isRessurectRequestedBy(response.resurrectorGuid))
     {
         return;
     }
@@ -748,6 +754,7 @@ void WorldSession::HandleReturnToGraveyard(WorldPacket& /*recvPacket*/)
         return;
     }
 
+    Corpse* corpse = pPlayer->GetCorpse();
     WorldSafeLocsEntry const* ClosestGrave = NULL;
 
     // Special handle for battleground maps
@@ -757,14 +764,18 @@ void WorldSession::HandleReturnToGraveyard(WorldPacket& /*recvPacket*/)
     }
     else
     {
-        ClosestGrave = sObjectMgr.GetClosestGraveYard(pPlayer->GetCorpse()->GetPositionX(), pPlayer->GetCorpse()->GetPositionY(), pPlayer->GetCorpse()->GetPositionZ(), pPlayer->GetCorpse()->GetMapId(), pPlayer->GetTeam());
+        if (!corpse)
+        {
+            return;
+        }
+        ClosestGrave = sObjectMgr.GetClosestGraveYard(corpse->GetPositionX(), corpse->GetPositionY(), corpse->GetPositionZ(), corpse->GetMapId(), pPlayer->GetTeam());
     }
 
     // if no grave found, stay at the current location
     // and don't show spirit healer location
     if (ClosestGrave)
     {
-        bool updateVisibility = pPlayer->IsInWorld() && pPlayer->GetCorpse()->GetMapId() == ClosestGrave->Continent;
+        bool updateVisibility = pPlayer->IsInWorld() && corpse && corpse->GetMapId() == ClosestGrave->Continent;
         pPlayer->TeleportTo(ClosestGrave->Continent, ClosestGrave->Pos_X, ClosestGrave->Pos_Y, ClosestGrave->Pos_Z, pPlayer->GetOrientation());
         if (pPlayer->IsDead())                                       // not send if alive, because it used in TeleportTo()
         {

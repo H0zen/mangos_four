@@ -1451,7 +1451,7 @@ typedef uint16_t uint16;
  *   CMSG_AUCTION_PLACE_BID                         0x03C8  DORMANT
  *   CMSG_ACTIVATETAXI                              0x03C9  DORMANT
  *   CMSG_PUSHQUESTTOPARTY                          0x03D2  ACTIVE
- *   CMSG_RECLAIM_CORPSE                            0x03D3  DORMANT
+ *   CMSG_RECLAIM_CORPSE                            0x03D3  ACTIVE
  *   CMSG_SET_TRADE_ITEM                            0x03D5  ACTIVE
  *   CMSG_SWAP_INV_ITEM                             0x03DF  ACTIVE
  *   CMSG_DUEL_RESPONSE                             0x03E2  DOC
@@ -1631,7 +1631,7 @@ typedef uint16_t uint16;
  *   CMSG_UNKNOWN_0x0AB6                            0x0AB6  DOC
  *   CMSG_UNKNOWN_0x0ABA                            0x0ABA  DOC
  *   CMSG_MESSAGECHAT_OFFICER                       0x0ABF  ACTIVE
- *   CMSG_RESURRECT_RESPONSE                        0x0B0C  DORMANT
+ *   CMSG_RESURRECT_RESPONSE                        0x0B0C  ACTIVE
  *   CMSG_GENERATE_RANDOM_CHARACTER_NAME            0x0B1C  ACTIVE
  *   CMSG_BATTLE_PAY_ACK_FAILED_RESPONSE            0x0B38  DOC
  *   CMSG_CONTACT_LIST                              0x0BB4  DORMANT
@@ -1740,7 +1740,7 @@ typedef uint16_t uint16;
  *   CMSG_PET_CANCEL_AURA                           0x12DA  DORMANT
  *   CMSG_DISMISS_CRITTER                           0x12DB  DORMANT
  *   CMSG_PET_SET_ACTION                            0x12E9  DORMANT
- *   CMSG_RETURN_TO_GRAVEYARD                       0x12EA  DORMANT
+ *   CMSG_RETURN_TO_GRAVEYARD                       0x12EA  ACTIVE
  *   CMSG_QUESTGIVER_QUERY_QUEST                    0x12F0  ACTIVE   [high-conf]
  *   CMSG_BUY_BANK_SLOT                             0x12F2  DORMANT
  *   CMSG_GOSSIP_HELLO                              0x12F3  ACTIVE

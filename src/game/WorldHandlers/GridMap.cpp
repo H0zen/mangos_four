@@ -1799,15 +1799,8 @@ uint32 TerrainManager::GetAreaIdByAreaFlag(uint16 areaflag, uint32 map_id)
 uint32 TerrainManager::GetZoneIdByAreaFlag(uint16 areaflag, uint32 map_id)
 {
     AreaTableEntry const* entry = GetAreaEntryByAreaFlagAndMap(areaflag, map_id);
-
-    if (entry)
-    {
-        return (entry->ParentAreaID != 0) ? entry->ParentAreaID : entry->ID;
-    }
-    else
-    {
-        return 0;
-    }
+    return MopTerrain::ResolveRootAreaId(entry,
+        [](uint32 id) { return GetAreaEntryByAreaID(id); });
 }
 
 /**
@@ -1823,5 +1816,6 @@ void TerrainManager::GetZoneAndAreaIdByAreaFlag(uint32& zoneid, uint32& areaid, 
     AreaTableEntry const* entry = GetAreaEntryByAreaFlagAndMap(areaflag, map_id);
 
     areaid = entry ? entry->ID : 0;
-    zoneid = entry ? ((entry->ParentAreaID != 0) ? entry->ParentAreaID : entry->ID) : 0;
+    zoneid = MopTerrain::ResolveRootAreaId(entry,
+        [](uint32 id) { return GetAreaEntryByAreaID(id); });
 }

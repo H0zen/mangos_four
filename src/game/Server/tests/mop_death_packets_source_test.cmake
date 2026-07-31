@@ -5,6 +5,9 @@ file(READ "${SOURCE_ROOT}/src/game/Object/Unit.cpp" unit_source)
 file(READ "${SOURCE_ROOT}/src/game/Object/ObjectMgr.h" object_mgr_header)
 file(READ "${SOURCE_ROOT}/src/game/Object/ObjectMgrGraveyard.cpp" object_mgr_graveyard)
 file(READ "${SOURCE_ROOT}/src/game/WorldHandlers/MiscHandler.cpp" misc_handler)
+file(READ "${SOURCE_ROOT}/src/game/WorldHandlers/SpellPackets.cpp" spell_packets)
+file(READ "${SOURCE_ROOT}/src/game/WorldHandlers/GridMap.h" grid_header)
+file(READ "${SOURCE_ROOT}/src/game/WorldHandlers/GridMap.cpp" grid_source)
 file(READ "${SOURCE_ROOT}/src/game/Server/Opcodes.h" opcode_header)
 file(READ "${SOURCE_ROOT}/src/game/Server/Opcodes.cpp" opcode_registry)
 file(READ "${SOURCE_ROOT}/src/game/Server/WorldSession.h" session_header)
@@ -104,6 +107,69 @@ elseif(MUTATION STREQUAL "durability_death_reference")
     string(REPLACE
         "SMSG_DURABILITY_DAMAGE_DEATH                   0x1E3E  ACTIVE"
         "SMSG_DURABILITY_DAMAGE_DEATH                   0x1E3E  DORMANT"
+        opcode_reference "${opcode_reference}")
+elseif(MUTATION STREQUAL "reclaim_mask_order")
+    string(REPLACE "ReadGuidMask<1, 5, 7, 2, 6, 3, 0, 4>" "ReadGuidMask<5, 1, 7, 2, 6, 3, 0, 4>"
+        player_header "${player_header}")
+elseif(MUTATION STREQUAL "reclaim_byte_order")
+    string(REPLACE "ReadGuidBytes<2, 5, 4, 6, 1, 0, 7, 3>" "ReadGuidBytes<5, 2, 4, 6, 1, 0, 7, 3>"
+        player_header "${player_header}")
+elseif(MUTATION STREQUAL "reclaim_handler_parser")
+    string(REPLACE "MopDeathPackets::ParseReclaimCorpseRequest(recv_data, corpseGuid)" "LegacyReclaimParser(recv_data, corpseGuid)"
+        misc_handler "${misc_handler}")
+elseif(MUTATION STREQUAL "resurrect_response_order")
+    string(REPLACE "in >> parsed.response;" "/* removed 32-bit response prefix */"
+        player_header "${player_header}")
+elseif(MUTATION STREQUAL "resurrect_response_mask_order")
+    string(REPLACE "ReadGuidMask<3, 0, 6, 4, 5, 2, 1, 7>" "ReadGuidMask<0, 3, 6, 4, 5, 2, 1, 7>"
+        player_header "${player_header}")
+elseif(MUTATION STREQUAL "resurrect_response_byte_order")
+    string(REPLACE "ReadGuidBytes<7, 0, 1, 3, 4, 6, 2, 5>" "ReadGuidBytes<0, 7, 1, 3, 4, 6, 2, 5>"
+        player_header "${player_header}")
+elseif(MUTATION STREQUAL "resurrect_request_mask_order")
+    string(REPLACE "WriteGuidMask<1, 5, 2, 6, 0, 4, 7>" "WriteGuidMask<5, 1, 2, 6, 0, 4, 7>"
+        player_header "${player_header}")
+elseif(MUTATION STREQUAL "resurrect_request_byte_order")
+    string(REPLACE "WriteGuidBytes<2, 4, 1, 6, 0>" "WriteGuidBytes<4, 2, 1, 6, 0>"
+        player_header "${player_header}")
+elseif(MUTATION STREQUAL "resurrect_name_truncation")
+    string(REPLACE "TruncateUtf8Bytes(offererName, 48)" "offererName"
+        player_header "${player_header}")
+elseif(MUTATION STREQUAL "resurrect_producer")
+    string(REPLACE "MopDeathPackets::BuildResurrectRequest(data," "LegacyBuildResurrectRequest(data,"
+        spell_packets "${spell_packets}")
+elseif(MUTATION STREQUAL "resurrect_producer_flags")
+    string(REPLACE "false, !isPlayer, 0, isPlayer ? realmID : 0" "!isPlayer, false, 0, isPlayer ? realmID : 0"
+        spell_packets "${spell_packets}")
+elseif(MUTATION STREQUAL "resurrect_producer_context")
+    string(REPLACE "false, !isPlayer, 0, isPlayer ? realmID : 0" "false, !isPlayer, 0, 0"
+        spell_packets "${spell_packets}")
+elseif(MUTATION STREQUAL "resurrect_request_admission")
+    string(REPLACE "case SMSG_RESURRECT_REQUEST:" "/* removed resurrect-request admission */"
+        session_source "${session_source}")
+elseif(MUTATION STREQUAL "resurrect_accept_polarity")
+    string(REPLACE "if (response.response != 0)" "if (response.response == 0)"
+        misc_handler "${misc_handler}")
+elseif(MUTATION STREQUAL "reclaim_registration")
+    string(REPLACE "DefC(CMSG_RECLAIM_CORPSE," "RemovedDefC(CMSG_RECLAIM_CORPSE,"
+        opcode_registry "${opcode_registry}")
+elseif(MUTATION STREQUAL "resurrect_registration")
+    string(REPLACE "DefC(CMSG_RESURRECT_RESPONSE," "RemovedDefC(CMSG_RESURRECT_RESPONSE,"
+        opcode_registry "${opcode_registry}")
+elseif(MUTATION STREQUAL "return_graveyard_registration")
+    string(REPLACE "DefC(CMSG_RETURN_TO_GRAVEYARD," "RemovedDefC(CMSG_RETURN_TO_GRAVEYARD,"
+        opcode_registry "${opcode_registry}")
+elseif(MUTATION STREQUAL "return_graveyard_corpse_guard")
+    string(REPLACE "Corpse* corpse = pPlayer->GetCorpse();" "Corpse* corpse = NULL;"
+        misc_handler "${misc_handler}")
+elseif(MUTATION STREQUAL "nested_zone_parent_walk")
+    string(REPLACE "while (entry->ParentAreaID != 0 && visitedCount < AREA_PARENT_LIMIT)" "while (false)"
+        grid_header "${grid_header}")
+elseif(MUTATION STREQUAL "nested_zone_api_delegate")
+    string(REPLACE "MopTerrain::ResolveRootAreaId(entry," "LegacyImmediateParent(entry,"
+        grid_source "${grid_source}")
+elseif(MUTATION STREQUAL "death_recovery_reference")
+    string(REPLACE "CMSG_RESURRECT_RESPONSE                        0x0B0C  ACTIVE" "CMSG_RESURRECT_RESPONSE                        0x0B0C  DORMANT"
         opcode_reference "${opcode_reference}")
 endif()
 
@@ -280,3 +346,96 @@ require_once("${opcode_header}"
 require_once("${opcode_header}"
     "SMSG_REQUEST_CEMETERY_LIST_RESPONSE[ \t]*=[ \t]*0x042A"
     "cemetery-list response opcode")
+
+require_once("${player_header}"
+    "ReadGuidMask<1, 5, 7, 2, 6, 3, 0, 4>"
+    "corpse-reclaim GUID mask order")
+require_once("${player_header}"
+    "ReadGuidBytes<2, 5, 4, 6, 1, 0, 7, 3>"
+    "corpse-reclaim GUID byte order")
+require_once("${misc_handler}"
+    "MopDeathPackets::ParseReclaimCorpseRequest[(]recv_data, corpseGuid[)]"
+    "corpse-reclaim converted parser")
+
+require_once("${player_header}"
+    "in >> parsed[.]response"
+    "resurrection-response 32-bit prefix")
+require_once("${player_header}"
+    "ReadGuidMask<3, 0, 6, 4, 5, 2, 1, 7>"
+    "resurrection-response GUID mask order")
+require_once("${player_header}"
+    "ReadGuidBytes<7, 0, 1, 3, 4, 6, 2, 5>"
+    "resurrection-response GUID byte order")
+require_once("${player_header}"
+    "out << context0 << context1 << spellId"
+    "resurrection-request scalar prefix")
+require_once("${player_header}"
+    "TruncateUtf8Bytes[(]offererName, 48[)]"
+    "resurrection-request UTF-8 byte bound")
+require_once("${player_header}"
+    "out[.]WriteGuidMask<1, 5, 2, 6, 0, 4, 7>[(]offererGuid[)]"
+    "resurrection-request GUID mask order")
+require_once("${player_header}"
+    "out[.]WriteGuidBytes<2, 4, 1, 6, 0>[(]offererGuid[)]"
+    "resurrection-request GUID byte order")
+require_once("${spell_packets}"
+    "MopDeathPackets::BuildResurrectRequest[(]data,"
+    "resurrection-request producer migration")
+require_once("${spell_packets}"
+    "false, !isPlayer, 0, isPlayer [?] realmID : 0"
+    "resurrection-request flags and realm context")
+require_once("${session_source}"
+    "case[ \t]+SMSG_RESURRECT_REQUEST:"
+    "resurrection-request in-world admission")
+require_once("${misc_handler}"
+    "if [(]response[.]response != 0[)]"
+    "resurrection accept polarity")
+
+string(FIND "${misc_handler}" "void WorldSession::HandleResurrectResponseOpcode" resurrect_handler_start)
+string(FIND "${misc_handler}" "void WorldSession::HandleReturnToGraveyard" resurrect_handler_end)
+if(resurrect_handler_start EQUAL -1 OR resurrect_handler_end LESS_EQUAL resurrect_handler_start)
+    message(FATAL_ERROR "could not isolate resurrection-response handler")
+endif()
+math(EXPR resurrect_handler_length "${resurrect_handler_end} - ${resurrect_handler_start}")
+string(SUBSTRING "${misc_handler}" ${resurrect_handler_start}
+    ${resurrect_handler_length} resurrect_handler)
+string(FIND "${resurrect_handler}" "response.response != 0" decline_pos)
+string(FIND "${resurrect_handler}" "clearResurrectRequestData" clear_pos)
+string(FIND "${resurrect_handler}" "GetPlayer()->IsAlive()" alive_pos)
+string(FIND "${resurrect_handler}" "isRessurectRequestedBy" offerer_pos)
+if(decline_pos EQUAL -1 OR clear_pos LESS decline_pos OR alive_pos LESS clear_pos OR
+        offerer_pos LESS alive_pos)
+    message(FATAL_ERROR "resurrection response must clear decline/timeout before gating accepted offers")
+endif()
+
+foreach(registration IN ITEMS
+        "CMSG_RECLAIM_CORPSE.*HandleReclaimCorpseOpcode"
+        "CMSG_RESURRECT_RESPONSE.*HandleResurrectResponseOpcode"
+        "CMSG_RETURN_TO_GRAVEYARD.*HandleReturnToGraveyard")
+    require_once("${opcode_registry}"
+        "[ \t\r\n]+DefC[(]${registration}[)]"
+        "death-recovery request registration")
+endforeach()
+foreach(reference IN ITEMS
+        "CMSG_RECLAIM_CORPSE[ \t]+0x03D3[ \t]+ACTIVE"
+        "CMSG_RESURRECT_RESPONSE[ \t]+0x0B0C[ \t]+ACTIVE"
+        "CMSG_RETURN_TO_GRAVEYARD[ \t]+0x12EA[ \t]+ACTIVE")
+    require_once("${opcode_reference}" "${reference}"
+        "active death-recovery reference")
+endforeach()
+
+require_once("${misc_handler}"
+    "Corpse[*] corpse = pPlayer->GetCorpse[(][)]"
+    "return-to-graveyard corpse guard")
+require_once("${misc_handler}"
+    "GetClosestGraveYard[(]corpse->GetPositionX[(][)], corpse->GetPositionY[(][)], corpse->GetPositionZ[(][)], corpse->GetMapId[(][)], pPlayer->GetTeam[(][)][)]"
+    "return-to-graveyard corpse-position selection")
+
+require_once("${grid_header}"
+    "while [(]entry->ParentAreaID != 0 && visitedCount < AREA_PARENT_LIMIT[)]"
+    "bounded nested-area parent traversal")
+string(REGEX MATCHALL "MopTerrain::ResolveRootAreaId[(]entry," zone_delegate_calls "${grid_source}")
+list(LENGTH zone_delegate_calls zone_delegate_count)
+if(NOT zone_delegate_count EQUAL 2)
+    message(FATAL_ERROR "both terrain zone APIs must use root-area resolution; found ${zone_delegate_count}")
+endif()

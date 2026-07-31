@@ -1442,7 +1442,15 @@ foreach(mutation IN ITEMS
         cemetery_wire cemetery_bound cemetery_query cemetery_serializer
         cemetery_registration cemetery_whitelist cemetery_opcode cemetery_team_filter
         durability_death_body durability_death_mirror_sender durability_death_unit_sender
-        durability_death_registration durability_death_whitelist durability_death_reference)
+        durability_death_registration durability_death_whitelist durability_death_reference
+        reclaim_mask_order reclaim_byte_order reclaim_handler_parser
+        resurrect_response_order resurrect_response_mask_order resurrect_response_byte_order
+        resurrect_request_mask_order resurrect_request_byte_order resurrect_name_truncation
+        resurrect_producer
+        resurrect_producer_flags resurrect_producer_context resurrect_request_admission
+        resurrect_accept_polarity reclaim_registration resurrect_registration
+        return_graveyard_registration return_graveyard_corpse_guard
+        nested_zone_parent_walk nested_zone_api_delegate death_recovery_reference)
     add_test(NAME mop_death_packets_source_mutation_${mutation}
         COMMAND ${CMAKE_COMMAND} -DSOURCE_ROOT=${CMAKE_SOURCE_DIR}
             -DMUTATION=${mutation}
