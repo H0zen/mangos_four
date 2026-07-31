@@ -1274,9 +1274,11 @@ void InitializeOpcodes()
     // once that reply was rebuilt to its 18414 body and admitted.
     //
     // GET_MAIL_LIST is promoted with its rebuilt 18414 two-pass reply. The
-    // guild-bank query remains held because SMSG_GUILD_BANK_LIST is still a
-    // legacy serializer that the send gate drops. Wiring a request without its
-    // reply is worse than dropping it, so the source policy enforces each pair.
+    // rebuilt guild-bank reply remains held because
+    // CMSG_GUILD_BANKER_ACTIVATE has an unresolved 18414 packed body. Normal UI
+    // entry depends on that request. Present-item dynamic flags are not modelled
+    // by this backend either. Query, reply registration, admission, and reference
+    // state therefore remain dormant as one source-enforced wave.
     DefC(CMSG_GET_MAIL_LIST, "CMSG_GET_MAIL_LIST", STATUS_LOGGEDIN, PROCESS_THREADUNSAFE, &WorldSession::HandleGetMailList);
     DefS(SMSG_MAIL_LIST_RESULT, "SMSG_MAIL_LIST_RESULT");
     DefC(CMSG_MAIL_MARK_AS_READ, "CMSG_MAIL_MARK_AS_READ", STATUS_LOGGEDIN, PROCESS_THREADUNSAFE, &WorldSession::HandleMailMarkAsRead);

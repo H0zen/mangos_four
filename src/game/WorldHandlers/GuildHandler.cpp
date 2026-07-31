@@ -1312,7 +1312,7 @@ void WorldSession::HandleGuildBankQueryTab(WorldPacket& recv_data)
         return;
     }
 
-    pGuild->DisplayGuildBankContent(this, TabId);
+    pGuild->DisplayGuildBankContent(this, TabId, sendAllSlots);
 }
 
 void WorldSession::HandleGuildBankDepositMoney(WorldPacket& recv_data)
@@ -1376,9 +1376,8 @@ void WorldSession::HandleGuildBankDepositMoney(WorldPacket& recv_data)
     //}
 #endif
 
-    pGuild->DisplayGuildBankTabsInfo(this);
-    pGuild->DisplayGuildBankContent(this, 0);
-    pGuild->DisplayGuildBankMoneyUpdate(this);
+    pGuild->DisplayGuildBankTabsInfo(this, 0);
+    pGuild->DisplayGuildBankMoneyUpdate();
 }
 
 void WorldSession::HandleGuildBankWithdrawMoney(WorldPacket& recv_data)
@@ -1438,9 +1437,8 @@ void WorldSession::HandleGuildBankWithdrawMoney(WorldPacket& recv_data)
     pGuild->LogBankEvent(GUILD_BANK_LOG_WITHDRAW_MONEY, uint8(0), GetPlayer()->GetGUIDLow(), money);
 
     pGuild->SendMoneyInfo(this, GetPlayer()->GetGUIDLow());
-    pGuild->DisplayGuildBankTabsInfo(this);
-    pGuild->DisplayGuildBankContent(this, 0);
-    pGuild->DisplayGuildBankMoneyUpdate(this);
+    pGuild->DisplayGuildBankTabsInfo(this, 0);
+    pGuild->DisplayGuildBankMoneyUpdate();
 }
 
 void WorldSession::HandleGuildBankSwapItems(WorldPacket& recv_data)
@@ -1605,7 +1603,7 @@ void WorldSession::HandleGuildBankBuyTab(WorldPacket& recv_data)
     GetPlayer()->ModifyMoney(-int64(TabCost));
     pGuild->SetBankRightsAndSlots(GetPlayer()->GetRank(), TabId, GUILD_BANK_RIGHT_FULL, WITHDRAW_SLOT_UNLIMITED, true);
     pGuild->Roster();                                       // broadcast for tab rights update
-    pGuild->DisplayGuildBankTabsInfo(this);
+    pGuild->DisplayGuildBankTabsInfo(this, TabId);
 }
 
 void WorldSession::HandleGuildBankUpdateTab(WorldPacket& recv_data)
@@ -1660,8 +1658,7 @@ void WorldSession::HandleGuildBankUpdateTab(WorldPacket& recv_data)
     }
 
     pGuild->SetGuildBankTabInfo(TabId, Name, IconIndex);
-    pGuild->DisplayGuildBankTabsInfo(this);
-    pGuild->DisplayGuildBankContent(this, TabId);
+    pGuild->DisplayGuildBankTabsInfo(this, TabId);
 }
 
 void WorldSession::HandleGuildBankLogQuery(WorldPacket& recv_data)

@@ -860,6 +860,34 @@ set_target_properties(mop_guild_packets_test PROPERTIES CXX_STANDARD 17 CXX_STAN
 target_link_libraries(mop_guild_packets_test PRIVATE game)
 add_test(NAME mop_guild_packets COMMAND mop_guild_packets_test)
 
+add_executable(mop_guild_bank_packets_test mop_guild_bank_packets_test.cpp)
+target_include_directories(mop_guild_bank_packets_test PRIVATE
+    ${CMAKE_SOURCE_DIR}/src/game/Object
+    ${CMAKE_SOURCE_DIR}/src/shared
+    $<TARGET_PROPERTY:game,INTERFACE_INCLUDE_DIRECTORIES>)
+set_target_properties(mop_guild_bank_packets_test PROPERTIES CXX_STANDARD 17 CXX_STANDARD_REQUIRED ON)
+target_compile_definitions(mop_guild_bank_packets_test PRIVATE
+    $<TARGET_PROPERTY:game,INTERFACE_COMPILE_DEFINITIONS>)
+target_link_libraries(mop_guild_bank_packets_test PRIVATE shared)
+add_test(NAME mop_guild_bank_packets COMMAND mop_guild_bank_packets_test)
+
+add_test(NAME mop_guild_bank_packets_source
+    COMMAND ${CMAKE_COMMAND} -DSOURCE_ROOT=${CMAKE_SOURCE_DIR}
+        -P ${CMAKE_CURRENT_SOURCE_DIR}/mop_guild_bank_packets_source_test.cmake)
+
+foreach(mutation IN ITEMS builder_route query_boolean tab_coalesce money_recipient
+        metadata_without_view zero_tab_metadata single_delta_bounds vector_delta_bounds
+        zero_tab_full_update dynamic_flags_producer dynamic_flags_hold
+        socket_order tab_lengths tab_data_order locked_zero modifier_contract
+        client_limits activation_registry activation_admission activation_reference legacy_writer)
+    add_test(NAME mop_guild_bank_packets_source_mutation_${mutation}
+        COMMAND ${CMAKE_COMMAND} -DSOURCE_ROOT=${CMAKE_SOURCE_DIR}
+            -DMUTATION=${mutation}
+            -P ${CMAKE_CURRENT_SOURCE_DIR}/mop_guild_bank_packets_source_test.cmake)
+    set_tests_properties(mop_guild_bank_packets_source_mutation_${mutation}
+        PROPERTIES WILL_FAIL TRUE)
+endforeach()
+
 add_executable(mop_chat_packets_test mop_chat_packets_test.cpp)
 target_include_directories(mop_chat_packets_test PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/..

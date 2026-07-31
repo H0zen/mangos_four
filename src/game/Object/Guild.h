@@ -41,6 +41,11 @@
 
 class WorldPacket;
 
+namespace MopGuildBankPackets
+{
+    struct GuildBankList;
+}
+
 namespace MopGuildPackets
 {
     struct EmblemDesign
@@ -1205,15 +1210,16 @@ class Guild
 
         // ** Guild bank **
         // Content & item deposit/withdraw
-        void   DisplayGuildBankContent(WorldSession* session, uint8 TabId);
-        void   DisplayGuildBankMoneyUpdate(WorldSession* session);
+        void   DisplayGuildBankContent(WorldSession* session, uint8 TabId,
+                    bool sendAllSlots = true, bool withTabInfo = false);
+        void   DisplayGuildBankMoneyUpdate();
 
         void   SwapItems(Player* pl, uint8 BankTab, uint8 BankTabSlot, uint8 BankTabDst, uint8 BankTabSlotDst, uint32 SplitedAmount);
         void   MoveFromBankToChar(Player* pl, uint8 BankTab, uint8 BankTabSlot, uint8 PlayerBag, uint8 PlayerSlot, uint32 SplitedAmount);
         void   MoveFromCharToBank(Player* pl, uint8 PlayerBag, uint8 PlayerSlot, uint8 BankTab, uint8 BankTabSlot, uint32 SplitedAmount);
 
         // Tabs
-        void   DisplayGuildBankTabsInfo(WorldSession* session);
+        void   DisplayGuildBankTabsInfo(WorldSession* session, uint8 TabId = 0);
         void   CreateNewBankTab();
         void   SetGuildBankTabText(uint8 TabId, std::string text);
         void   SendGuildBankTabText(WorldSession* session, uint8 TabId);
@@ -1296,7 +1302,8 @@ class Guild
         void   DisplayGuildBankContentUpdate(uint8 TabId, GuildItemPosCountVec const& slots);
 
         // internal common parts for CanStore/StoreItem functions
-        void AppendDisplayGuildBankSlot(WorldPacket& data, ByteBuffer& buffer, GuildBankTab const* tab, int32 slot);
+        bool AppendDisplayGuildBankSlot(MopGuildBankPackets::GuildBankList& list,
+            GuildBankTab const* tab, int32 slot) const;
         InventoryResult _CanStoreItem_InSpecificSlot(uint8 tab, uint8 slot, GuildItemPosCountVec& dest, uint32& count, bool swap, Item* pSrcItem) const;
         InventoryResult _CanStoreItem_InTab(uint8 tab, GuildItemPosCountVec& dest, uint32& count, bool merge, Item* pSrcItem, uint8 skip_slot) const;
         Item* _StoreItem(uint8 tab, uint8 slot, Item* pItem, uint32 count, bool clone);
