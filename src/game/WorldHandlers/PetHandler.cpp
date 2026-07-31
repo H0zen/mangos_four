@@ -485,7 +485,9 @@ void WorldSession::HandlePetStopAttack(WorldPacket& recv_data)
         return;
     }
 
-    if (GetPlayer()->GetObjectGuid() != pet->GetCharmerOrOwnerGuid())
+    if ((petGuid != GetPlayer()->GetPetGuid() &&
+            petGuid != GetPlayer()->GetCharmGuid()) ||
+        GetPlayer()->GetObjectGuid() != pet->GetCharmerOrOwnerGuid())
     {
         DEBUG_LOG("PET_CONTROL_REJECT opcode=CMSG_PET_STOP_ATTACK reason=not_controlled account=%u player=%s pet=%s",
             GetAccountId(), GetPlayer()->GetGuidStr().c_str(),

@@ -51,8 +51,18 @@ elseif(MUTATION STREQUAL "stop_reference")
         opcode_reference "${opcode_reference}")
 elseif(MUTATION STREQUAL "stop_drop_owner")
     string(REPLACE
-        "if (GetPlayer()->GetObjectGuid() != pet->GetCharmerOrOwnerGuid())"
-        "if (false)"
+        "GetPlayer()->GetObjectGuid() != pet->GetCharmerOrOwnerGuid()"
+        "false"
+        pet_handler "${pet_handler}")
+elseif(MUTATION STREQUAL "stop_drop_slot_membership")
+    string(REPLACE
+        "(petGuid != GetPlayer()->GetPetGuid() &&\n            petGuid != GetPlayer()->GetCharmGuid()) ||\n        "
+        ""
+        pet_handler "${pet_handler}")
+elseif(MUTATION STREQUAL "stop_bypass_slot_membership")
+    string(REPLACE
+        "(petGuid != GetPlayer()->GetPetGuid() &&\n            petGuid != GetPlayer()->GetCharmGuid())"
+        "false"
         pet_handler "${pet_handler}")
 elseif(MUTATION STREQUAL "stop_drop_alive")
     string(REPLACE "if (!pet->IsAlive())" "if (false)"
@@ -63,8 +73,17 @@ elseif(MUTATION STREQUAL "stop_move_attack_before_owner")
         "}\n\n/**\n * @brief Handles a client request for a pet name query."
         pet_handler "${pet_handler}")
     string(REPLACE
-        "if (GetPlayer()->GetObjectGuid() != pet->GetCharmerOrOwnerGuid())"
-        "pet->AttackStop();\n\n    if (GetPlayer()->GetObjectGuid() != pet->GetCharmerOrOwnerGuid())"
+        "GetPlayer()->GetObjectGuid() != pet->GetCharmerOrOwnerGuid()"
+        "pet->AttackStop();\n\n        GetPlayer()->GetObjectGuid() != pet->GetCharmerOrOwnerGuid()"
+        pet_handler "${pet_handler}")
+elseif(MUTATION STREQUAL "stop_move_attack_before_membership")
+    string(REPLACE
+        "    pet->AttackStop();\n}\n\n/**\n * @brief Handles a client request for a pet name query."
+        "}\n\n/**\n * @brief Handles a client request for a pet name query."
+        pet_handler "${pet_handler}")
+    string(REPLACE
+        "if ((petGuid != GetPlayer()->GetPetGuid()"
+        "pet->AttackStop();\n\n    if ((petGuid != GetPlayer()->GetPetGuid()"
         pet_handler "${pet_handler}")
 elseif(MUTATION STREQUAL "stop_not_found_error")
     string(REPLACE
@@ -229,6 +248,9 @@ if("${stop_handler}" MATCHES "recv_data[\r\n\t ]*>>[\r\n\t ]*petGuid")
     message(FATAL_ERROR "stop raw GUID guard: legacy raw read present")
 endif()
 require_once("${stop_handler}"
+    "(petGuid != GetPlayer()->GetPetGuid() &&\n            petGuid != GetPlayer()->GetCharmGuid())"
+    "stop active-slot membership")
+require_once("${stop_handler}"
     "GetPlayer()->GetObjectGuid() != pet->GetCharmerOrOwnerGuid()"
     "stop ownership")
 require_once("${stop_handler}" "if (!pet->IsAlive())" "stop alive")
@@ -239,14 +261,17 @@ string(FIND "${stop_handler}"
 string(FIND "${stop_handler}"
     "GetPlayer()->GetMap()->GetUnit(petGuid)" object_lookup)
 string(FIND "${stop_handler}"
+    "petGuid != GetPlayer()->GetPetGuid()" slot_membership)
+string(FIND "${stop_handler}"
     "GetPlayer()->GetObjectGuid() != pet->GetCharmerOrOwnerGuid()" owner_check)
 string(FIND "${stop_handler}" "if (!pet->IsAlive())" alive_check)
 string(FIND "${stop_handler}" "pet->AttackStop();" attack_stop)
 if(reader_call EQUAL -1 OR object_lookup LESS_EQUAL reader_call OR
-        owner_check LESS_EQUAL object_lookup OR alive_check LESS_EQUAL owner_check OR
+        slot_membership LESS_EQUAL object_lookup OR
+        owner_check LESS_EQUAL slot_membership OR alive_check LESS_EQUAL owner_check OR
         attack_stop LESS_EQUAL alive_check)
     message(FATAL_ERROR
-        "stop handler order guard: reader, lookup, owner, alive, AttackStop")
+        "stop handler order guard: reader, lookup, active slot, owner, alive, AttackStop")
 endif()
 
 require_once("${stop_handler}"
