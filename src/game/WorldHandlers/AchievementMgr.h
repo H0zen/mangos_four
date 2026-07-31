@@ -102,6 +102,13 @@ namespace MopAchievementPackets
         out.WriteGuidBytes<2>(secondGuid);
     }
 
+    // Writes only the 18414 SMSG_ACHIEVEMENT_DELETED body; the caller owns
+    // opcode selection. The client consumes both words but ignores the second.
+    inline void BuildAchievementDeleted(WorldPacket& out, uint32 achievementId)
+    {
+        out << achievementId << uint32(0);
+    }
+
     inline void BuildAllAchievementData(WorldPacket& out,
         std::vector<CompletedAchievement> const& completed,
         std::vector<CriteriaProgress> const& progress)

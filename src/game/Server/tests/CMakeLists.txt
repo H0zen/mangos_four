@@ -550,6 +550,9 @@ foreach(mutation IN ITEMS
         earned_producer_mapping earned_sender_opcode earned_broadcast_scope
         earned_legacy_body earned_opcode_value earned_registration
         earned_admission earned_reference
+        deleted_body_second_word deleted_reset_producer deleted_incomplete_producer
+        deleted_reset_loading_gate deleted_incomplete_loading_gate
+        criteria_deleted_loading_gate criteria_deleted_reset_escape
         criteria_update_registration criteria_update_admission criteria_update_reference
         criteria_deleted_registration criteria_deleted_admission criteria_deleted_reference
         achievement_deleted_registration achievement_deleted_admission achievement_deleted_reference)

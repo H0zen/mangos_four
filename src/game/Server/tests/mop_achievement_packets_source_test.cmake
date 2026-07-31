@@ -72,6 +72,45 @@ elseif(MUTATION STREQUAL "earned_reference")
     string(REGEX REPLACE
         "(SMSG_ACHIEVEMENT_EARNED[ \t]+0x080B[ \t]+)ACTIVE"
         "\\1DORMANT" opcode_reference "${opcode_reference}")
+elseif(MUTATION STREQUAL "deleted_body_second_word")
+    string(REPLACE
+        "out << achievementId << uint32(0);"
+        "out << achievementId << uint32(1);"
+        achievement_header "${achievement_header}")
+elseif(MUTATION STREQUAL "deleted_reset_producer")
+    string(REPLACE
+        "MopAchievementPackets::BuildAchievementDeleted(data, uint32(iter->first));"
+        "MopAchievementPackets::BuildAchievementDeleted(data, 0);"
+        achievement_source "${achievement_source}")
+elseif(MUTATION STREQUAL "deleted_incomplete_producer")
+    string(REPLACE
+        "MopAchievementPackets::BuildAchievementDeleted(data, uint32(achievement->ID));"
+        "MopAchievementPackets::BuildAchievementDeleted(data, 0);"
+        achievement_source "${achievement_source}")
+elseif(MUTATION STREQUAL "deleted_reset_loading_gate")
+    string(REPLACE
+        "if (!m_player->GetSession()->PlayerLoading())\n    {\n        for (CompletedAchievementMap::const_iterator"
+        "if (true)\n    {\n        for (CompletedAchievementMap::const_iterator"
+        achievement_source "${achievement_source}")
+elseif(MUTATION STREQUAL "deleted_incomplete_loading_gate")
+    string(REPLACE
+        "if (!m_player->GetSession()->PlayerLoading())\n    {\n        WorldPacket data(SMSG_ACHIEVEMENT_DELETED, 8);"
+        "if (true)\n    {\n        WorldPacket data(SMSG_ACHIEVEMENT_DELETED, 8);"
+        achievement_source "${achievement_source}")
+elseif(MUTATION STREQUAL "criteria_deleted_loading_gate")
+    string(REPLACE
+        "if (!m_player->GetSession()->PlayerLoading() && progress->counter < max_value)"
+        "if (progress->counter < max_value)"
+        achievement_source "${achievement_source}")
+elseif(MUTATION STREQUAL "criteria_deleted_reset_escape")
+    string(REPLACE
+        "        for (CriteriaProgressMap::const_iterator"
+        "    }\n\n    for (CriteriaProgressMap::const_iterator"
+        achievement_source "${achievement_source}")
+    string(REPLACE
+        "        }\n    }\n\n    m_completedAchievements.clear();"
+        "        }\n\n    m_completedAchievements.clear();"
+        achievement_source "${achievement_source}")
 elseif(MUTATION MATCHES "^(criteria_update|criteria_deleted|achievement_deleted)_(registration|admission|reference)$")
     if(CMAKE_MATCH_1 STREQUAL "criteria_update")
         set(blocked_opcode SMSG_CRITERIA_UPDATE)
@@ -214,6 +253,63 @@ require_literal_once("${world_session}" "case SMSG_ACHIEVEMENT_EARNED:"
 require_regex_once("${opcode_reference}"
     "SMSG_ACHIEVEMENT_EARNED[ \t]+0x080B[ \t]+ACTIVE"
     "achievement-earned active catalogue row")
+
+require_literal_once("${achievement_header}"
+    "out << achievementId << uint32(0);"
+    "achievement-deleted deterministic ignored word")
+
+string(FIND "${achievement_source}" "void AchievementMgr::Reset()" reset_start)
+string(FIND "${achievement_source}" "void AchievementMgr::ResetAchievementCriteria" reset_end)
+if(reset_start EQUAL -1 OR reset_end EQUAL -1 OR reset_end LESS reset_start)
+    message(FATAL_ERROR "achievement reset producer function bounds are missing")
+endif()
+math(EXPR reset_length "${reset_end} - ${reset_start}")
+string(SUBSTRING "${achievement_source}" ${reset_start} ${reset_length} reset_source)
+require_literal_once("${reset_source}"
+    "if (!m_player->GetSession()->PlayerLoading())\n    {\n        for (CompletedAchievementMap::const_iterator"
+    "achievement reset loading gate")
+require_literal_once("${reset_source}"
+    "WorldPacket data(SMSG_ACHIEVEMENT_DELETED,"
+    "achievement-deleted reset opcode")
+require_literal_once("${reset_source}"
+    "MopAchievementPackets::BuildAchievementDeleted(data, uint32(iter->first));"
+    "achievement-deleted reset producer mapping")
+set(reset_criteria_gate_tail "        for (CriteriaProgressMap::const_iterator iter = m_criteriaProgress.begin(); iter != m_criteriaProgress.end(); ++iter)
+        {
+            WorldPacket data(SMSG_CRITERIA_DELETED, 4);
+            data << uint32(iter->first);
+            m_player->SendDirectMessage(&data);
+        }
+    }
+
+    m_completedAchievements.clear();")
+require_literal_once("${reset_source}" "${reset_criteria_gate_tail}"
+    "criteria-deleted reset loading gate")
+
+string(FIND "${achievement_source}" "void AchievementMgr::SetCriteriaProgress" progress_start)
+string(FIND "${achievement_source}" "void AchievementMgr::CompletedAchievement" progress_end)
+if(progress_start EQUAL -1 OR progress_end EQUAL -1 OR progress_end LESS progress_start)
+    message(FATAL_ERROR "criteria progress producer function bounds are missing")
+endif()
+math(EXPR progress_length "${progress_end} - ${progress_start}")
+string(SUBSTRING "${achievement_source}" ${progress_start} ${progress_length} progress_source)
+require_literal_once("${progress_source}"
+    "if (!m_player->GetSession()->PlayerLoading() && progress->counter < max_value)"
+    "criteria-deleted loading gate")
+
+string(FIND "${achievement_source}" "void AchievementMgr::IncompletedAchievement" incomplete_start)
+string(FIND "${achievement_source}" "void AchievementMgr::SendAllAchievementData" incomplete_end)
+if(incomplete_start EQUAL -1 OR incomplete_end EQUAL -1 OR incomplete_end LESS incomplete_start)
+    message(FATAL_ERROR "achievement incomplete producer function bounds are missing")
+endif()
+math(EXPR incomplete_length "${incomplete_end} - ${incomplete_start}")
+string(SUBSTRING "${achievement_source}" ${incomplete_start} ${incomplete_length} incomplete_source)
+require_literal_once("${incomplete_source}"
+    "if (!m_player->GetSession()->PlayerLoading())\n    {\n        WorldPacket data(SMSG_ACHIEVEMENT_DELETED,"
+    "achievement-deleted incomplete loading gate")
+require_literal_once("${incomplete_source}"
+    "MopAchievementPackets::BuildAchievementDeleted(data, uint32(achievement->ID));"
+    "achievement-deleted incomplete producer mapping")
 
 set(blocked_opcodes
     SMSG_CRITERIA_UPDATE

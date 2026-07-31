@@ -271,12 +271,34 @@ static void test_achievement_earned_preserves_caller_opcode()
     CHECK(packet.GetOpcode() == SMSG_TITLE_EARNED);
 }
 
+static void test_achievement_deleted_body()
+{
+    // Binary-derived synthetic coverage, not captured retail evidence. The
+    // build-18414 client consumes two uint32 values, uses the achievement ID,
+    // and never reads the second word, so the producer writes a stable zero.
+    WorldPacket packet(SMSG_ACHIEVEMENT_DELETED, 8);
+    MopAchievementPackets::BuildAchievementDeleted(packet, 0x11223344u);
+    CHECK(ExpectBytes(packet, {
+        0x44, 0x33, 0x22, 0x11, 0x00, 0x00, 0x00, 0x00
+    }));
+}
+
+static void test_achievement_deleted_preserves_caller_opcode()
+{
+    // This proves only the body-builder contract: the caller owns opcode choice.
+    WorldPacket packet(SMSG_TITLE_EARNED, 8);
+    MopAchievementPackets::BuildAchievementDeleted(packet, 0x11223344u);
+    CHECK(packet.GetOpcode() == SMSG_TITLE_EARNED);
+}
+
 static void test_opcode_values_are_framable()
 {
     CHECK(uint32_t(SMSG_ALL_ACHIEVEMENT_DATA) == 0x180Au);
     CHECK(uint32_t(SMSG_ALL_ACHIEVEMENT_DATA) <= 0x1FFFu);
     CHECK(uint32_t(SMSG_ACHIEVEMENT_EARNED) == 0x080Bu);
     CHECK(uint32_t(SMSG_ACHIEVEMENT_EARNED) <= 0x1FFFu);
+    CHECK(uint32_t(SMSG_ACHIEVEMENT_DELETED) == 0x1A2Fu);
+    CHECK(uint32_t(SMSG_ACHIEVEMENT_DELETED) <= 0x1FFFu);
 }
 
 int main(int /*argc*/, char** /*argv*/)
@@ -291,6 +313,8 @@ int main(int /*argc*/, char** /*argv*/)
     test_achievement_earned_boolean_bit();
     test_achievement_earned_mask_order_complements();
     test_achievement_earned_preserves_caller_opcode();
+    test_achievement_deleted_body();
+    test_achievement_deleted_preserves_caller_opcode();
     test_opcode_values_are_framable();
 
     if (g_fail)

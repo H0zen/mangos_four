@@ -87,18 +87,24 @@ AchievementMgr::~AchievementMgr()
 
 void AchievementMgr::Reset()
 {
-    for (CompletedAchievementMap::const_iterator iter = m_completedAchievements.begin(); iter != m_completedAchievements.end(); ++iter)
+    // LoadFromDB evaluates criteria before the central enter-world suppression
+    // gate is raised. The full achievement snapshot replaces these incremental
+    // notifications later in the login sequence.
+    if (!m_player->GetSession()->PlayerLoading())
     {
-        WorldPacket data(SMSG_ACHIEVEMENT_DELETED, 4);
-        data << uint32(iter->first);
-        m_player->SendDirectMessage(&data);
-    }
+        for (CompletedAchievementMap::const_iterator iter = m_completedAchievements.begin(); iter != m_completedAchievements.end(); ++iter)
+        {
+            WorldPacket data(SMSG_ACHIEVEMENT_DELETED, 8);
+            MopAchievementPackets::BuildAchievementDeleted(data, uint32(iter->first));
+            m_player->SendDirectMessage(&data);
+        }
 
-    for (CriteriaProgressMap::const_iterator iter = m_criteriaProgress.begin(); iter != m_criteriaProgress.end(); ++iter)
-    {
-        WorldPacket data(SMSG_CRITERIA_DELETED, 4);
-        data << uint32(iter->first);
-        m_player->SendDirectMessage(&data);
+        for (CriteriaProgressMap::const_iterator iter = m_criteriaProgress.begin(); iter != m_criteriaProgress.end(); ++iter)
+        {
+            WorldPacket data(SMSG_CRITERIA_DELETED, 4);
+            data << uint32(iter->first);
+            m_player->SendDirectMessage(&data);
+        }
     }
 
     m_completedAchievements.clear();
@@ -2108,7 +2114,7 @@ void AchievementMgr::SetCriteriaProgress(AchievementCriteriaEntry const* criteri
     // update dependent achievements state at criteria incomplete
     else if (old_value > progress->counter)
     {
-        if (progress->counter < max_value)
+        if (!m_player->GetSession()->PlayerLoading() && progress->counter < max_value)
         {
             WorldPacket data(SMSG_CRITERIA_DELETED, 4);
             data << uint32(criteria->ID);
@@ -2225,9 +2231,12 @@ void AchievementMgr::IncompletedAchievement(AchievementEntry const* achievement)
         return;
     }
 
-    WorldPacket data(SMSG_ACHIEVEMENT_DELETED, 4);
-    data << uint32(achievement->ID);
-    m_player->SendDirectMessage(&data);
+    if (!m_player->GetSession()->PlayerLoading())
+    {
+        WorldPacket data(SMSG_ACHIEVEMENT_DELETED, 8);
+        MopAchievementPackets::BuildAchievementDeleted(data, uint32(achievement->ID));
+        m_player->SendDirectMessage(&data);
+    }
 
     if (!itr->second.changed)                               // complete state saved
         CharacterDatabase.PExecute("DELETE FROM `character_achievement` WHERE `guid` = %u AND `achievement` = %u",
