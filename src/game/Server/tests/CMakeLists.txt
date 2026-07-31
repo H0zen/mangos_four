@@ -276,33 +276,25 @@ target_compile_definitions(mop_compact_packets_test PRIVATE
 target_link_libraries(mop_compact_packets_test PRIVATE shared)
 add_test(NAME mop_compact_packets COMMAND mop_compact_packets_test)
 
-add_executable(mop_pet_stop_attack_packets_test
-    mop_pet_stop_attack_packets_test.cpp)
-target_include_directories(mop_pet_stop_attack_packets_test PRIVATE
-    ${CMAKE_CURRENT_SOURCE_DIR}/..
-    ${CMAKE_SOURCE_DIR}/src/shared
-    $<TARGET_PROPERTY:game,INTERFACE_INCLUDE_DIRECTORIES>)
-set_target_properties(mop_pet_stop_attack_packets_test PROPERTIES
-    CXX_STANDARD 17 CXX_STANDARD_REQUIRED ON)
-target_compile_definitions(mop_pet_stop_attack_packets_test PRIVATE
-    $<TARGET_PROPERTY:game,INTERFACE_COMPILE_DEFINITIONS>)
-target_link_libraries(mop_pet_stop_attack_packets_test PRIVATE shared)
-add_test(NAME mop_pet_stop_attack_packets COMMAND
-    mop_pet_stop_attack_packets_test)
+add_test(NAME mop_pet_stop_attack_source
+    COMMAND ${CMAKE_COMMAND} -DSOURCE_ROOT=${CMAKE_SOURCE_DIR}
+        -P ${CMAKE_CURRENT_SOURCE_DIR}/mop_pet_stop_attack_source_test.cmake)
 
-add_test(NAME mop_pet_stop_attack_packets_source
-    COMMAND ${CMAKE_COMMAND}
-        -DSOURCE_ROOT=${CMAKE_SOURCE_DIR}
-        -P ${CMAKE_CURRENT_SOURCE_DIR}/mop_pet_stop_attack_packets_source_test.cmake)
-
-foreach(mutation IN ITEMS opcode registration reference reader_call
-        exact_consumption ownership_check alive_check)
-    add_test(NAME mop_pet_stop_attack_packets_source_mutation_${mutation}
+foreach(mutation IN ITEMS
+        stop_mask_order stop_byte_order stop_exact_length stop_canonical_byte
+        stop_empty_guid stop_handler_route stop_restore_raw_guid
+        stop_registration stop_reference stop_drop_owner stop_drop_alive
+        stop_move_attack_before_owner stop_not_found_error
+        stop_not_controlled_error stop_log_shape action_not_found_error
+        action_not_controlled_error action_unknown_command_error
+        action_unknown_spell_error action_unknown_action_error
+        action_drop_charminfo_error)
+    add_test(NAME mop_pet_stop_attack_source_mutation_${mutation}
         COMMAND ${CMAKE_COMMAND} -DSOURCE_ROOT=${CMAKE_SOURCE_DIR}
             -DMUTATION=${mutation}
-            -P ${CMAKE_CURRENT_SOURCE_DIR}/mop_pet_stop_attack_packets_source_test.cmake)
+            -P ${CMAKE_CURRENT_SOURCE_DIR}/mop_pet_stop_attack_source_test.cmake)
     set_tests_properties(
-        mop_pet_stop_attack_packets_source_mutation_${mutation}
+        mop_pet_stop_attack_source_mutation_${mutation}
         PROPERTIES WILL_FAIL TRUE)
 endforeach()
 

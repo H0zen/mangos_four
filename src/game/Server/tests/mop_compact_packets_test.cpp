@@ -1362,6 +1362,80 @@ static void test_pet_action_matches_retail_bodies()
     CHECK(posX == expectedX);
 }
 
+static void CheckPetStopAttack(char const* what,
+    std::vector<uint8_t> const& body, bool expectedAccepted,
+    uint64 expectedGuid)
+{
+    WorldPacket packet = InputPacket(CMSG_PET_STOP_ATTACK, body);
+    ObjectGuid guid(UINT64_C(0x0807060504030201));
+    bool const accepted = MopCompactPackets::ReadPetStopAttack(packet, guid);
+
+    if (accepted != expectedAccepted || guid.GetRawValue() != expectedGuid ||
+        packet.rpos() != packet.size())
+    {
+        std::fprintf(stderr,
+            "FAIL %s: accepted %u wanted %u guid 0x%016llX wanted "
+            "0x%016llX consumed %u/%u\n",
+            what, unsigned(accepted), unsigned(expectedAccepted),
+            (unsigned long long)guid.GetRawValue(),
+            (unsigned long long)expectedGuid,
+            unsigned(packet.rpos()), unsigned(packet.size()));
+        ++g_fail;
+    }
+}
+
+static void test_pet_stop_attack_matches_retail_and_rejects_malformed_bodies()
+{
+    // Captured retail bodies from catalogue generation 2BE10C89.
+    CheckPetStopAttack("retail vehicle F1506C6B00002F07",
+        { 0xFA, 0x6D, 0x06, 0x6A, 0x2E, 0xF0, 0x51 }, true,
+        UINT64_C(0xF1506C6B00002F07));
+    CheckPetStopAttack("retail vehicle F1506A7A00A3DB5C",
+        { 0xFE, 0xA2, 0x6B, 0x5D, 0x7B, 0xDA, 0xF0, 0x51 }, true,
+        UINT64_C(0xF1506A7A00A3DB5C));
+
+    // Binary-derived synthetic fixtures for 0xF150010203040506. The first is
+    // dense; each following body clears exactly one distinct raw GUID byte.
+    CheckPetStopAttack("binary-derived dense",
+        { 0xFF, 0x05, 0x00, 0x07, 0x03, 0x04, 0xF0, 0x51, 0x02 }, true,
+        UINT64_C(0xF150010203040506));
+    CheckPetStopAttack("binary-derived zero byte 0",
+        { 0xF7, 0x05, 0x00, 0x03, 0x04, 0xF0, 0x51, 0x02 }, true,
+        UINT64_C(0xF150010203040500));
+    CheckPetStopAttack("binary-derived zero byte 1",
+        { 0xDF, 0x05, 0x00, 0x07, 0x03, 0xF0, 0x51, 0x02 }, true,
+        UINT64_C(0xF150010203040006));
+    CheckPetStopAttack("binary-derived zero byte 2",
+        { 0xFB, 0x00, 0x07, 0x03, 0x04, 0xF0, 0x51, 0x02 }, true,
+        UINT64_C(0xF150010203000506));
+    CheckPetStopAttack("binary-derived zero byte 3",
+        { 0xFE, 0x05, 0x00, 0x07, 0x03, 0x04, 0xF0, 0x51 }, true,
+        UINT64_C(0xF150010200040506));
+    CheckPetStopAttack("binary-derived zero byte 4",
+        { 0xFD, 0x05, 0x00, 0x07, 0x04, 0xF0, 0x51, 0x02 }, true,
+        UINT64_C(0xF150010003040506));
+    CheckPetStopAttack("binary-derived zero byte 5",
+        { 0xBF, 0x05, 0x07, 0x03, 0x04, 0xF0, 0x51, 0x02 }, true,
+        UINT64_C(0xF150000203040506));
+    CheckPetStopAttack("binary-derived zero byte 6",
+        { 0xEF, 0x05, 0x00, 0x07, 0x03, 0x04, 0xF0, 0x02 }, true,
+        UINT64_C(0xF100010203040506));
+    CheckPetStopAttack("binary-derived zero byte 7",
+        { 0x7F, 0x05, 0x00, 0x07, 0x03, 0x04, 0x51, 0x02 }, true,
+        UINT64_C(0x0050010203040506));
+
+    CheckPetStopAttack("empty body", {}, false, 0);
+    CheckPetStopAttack("all-zero GUID", { 0x00 }, false, 0);
+    CheckPetStopAttack("truncated dense body",
+        { 0xFF, 0x05, 0x00, 0x07 }, false, 0);
+    CheckPetStopAttack("retail body with tail",
+        { 0xFA, 0x6D, 0x06, 0x6A, 0x2E, 0xF0, 0x51, 0xAA }, false, 0);
+    CheckPetStopAttack("non-canonical zero GUID byte",
+        { 0x80, 0x01 }, false, 0);
+    CheckPetStopAttack("non-canonical byte in nonzero GUID",
+        { 0xC0, 0x02, 0x01 }, false, 0);
+}
+
 /// CMSG_PET_NAME_QUERY and its response, pinned to real 18414 bodies.
 ///
 /// The request carries sixteen presence bits interleaved across the pet GUID and
@@ -2023,6 +2097,7 @@ static void test_opcode_values_are_framable()
     CHECK(uint32_t(SMSG_DISMOUNT) == 0x0E3Au);
     CHECK(uint32_t(SMSG_PRE_RESURRECT) == 0x19C0u);
     CHECK(uint32_t(SMSG_UPDATE_COMBO_POINTS) == 0x082Fu);
+    CHECK(uint32_t(CMSG_PET_STOP_ATTACK) == 0x065Bu);
 
     CHECK(uint32_t(SMSG_ATTACKSWING_ERROR) <= 0x1FFFu);
     CHECK(uint32_t(SMSG_MOVE_SET_SWIM_SPEED) <= 0x1FFFu);
@@ -2053,6 +2128,7 @@ static void test_opcode_values_are_framable()
     CHECK(uint32_t(SMSG_DISMOUNT) <= 0x1FFFu);
     CHECK(uint32_t(SMSG_PRE_RESURRECT) <= 0x1FFFu);
     CHECK(uint32_t(SMSG_UPDATE_COMBO_POINTS) <= 0x1FFFu);
+    CHECK(uint32_t(CMSG_PET_STOP_ATTACK) <= 0x1FFFu);
 }
 
 int main(int /*argc*/, char** /*argv*/)
@@ -2072,6 +2148,7 @@ int main(int /*argc*/, char** /*argv*/)
     test_direct_speed_family_mask_order();
     test_spline_speed_family_mask_order();
     test_pet_action_matches_retail_bodies();
+    test_pet_stop_attack_matches_retail_and_rejects_malformed_bodies();
     test_pet_name_query_matches_retail_bodies();
     test_lfg_join_matches_retail_bodies();
     test_mail_family_matches_retail_bodies();

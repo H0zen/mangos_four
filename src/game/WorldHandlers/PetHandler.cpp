@@ -94,13 +94,15 @@ void WorldSession::HandlePetAction(WorldPacket& recv_data)
     Unit* pet = _player->GetMap()->GetUnit(petGuid);
     if (!pet)
     {
-        sLog.outError("HandlePetAction: %s not exist.", petGuid.GetString().c_str());
+        DEBUG_LOG("PET_CONTROL_REJECT opcode=CMSG_PET_ACTION reason=not_found account=%u player=%s pet=%s",
+            GetAccountId(), _player->GetGuidStr().c_str(), petGuid.GetString().c_str());
         return;
     }
 
     if (_player->GetObjectGuid() != pet->GetCharmerOrOwnerGuid())
     {
-        sLog.outError("HandlePetAction: %s isn't controlled by %s.", petGuid.GetString().c_str(), _player->GetGuidStr().c_str());
+        DEBUG_LOG("PET_CONTROL_REJECT opcode=CMSG_PET_ACTION reason=not_controlled account=%u player=%s pet=%s",
+            GetAccountId(), _player->GetGuidStr().c_str(), petGuid.GetString().c_str());
         return;
     }
 
@@ -273,7 +275,9 @@ void WorldSession::HandlePetAction(WorldPacket& recv_data)
                     break;
                 }
                 default:
-                    sLog.outError("WORLD: unknown PET flag Action %i and spellid %i.", uint32(flag), spellid);
+                    DEBUG_LOG("PET_CONTROL_REJECT opcode=CMSG_PET_ACTION reason=unknown_command account=%u player=%s pet=%s action_type=%u action=%u",
+                            GetAccountId(), _player->GetGuidStr().c_str(), petGuid.GetString().c_str(),
+                            uint32(flag), spellid);
             }
             break;
         case ACT_REACTION:                                  // 0x6
@@ -312,7 +316,8 @@ void WorldSession::HandlePetAction(WorldPacket& recv_data)
             SpellEntry const* spellInfo = sSpellStore.LookupEntry(spellid);
             if (!spellInfo)
             {
-                sLog.outError("WORLD: unknown PET spell id %i", spellid);
+                DEBUG_LOG("PET_CONTROL_REJECT opcode=CMSG_PET_ACTION reason=unknown_spell account=%u player=%s pet=%s spell=%u",
+                    GetAccountId(), _player->GetGuidStr().c_str(), petGuid.GetString().c_str(), spellid);
                 return;
             }
 
@@ -448,7 +453,9 @@ void WorldSession::HandlePetAction(WorldPacket& recv_data)
             break;
         }
         default:
-            sLog.outError("WORLD: unknown PET flag Action %i and spellid %i.", uint32(flag), spellid);
+            DEBUG_LOG("PET_CONTROL_REJECT opcode=CMSG_PET_ACTION reason=unknown_action account=%u player=%s pet=%s action_type=%u action=%u",
+                    GetAccountId(), _player->GetGuidStr().c_str(), petGuid.GetString().c_str(),
+                    uint32(flag), spellid);
     }
 }
 
@@ -464,19 +471,25 @@ void WorldSession::HandlePetStopAttack(WorldPacket& recv_data)
     ObjectGuid petGuid;
     if (!MopCompactPackets::ReadPetStopAttack(recv_data, petGuid))
     {
+        DEBUG_LOG("PET_CONTROL_REJECT opcode=CMSG_PET_STOP_ATTACK reason=malformed account=%u player=%s",
+            GetAccountId(), GetPlayer()->GetGuidStr().c_str());
         return;
     }
 
     Unit* pet = GetPlayer()->GetMap()->GetUnit(petGuid);    // pet or controlled creature/player
     if (!pet)
     {
-        sLog.outError("%s doesn't exist.", petGuid.GetString().c_str());
+        DEBUG_LOG("PET_CONTROL_REJECT opcode=CMSG_PET_STOP_ATTACK reason=not_found account=%u player=%s pet=%s",
+            GetAccountId(), GetPlayer()->GetGuidStr().c_str(),
+            petGuid.GetString().c_str());
         return;
     }
 
     if (GetPlayer()->GetObjectGuid() != pet->GetCharmerOrOwnerGuid())
     {
-        sLog.outError("HandlePetStopAttack: %s isn't charm/pet of %s.", petGuid.GetString().c_str(), GetPlayer()->GetGuidStr().c_str());
+        DEBUG_LOG("PET_CONTROL_REJECT opcode=CMSG_PET_STOP_ATTACK reason=not_controlled account=%u player=%s pet=%s",
+            GetAccountId(), GetPlayer()->GetGuidStr().c_str(),
+            petGuid.GetString().c_str());
         return;
     }
 

@@ -172,53 +172,52 @@ namespace MopCompactPackets
     }
 
     /// CMSG_PET_STOP_ATTACK (0x065B), the 18414 body: one packed
-    /// controlled-unit GUID and no trailing fields.
+    /// controlled-unit GUID and no trailing fields. The reader consumes the
+    /// two captured vehicle bodies documented at catalogue 2BE10C89; the dense
+    /// and single-zero discriminator bodies are binary-derived from the client
+    /// writer, not captured traffic.
     inline bool ReadPetStopAttack(WorldPacket& in, ObjectGuid& petGuid)
     {
-        size_t const remaining = in.size() - in.rpos();
-        if (remaining < 1)
+        petGuid.Clear();
+        if (in.rpos() >= in.size())
         {
-            in.rfinish();
             return false;
         }
 
-        uint8 const mask = in[in.rpos()];
-        size_t guidByteCount = 0;
-        for (uint8 bits = mask; bits; bits >>= 1)
-        {
-            guidByteCount += bits & 1;
-        }
-        if (remaining != 1 + guidByteCount)
-        {
-            in.rfinish();
-            return false;
-        }
-
-        uint8 guid[8] = { 0, 0, 0, 0, 0, 0, 0, 0 };
         in.ResetBitReader();
-        guid[7] = in.ReadBit();  guid[5] = in.ReadBit();
-        guid[1] = in.ReadBit();  guid[6] = in.ReadBit();
-        guid[0] = in.ReadBit();  guid[2] = in.ReadBit();
-        guid[4] = in.ReadBit();  guid[3] = in.ReadBit();
+        in.ReadGuidMask<7, 5, 1, 6, 0, 2, 4, 3>(petGuid);
 
-        uint8 const byteOrder[] = { 2, 5, 0, 4, 1, 7, 6, 3 };
+        size_t presentByteCount = 0;
         for (uint8 index = 0; index < 8; ++index)
         {
-            in.ReadByteSeq(guid[byteOrder[index]]);
+            presentByteCount += petGuid[index] != 0;
         }
 
-        uint64 raw = 0;
-        for (uint8 index = 0; index < 8; ++index)
+        if (in.size() - in.rpos() != presentByteCount)
         {
-            raw |= uint64(guid[index]) << (8 * index);
-        }
-        if (raw == 0)
-        {
+            petGuid.Clear();
             in.rfinish();
             return false;
         }
 
-        petGuid = ObjectGuid(raw);
+        for (size_t index = in.rpos(); index < in.size(); ++index)
+        {
+            if (in[index] == 1)
+            {
+                petGuid.Clear();
+                in.rfinish();
+                return false;
+            }
+        }
+
+        in.ReadGuidBytes<2, 5, 0, 4, 1, 7, 6, 3>(petGuid);
+        if (petGuid.IsEmpty() || in.rpos() != in.size())
+        {
+            petGuid.Clear();
+            in.rfinish();
+            return false;
+        }
+
         return true;
     }
 
