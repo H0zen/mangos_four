@@ -1702,9 +1702,9 @@ static void test_mail_family_matches_retail_bodies()
 /// CMSG_TOTEM_DESTROYED and CMSG_SET_ACTION_BUTTON, pinned to real 18414 bodies.
 ///
 /// Both are a plain byte, a mask byte, then the present bytes of a packed value.
-/// Four distinct masks each. The action button is additionally byte-for-byte
-/// identical to the client's writer sub_669CAE, which is what proves its orders
-/// rather than merely constraining them.
+/// Five observed totem masks and four action-button masks. The action button is
+/// additionally byte-for-byte identical to the client's writer sub_669CAE,
+/// which is what proves its orders rather than merely constraining them.
 ///
 /// The empty action-button body is the important one: mask 0x00 means every byte
 /// of the packed value is absent, so the whole request is two bytes and clears
@@ -1721,6 +1721,10 @@ static void test_totem_and_action_button_bodies()
           UINT64_C(0xF130BA2100000885) },
         { "totem mask E7", { 0x00, 0xE7, 0x31, 0x26, 0xEA, 0xB6, 0xA8, 0xF0 }, 8, 0,
           UINT64_C(0xF130A9EB0027B700) },
+        { "totem mask EF", { 0x00, 0xEF, 0x31, 0x90, 0x06, 0xB1, 0xE9, 0xCB, 0xF0 }, 9, 0,
+          UINT64_C(0xF130E8070091B0CA) },
+        { "manual totem slot 0", { 0x00, 0x00 }, 2, 0, UINT64_C(0) },
+        { "manual totem slot 3", { 0x03, 0x00 }, 2, 3, UINT64_C(0) },
     };
     for (size_t i = 0; i < sizeof(totems) / sizeof(totems[0]); ++i)
     {
@@ -1737,8 +1741,78 @@ static void test_totem_and_action_button_bodies()
                          unsigned(p.rpos()), unsigned(p.size()));
             ++g_fail;
         }
-        // Every totem here is a creature, which is the check outside the packet.
-        CHECK((guid.GetRawValue() >> 52) == 0xF13);
+        // Every non-empty observed totem is a creature. The official manual UI
+        // path deliberately supplies the empty GUID as a slot-only sentinel.
+        if (totems[i].guid != 0)
+        {
+            CHECK((guid.GetRawValue() >> 52) == 0xF13);
+        }
+        CHECK(MopCompactPackets::IsTotemDestroyedRequestAdmissible(p, slot));
+    }
+
+    {
+        // A canonical writer omits zero GUID bytes. Marking all bytes present
+        // and sending 0x01 decodes to zero, but must not gain sentinel meaning.
+        uint8_t const nonCanonicalEmpty[] = {
+            0x00, 0xFF, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01
+        };
+        WorldPacket p(CMSG_TOTEM_DESTROYED, sizeof(nonCanonicalEmpty));
+        p.append(nonCanonicalEmpty, sizeof(nonCanonicalEmpty));
+        uint8 slot = 0xFF;
+        ObjectGuid const guid = MopCompactPackets::ReadTotemDestroyed(p, slot);
+        CHECK(slot == 0);
+        CHECK(guid.IsEmpty());
+        CHECK(!MopCompactPackets::IsTotemDestroyedRequestAdmissible(p, slot));
+    }
+
+    {   // The dense EF body has seven GUID bytes. Every strict prefix from the
+        // slot-only body through the final missing GUID byte must throw.
+        uint8_t const dense[] = { 0x00, 0xEF, 0x31, 0x90, 0x06, 0xB1, 0xE9, 0xCB, 0xF0 };
+        for (size_t length = 1; length < sizeof(dense); ++length)
+        {
+            WorldPacket p(CMSG_TOTEM_DESTROYED, uint32(length));
+            p.append(dense, length);
+            uint8 slot = 0xFF;
+            bool threw = false;
+            try
+            {
+                MopCompactPackets::ReadTotemDestroyed(p, slot);
+            }
+            catch (ByteBufferException const&)
+            {
+                threw = true;
+            }
+            CHECK(threw);
+        }
+    }
+
+    {
+        uint8_t const trailing[] = { 0x00, 0x00, 0xFF };
+        WorldPacket p(CMSG_TOTEM_DESTROYED, sizeof(trailing));
+        p.append(trailing, sizeof(trailing));
+        uint8 slot = 0xFF;
+        ObjectGuid const guid = MopCompactPackets::ReadTotemDestroyed(p, slot);
+        CHECK(guid.IsEmpty());
+        CHECK(!MopCompactPackets::IsTotemDestroyedRequestAdmissible(p, slot));
+    }
+
+    {
+        uint8_t const hostileSlot[] = { 0x04, 0x00 };
+        WorldPacket p(CMSG_TOTEM_DESTROYED, sizeof(hostileSlot));
+        p.append(hostileSlot, sizeof(hostileSlot));
+        uint8 slot = 0xFF;
+        ObjectGuid const guid = MopCompactPackets::ReadTotemDestroyed(p, slot);
+        CHECK(slot == 4);
+        CHECK(guid.IsEmpty());
+        CHECK(!MopCompactPackets::IsTotemDestroyedRequestAdmissible(p, slot));
+    }
+
+    {
+        ObjectGuid const occupied(UINT64_C(0xF130660D00009300));
+        ObjectGuid const replacement(UINT64_C(0xF130660D00009400));
+        CHECK(MopCompactPackets::TotemDestroyedGuidMatches(ObjectGuid(), occupied));
+        CHECK(MopCompactPackets::TotemDestroyedGuidMatches(occupied, occupied));
+        CHECK(!MopCompactPackets::TotemDestroyedGuidMatches(occupied, replacement));
     }
 
     struct Button { char const* what; uint8_t body[6]; size_t length; uint8 slot; uint32 action; };

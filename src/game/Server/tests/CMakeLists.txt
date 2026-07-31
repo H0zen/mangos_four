@@ -352,7 +352,12 @@ foreach(mutation IN ITEMS cancel_sender cancel_registration cancel_allowlist can
         dismount_allowlist dismount_reference
         pre_resurrect_mask pre_resurrect_bytes pre_resurrect_sender
         pre_resurrect_registration pre_resurrect_allowlist pre_resurrect_reference
-        combo_mask combo_bytes combo_sender combo_registration combo_allowlist combo_reference)
+        combo_mask combo_bytes combo_sender combo_registration combo_allowlist combo_reference
+        totem_mask_order totem_byte_order totem_opcode_value totem_registration
+        totem_reference totem_handler_route totem_drop_self_mover_guard
+        totem_drop_slot_bound totem_increment_slot totem_accept_nonempty_mismatch
+        totem_reject_empty_sentinel totem_drop_exact_tail
+        totem_accept_noncanonical_zero_byte)
     add_test(NAME mop_compact_packets_source_mutation_${mutation}
         COMMAND ${CMAKE_COMMAND} -DSOURCE_ROOT=${CMAKE_SOURCE_DIR}
             -DMUTATION=${mutation}

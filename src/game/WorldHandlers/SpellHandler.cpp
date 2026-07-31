@@ -777,25 +777,23 @@ void WorldSession::HandleTotemDestroyed(WorldPacket& recvPacket)
     uint8 slotId;
     ObjectGuid totemGuid = MopCompactPackets::ReadTotemDestroyed(recvPacket, slotId);
 
+    if (!MopCompactPackets::IsTotemDestroyedRequestAdmissible(recvPacket, slotId))
+    {
+        return;
+    }
+
     // ignore for remote control state
     if (!_player->IsSelfMover())
     {
         return;
     }
 
-    if (int(slotId) >= MAX_TOTEM_SLOT)
-    {
-        return;
-    }
-
     if (Totem* totem = GetPlayer()->GetTotem(TotemSlot(slotId)))
     {
-        // The request names the totem as well as the slot, and both must agree.
-        // Acting on the slot alone lets a stale or replayed request destroy a
-        // REPLACEMENT totem that has since taken that slot -- the player recasts,
-        // the old request arrives, and the new totem dies. The 18414 body carries
-        // the GUID precisely so this can be checked.
-        if (totem->GetObjectGuid() != totemGuid)
+        // The manual UI path sends an empty GUID to name the occupied slot. The
+        // automatic removal paths send a concrete GUID, which must still match so
+        // a stale request cannot destroy a replacement in the same slot.
+        if (!MopCompactPackets::TotemDestroyedGuidMatches(totemGuid, totem->GetObjectGuid()))
         {
             DEBUG_LOG("CMSG_TOTEM_DESTROYED from %s names %s in slot %u, but %s occupies it; ignored.",
                       GetPlayerName(), totemGuid.GetString().c_str(), uint32(slotId),

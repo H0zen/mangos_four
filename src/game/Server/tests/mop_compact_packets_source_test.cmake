@@ -27,6 +27,9 @@ file(READ "${SOURCE_ROOT}/src/game/Server/WorldSession.cpp" world_session)
 file(READ "${SOURCE_ROOT}/src/game/WorldHandlers/ItemHandler.cpp" item_handler)
 file(READ "${SOURCE_ROOT}/src/game/Server/Opcodes_reference.h" opcode_reference)
 
+string(CONCAT original_totem_sources "${unit_header}" "${opcode_header}"
+    "${opcode_registry}" "${opcode_reference}" "${spell_handler}")
+
 if(MUTATION STREQUAL "cancel_sender")
     string(REPLACE
         "WorldPacket data(SMSG_CANCEL_COMBAT, 0);"
@@ -431,6 +434,80 @@ elseif(MUTATION STREQUAL "pre_resurrect_reference")
         "SMSG_PRE_RESURRECT                             0x19C0  ACTIVE"
         "SMSG_PRE_RESURRECT                             0x19C0  DORMANT"
         opcode_reference "${opcode_reference}")
+elseif(MUTATION STREQUAL "totem_mask_order")
+    string(REPLACE
+        "uint8 const maskOrder[] = { 4, 2, 1, 3, 0, 6, 7, 5 };"
+        "uint8 const maskOrder[] = { 2, 4, 1, 3, 0, 6, 7, 5 };"
+        unit_header "${unit_header}")
+elseif(MUTATION STREQUAL "totem_byte_order")
+    string(REPLACE
+        "uint8 const byteOrder[] = { 6, 2, 4, 1, 5, 0, 3, 7 };"
+        "uint8 const byteOrder[] = { 2, 6, 4, 1, 5, 0, 3, 7 };"
+        unit_header "${unit_header}")
+elseif(MUTATION STREQUAL "totem_opcode_value")
+    string(REPLACE
+        "CMSG_TOTEM_DESTROYED                         = 0x1263"
+        "CMSG_TOTEM_DESTROYED                         = 0x1262"
+        opcode_header "${opcode_header}")
+elseif(MUTATION STREQUAL "totem_registration")
+    string(REPLACE
+        "DefC(CMSG_TOTEM_DESTROYED, \"CMSG_TOTEM_DESTROYED\", STATUS_LOGGEDIN, PROCESS_THREADUNSAFE, &WorldSession::HandleTotemDestroyed);"
+        "/* removed CMSG_TOTEM_DESTROYED registration */"
+        opcode_registry "${opcode_registry}")
+elseif(MUTATION STREQUAL "totem_reference")
+    string(REPLACE
+        "CMSG_TOTEM_DESTROYED                           0x1263  ACTIVE"
+        "CMSG_TOTEM_DESTROYED                           0x1263  DORMANT"
+        opcode_reference "${opcode_reference}")
+elseif(MUTATION STREQUAL "totem_handler_route")
+    string(REPLACE
+        "MopCompactPackets::ReadTotemDestroyed(recvPacket, slotId)"
+        "/* removed totem-destroy reader route */ ObjectGuid()"
+        spell_handler "${spell_handler}")
+elseif(MUTATION STREQUAL "totem_drop_self_mover_guard")
+    string(REPLACE
+        "if (!_player->IsSelfMover())"
+        "if (false) /* removed self-mover guard */"
+        spell_handler "${spell_handler}")
+elseif(MUTATION STREQUAL "totem_drop_slot_bound")
+    string(REPLACE
+        "slotId < MAX_TOTEM_SLOT"
+        "slotId <= MAX_TOTEM_SLOT"
+        unit_header "${unit_header}")
+elseif(MUTATION STREQUAL "totem_increment_slot")
+    string(REPLACE
+        "ObjectGuid totemGuid = MopCompactPackets::ReadTotemDestroyed(recvPacket, slotId);"
+        "ObjectGuid totemGuid = MopCompactPackets::ReadTotemDestroyed(recvPacket, slotId); ++slotId;"
+        spell_handler "${spell_handler}")
+elseif(MUTATION STREQUAL "totem_accept_nonempty_mismatch")
+    string(REPLACE
+        "return requestedGuid.IsEmpty() || requestedGuid == occupiedGuid;"
+        "return true;"
+        unit_header "${unit_header}")
+elseif(MUTATION STREQUAL "totem_reject_empty_sentinel")
+    string(REPLACE
+        "return requestedGuid.IsEmpty() || requestedGuid == occupiedGuid;"
+        "return requestedGuid == occupiedGuid;"
+        unit_header "${unit_header}")
+elseif(MUTATION STREQUAL "totem_drop_exact_tail")
+    string(REPLACE
+        "slotId < MAX_TOTEM_SLOT && in.rpos() == in.size() &&"
+        "slotId < MAX_TOTEM_SLOT &&"
+        unit_header "${unit_header}")
+elseif(MUTATION STREQUAL "totem_accept_noncanonical_zero_byte")
+    string(REPLACE
+        "if (in[index] == 0x01)"
+        "if (false)"
+        unit_header "${unit_header}")
+endif()
+
+if(MUTATION MATCHES "^totem_")
+    string(CONCAT mutated_totem_sources "${unit_header}" "${opcode_header}"
+        "${opcode_registry}" "${opcode_reference}" "${spell_handler}")
+    if(mutated_totem_sources STREQUAL original_totem_sources)
+        message(STATUS "MUTATION '${MUTATION}' changed nothing -- dead arm, exiting 0 so WILL_FAIL reports it")
+        return()
+    endif()
 endif()
 
 if(player_combat MATCHES "WorldPacket[ \t]+data\\(SMSG_ATTACKSWING_NOTINRANGE")
@@ -549,10 +626,62 @@ foreach(ack IN ITEMS
     endif()
 endforeach()
 
-# The totem destroy request names a totem as well as a slot, and the handler must
-# compare them or a stale request can destroy a replacement in the same slot.
-if(NOT spell_handler_code MATCHES "totem->GetObjectGuid[(][)]${ws}*!=${ws}*totemGuid")
-    message(FATAL_ERROR "totem-destroy handler no longer verifies the named totem occupies the slot")
+# CMSG_TOTEM_DESTROYED is active only as one coherent path: exact 18414 wire
+# grammar, zero-based bounded slot, sender-owned lookup, dual GUID policy, and
+# exact packet consumption. The official manual UI route sends an empty GUID;
+# automatic removal sends a concrete GUID which must still match the occupant.
+string(FIND "${unit_header}" "uint8 const maskOrder[] = { 4, 2, 1, 3, 0, 6, 7, 5 };" totem_mask_order)
+if(totem_mask_order EQUAL -1)
+    message(FATAL_ERROR "totem mask order no longer matches the 18414 writer")
+endif()
+string(FIND "${unit_header}" "uint8 const byteOrder[] = { 6, 2, 4, 1, 5, 0, 3, 7 };" totem_byte_order)
+if(totem_byte_order EQUAL -1)
+    message(FATAL_ERROR "totem byte order no longer matches the 18414 writer")
+endif()
+if(NOT opcode_header MATCHES "CMSG_TOTEM_DESTROYED${ws}*=${ws}*0x1263")
+    message(FATAL_ERROR "totem opcode value is not the binary-proven 0x1263")
+endif()
+string(REGEX MATCHALL "DefC${ws}*[(]${ws}*CMSG_TOTEM_DESTROYED${ws}*,${ws}*\"CMSG_TOTEM_DESTROYED\"${ws}*,${ws}*STATUS_LOGGEDIN${ws}*,${ws}*PROCESS_THREADUNSAFE${ws}*,${ws}*&WorldSession::HandleTotemDestroyed${ws}*[)]" totem_registrations "${registry_code}")
+list(LENGTH totem_registrations totem_registration_count)
+if(NOT totem_registration_count EQUAL 1)
+    message(FATAL_ERROR "totem registration must be exactly one logged-in world-thread handler row")
+endif()
+if(NOT opcode_reference MATCHES "CMSG_TOTEM_DESTROYED${ws}+0x1263${ws}+ACTIVE")
+    message(FATAL_ERROR "totem reference inventory is not ACTIVE at 0x1263")
+endif()
+string(FIND "${spell_handler_code}" "void WorldSession::HandleTotemDestroyed" totem_handler_at)
+string(FIND "${spell_handler_code}" "void WorldSession::HandleSelfResOpcode" totem_handler_end)
+if(totem_handler_at EQUAL -1 OR totem_handler_end EQUAL -1 OR NOT totem_handler_at LESS totem_handler_end)
+    message(FATAL_ERROR "totem handler route cannot be isolated")
+endif()
+math(EXPR totem_handler_length "${totem_handler_end} - ${totem_handler_at}")
+string(SUBSTRING "${spell_handler_code}" ${totem_handler_at} ${totem_handler_length} totem_handler_body)
+foreach(required IN ITEMS
+        "MopCompactPackets::ReadTotemDestroyed(recvPacket, slotId)"
+        "if (!_player->IsSelfMover())"
+        "MopCompactPackets::IsTotemDestroyedRequestAdmissible(recvPacket, slotId)"
+        "GetPlayer()->GetTotem(TotemSlot(slotId))"
+        "MopCompactPackets::TotemDestroyedGuidMatches(totemGuid, totem->GetObjectGuid())"
+        "totem->UnSummon()")
+    string(FIND "${totem_handler_body}" "${required}" required_at)
+    if(required_at EQUAL -1)
+        message(FATAL_ERROR "totem handler policy is missing: ${required}")
+    endif()
+endforeach()
+if(totem_handler_body MATCHES "[+][+]${ws}*slotId|slotId${ws}*[+][+]")
+    message(FATAL_ERROR "totem handler increments the zero-based wire slot")
+endif()
+string(FIND "${unit_header}" "slotId < MAX_TOTEM_SLOT && in.rpos() == in.size() &&" totem_admission)
+if(totem_admission EQUAL -1)
+    message(FATAL_ERROR "totem admission must reject hostile slots and trailing bytes")
+endif()
+string(FIND "${unit_header}" "if (in[index] == 0x01)" totem_canonical_guid)
+if(totem_canonical_guid EQUAL -1)
+    message(FATAL_ERROR "totem admission must reject non-canonical present zero GUID bytes")
+endif()
+string(FIND "${unit_header}" "return requestedGuid.IsEmpty() || requestedGuid == occupiedGuid;" totem_guid_policy)
+if(totem_guid_policy EQUAL -1)
+    message(FATAL_ERROR "totem GUID policy must accept the empty sentinel and reject non-empty mismatch")
 endif()
 
 # MARK_AS_READ owes no reply and may stand alone, but exactly once: a duplicate

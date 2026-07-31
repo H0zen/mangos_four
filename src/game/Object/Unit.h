@@ -576,6 +576,31 @@ namespace MopCompactPackets
         return ObjectGuid(ReadPrefixedPackedValue(in, slotId, maskOrder, byteOrder));
     }
 
+    inline bool HasCanonicalTotemDestroyedGuidEncoding(WorldPacket const& in)
+    {
+        // Present GUID bytes are XOR-obfuscated. A wire byte of 0x01 decodes
+        // to zero, which the retail writer represents by clearing its mask bit.
+        for (size_t index = 2; index < in.size(); ++index)
+        {
+            if (in[index] == 0x01)
+            {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    inline bool IsTotemDestroyedRequestAdmissible(WorldPacket const& in, uint8 slotId)
+    {
+        return slotId < MAX_TOTEM_SLOT && in.rpos() == in.size() &&
+               HasCanonicalTotemDestroyedGuidEncoding(in);
+    }
+
+    inline bool TotemDestroyedGuidMatches(ObjectGuid const& requestedGuid, ObjectGuid const& occupiedGuid)
+    {
+        return requestedGuid.IsEmpty() || requestedGuid == occupiedGuid;
+    }
+
     /// CMSG_SET_ACTION_BUTTON (0x1F8C): the button, then a packed eight-byte
     /// value, byte-for-byte identical to the client's writer sub_669CAE.
     ///
