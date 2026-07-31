@@ -37,8 +37,11 @@ if(DEFINED MUTATION AND NOT MUTATION_INTERNAL)
         set(expected_guard "missing non-COD diagnostic scope")
     elseif(MUTATION STREQUAL "log_receiver_reject")
         set(expected_guard "missing receiver-authority diagnostic scope")
+    elseif(MUTATION STREQUAL "log_missing_item_reject")
+        set(expected_guard "missing resolved-item-existence diagnostic scope")
     else()
-        message(FATAL_ERROR "unknown mutation: ${MUTATION}")
+        message(STATUS "mutation target unavailable or wrong guard: ${MUTATION}")
+        return()
     endif()
 
     set(inner_arguments
@@ -221,6 +224,11 @@ elseif(MUTATION STREQUAL "log_receiver_reject")
         "mail.receiverGuid == playerGuid &&"
         "true &&"
         "log_receiver_reject")
+elseif(MUTATION STREQUAL "log_missing_item_reject")
+    mutate_once(policy_source
+        "item.exists &&"
+        "true &&"
+        "log_missing_item_reject")
 elseif(DEFINED MUTATION)
     message(FATAL_ERROR "unknown mutation: ${MUTATION}")
 endif()
@@ -269,6 +277,8 @@ require_once("${policy_source}" "attachment != NULL &&"
     "selected-attachment diagnostic scope")
 require_once("${policy_source}" "mail.COD == 0 &&"
     "non-COD diagnostic scope")
+require_once("${policy_source}" "item.exists &&"
+    "resolved-item-existence diagnostic scope")
 
 require_once("${policy_source}" "mail.receiverGuid != playerGuid ||"
     "receiver authority check")

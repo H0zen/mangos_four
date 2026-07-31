@@ -153,6 +153,8 @@ static void test_attacker_driven_rejections_are_not_diagnostic()
         ObjectGuid(HIGHGUID_PLAYER, 0x43u), 0xBB02u, attachmentB, driftedItem));
     CHECK(!MailTakeItemPolicy::HasTemplateCoherenceDrift(mailB, receiver,
         0xBB02u, attachmentB, { true, 0xBB03u, 0x2003u }));
+    CHECK(!MailTakeItemPolicy::HasTemplateCoherenceDrift(mailB, receiver,
+        0xBB02u, attachmentB, { false, 0xBB02u, 0x2003u }));
 }
 
 int main()
