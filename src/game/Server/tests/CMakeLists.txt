@@ -299,6 +299,36 @@ foreach(mutation IN ITEMS
         PROPERTIES WILL_FAIL TRUE)
 endforeach()
 
+add_executable(mop_mail_take_item_security_test
+    mop_mail_take_item_security_test.cpp)
+target_include_directories(mop_mail_take_item_security_test PRIVATE
+    ${CMAKE_SOURCE_DIR}/src/game/WorldHandlers
+    ${CMAKE_SOURCE_DIR}/src/shared
+    $<TARGET_PROPERTY:game,INTERFACE_INCLUDE_DIRECTORIES>)
+set_target_properties(mop_mail_take_item_security_test PROPERTIES
+    CXX_STANDARD 17 CXX_STANDARD_REQUIRED ON)
+target_link_libraries(mop_mail_take_item_security_test PRIVATE shared)
+add_test(NAME mop_mail_take_item_security
+    COMMAND mop_mail_take_item_security_test)
+
+add_test(NAME mop_mail_take_item_security_source
+    COMMAND ${CMAKE_COMMAND} -DSOURCE_ROOT=${CMAKE_SOURCE_DIR}
+        -P ${CMAKE_CURRENT_SOURCE_DIR}/mop_mail_take_item_security_source_test.cmake)
+
+foreach(mutation IN ITEMS
+        drop_attachment_lookup lookup_after_global_item policy_after_can_store
+        drop_receiver_check allow_cod ignore_remove_result
+        restore_cod_send_mail restore_cod_modify_money
+        cod_reply_item_zero cod_reply_count_one
+        remove_before_can_store success_before_commit)
+    add_test(NAME mop_mail_take_item_security_source_mutation_${mutation}
+        COMMAND ${CMAKE_COMMAND} -DSOURCE_ROOT=${CMAKE_SOURCE_DIR}
+            -DMUTATION=${mutation}
+            -P ${CMAKE_CURRENT_SOURCE_DIR}/mop_mail_take_item_security_source_test.cmake)
+    set_tests_properties(mop_mail_take_item_security_source_mutation_${mutation}
+        PROPERTIES WILL_FAIL TRUE)
+endforeach()
+
 add_test(NAME mop_guild_banker_activate_source
     COMMAND ${CMAKE_COMMAND}
         -DSOURCE_ROOT=${CMAKE_SOURCE_DIR}

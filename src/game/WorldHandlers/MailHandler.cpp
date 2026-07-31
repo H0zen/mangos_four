@@ -42,6 +42,7 @@
  */
 
 #include "Mail.h"
+#include "MailTakeItemPolicy.h"
 #include "Language.h"
 #include "Log.h"
 #include "ObjectGuid.h"
@@ -565,17 +566,19 @@ void WorldSession::HandleMailTakeItem(WorldPacket& recv_data)
         return;
     }
 
-    // prevent cheating with skip client money check
-    if (pl->GetMoney() < m->COD)
-    {
-        pl->SendMailResult(mailId, MAIL_ITEM_TAKEN, MAIL_ERR_NOT_ENOUGH_MONEY);
-        return;
-    }
-
+    MailItemInfo const* const attachment =
+        MailTakeItemPolicy::FindAttachment(*m, itemId);
     Item* it = pl->GetMItem(itemId);
-    if (!it)
+    MailTakeItemPolicy::ResolvedItem const resolved = {
+        it != NULL,
+        it ? it->GetGUIDLow() : 0,
+        it ? it->GetEntry() : 0
+    };
+    if (MailTakeItemPolicy::Evaluate(*m, pl->GetObjectGuid(), itemId,
+            attachment, resolved) == MailTakeItemPolicy::Decision::RejectInternal)
     {
-        pl->SendMailResult(mailId, MAIL_ITEM_TAKEN, MAIL_ERR_INTERNAL_ERROR);
+        pl->SendMailResult(mailId, MAIL_ITEM_TAKEN,
+            MAIL_ERR_INTERNAL_ERROR, 0, itemId, 0);
         return;
     }
 
@@ -583,53 +586,14 @@ void WorldSession::HandleMailTakeItem(WorldPacket& recv_data)
     InventoryResult msg = _player->CanStoreItem(NULL_BAG, NULL_SLOT, dest, it, false);
     if (msg == EQUIP_ERR_OK)
     {
-        m->RemoveItem(itemId);
+        if (!m->RemoveItem(itemId))
+        {
+            pl->SendMailResult(mailId, MAIL_ITEM_TAKEN,
+                MAIL_ERR_INTERNAL_ERROR, 0, itemId, 0);
+            return;
+        }
         m->removedItems.push_back(itemId);
 
-        if (m->COD > 0)                                     // if there is COD, take COD money from player and send them to sender by mail
-        {
-            ObjectGuid sender_guid = ObjectGuid(HIGHGUID_PLAYER, m->sender);
-            Player* sender = sObjectMgr.GetPlayer(sender_guid);
-
-            uint32 sender_accId = 0;
-
-            if (GetSecurity() > SEC_PLAYER && sWorld.getConfig(CONFIG_BOOL_GM_LOG_TRADE))
-            {
-                std::string sender_name;
-                if (sender)
-                {
-                    sender_accId = sender->GetSession()->GetAccountId();
-                    sender_name = sender->GetName();
-                }
-                else if (sender_guid)
-                {
-                    // can be calculated early
-                    sender_accId = sObjectMgr.GetPlayerAccountIdByGUID(sender_guid);
-
-                    if (!sObjectMgr.GetPlayerNameByGUID(sender_guid, sender_name))
-                    {
-                        sender_name = sObjectMgr.GetMangosStringForDBCLocale(LANG_UNKNOWN);
-                    }
-                }
-                sLog.outCommand(GetAccountId(), "GM %s (Account: %u) receive mail item: %s (Entry: %u Count: %u) and send COD money: %u to player: %s (Account: %u)",
-                                GetPlayerName(), GetAccountId(), it->GetProto()->Name1, it->GetEntry(), it->GetCount(), m->COD, sender_name.c_str(), sender_accId);
-            }
-            else if (!sender)
-            {
-                sender_accId = sObjectMgr.GetPlayerAccountIdByGUID(sender_guid);
-            }
-
-            // check player existence
-            if (sender || sender_accId)
-            {
-                MailDraft(m->subject, "")
-                .SetMoney(m->COD)
-                .SendMailTo(MailReceiver(sender, sender_guid), _player, MAIL_CHECK_MASK_COD_PAYMENT);
-            }
-
-            pl->ModifyMoney(-int64(m->COD));
-        }
-        m->COD = 0;
         m->state = MAIL_STATE_CHANGED;
         pl->m_mailsUpdated = true;
         pl->RemoveMItem(it->GetGUIDLow());

@@ -1984,6 +1984,19 @@ static void test_send_mail_result_matches_retail_bodies()
             0x00, 0x00, 0x00, 0x00
         }));
     }
+    {   // Constructed containment reply: authority/COD failure names the item.
+        WorldPacket p(SMSG_SEND_MAIL_RESULT, 24);
+        MopCompactPackets::BuildSendMailResult(
+            p, 0x11223344u, 0, 6, 2, 0xA1B2C3D4u, 0);
+        CHECK(BytesEqual(p, {
+            0x44, 0x33, 0x22, 0x11,
+            0x00, 0x00, 0x00, 0x00,
+            0x06, 0x00, 0x00, 0x00,
+            0x02, 0x00, 0x00, 0x00,
+            0xD4, 0xC3, 0xB2, 0xA1,
+            0x00, 0x00, 0x00, 0x00
+        }));
+    }
     {   // Deleted: action 4 is MAIL_DELETED, not MAIL_RETURNED_TO_SENDER, which
         // is 3. Either way the item fields are zero but still present.
         WorldPacket p(SMSG_SEND_MAIL_RESULT, 24);
