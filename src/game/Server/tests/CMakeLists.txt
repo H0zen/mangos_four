@@ -276,6 +276,26 @@ target_compile_definitions(mop_compact_packets_test PRIVATE
 target_link_libraries(mop_compact_packets_test PRIVATE shared)
 add_test(NAME mop_compact_packets COMMAND mop_compact_packets_test)
 
+add_test(NAME mop_guild_banker_activate_source
+    COMMAND ${CMAKE_COMMAND}
+        -DSOURCE_ROOT=${CMAKE_SOURCE_DIR}
+        -P ${CMAKE_CURRENT_SOURCE_DIR}/mop_guild_banker_activate_source_test.cmake)
+
+foreach(mutation IN ITEMS
+        activate_mask_order activate_flag_position activate_byte_order
+        activate_xor activate_exact_length activate_padding
+        activate_canonical_byte activate_all_zero activate_handler_route
+        activate_interaction activate_registration query_registration
+        list_registration list_admission activate_refresh_side_effect
+        reference_activate reference_query reference_list)
+    add_test(NAME mop_guild_banker_activate_source_mutation_${mutation}
+        COMMAND ${CMAKE_COMMAND} -DSOURCE_ROOT=${CMAKE_SOURCE_DIR}
+            -DMUTATION=${mutation}
+            -P ${CMAKE_CURRENT_SOURCE_DIR}/mop_guild_banker_activate_source_test.cmake)
+    set_tests_properties(mop_guild_banker_activate_source_mutation_${mutation}
+        PROPERTIES WILL_FAIL TRUE)
+endforeach()
+
 add_executable(mop_mail_packets_test mop_mail_packets_test.cpp)
 target_include_directories(mop_mail_packets_test PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/..

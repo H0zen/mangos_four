@@ -462,6 +462,84 @@ namespace MopCompactPackets
         return ObjectGuid(raw);
     }
 
+    /// CMSG_GUILD_BANKER_ACTIVATE (0x0372): eight packed GUID-presence bits
+    /// and one standalone full-slot-refresh bit span two mask bytes. The low
+    /// seven bits of the second byte are writer padding, and there are no
+    /// scalar fields before or after the XOR-obfuscated GUID bytes.
+    inline bool ReadGuildBankerActivate(WorldPacket& in,
+        ObjectGuid& bankGuid, bool& fullSlotRefresh)
+    {
+        size_t const remaining = in.size() - in.rpos();
+        if (remaining < 2)
+        {
+            in.rfinish();
+            return false;
+        }
+
+        uint8 const firstMask = in[in.rpos()];
+        uint8 const secondMask = in[in.rpos() + 1];
+        if ((secondMask & 0x7F) != 0)
+        {
+            in.rfinish();
+            return false;
+        }
+
+        size_t guidByteCount = (secondMask & 0x80) ? 1 : 0;
+        for (uint8 bits = firstMask & 0xBF; bits; bits >>= 1)
+        {
+            guidByteCount += bits & 1;
+        }
+        if (remaining != 2 + guidByteCount)
+        {
+            in.rfinish();
+            return false;
+        }
+
+        // ReadByteSeq XORs each present wire byte with one. A raw one would
+        // decode to zero despite its presence bit and is non-canonical.
+        for (size_t index = in.rpos() + 2; index < in.size(); ++index)
+        {
+            if (in[index] == 1)
+            {
+                in.rfinish();
+                return false;
+            }
+        }
+
+        uint8 guid[8] = { 0, 0, 0, 0, 0, 0, 0, 0 };
+        in.ResetBitReader();
+        guid[3] = in.ReadBit();
+        bool const parsedFullSlotRefresh = in.ReadBit();
+        guid[0] = in.ReadBit();
+        guid[7] = in.ReadBit();
+        guid[1] = in.ReadBit();
+        guid[5] = in.ReadBit();
+        guid[2] = in.ReadBit();
+        guid[6] = in.ReadBit();
+        guid[4] = in.ReadBit();
+
+        uint8 const byteOrder[] = { 7, 1, 0, 6, 4, 2, 5, 3 };
+        for (uint8 index = 0; index < 8; ++index)
+        {
+            in.ReadByteSeq(guid[byteOrder[index]]);
+        }
+
+        uint64 raw = 0;
+        for (uint8 index = 0; index < 8; ++index)
+        {
+            raw |= uint64(guid[index]) << (8 * index);
+        }
+        if (raw == 0 || in.rpos() != in.size())
+        {
+            in.rfinish();
+            return false;
+        }
+
+        bankGuid = ObjectGuid(raw);
+        fullSlotRefresh = parsedFullSlotRefresh;
+        return true;
+    }
+
     /// A plain byte, then one mask byte, then the present bytes of a packed
     /// eight-byte value. Two unrelated opcodes share this exact shape at 18414
     /// and differ only in their orders, so the walk is written once.

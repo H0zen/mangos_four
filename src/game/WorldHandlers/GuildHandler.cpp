@@ -1256,11 +1256,17 @@ void WorldSession::HandleGuildPermissions(WorldPacket& /* recv_data */)
 /* Called when clicking on Guild bank gameobject */
 void WorldSession::HandleGuildBankerActivate(WorldPacket& recv_data)
 {
-    DEBUG_LOG("WORLD: Received (CMSG_GUILD_BANKER_ACTIVATE)");
-
     ObjectGuid goGuid;
-    uint8 unk;
-    recv_data >> goGuid >> unk;
+    bool fullSlotRefresh = false;
+    if (!MopCompactPackets::ReadGuildBankerActivate(
+            recv_data, goGuid, fullSlotRefresh))
+    {
+        DEBUG_LOG("WORLD: Rejected malformed CMSG_GUILD_BANKER_ACTIVATE");
+        return;
+    }
+
+    DEBUG_LOG("WORLD: Received (CMSG_GUILD_BANKER_ACTIVATE) FullSlotRefresh %u",
+        uint32(fullSlotRefresh));
 
     if (!GetPlayer()->GetGameObjectIfCanInteractWith(goGuid, GAMEOBJECT_TYPE_GUILD_BANK))
     {

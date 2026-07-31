@@ -1284,12 +1284,13 @@ void InitializeOpcodes()
     // result at all; TAKE_ITEM was promoted together with SMSG_SEND_MAIL_RESULT
     // once that reply was rebuilt to its 18414 body and admitted.
     //
-    // GET_MAIL_LIST is promoted with its rebuilt 18414 two-pass reply. The
-    // rebuilt guild-bank reply remains held because
-    // CMSG_GUILD_BANKER_ACTIVATE has an unresolved 18414 packed body. Normal UI
-    // entry depends on that request. Present-item dynamic flags are not modelled
-    // by this backend either. Query, reply registration, admission, and reference
-    // state therefore remain dormant as one source-enforced wave.
+    // GET_MAIL_LIST is promoted with its rebuilt 18414 two-pass reply.
+    // The 18414 CMSG_GUILD_BANKER_ACTIVATE request body is resolved, but the
+    // wave remains held solely because the first uint32 in each present-item
+    // SMSG_GUILD_BANK_LIST record maps to the client's +48 dynamic-flags field,
+    // whose server-side meaning and state are not yet modelled. Activate/query
+    // registration, reply registration/admission, and all three reference rows
+    // therefore remain dormant as one source-enforced wave.
     DefC(CMSG_GET_MAIL_LIST, "CMSG_GET_MAIL_LIST", STATUS_LOGGEDIN, PROCESS_THREADUNSAFE, &WorldSession::HandleGetMailList);
     DefS(SMSG_MAIL_LIST_RESULT, "SMSG_MAIL_LIST_RESULT");
     DefC(CMSG_MAIL_MARK_AS_READ, "CMSG_MAIL_MARK_AS_READ", STATUS_LOGGEDIN, PROCESS_THREADUNSAFE, &WorldSession::HandleMailMarkAsRead);

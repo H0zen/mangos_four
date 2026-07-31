@@ -76,6 +76,16 @@ static bool BytesEqual(WorldPacket const& packet, std::vector<uint8_t> const& ex
     return true;
 }
 
+static WorldPacket InputPacket(uint32_t opcode, std::vector<uint8_t> const& body)
+{
+    WorldPacket packet(opcode, body.size());
+    if (!body.empty())
+    {
+        packet.append(body.data(), body.size());
+    }
+    return packet;
+}
+
 static void test_attack_swing_reasons()
 {
     const uint8_t expected[] = { 0x00, 0x40, 0x80, 0xC0 };
@@ -1066,6 +1076,92 @@ static void test_show_bank_matches_retail_bodies()
     }));
 }
 
+static void test_guild_banker_activate_retail_bodies()
+{
+    struct Fixture
+    {
+        std::vector<uint8_t> body;
+        uint64_t guid;
+    };
+
+    // Build-filtered 18414 corpus bodies from catalogue generation
+    // 2BE10C899585BAECD237705AC13BBF9262D81B6BDC085B462808C6869CE88752.
+    std::vector<Fixture> const retailFixtures = {
+        { { 0x7D, 0x80, 0xF0, 0x06, 0x11, 0x12, 0x70, 0x43 }, UINT64_C(0xF113427100000710) },
+        { { 0x7D, 0x80, 0xF0, 0x05, 0x1F, 0x12, 0x0B, 0x26 }, UINT64_C(0xF113270A0000041E) },
+        { { 0x7F, 0x80, 0xF0, 0x62, 0x51, 0x12, 0x0B, 0x00, 0x26 }, UINT64_C(0xF113270A00016350) },
+        { { 0x7F, 0x80, 0xF0, 0xD6, 0x74, 0x12, 0x0B, 0x12, 0x26 }, UINT64_C(0xF113270A0013D775) },
+        { { 0x7D, 0x80, 0xF0, 0x07, 0xE7, 0x12, 0x71, 0x43 }, UINT64_C(0xF1134270000006E6) },
+        { { 0x7D, 0x80, 0xF0, 0x07, 0x19, 0x12, 0xDB, 0x45 }, UINT64_C(0xF11344DA00000618) }
+    };
+
+    for (Fixture const& fixture : retailFixtures)
+    {
+        WorldPacket packet = InputPacket(CMSG_GUILD_BANKER_ACTIVATE, fixture.body);
+        ObjectGuid guid(UINT64_C(0xFFFFFFFFFFFFFFFF));
+        bool fullSlotRefresh = false;
+        CHECK(MopCompactPackets::ReadGuildBankerActivate(packet, guid, fullSlotRefresh));
+        CHECK(guid.GetRawValue() == fixture.guid);
+        CHECK(fullSlotRefresh);
+        CHECK(packet.rpos() == packet.size());
+    }
+}
+
+static void test_guild_banker_activate_binary_edge_bodies()
+{
+    // Binary-derived parser-only body: the corpus fixture with the standalone
+    // full-slot-refresh bit cleared. It is intentionally not labelled retail.
+    WorldPacket noRefresh = InputPacket(CMSG_GUILD_BANKER_ACTIVATE,
+        { 0x3D, 0x80, 0xF0, 0x06, 0x11, 0x12, 0x70, 0x43 });
+    ObjectGuid guid;
+    bool fullSlotRefresh = true;
+    CHECK(MopCompactPackets::ReadGuildBankerActivate(noRefresh, guid, fullSlotRefresh));
+    CHECK(guid.GetRawValue() == UINT64_C(0xF113427100000710));
+    CHECK(!fullSlotRefresh);
+    CHECK(noRefresh.rpos() == noRefresh.size());
+
+    // Binary-derived all-eight-byte body for 0x0807060504030201. Distinct
+    // byte values prove both mask and XOR byte order independently.
+    WorldPacket allPresent = InputPacket(CMSG_GUILD_BANKER_ACTIVATE,
+        { 0xFF, 0x80, 0x09, 0x03, 0x00, 0x06, 0x04, 0x02, 0x07, 0x05 });
+    fullSlotRefresh = false;
+    CHECK(MopCompactPackets::ReadGuildBankerActivate(allPresent, guid, fullSlotRefresh));
+    CHECK(guid.GetRawValue() == UINT64_C(0x0807060504030201));
+    CHECK(fullSlotRefresh);
+    CHECK(allPresent.rpos() == allPresent.size());
+
+    CHECK(uint32_t(CMSG_GUILD_BANKER_ACTIVATE) == 0x0372u);
+}
+
+static void test_guild_banker_activate_rejects_malformed_bodies()
+{
+    std::vector<uint8_t> const allPresent =
+        { 0xFF, 0x80, 0x09, 0x03, 0x00, 0x06, 0x04, 0x02, 0x07, 0x05 };
+    std::vector<std::vector<uint8_t>> malformed;
+
+    // Covers zero- and one-byte mask truncation plus every missing-present-byte
+    // boundary of the dense GUID body.
+    for (size_t size = 0; size < allPresent.size(); ++size)
+    {
+        malformed.emplace_back(allPresent.begin(), allPresent.begin() + size);
+    }
+    malformed.push_back({ 0x7D, 0x80, 0xF0, 0x06, 0x11, 0x12, 0x70, 0x43, 0x00 }); // trailing scalar/byte
+    malformed.push_back({ 0x00, 0x01 }); // non-zero low-seven padding bits
+    malformed.push_back({ 0x20, 0x00, 0x01 }); // present wire byte XOR-decodes to zero
+    malformed.push_back({ 0x40, 0x00 }); // all-zero GUID with the refresh bit set
+
+    for (std::vector<uint8_t> const& body : malformed)
+    {
+        WorldPacket packet = InputPacket(CMSG_GUILD_BANKER_ACTIVATE, body);
+        ObjectGuid guid(UINT64_C(0xFFFFFFFFFFFFFFFF));
+        bool fullSlotRefresh = true;
+        CHECK(!MopCompactPackets::ReadGuildBankerActivate(packet, guid, fullSlotRefresh));
+        CHECK(packet.rpos() == packet.size());
+        CHECK(guid.GetRawValue() == UINT64_C(0xFFFFFFFFFFFFFFFF));
+        CHECK(fullSlotRefresh);
+    }
+}
+
 static void test_combo_points_packet()
 {
     WorldPacket packet;
@@ -1923,6 +2019,9 @@ int main(int /*argc*/, char** /*argv*/)
     test_threat_packets();
     test_dismount_packet();
     test_show_bank_matches_retail_bodies();
+    test_guild_banker_activate_retail_bodies();
+    test_guild_banker_activate_binary_edge_bodies();
+    test_guild_banker_activate_rejects_malformed_bodies();
     test_pre_resurrect_packet();
     test_combo_points_packet();
     test_opcode_values_are_framable();
