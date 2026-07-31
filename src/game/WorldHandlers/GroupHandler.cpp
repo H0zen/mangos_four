@@ -277,12 +277,9 @@ void WorldSession::HandleGroupInviteOpcode(WorldPacket& recv_data)
  */
 void WorldSession::HandleGroupInviteResponseOpcode(WorldPacket& recv_data)
 {
-    bool unk = recv_data.ReadBit();
-    bool accepted = recv_data.ReadBit();
-    if (unk)
-    {
-        recv_data.read_skip<uint32>();
-    }
+    MopGroupInvitePackets::Response response;
+    if (!MopGroupInvitePackets::ParseResponse(recv_data, response))
+        return;
 
     Group* group = GetPlayer()->GetGroupInvite();
     if (!group)
@@ -290,7 +287,7 @@ void WorldSession::HandleGroupInviteResponseOpcode(WorldPacket& recv_data)
         return;
     }
 
-    if (accepted)
+    if (response.accepted)
     {
         // remove in from invites in any case
         group->RemoveInvite(GetPlayer());
@@ -339,11 +336,13 @@ void WorldSession::HandleGroupInviteResponseOpcode(WorldPacket& recv_data)
     }
     else
     {
+        ObjectGuid const leaderGuid = group->GetLeaderGuid();
+
         // uninvite, group can be deleted
         GetPlayer()->UninviteFromGroup();
 
         // remember leader if online
-        Player* leader = sObjectMgr.GetPlayer(group->GetLeaderGuid());
+        Player* leader = sObjectMgr.GetPlayer(leaderGuid);
         if (!leader || !leader->GetSession())
         {
             return;

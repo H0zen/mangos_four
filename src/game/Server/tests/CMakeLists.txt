@@ -545,6 +545,45 @@ add_test(NAME mop_group_marker_source
         -DSOURCE_ROOT=${CMAKE_SOURCE_DIR}
         -P ${CMAKE_CURRENT_SOURCE_DIR}/mop_group_marker_source_test.cmake)
 
+add_executable(mop_group_invite_response_packets_test
+    mop_group_invite_response_packets_test.cpp)
+target_include_directories(mop_group_invite_response_packets_test PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}/..
+    ${CMAKE_SOURCE_DIR}/src/shared)
+set_target_properties(mop_group_invite_response_packets_test PROPERTIES
+    CXX_STANDARD 17 CXX_STANDARD_REQUIRED ON)
+target_link_libraries(mop_group_invite_response_packets_test PRIVATE game)
+add_test(NAME mop_group_invite_response_packets
+    COMMAND mop_group_invite_response_packets_test)
+
+add_test(NAME mop_group_invite_response_source
+    COMMAND ${CMAKE_COMMAND} -DSOURCE_ROOT=${CMAKE_SOURCE_DIR}
+        -P ${CMAKE_CURRENT_SOURCE_DIR}/mop_group_invite_response_source_test.cmake)
+
+foreach(mutation IN ITEMS
+        group_invite_response_opcode_value
+        group_invite_response_registration
+        group_invite_response_reference
+        group_invite_response_skip_marker
+        group_invite_response_marker_value
+        group_invite_response_swap_bits
+        group_invite_response_drop_padding_guard
+        group_invite_response_unconditional_roles
+        group_invite_response_roles_endian
+        group_invite_response_drop_exact_tail
+        group_invite_response_side_effect_before_parse
+        group_invite_response_branch_on_has_roles
+        group_invite_response_decline_group_uaf
+        group_invite_response_unexpected_smsg_activation)
+    add_test(NAME mop_group_invite_response_source_mutation_${mutation}
+        COMMAND ${CMAKE_COMMAND} -DSOURCE_ROOT=${CMAKE_SOURCE_DIR}
+            -DMUTATION=${mutation}
+            -P ${CMAKE_CURRENT_SOURCE_DIR}/mop_group_invite_response_source_test.cmake)
+    set_tests_properties(
+        mop_group_invite_response_source_mutation_${mutation}
+        PROPERTIES WILL_FAIL TRUE)
+endforeach()
+
 add_executable(mop_auction_packets_test mop_auction_packets_test.cpp)
 target_include_directories(mop_auction_packets_test PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/..

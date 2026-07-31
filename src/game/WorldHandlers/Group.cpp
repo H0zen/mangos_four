@@ -67,6 +67,45 @@
 
 #define LOOT_ROLL_TIMEOUT  (1*MINUTE*IN_MILLISECONDS)
 
+bool MopGroupInvitePackets::ParseResponse(WorldPacket& in, Response& out)
+{
+    auto fail = [&in]()
+    {
+        in.rfinish();
+        return false;
+    };
+
+    if (in.rpos() != 0 || in.size() - in.rpos() < 2)
+        return fail();
+
+    Response parsed;
+    uint8 marker = 0;
+    in >> marker;
+    if (marker != 0x7F)
+        return fail();
+
+    parsed.hasRoles = in.ReadBit();
+    parsed.accepted = in.ReadBit();
+    uint8 const padding = uint8(in.ReadBits(6));
+    in.ResetBitReader();
+    if (padding != 0)
+        return fail();
+
+    size_t const expectedRemaining = parsed.hasRoles ? sizeof(uint32) : 0;
+    size_t const remaining = in.size() - in.rpos();
+    if (remaining != expectedRemaining)
+        return fail();
+
+    if (parsed.hasRoles)
+        in >> parsed.roles;
+
+    if (in.rpos() != in.size())
+        return fail();
+
+    out = parsed;
+    return true;
+}
+
 //===================================================
 //============== Roll ===============================
 //===================================================

@@ -1095,6 +1095,7 @@ void InitializeOpcodes()
     // Wave 20 full party roster/update request and response.
     DefC(CMSG_GROUP_REQUEST_JOIN_UPDATES, "CMSG_GROUP_REQUEST_JOIN_UPDATES", STATUS_LOGGEDIN, PROCESS_THREADUNSAFE, &WorldSession::HandleGroupRequestJoinUpdates);
     DefS(SMSG_GROUP_LIST, "SMSG_GROUP_LIST");
+    DefC(CMSG_GROUP_INVITE_RESPONSE, "CMSG_GROUP_INVITE_RESPONSE", STATUS_LOGGEDIN, PROCESS_THREADUNSAFE, &WorldSession::HandleGroupInviteResponseOpcode);
 
     // Wave 15 stable-pet list request, list response, and operation result.
     DefC(CMSG_REQUEST_STABLED_PETS, "CMSG_REQUEST_STABLED_PETS", STATUS_LOGGEDIN, PROCESS_THREADUNSAFE, &WorldSession::HandleListStabledPetsOpcode);

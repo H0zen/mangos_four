@@ -1658,7 +1658,7 @@ typedef uint16_t uint16;
  *   CMSG_READ_ITEM                                 0x0D00  DORMANT
  *   CMSG_ADD_IGNORE                                0x0D20  DORMANT
  *   CMSG_GUILD_QUERY_RANKS                         0x0D50  ACTIVE
- *   CMSG_GROUP_INVITE_RESPONSE                     0x0D61  DORMANT
+ *   CMSG_GROUP_INVITE_RESPONSE                     0x0D61  ACTIVE
  *   CMSG_GUILD_DISBAND                             0x0D73  DORMANT
  *   CMSG_GUILD_DEL_RANK                            0x0D79  DORMANT
  *   CMSG_BATTLE_PAY_GET_PRODUCT_LIST               0x0DE0  DOC

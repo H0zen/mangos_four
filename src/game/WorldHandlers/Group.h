@@ -162,6 +162,18 @@ namespace MopReadyCheckPackets
     void BuildCompleted(WorldPacket& out, uint64 groupGuid, uint8 partyIndex);
 }
 
+namespace MopGroupInvitePackets
+{
+    struct Response
+    {
+        bool hasRoles = false;
+        bool accepted = false;
+        uint32 roles = 0;
+    };
+
+    bool ParseResponse(WorldPacket& in, Response& out);
+}
+
 namespace MopGroupMarkerPackets
 {
     struct MinimapPingRequest
