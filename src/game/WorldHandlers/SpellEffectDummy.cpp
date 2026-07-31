@@ -342,8 +342,8 @@ void Spell::EffectDummy(SpellEffectEntry const* effect)
 
                     if (caster && caster->GetTypeId() == TYPEID_PLAYER)
                     {
-                        WorldPacket data(SMSG_SPIRIT_HEALER_CONFIRM, 8);
-                        data << unitTarget->GetObjectGuid();
+                        WorldPacket data;
+                        MopDeathPackets::BuildSpiritHealerConfirm(data, unitTarget->GetObjectGuid());
                         ((Player*)caster)->GetSession()->SendPacket(&data);
                     }
                     return;

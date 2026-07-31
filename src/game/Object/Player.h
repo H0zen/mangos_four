@@ -740,6 +740,42 @@ namespace MopDeathPackets
         return true;
     }
 
+    inline void BuildSpiritHealerConfirm(WorldPacket& out,
+        ObjectGuid const& healerGuid)
+    {
+        out.Initialize(SMSG_SPIRIT_HEALER_CONFIRM, 9);
+        out.WriteGuidMask<6, 5, 7, 1, 4, 2, 3, 0>(healerGuid);
+        out.FlushBits();
+        out.WriteGuidBytes<0, 4, 2, 3, 7, 6, 5, 1>(healerGuid);
+    }
+
+    inline bool ParseSpiritHealerActivate(WorldPacket& in, ObjectGuid& guid)
+    {
+        size_t const remaining = in.size() - in.rpos();
+        if (remaining < 1)
+        {
+            return RejectMalformedRequest(in);
+        }
+
+        size_t const byteCount = PackedGuidByteCount(in[in.rpos()]);
+        if (remaining != 1 + byteCount ||
+            !HasCanonicalPackedGuidBytes(in, in.rpos() + 1, byteCount))
+        {
+            return RejectMalformedRequest(in);
+        }
+
+        ObjectGuid parsed;
+        in.ReadGuidMask<2, 7, 6, 0, 5, 4, 1, 3>(parsed);
+        in.ReadGuidBytes<1, 5, 6, 3, 2, 0, 7, 4>(parsed);
+        if (in.rpos() != in.size())
+        {
+            return RejectMalformedRequest(in);
+        }
+
+        guid = parsed;
+        return true;
+    }
+
     struct ResurrectResponse
     {
         uint32 response = 0;

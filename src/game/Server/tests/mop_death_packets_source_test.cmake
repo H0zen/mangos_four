@@ -5,6 +5,8 @@ file(READ "${SOURCE_ROOT}/src/game/Object/Unit.cpp" unit_source)
 file(READ "${SOURCE_ROOT}/src/game/Object/ObjectMgr.h" object_mgr_header)
 file(READ "${SOURCE_ROOT}/src/game/Object/ObjectMgrGraveyard.cpp" object_mgr_graveyard)
 file(READ "${SOURCE_ROOT}/src/game/WorldHandlers/MiscHandler.cpp" misc_handler)
+file(READ "${SOURCE_ROOT}/src/game/WorldHandlers/NPCHandler.cpp" npc_handler)
+file(READ "${SOURCE_ROOT}/src/game/WorldHandlers/SpellEffectDummy.cpp" spell_effect_dummy)
 file(READ "${SOURCE_ROOT}/src/game/WorldHandlers/SpellPackets.cpp" spell_packets)
 file(READ "${SOURCE_ROOT}/src/game/WorldHandlers/GridMap.h" grid_header)
 file(READ "${SOURCE_ROOT}/src/game/WorldHandlers/GridMap.cpp" grid_source)
@@ -170,6 +172,66 @@ elseif(MUTATION STREQUAL "nested_zone_api_delegate")
         grid_source "${grid_source}")
 elseif(MUTATION STREQUAL "death_recovery_reference")
     string(REPLACE "CMSG_RESURRECT_RESPONSE                        0x0B0C  ACTIVE" "CMSG_RESURRECT_RESPONSE                        0x0B0C  DORMANT"
+        opcode_reference "${opcode_reference}")
+elseif(MUTATION STREQUAL "spirit_confirm_mask_order")
+    string(REPLACE "WriteGuidMask<6, 5, 7, 1, 4, 2, 3, 0>" "WriteGuidMask<5, 6, 7, 1, 4, 2, 3, 0>"
+        player_header "${player_header}")
+elseif(MUTATION STREQUAL "spirit_confirm_byte_order")
+    string(REPLACE "WriteGuidBytes<0, 4, 2, 3, 7, 6, 5, 1>" "WriteGuidBytes<4, 0, 2, 3, 7, 6, 5, 1>"
+        player_header "${player_header}")
+elseif(MUTATION STREQUAL "spirit_confirm_raw_guid")
+    string(REPLACE
+        "out.WriteGuidMask<6, 5, 7, 1, 4, 2, 3, 0>(healerGuid);\n        out.FlushBits();\n        out.WriteGuidBytes<0, 4, 2, 3, 7, 6, 5, 1>(healerGuid);"
+        "out << healerGuid;"
+        player_header "${player_header}")
+elseif(MUTATION STREQUAL "spirit_confirm_producer")
+    string(REPLACE "MopDeathPackets::BuildSpiritHealerConfirm(data, unitTarget->GetObjectGuid());"
+        "data << unitTarget->GetObjectGuid();"
+        spell_effect_dummy "${spell_effect_dummy}")
+elseif(MUTATION STREQUAL "spirit_confirm_admission")
+    string(REPLACE "case SMSG_SPIRIT_HEALER_CONFIRM:" "/* removed spirit-healer confirmation admission */"
+        session_source "${session_source}")
+elseif(MUTATION STREQUAL "spirit_activate_mask_order")
+    string(REPLACE "ReadGuidMask<2, 7, 6, 0, 5, 4, 1, 3>" "ReadGuidMask<7, 2, 6, 0, 5, 4, 1, 3>"
+        player_header "${player_header}")
+elseif(MUTATION STREQUAL "spirit_activate_byte_order")
+    string(REPLACE "ReadGuidBytes<1, 5, 6, 3, 2, 0, 7, 4>" "ReadGuidBytes<5, 1, 6, 3, 2, 0, 7, 4>"
+        player_header "${player_header}")
+elseif(MUTATION STREQUAL "spirit_activate_raw_guid")
+    string(REPLACE
+        "in.ReadGuidMask<2, 7, 6, 0, 5, 4, 1, 3>(parsed);\n        in.ReadGuidBytes<1, 5, 6, 3, 2, 0, 7, 4>(parsed);"
+        "in >> parsed;"
+        player_header "${player_header}")
+elseif(MUTATION STREQUAL "spirit_activate_malformed_guard")
+    string(REPLACE "remaining != 1 + byteCount ||" "false ||"
+        player_header "${player_header}")
+elseif(MUTATION STREQUAL "spirit_activate_trailing_guard")
+    string(REPLACE "if (in.rpos() != in.size())" "if (false)"
+        player_header "${player_header}")
+elseif(MUTATION STREQUAL "spirit_activate_handler_parser")
+    string(REPLACE "MopDeathPackets::ParseSpiritHealerActivate(recv_data, guid)"
+        "LegacySpiritHealerParser(recv_data, guid)"
+        npc_handler "${npc_handler}")
+elseif(MUTATION STREQUAL "spirit_activate_player_state_guard")
+    string(REPLACE
+        "if (GetPlayer()->IsAlive() || !GetPlayer()->HasFlag(PLAYER_FLAGS, PLAYER_FLAGS_GHOST))"
+        "if (false)"
+        npc_handler "${npc_handler}")
+elseif(MUTATION STREQUAL "spirit_activate_npc_flag")
+    string(REPLACE
+        "GetNPCIfCanInteractWith(guid, UNIT_NPC_FLAG_SPIRITHEALER)"
+        "GetNPCIfCanInteractWith(guid, UNIT_NPC_FLAG_GOSSIP)"
+        npc_handler "${npc_handler}")
+elseif(MUTATION STREQUAL "spirit_activate_registration")
+    string(REPLACE "DefC(CMSG_SPIRIT_HEALER_ACTIVATE," "RemovedSpiritActivate(CMSG_SPIRIT_HEALER_ACTIVATE,"
+        opcode_registry "${opcode_registry}")
+elseif(MUTATION STREQUAL "spirit_healer_opcode_values")
+    string(REPLACE "CMSG_SPIRIT_HEALER_ACTIVATE                  = 0x0340"
+        "CMSG_SPIRIT_HEALER_ACTIVATE                  = 0x0341"
+        opcode_header "${opcode_header}")
+elseif(MUTATION STREQUAL "spirit_healer_reference")
+    string(REPLACE "CMSG_SPIRIT_HEALER_ACTIVATE                    0x0340  ACTIVE"
+        "CMSG_SPIRIT_HEALER_ACTIVATE                    0x0340  DORMANT"
         opcode_reference "${opcode_reference}")
 endif()
 
@@ -430,6 +492,110 @@ require_once("${misc_handler}"
 require_once("${misc_handler}"
     "GetClosestGraveYard[(]corpse->GetPositionX[(][)], corpse->GetPositionY[(][)], corpse->GetPositionZ[(][)], corpse->GetMapId[(][)], pPlayer->GetTeam[(][)][)]"
     "return-to-graveyard corpse-position selection")
+
+string(FIND "${player_header}" "inline void BuildSpiritHealerConfirm" spirit_confirm_start)
+string(FIND "${player_header}" "inline bool ParseSpiritHealerActivate" spirit_confirm_end)
+if(spirit_confirm_start EQUAL -1 OR spirit_confirm_end LESS_EQUAL spirit_confirm_start)
+    message(FATAL_ERROR "could not isolate spirit-healer confirmation serializer")
+endif()
+math(EXPR spirit_confirm_length "${spirit_confirm_end} - ${spirit_confirm_start}")
+string(SUBSTRING "${player_header}" ${spirit_confirm_start}
+    ${spirit_confirm_length} spirit_confirm_serializer)
+
+string(FIND "${player_header}" "inline bool ParseSpiritHealerActivate" spirit_activate_start)
+string(FIND "${player_header}" "struct ResurrectResponse" spirit_activate_end)
+if(spirit_activate_start EQUAL -1 OR spirit_activate_end LESS_EQUAL spirit_activate_start)
+    message(FATAL_ERROR "could not isolate spirit-healer activation parser")
+endif()
+math(EXPR spirit_activate_length "${spirit_activate_end} - ${spirit_activate_start}")
+string(SUBSTRING "${player_header}" ${spirit_activate_start}
+    ${spirit_activate_length} spirit_activate_parser)
+
+require_once("${spirit_confirm_serializer}"
+    "out[.]Initialize[(]SMSG_SPIRIT_HEALER_CONFIRM, 9[)]"
+    "spirit-healer confirmation opcode")
+require_once("${spirit_confirm_serializer}"
+    "WriteGuidMask<6, 5, 7, 1, 4, 2, 3, 0>"
+    "spirit-healer confirmation GUID mask order")
+require_once("${spirit_confirm_serializer}"
+    "WriteGuidBytes<0, 4, 2, 3, 7, 6, 5, 1>"
+    "spirit-healer confirmation GUID byte order")
+require_once("${spell_effect_dummy}"
+    "MopDeathPackets::BuildSpiritHealerConfirm[(]data, unitTarget->GetObjectGuid[(][)][)]"
+    "spirit-healer confirmation producer")
+require_once("${session_source}"
+    "case[ \t]+SMSG_SPIRIT_HEALER_CONFIRM:"
+    "spirit-healer confirmation suppression admission")
+
+require_once("${spirit_activate_parser}"
+    "bool ParseSpiritHealerActivate[(]WorldPacket& in, ObjectGuid& guid[)]"
+    "spirit-healer activation parser")
+require_once("${spirit_activate_parser}"
+    "remaining != 1 [+] byteCount"
+    "spirit-healer activation exact body length")
+require_once("${spirit_activate_parser}"
+    "HasCanonicalPackedGuidBytes[(]in, in[.]rpos[(][)] [+] 1, byteCount[)]"
+    "spirit-healer activation canonical GUID bytes")
+require_once("${spirit_activate_parser}"
+    "ReadGuidMask<2, 7, 6, 0, 5, 4, 1, 3>"
+    "spirit-healer activation GUID mask order")
+require_once("${spirit_activate_parser}"
+    "ReadGuidBytes<1, 5, 6, 3, 2, 0, 7, 4>"
+    "spirit-healer activation GUID byte order")
+require_once("${spirit_activate_parser}"
+    "if [(]in[.]rpos[(][)] != in[.]size[(][)][)]"
+    "spirit-healer activation full consumption")
+string(FIND "${npc_handler}" "void WorldSession::HandleSpiritHealerActivateOpcode" spirit_handler_start)
+string(FIND "${npc_handler}" "void WorldSession::SendSpiritResurrect" spirit_handler_end)
+if(spirit_handler_start EQUAL -1 OR spirit_handler_end LESS_EQUAL spirit_handler_start)
+    message(FATAL_ERROR "could not isolate spirit-healer activation handler")
+endif()
+math(EXPR spirit_handler_length "${spirit_handler_end} - ${spirit_handler_start}")
+string(SUBSTRING "${npc_handler}" ${spirit_handler_start}
+    ${spirit_handler_length} spirit_handler)
+
+require_once("${spirit_handler}"
+    "MopDeathPackets::ParseSpiritHealerActivate[(]recv_data, guid[)]"
+    "spirit-healer activation handler parser")
+require_once("${spirit_handler}"
+    "GetNPCIfCanInteractWith[(]guid, UNIT_NPC_FLAG_SPIRITHEALER[)]"
+    "spirit-healer activation interaction flag")
+if("${spirit_handler}" MATCHES "recv_data[ \t\r\n]*>>[ \t\r\n]*guid")
+    message(FATAL_ERROR "legacy raw spirit-healer GUID reader remains active")
+endif()
+string(FIND "${spirit_handler}"
+    "if (GetPlayer()->IsAlive() || !GetPlayer()->HasFlag(PLAYER_FLAGS, PLAYER_FLAGS_GHOST))"
+    spirit_state_guard_pos)
+string(FIND "${spirit_handler}"
+    "GetNPCIfCanInteractWith(guid, UNIT_NPC_FLAG_SPIRITHEALER)"
+    spirit_interaction_pos)
+string(FIND "${spirit_handler}" "hasUnitState(UNIT_STAT_DIED)" spirit_fake_death_pos)
+string(FIND "${spirit_handler}" "SendSpiritResurrect();" spirit_resurrect_pos)
+if(spirit_state_guard_pos EQUAL -1 OR
+        spirit_interaction_pos LESS spirit_state_guard_pos OR
+        spirit_fake_death_pos LESS spirit_state_guard_pos OR
+        spirit_resurrect_pos LESS spirit_state_guard_pos)
+    message(FATAL_ERROR
+        "spirit-healer player-state guard must precede interaction lookup, fake-death removal, and resurrection")
+endif()
+require_once("${opcode_registry}"
+    "DefS[(]SMSG_SPIRIT_HEALER_CONFIRM,[ \t]*\"SMSG_SPIRIT_HEALER_CONFIRM\"[)]"
+    "spirit-healer confirmation registration")
+require_once("${opcode_registry}"
+    "DefC[(]CMSG_SPIRIT_HEALER_ACTIVATE,[ \t]*\"CMSG_SPIRIT_HEALER_ACTIVATE\",[ \t]*STATUS_LOGGEDIN,[ \t]*PROCESS_THREADUNSAFE,[ \t]*&WorldSession::HandleSpiritHealerActivateOpcode[)]"
+    "spirit-healer activation registration")
+require_once("${opcode_header}"
+    "SMSG_SPIRIT_HEALER_CONFIRM[ \t]*=[ \t]*0x1EAA"
+    "spirit-healer confirmation opcode value")
+require_once("${opcode_header}"
+    "CMSG_SPIRIT_HEALER_ACTIVATE[ \t]*=[ \t]*0x0340"
+    "spirit-healer activation opcode value")
+require_once("${opcode_reference}"
+    "SMSG_SPIRIT_HEALER_CONFIRM[ \t]+0x1EAA[ \t]+ACTIVE"
+    "active spirit-healer confirmation reference")
+require_once("${opcode_reference}"
+    "CMSG_SPIRIT_HEALER_ACTIVATE[ \t]+0x0340[ \t]+ACTIVE"
+    "active spirit-healer activation reference")
 
 require_once("${grid_header}"
     "while [(]entry->ParentAreaID != 0 && visitedCount < AREA_PARENT_LIMIT[)]"

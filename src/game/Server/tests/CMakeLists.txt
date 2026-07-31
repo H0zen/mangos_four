@@ -1484,7 +1484,14 @@ foreach(mutation IN ITEMS
         resurrect_producer_flags resurrect_producer_context resurrect_request_admission
         resurrect_accept_polarity reclaim_registration resurrect_registration
         return_graveyard_registration return_graveyard_corpse_guard
-        nested_zone_parent_walk nested_zone_api_delegate death_recovery_reference)
+        nested_zone_parent_walk nested_zone_api_delegate death_recovery_reference
+        spirit_confirm_mask_order spirit_confirm_byte_order spirit_confirm_raw_guid
+        spirit_confirm_producer spirit_confirm_admission
+        spirit_activate_mask_order spirit_activate_byte_order spirit_activate_raw_guid
+        spirit_activate_malformed_guard spirit_activate_trailing_guard
+        spirit_activate_handler_parser spirit_activate_player_state_guard spirit_activate_npc_flag
+        spirit_activate_registration
+        spirit_healer_opcode_values spirit_healer_reference)
     add_test(NAME mop_death_packets_source_mutation_${mutation}
         COMMAND ${CMAKE_COMMAND} -DSOURCE_ROOT=${CMAKE_SOURCE_DIR}
             -DMUTATION=${mutation}

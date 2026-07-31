@@ -575,8 +575,16 @@ void WorldSession::HandleSpiritHealerActivateOpcode(WorldPacket& recv_data)
     DEBUG_LOG("WORLD: CMSG_SPIRIT_HEALER_ACTIVATE");
 
     ObjectGuid guid;
+    if (!MopDeathPackets::ParseSpiritHealerActivate(recv_data, guid))
+    {
+        DEBUG_LOG("WORLD: CMSG_SPIRIT_HEALER_ACTIVATE - malformed packet");
+        return;
+    }
 
-    recv_data >> guid;
+    if (GetPlayer()->IsAlive() || !GetPlayer()->HasFlag(PLAYER_FLAGS, PLAYER_FLAGS_GHOST))
+    {
+        return;
+    }
 
     Creature* unit = GetPlayer()->GetNPCIfCanInteractWith(guid, UNIT_NPC_FLAG_SPIRITHEALER);
     if (!unit)

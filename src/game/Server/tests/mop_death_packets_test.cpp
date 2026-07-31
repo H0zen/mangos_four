@@ -273,6 +273,134 @@ static void test_resurrect_response_rejects_malformed_bodies()
     }
 }
 
+static void test_spirit_healer_confirm()
+{
+    struct RetailFixture
+    {
+        uint64_t guid;
+        std::vector<uint8_t> body;
+    };
+    std::vector<RetailFixture> const retailFixtures = {
+        { UINT64_C(0xF130195B0000279A), { 0xF9, 0x9B, 0x5A, 0xF0, 0x31, 0x18, 0x26 } },
+        { UINT64_C(0xF130195B00002415), { 0xF9, 0x14, 0x5A, 0xF0, 0x31, 0x18, 0x25 } },
+        { UINT64_C(0xF130195B000036DF), { 0xF9, 0xDE, 0x5A, 0xF0, 0x31, 0x18, 0x37 } },
+        { UINT64_C(0xF130195B000036D4), { 0xF9, 0xD5, 0x5A, 0xF0, 0x31, 0x18, 0x37 } },
+        { UINT64_C(0xF130195B0000362D), { 0xF9, 0x2C, 0x5A, 0xF0, 0x31, 0x18, 0x37 } }
+    };
+    for (RetailFixture const& fixture : retailFixtures)
+    {
+        WorldPacket packet;
+        MopDeathPackets::BuildSpiritHealerConfirm(packet, ObjectGuid(fixture.guid));
+        CHECK(packet.GetOpcode() == SMSG_SPIRIT_HEALER_CONFIRM);
+        CHECK(ExpectBytes(packet, fixture.body));
+    }
+
+    // Binary-derived all-present body for 0x0807060504030201.
+    WorldPacket full;
+    MopDeathPackets::BuildSpiritHealerConfirm(full,
+        ObjectGuid(UINT64_C(0x0807060504030201)));
+    CHECK(ExpectBytes(full,
+        { 0xFF, 0x00, 0x04, 0x02, 0x05, 0x09, 0x06, 0x07, 0x03 }));
+
+    WorldPacket zero;
+    MopDeathPackets::BuildSpiritHealerConfirm(zero, ObjectGuid());
+    CHECK(ExpectBytes(zero, { 0x00 }));
+
+    // Each fixture independently removes one GUID byte and its mask bit.
+    std::vector<std::vector<uint8_t>> const bodies = {
+        { 0xFE, 0x04, 0x02, 0x05, 0x09, 0x06, 0x07, 0x03 },
+        { 0xEF, 0x00, 0x04, 0x02, 0x05, 0x09, 0x06, 0x07 },
+        { 0xFB, 0x00, 0x04, 0x05, 0x09, 0x06, 0x07, 0x03 },
+        { 0xFD, 0x00, 0x04, 0x02, 0x09, 0x06, 0x07, 0x03 },
+        { 0xF7, 0x00, 0x02, 0x05, 0x09, 0x06, 0x07, 0x03 },
+        { 0xBF, 0x00, 0x04, 0x02, 0x05, 0x09, 0x06, 0x03 },
+        { 0x7F, 0x00, 0x04, 0x02, 0x05, 0x09, 0x07, 0x03 },
+        { 0xDF, 0x00, 0x04, 0x02, 0x05, 0x06, 0x07, 0x03 }
+    };
+    for (uint8_t zeroByte = 0; zeroByte < 8; ++zeroByte)
+    {
+        uint64_t const guid = UINT64_C(0x0807060504030201) &
+            ~(UINT64_C(0xFF) << (zeroByte * 8));
+        WorldPacket packet;
+        MopDeathPackets::BuildSpiritHealerConfirm(packet, ObjectGuid(guid));
+        CHECK(ExpectBytes(packet, bodies[zeroByte]));
+    }
+}
+
+static void test_spirit_healer_activate()
+{
+    struct RetailFixture
+    {
+        std::vector<uint8_t> body;
+        uint64_t guid;
+    };
+    std::vector<RetailFixture> const retailFixtures = {
+        { { 0x7E, 0x26, 0x18, 0x31, 0x9B, 0xF0, 0x5A }, UINT64_C(0xF130195B0000279A) },
+        { { 0x7E, 0x25, 0x18, 0x31, 0x14, 0xF0, 0x5A }, UINT64_C(0xF130195B00002415) },
+        { { 0x7E, 0x37, 0x18, 0x31, 0xDE, 0xF0, 0x5A }, UINT64_C(0xF130195B000036DF) },
+        { { 0x7E, 0x37, 0x18, 0x31, 0xD5, 0xF0, 0x5A }, UINT64_C(0xF130195B000036D4) },
+        { { 0x7E, 0x37, 0x18, 0x31, 0x2C, 0xF0, 0x5A }, UINT64_C(0xF130195B0000362D) }
+    };
+    ObjectGuid guid;
+    for (RetailFixture const& fixture : retailFixtures)
+    {
+        WorldPacket packet = MakePacket(CMSG_SPIRIT_HEALER_ACTIVATE, fixture.body);
+        CHECK(MopDeathPackets::ParseSpiritHealerActivate(packet, guid));
+        CHECK(guid.GetRawValue() == fixture.guid);
+        CHECK(packet.rpos() == packet.size());
+    }
+
+    WorldPacket full = MakePacket(CMSG_SPIRIT_HEALER_ACTIVATE,
+        { 0xFF, 0x03, 0x07, 0x06, 0x05, 0x02, 0x00, 0x09, 0x04 });
+    CHECK(MopDeathPackets::ParseSpiritHealerActivate(full, guid));
+    CHECK(guid.GetRawValue() == UINT64_C(0x0807060504030201));
+
+    WorldPacket zero = MakePacket(CMSG_SPIRIT_HEALER_ACTIVATE, { 0x00 });
+    CHECK(MopDeathPackets::ParseSpiritHealerActivate(zero, guid));
+    CHECK(guid.IsEmpty());
+
+    std::vector<std::vector<uint8_t>> const bodies = {
+        { 0xEF, 0x03, 0x07, 0x06, 0x05, 0x02, 0x09, 0x04 },
+        { 0xFD, 0x07, 0x06, 0x05, 0x02, 0x00, 0x09, 0x04 },
+        { 0x7F, 0x03, 0x07, 0x06, 0x05, 0x00, 0x09, 0x04 },
+        { 0xFE, 0x03, 0x07, 0x06, 0x02, 0x00, 0x09, 0x04 },
+        { 0xFB, 0x03, 0x07, 0x06, 0x05, 0x02, 0x00, 0x09 },
+        { 0xF7, 0x03, 0x06, 0x05, 0x02, 0x00, 0x09, 0x04 },
+        { 0xDF, 0x03, 0x07, 0x05, 0x02, 0x00, 0x09, 0x04 },
+        { 0xBF, 0x03, 0x07, 0x06, 0x05, 0x02, 0x00, 0x04 }
+    };
+    for (uint8_t zeroByte = 0; zeroByte < 8; ++zeroByte)
+    {
+        WorldPacket packet = MakePacket(CMSG_SPIRIT_HEALER_ACTIVATE, bodies[zeroByte]);
+        CHECK(MopDeathPackets::ParseSpiritHealerActivate(packet, guid));
+        uint64_t const expected = UINT64_C(0x0807060504030201) &
+            ~(UINT64_C(0xFF) << (zeroByte * 8));
+        CHECK(guid.GetRawValue() == expected);
+    }
+}
+
+static void test_spirit_healer_activate_rejects_malformed_bodies()
+{
+    std::vector<uint8_t> const full =
+        { 0xFF, 0x03, 0x07, 0x06, 0x05, 0x02, 0x00, 0x09, 0x04 };
+    std::vector<std::vector<uint8_t>> bodies;
+    for (size_t size = 0; size < full.size(); ++size)
+    {
+        bodies.push_back(std::vector<uint8_t>(full.begin(), full.begin() + size));
+    }
+    bodies.push_back({ 0x00, 0x00 }); // trailing byte after a valid zero GUID
+    bodies.push_back({ 0x80, 0x01 }); // present byte decodes to zero
+
+    for (std::vector<uint8_t> const& body : bodies)
+    {
+        WorldPacket packet = MakePacket(CMSG_SPIRIT_HEALER_ACTIVATE, body);
+        ObjectGuid guid(UINT64_C(0xFFFFFFFFFFFFFFFF));
+        CHECK(!MopDeathPackets::ParseSpiritHealerActivate(packet, guid));
+        CHECK(packet.rpos() == packet.size());
+        CHECK(guid.GetRawValue() == UINT64_C(0xFFFFFFFFFFFFFFFF));
+    }
+}
+
 static void test_nested_area_zone_resolution()
 {
     AreaTableEntry areas[5] = {};
@@ -419,6 +547,9 @@ int main(int /*argc*/, char** /*argv*/)
     test_resurrect_response_request();
     test_resurrect_response_rejects_malformed_bodies();
     test_resurrect_request();
+    test_spirit_healer_confirm();
+    test_spirit_healer_activate();
+    test_spirit_healer_activate_rejects_malformed_bodies();
     test_nested_area_zone_resolution();
     test_graveyard_location();
     test_clear_location();

@@ -831,9 +831,7 @@ void InitializeOpcodes()
     DefS(SMSG_RESURRECT_REQUEST, "SMSG_RESURRECT_REQUEST");
     DefC(CMSG_RESURRECT_RESPONSE, "CMSG_RESURRECT_RESPONSE", STATUS_LOGGEDIN, PROCESS_THREADUNSAFE, &WorldSession::HandleResurrectResponseOpcode);
     DefS(SMSG_SPIRIT_HEALER_CONFIRM, "SMSG_SPIRIT_HEALER_CONFIRM");
-
-    // CMSG_SPIRIT_HEALER_ACTIVATE remains dormant: its seven-byte 18414 body
-    // still needs conversion before the legacy raw-GUID handler is safe.
+    DefC(CMSG_SPIRIT_HEALER_ACTIVATE, "CMSG_SPIRIT_HEALER_ACTIVATE", STATUS_LOGGEDIN, PROCESS_THREADUNSAFE, &WorldSession::HandleSpiritHealerActivateOpcode);
 
     // Two members of this flow are deliberately left dormant.
     //

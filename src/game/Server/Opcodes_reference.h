@@ -175,9 +175,9 @@
  *   TOTAL SMSG rows                   925
  *
  * SUBSYSTEM CONFIDENCE: high=365, low=221, medium=182, none=157
- * STATUS TOTALS: ACTIVE=528, DOC=434, DORMANT=558
+ * STATUS TOTALS: ACTIVE=529, DOC=434, DORMANT=557
  *   SMSG: ACTIVE=316, DOC=271, DORMANT=338
- *   CMSG: ACTIVE=212, DOC=163, DORMANT=220
+ *   CMSG: ACTIVE=213, DOC=163, DORMANT=219
  */
 
 // CAVEATS -- read before trusting any single row:
@@ -1425,7 +1425,7 @@ typedef uint16_t uint16;
  *   CMSG_GROUP_RAID_CONVERT                        0x032C  DORMANT
  *   CMSG_LFG_GET_STATUS                            0x032D  ACTIVE
  *   CMSG_GM_RESPONSE_RESOLVE                       0x033D  DOC
- *   CMSG_SPIRIT_HEALER_ACTIVATE                    0x0340  DORMANT
+ *   CMSG_SPIRIT_HEALER_ACTIVATE                    0x0340  ACTIVE
  *   CMSG_BATTLEFIELD_MGR_EXIT_REQUEST              0x0343  DOC
  *   CMSG_ATTACKSTOP                                0x0345  ACTIVE
  *   CMSG_TRAINER_LIST                              0x034B  DORMANT

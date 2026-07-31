@@ -302,6 +302,7 @@ static bool IsEnterWorldConverted(uint16 opcode)
         case SMSG_MOTD:                            // 4-bit count, 7-bit lengths, raw strings; sub_75B75A
         case SMSG_CORPSE_RECLAIM_DELAY:            // no-delay bit plus optional uint32 milliseconds; sub_6D7781
         case SMSG_RESURRECT_REQUEST:               // MopDeathPackets::BuildResurrectRequest
+        case SMSG_SPIRIT_HEALER_CONFIRM:           // MopDeathPackets::BuildSpiritHealerConfirm
         case SMSG_SET_FORCED_REACTIONS:            // 2-bit count plus uint32 pairs; sub_72C708
         case SMSG_SET_FACTION_STANDING:            // 1-bit visual flag, 21-bit count, standing/index pairs, two floats
         case SMSG_SET_FACTION_VISIBLE:             // one uint32 reputation-list index
