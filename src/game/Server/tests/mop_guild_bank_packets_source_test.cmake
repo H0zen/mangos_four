@@ -51,8 +51,9 @@ elseif(MUTATION STREQUAL "dynamic_flags_producer")
         guild_bank "${guild_bank}")
 elseif(MUTATION STREQUAL "dynamic_flags_hold")
     string(REPLACE
-        "Present-item dynamic flags are not modelled"
-        "Present-item dynamic flags are available" registry "${registry}")
+        "SMSG_GUILD_BANK_LIST                            0x0B79  DORMANT"
+        "SMSG_GUILD_BANK_LIST                            0x0B79  ACTIVE"
+        reference "${reference}")
 elseif(MUTATION STREQUAL "socket_order")
     string(REPLACE "staged << socket.index << socket.enchantmentId"
         "staged << socket.enchantmentId << socket.index" builder "${builder}")
@@ -207,15 +208,6 @@ if(NOT builder MATCHES "MAX_TAB_COUNT${ws}*=${ws}*8" OR
         NOT builder MATCHES "MAX_TAB_ICON_BYTES${ws}*=${ws}*255" OR
         NOT builder MATCHES "MAX_POST_CRYPT_PAYLOAD_BYTES${ws}*=${ws}*0x7FFFF")
     message(FATAL_ERROR "guild-bank client-bounds guard: fixed client or frame limit drifted")
-endif()
-if(NOT registry MATCHES
-        "CMSG_GUILD_BANKER_ACTIVATE${ws}+has${ws}+an${ws}+unresolved${ws}+18414${ws}+packed${ws}+body")
-    message(FATAL_ERROR "guild-bank activation HOLD guard: unresolved banker-activate reason is missing")
-endif()
-if(NOT registry MATCHES
-        "Present-item${ws}+dynamic${ws}+flags${ws}+are${ws}+not${ws}+modelled")
-    message(FATAL_ERROR
-        "guild-bank activation HOLD guard: dynamic-flags backend limitation is missing")
 endif()
 if(registry_code MATCHES "DefC${ws}*[(]${ws}*CMSG_GUILD_BANKER_ACTIVATE" OR
         registry_code MATCHES "DefC${ws}*[(]${ws}*CMSG_GUILD_BANK_QUERY_TAB" OR

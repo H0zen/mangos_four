@@ -474,6 +474,31 @@ endif()
 math(EXPR cast_length "${cast_end} - ${cast_start}")
 string(SUBSTRING "${spell_handler}" ${cast_start} ${cast_length} cast_handler)
 
+string(FIND "${spell_source}" "void ReadCastSpellMovementBits" cast_movement_bits_begin)
+string(FIND "${spell_source}" "void ReadCastSpellMovementBytes" cast_movement_bits_end)
+if(cast_movement_bits_begin EQUAL -1 OR cast_movement_bits_end EQUAL -1
+        OR cast_movement_bits_end LESS_EQUAL cast_movement_bits_begin)
+    message(FATAL_ERROR "could not isolate ReadCastSpellMovementBits")
+endif()
+math(EXPR cast_movement_bits_length "${cast_movement_bits_end} - ${cast_movement_bits_begin}")
+string(SUBSTRING "${spell_source}" ${cast_movement_bits_begin} ${cast_movement_bits_length}
+    cast_movement_bits)
+
+string(FIND "${spell_source}" "bool MopSpellPackets::ReadCastSpellRequest" cast_request_begin)
+if(cast_request_begin EQUAL -1 OR cast_request_begin LESS_EQUAL cast_movement_bits_end)
+    message(FATAL_ERROR "could not isolate ReadCastSpellMovementBytes")
+endif()
+math(EXPR cast_movement_bytes_length "${cast_request_begin} - ${cast_movement_bits_end}")
+string(SUBSTRING "${spell_source}" ${cast_movement_bits_end} ${cast_movement_bytes_length}
+    cast_movement_bytes)
+
+string(FIND "${spell_source}" "namespace\n{\n    struct UseItemMovement" use_item_helpers_begin)
+if(use_item_helpers_begin EQUAL -1 OR use_item_helpers_begin LESS_EQUAL cast_request_begin)
+    message(FATAL_ERROR "could not isolate ReadCastSpellRequest")
+endif()
+math(EXPR cast_request_length "${use_item_helpers_begin} - ${cast_request_begin}")
+string(SUBSTRING "${spell_source}" ${cast_request_begin} ${cast_request_length} cast_request)
+
 string(FIND "${spell_packets}" "void Spell::SendSpellStart()" spell_start_begin)
 string(FIND "${spell_packets}" "void Spell::SendSpellGo()" spell_start_end)
 if(spell_start_begin EQUAL -1 OR spell_start_end EQUAL -1 OR spell_start_end LESS_EQUAL spell_start_begin)
@@ -543,19 +568,19 @@ require_once("${opcode_registry}"
 require_once("${cast_handler}"
     "MopSpellPackets::ReadCastSpellRequest(recvPacket, request)"
     "18414 cast reader wiring")
-require_once("${spell_source}"
+require_once("${cast_movement_bits}"
     "movement.forceCount = in.ReadBits(22);"
     "22-bit embedded movement count")
-require_once("${spell_source}"
+require_once("${cast_movement_bytes}"
     "movement.forceCount > (in.size() - in.rpos()) / sizeof(uint32)"
     "embedded movement allocation bound")
-require_once("${spell_source}"
+require_once("${cast_request}"
     "if (hasMissileSpeed)\n            in >> missileSpeed;"
     "binary-proven missile-speed guard")
-require_once("${spell_source}"
+require_once("${cast_request}"
     "if (hasElevation)\n            in >> elevation;"
     "binary-proven elevation guard")
-require_once("${spell_source}"
+require_once("${cast_request}"
     "if (in.rpos() != in.size())"
     "full request consumption gate")
 require_once("${spell_source}"
@@ -573,7 +598,7 @@ require_once("${spell_source}"
 require_once("${spell_source}"
     "request.targetMask & (TARGET_FLAG_ITEM | TARGET_FLAG_TRADE_ITEM)"
     "item target mapping")
-require_once("${spell_source}"
+require_once("${cast_request}"
     "targetStringLength > in.size() - in.rpos()"
     "target-string allocation bound")
 require_once("${opcode_header}"
@@ -957,10 +982,10 @@ if(reader_position EQUAL -1 OR lookup_position EQUAL -1 OR initializer_position 
     message(FATAL_ERROR "cast parser/validation/target-resolution order drifted")
 endif()
 
-string(FIND "${spell_source}" "movement.hasMovementFlags = !in.ReadBit();" movement_flags_presence)
-string(FIND "${spell_source}" "movement.hasTimestamp = !in.ReadBit();" movement_timestamp_presence)
-string(FIND "${spell_source}" "movement.hasUnknownUInt32 = !in.ReadBit();" movement_uint32_presence)
-string(FIND "${spell_source}" "in.ReadBits(30);" movement_flags_payload)
+string(FIND "${cast_movement_bits}" "movement.hasMovementFlags = !in.ReadBit();" movement_flags_presence)
+string(FIND "${cast_movement_bits}" "movement.hasTimestamp = !in.ReadBit();" movement_timestamp_presence)
+string(FIND "${cast_movement_bits}" "movement.hasUnknownUInt32 = !in.ReadBit();" movement_uint32_presence)
+string(FIND "${cast_movement_bits}" "in.ReadBits(30);" movement_flags_payload)
 if(movement_flags_presence EQUAL -1 OR movement_timestamp_presence EQUAL -1
         OR movement_uint32_presence EQUAL -1 OR movement_flags_payload EQUAL -1
         OR NOT movement_flags_presence LESS movement_timestamp_presence

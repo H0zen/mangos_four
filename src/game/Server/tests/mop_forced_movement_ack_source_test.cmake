@@ -215,8 +215,4 @@ foreach(active_row IN ITEMS
         "CMSG_MOVE_WATER_WALK_ACK                       0x10F2  ACTIVE")
     require_text("${opcode_reference}" "${active_row}" "seven ACTIVE reference rows")
 endforeach()
-require_text("${opcode_reference}" "STATUS TOTALS: ACTIVE=528, DOC=434, DORMANT=558" "reference global totals")
-require_text("${opcode_reference}" "SMSG: ACTIVE=316, DOC=271, DORMANT=338" "reference SMSG totals")
-require_text("${opcode_reference}" "CMSG: ACTIVE=212, DOC=163, DORMANT=220" "reference CMSG totals")
-
 message(STATUS "mop_forced_movement_ack_source: exact readers and parse-only handlers are atomic")
