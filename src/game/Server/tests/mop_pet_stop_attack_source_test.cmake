@@ -120,6 +120,11 @@ elseif(MUTATION STREQUAL "action_bypass_slot_membership")
         "(petGuid != _player->GetPetGuid() &&\n            petGuid != _player->GetCharmGuid())"
         "false"
         pet_handler "${pet_handler}")
+elseif(MUTATION STREQUAL "action_weaken_conjunction")
+    string(REPLACE
+        "petGuid != _player->GetCharmGuid()) ||\n        _player->GetObjectGuid() != pet->GetCharmerOrOwnerGuid()"
+        "petGuid != _player->GetCharmGuid()) &&\n        _player->GetObjectGuid() != pet->GetCharmerOrOwnerGuid()"
+        pet_handler "${pet_handler}")
 elseif(MUTATION STREQUAL "action_move_side_effect_before_membership")
     string(REPLACE
         "    if ((petGuid != _player->GetPetGuid()"
@@ -261,6 +266,9 @@ require_once("${action_handler}"
 require_once("${action_handler}"
     "_player->GetObjectGuid() != pet->GetCharmerOrOwnerGuid()"
     "action reverse relationship")
+require_once("${action_handler}"
+    "petGuid != _player->GetCharmGuid()) ||\n        _player->GetObjectGuid() != pet->GetCharmerOrOwnerGuid()"
+    "action authority conjunction")
 
 string(FIND "${action_handler}"
     "MopCompactPackets::ReadPetAction" action_reader)
