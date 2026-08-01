@@ -161,7 +161,7 @@ if(WW_OBS_ON EQUAL -1 OR WW_OBS_OFF EQUAL -1)
     message(FATAL_ERROR "Player::SetWaterWalk must tell observers too")
 endif()
 
-string(REGEX MATCH "SendMessageToSet[(]&spline,[ 	]*false[)]" WW_EXCLUDES_SELF "${WW_BODY}")
+string(REGEX MATCH "SendMessageToSet[(]&spline,[ ]*false[)]" WW_EXCLUDES_SELF "${WW_BODY}")
 if(WW_EXCLUDES_SELF STREQUAL "")
     message(FATAL_ERROR "Player::SetWaterWalk must broadcast the observer half with self=false")
 endif()

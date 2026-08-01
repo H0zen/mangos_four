@@ -27,6 +27,7 @@
 #define MANGOS_INSTANCE_DATA_H
 
 #include "Common.h"
+#include "LootMgr.h"
 #include "ObjectGuid.h"
 #include "Opcodes.h"
 #include "WorldPacket.h"

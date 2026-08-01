@@ -60,7 +60,7 @@ foreach(WHICH helm cloak)
         message(FATAL_ERROR "${WHICH}: body must be read as a single MSB-first bit")
     endif()
 
-    string(REGEX MATCH "recv_data[ 	]*>>[ 	]*[A-Za-z_]" READS_SCALAR "${BODY}")
+    string(REGEX MATCH "recv_data[ ]*>>[ ]*[A-Za-z_]" READS_SCALAR "${BODY}")
     if(NOT READS_SCALAR STREQUAL "")
         message(FATAL_ERROR "${WHICH}: body must not be read as a scalar (${READS_SCALAR})")
     endif()
