@@ -174,10 +174,6 @@ if(DEFINED MUTATION)
         replace_literal_once(policy_header "return current <= limit && amount <= limit - current;" "return current + amount <= limit;" "${MUTATION}")
     elseif(MUTATION STREQUAL "credit_drop_current_guard")
         replace_literal_once(policy_header "return current <= limit && amount <= limit - current;" "return amount <= limit - current;" "${MUTATION}")
-    elseif(MUTATION STREQUAL "register_take_money")
-        string(APPEND opcode_registry "\nDefC(CMSG_MAIL_TAKE_MONEY, STATUS_LOGGEDIN, PROCESS_THREADUNSAFE, &WorldSession::HandleMailTakeMoney);\n")
-    elseif(MUTATION STREQUAL "activate_take_money")
-        replace_literal_once(opcode_reference "CMSG_MAIL_TAKE_MONEY                           0x06FA  DORMANT" "CMSG_MAIL_TAKE_MONEY                           0x06FA  ACTIVE" "${MUTATION}")
     elseif(MUTATION STREQUAL "register_send_mail")
         string(APPEND opcode_registry "\nDefC(CMSG_SEND_MAIL, STATUS_LOGGEDIN, PROCESS_THREADUNSAFE, &WorldSession::HandleSendMail);\n")
     elseif(MUTATION STREQUAL "activate_send_mail")
@@ -245,7 +241,5 @@ require_literal_once("${eluna_global_methods}"
 require_literal_once("${eluna_global_methods}"
     "@param uint64 cod = 0 : cod money amount (uint32 before Mists)"
     "Eluna SendMail COD documentation width")
-require_none("${opcode_registry}" "DefC(CMSG_MAIL_TAKE_MONEY" "CMSG_MAIL_TAKE_MONEY registration")
 require_none("${opcode_registry}" "DefC(CMSG_SEND_MAIL" "CMSG_SEND_MAIL registration")
-require_literal_once("${opcode_reference}" "CMSG_MAIL_TAKE_MONEY                           0x06FA  DORMANT" "CMSG_MAIL_TAKE_MONEY dormant reference")
 require_literal_once("${opcode_reference}" "CMSG_SEND_MAIL                                 0x1DBA  DORMANT" "CMSG_SEND_MAIL dormant reference")

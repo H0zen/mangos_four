@@ -537,6 +537,64 @@ namespace MopCompactPackets
         return ReadMailboxGuid(in, maskOrder, byteOrder);
     }
 
+    struct MailTakeMoneyRequest
+    {
+        uint32 mailId = 0;
+        uint64 claimedMoney = 0;
+        ObjectGuid mailboxGuid;
+    };
+
+    /// CMSG_MAIL_TAKE_MONEY (0x06FA): mail id and displayed money precede the
+    /// packed mailbox GUID. The money is client-supplied context only; callers
+    /// must use the player-owned Mail record as the credit authority.
+    inline bool ReadMailTakeMoney(WorldPacket& in, MailTakeMoneyRequest& request)
+    {
+        request = MailTakeMoneyRequest();
+        size_t const start = in.rpos();
+        if (in.size() - start < 13)
+        {
+            in.rfinish();
+            return false;
+        }
+
+        uint8 const mask = in.contents()[start + 12];
+        size_t presentBytes = 0;
+        for (uint8 bit = 0; bit < 8; ++bit)
+        {
+            presentBytes += (mask >> bit) & 1;
+        }
+        if (in.size() - start != 13 + presentBytes)
+        {
+            in.rfinish();
+            return false;
+        }
+        for (size_t index = start + 13; index < in.size(); ++index)
+        {
+            if (in[index] == 0x01)
+            {
+                in.rfinish();
+                return false;
+            }
+        }
+
+        MailTakeMoneyRequest parsed;
+        in >> parsed.mailId;
+        in >> parsed.claimedMoney;
+        uint8 const maskOrder[] = { 7, 6, 3, 2, 4, 5, 0, 1 };
+        uint8 const byteOrder[] = { 7, 1, 4, 0, 3, 2, 6, 5 };
+        in.ResetBitReader();
+        parsed.mailboxGuid = ReadMailboxGuid(in, maskOrder, byteOrder);
+
+        if (in.rpos() != in.size())
+        {
+            in.rfinish();
+            return false;
+        }
+
+        request = parsed;
+        return true;
+    }
+
     /// CMSG_GUILD_BANK_QUERY_TAB (0x1372): the tab id leads, then nine mask bits
     /// over two bytes of which one is a standalone boolean, then the bytes. That
     /// boolean is proven by two bodies of equal length differing only in it.

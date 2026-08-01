@@ -334,6 +334,28 @@ void Player::SaveGoldToDB()
     stmt.PExecute(GetMoney(), GetGUIDLow());
 }
 
+bool Player::StageMailMoneyTakeToDB(uint32 mailId, uint64 nextMoney)
+{
+    static SqlStatementID updateGold;
+    static SqlStatementID clearMailMoney;
+
+    SqlStatement gold = CharacterDatabase.CreateStatement(updateGold,
+        "UPDATE `characters` SET `money` = ? WHERE `guid` = ?");
+    gold.addUInt64(nextMoney);
+    gold.addUInt32(GetGUIDLow());
+    if (!gold.Execute())
+    {
+        return false;
+    }
+
+    SqlStatement mail = CharacterDatabase.CreateStatement(clearMailMoney,
+        "UPDATE `mail` SET `money` = ? WHERE `id` = ? AND `receiver` = ?");
+    mail.addUInt64(uint64(0));
+    mail.addUInt32(mailId);
+    mail.addUInt32(GetGUIDLow());
+    return mail.Execute();
+}
+
 /**
  * @brief Saves changed action bar bindings to the database.
  */

@@ -42,6 +42,7 @@
  */
 
 #include "Mail.h"
+#include "MailMoneyPolicy.h"
 #include "MailTakeItemPolicy.h"
 #include "Language.h"
 #include "Log.h"
@@ -630,19 +631,19 @@ void WorldSession::HandleMailTakeItem(WorldPacket& recv_data)
  */
 void WorldSession::HandleMailTakeMoney(WorldPacket& recv_data)
 {
-    ObjectGuid mailboxGuid;
-    uint32 mailId;
-    uint64 money;
-    recv_data >> mailboxGuid;
-    recv_data >> mailId;
-    recv_data >> money;
+    MopCompactPackets::MailTakeMoneyRequest request;
+    if (!MopCompactPackets::ReadMailTakeMoney(recv_data, request))
+    {
+        return;
+    }
 
-    if (!CheckMailBox(mailboxGuid))
+    if (!CheckMailBox(request.mailboxGuid))
     {
         return;
     }
 
     Player* pl = _player;
+    uint32 const mailId = request.mailId;
 
     Mail* m = pl->GetMail(mailId);
     if (!m || m->state == MAIL_STATE_DELETED || m->deliver_time > time(NULL))
@@ -651,18 +652,52 @@ void WorldSession::HandleMailTakeMoney(WorldPacket& recv_data)
         return;
     }
 
-    pl->SendMailResult(mailId, MAIL_MONEY_TAKEN, MAIL_OK);
+    uint64 const currentMoney = pl->GetMoney();
+    uint64 const mailMoney = m->money;
+    MailMoneyPolicy::MailMoneyTakePlan const plan =
+        MailMoneyPolicy::PlanMailMoneyTake(currentMoney, mailMoney, MAX_MONEY_AMOUNT);
+    if (plan.decision == MailMoneyPolicy::MailMoneyTakeDecision::InvalidBalance)
+    {
+        pl->SendMailResult(mailId, MAIL_MONEY_TAKEN, MAIL_ERR_INTERNAL_ERROR);
+        return;
+    }
+    if (plan.decision == MailMoneyPolicy::MailMoneyTakeDecision::GoldCapExceeded)
+    {
+        pl->SendMailResult(mailId, MAIL_MONEY_TAKEN, MAIL_ERR_EQUIP_ERROR,
+            EQUIP_ERR_TOO_MUCH_GOLD);
+        return;
+    }
+    if (mailMoney == 0)
+    {
+        pl->SendMailResult(mailId, MAIL_MONEY_TAKEN, MAIL_OK);
+        return;
+    }
 
-    pl->ModifyMoney(m->money);
+    if (!CharacterDatabase.BeginTransaction())
+    {
+        pl->SendMailResult(mailId, MAIL_MONEY_TAKEN, MAIL_ERR_INTERNAL_ERROR);
+        return;
+    }
+    if (!pl->StageMailMoneyTakeToDB(mailId, plan.nextMoney))
+    {
+        CharacterDatabase.RollbackTransaction();
+        pl->SendMailResult(mailId, MAIL_MONEY_TAKEN, MAIL_ERR_INTERNAL_ERROR);
+        return;
+    }
+    if (!CharacterDatabase.CommitTransactionDirect())
+    {
+        sLog.outError("CMSG_MAIL_TAKE_MONEY: indeterminate commit for account %u, player %u, mail %u, currentMoney=" UI64FMTD ", mailMoney=" UI64FMTD,
+            GetAccountId(), pl->GetGUIDLow(), mailId, currentMoney, mailMoney);
+        pl->SendMailResult(mailId, MAIL_MONEY_TAKEN, MAIL_ERR_INTERNAL_ERROR);
+        KickPlayer();
+        return;
+    }
+
+    pl->SetMoney(plan.nextMoney);
     m->money = 0;
     m->state = MAIL_STATE_CHANGED;
     pl->m_mailsUpdated = true;
-
-    // save money and mail to prevent cheating
-    CharacterDatabase.BeginTransaction();
-    pl->SaveGoldToDB();
-    pl->_SaveMail();
-    CharacterDatabase.CommitTransaction();
+    pl->SendMailResult(mailId, MAIL_MONEY_TAKEN, MAIL_OK);
 }
 
 /**

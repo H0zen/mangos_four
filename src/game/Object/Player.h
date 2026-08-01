@@ -4084,6 +4084,9 @@ class Player : public Unit
         // Save the gold to the database
         void SaveGoldToDB();
 
+        // Stage one authoritative take-mail-money transition in the caller's transaction.
+        bool StageMailMoneyTakeToDB(uint32 mailId, uint64 nextMoney);
+
         // Set a uint32 value in an array
         static void SetUInt32ValueInArray(Tokens& data, uint16 index, uint32 value);
         static void SetFloatValueInArray(Tokens& data, uint16 index, float value);

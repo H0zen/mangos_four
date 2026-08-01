@@ -175,9 +175,9 @@
  *   TOTAL SMSG rows                   925
  *
  * SUBSYSTEM CONFIDENCE: high=365, low=221, medium=182, none=157
- * STATUS TOTALS: ACTIVE=538, DOC=434, DORMANT=548
+ * STATUS TOTALS: ACTIVE=539, DOC=434, DORMANT=547
  *   SMSG: ACTIVE=319, DOC=271, DORMANT=335
- *   CMSG: ACTIVE=219, DOC=163, DORMANT=213
+ *   CMSG: ACTIVE=220, DOC=163, DORMANT=212
  */
 
 // CAVEATS -- read before trusting any single row:
@@ -1528,7 +1528,7 @@ typedef uint16_t uint16;
  *   CMSG_PET_SPELL_AUTOCAST                        0x06F0  DORMANT
  *   CMSG_REQUEST_FORCED_REACTIONS                  0x06F5  ACTIVE
  *   CMSG_REPORT_PVP_AFK                            0x06F9  DORMANT
- *   CMSG_MAIL_TAKE_MONEY                           0x06FA  DORMANT
+ *   CMSG_MAIL_TAKE_MONEY                           0x06FA  ACTIVE
  *   CMSG_ACTIVATETAXIEXPRESS                       0x06FB  DORMANT
  *   CMSG_CALENDAR_EVENT_MODERATOR_STATUS           0x0708  DORMANT
  *   CMSG_UNKNOWN_0x0719                            0x0719  DOC

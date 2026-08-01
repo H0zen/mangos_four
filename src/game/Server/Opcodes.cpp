@@ -1312,6 +1312,7 @@ void InitializeOpcodes()
     // delivery transaction, so it may only go live once the client can be told
     // the outcome. SMSG_SEND_MAIL_RESULT is now the real 18414 body and admitted.
     DefC(CMSG_MAIL_TAKE_ITEM, "CMSG_MAIL_TAKE_ITEM", STATUS_LOGGEDIN, PROCESS_THREADUNSAFE, &WorldSession::HandleMailTakeItem);
+    DefC(CMSG_MAIL_TAKE_MONEY, "CMSG_MAIL_TAKE_MONEY", STATUS_LOGGEDIN, PROCESS_THREADUNSAFE, &WorldSession::HandleMailTakeMoney);
     DefS(SMSG_SEND_MAIL_RESULT, "SMSG_SEND_MAIL_RESULT");
 
     // Both send no reply, so neither carries the unpaired-response hazard that

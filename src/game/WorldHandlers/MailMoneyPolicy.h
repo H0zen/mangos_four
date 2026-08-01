@@ -27,6 +27,33 @@ inline bool CanCredit(uint64 current, uint64 amount, uint64 limit)
 {
     return current <= limit && amount <= limit - current;
 }
+
+enum class MailMoneyTakeDecision : uint8
+{
+    Success,
+    InvalidBalance,
+    GoldCapExceeded
+};
+
+struct MailMoneyTakePlan
+{
+    MailMoneyTakeDecision decision;
+    uint64 nextMoney;
+};
+
+inline MailMoneyTakePlan PlanMailMoneyTake(uint64 currentMoney,
+    uint64 mailMoney, uint64 moneyLimit)
+{
+    if (currentMoney > moneyLimit)
+    {
+        return { MailMoneyTakeDecision::InvalidBalance, currentMoney };
+    }
+    if (mailMoney > moneyLimit - currentMoney)
+    {
+        return { MailMoneyTakeDecision::GoldCapExceeded, currentMoney };
+    }
+    return { MailMoneyTakeDecision::Success, currentMoney + mailMoney };
+}
 }
 
 #endif

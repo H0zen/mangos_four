@@ -1874,6 +1874,124 @@ static void test_mail_family_matches_retail_bodies()
     }
 }
 
+static void test_mail_take_money_matches_retail_and_rejects_malformed_bodies()
+{
+    struct Fixture
+    {
+        std::vector<uint8_t> body;
+        uint32_t mailId;
+        uint64_t claimedMoney;
+        uint64_t mailboxGuid;
+    };
+
+    Fixture const retail[] = {
+        { { 0xCF,0xAF,0xE7,0x55, 0x7C,0x73,0x01,0,0,0,0,0,
+            0xCF, 0xF0,0x06,0x90,0x1B,0x12,0x3D },
+          1441247183u, UINT64_C(95100), UINT64_C(0xF1133C910000071A) },
+        { { 0xF7,0x40,0x5E,0x56, 0xA8,0x76,0x9F,0,0,0,0,0,
+            0xCF, 0xF0,0x10,0x0E,0x68,0x12,0x03 },
+          1449017591u, UINT64_C(10450600), UINT64_C(0xF113020F00001169) },
+        { { 0x03,0xFE,0xC5,0x57, 0x40,0x4B,0x4C,0,0,0,0,0,
+            0xCF, 0xF0,0x07,0xB5,0xD4,0x13,0xDA },
+          1472593411u, UINT64_C(5000000), UINT64_C(0xF112DBB4000006D5) }
+    };
+
+    for (Fixture const& fixture : retail)
+    {
+        WorldPacket packet = InputPacket(CMSG_MAIL_TAKE_MONEY, fixture.body);
+        MopCompactPackets::MailTakeMoneyRequest request;
+        CHECK(MopCompactPackets::ReadMailTakeMoney(packet, request));
+        CHECK(request.mailId == fixture.mailId);
+        CHECK(request.claimedMoney == fixture.claimedMoney);
+        CHECK(request.mailboxGuid.GetRawValue() == fixture.mailboxGuid);
+        CHECK(packet.rpos() == packet.size());
+    }
+
+    std::vector<uint8_t> const allZero = {
+        0x78,0x56,0x34,0x12, 0x88,0x77,0x66,0x55,0x44,0x33,0x22,0x11,
+        0x00
+    };
+    {
+        WorldPacket packet = InputPacket(CMSG_MAIL_TAKE_MONEY, allZero);
+        MopCompactPackets::MailTakeMoneyRequest request;
+        CHECK(MopCompactPackets::ReadMailTakeMoney(packet, request));
+        CHECK(request.mailId == 0x12345678u);
+        CHECK(request.claimedMoney == UINT64_C(0x1122334455667788));
+        CHECK(request.mailboxGuid.IsEmpty());
+    }
+
+    std::vector<uint8_t> const dense = {
+        0x78,0x56,0x34,0x12, 0x88,0x77,0x66,0x55,0x44,0x33,0x22,0x11,
+        0xFF, 0x86,0x20,0x55,0x11,0x42,0x33,0x77,0x64
+    };
+    {
+        WorldPacket packet = InputPacket(CMSG_MAIL_TAKE_MONEY, dense);
+        MopCompactPackets::MailTakeMoneyRequest request;
+        CHECK(MopCompactPackets::ReadMailTakeMoney(packet, request));
+        CHECK(request.mailboxGuid.GetRawValue() == UINT64_C(0x8776655443322110));
+    }
+
+    {   // Seven present bytes: GUID byte 1 is omitted by the mask and body.
+        std::vector<uint8_t> const seven = {
+            0x78,0x56,0x34,0x12, 0x88,0x77,0x66,0x55,0x44,0x33,0x22,0x11,
+            0xFE, 0x86,0x55,0x11,0x42,0x33,0x77,0x64
+        };
+        WorldPacket packet = InputPacket(CMSG_MAIL_TAKE_MONEY, seven);
+        MopCompactPackets::MailTakeMoneyRequest request;
+        CHECK(MopCompactPackets::ReadMailTakeMoney(packet, request));
+        CHECK(request.mailboxGuid.GetRawValue() == UINT64_C(0x8776655443320010));
+    }
+
+    struct OneHot { uint8_t mask; uint8_t wire; uint64_t expected; };
+    OneHot const oneHot[] = {
+        { 0x80,0x86,UINT64_C(0x8700000000000000) },
+        { 0x40,0x77,UINT64_C(0x0076000000000000) },
+        { 0x20,0x42,UINT64_C(0x0000000043000000) },
+        { 0x10,0x33,UINT64_C(0x0000000000320000) },
+        { 0x08,0x55,UINT64_C(0x0000005400000000) },
+        { 0x04,0x64,UINT64_C(0x0000650000000000) },
+        { 0x02,0x11,UINT64_C(0x0000000000000010) },
+        { 0x01,0x20,UINT64_C(0x0000000000002100) }
+    };
+    for (OneHot const& fixture : oneHot)
+    {
+        std::vector<uint8_t> body(allZero.begin(), allZero.end());
+        body[12] = fixture.mask;
+        body.push_back(fixture.wire);
+        WorldPacket packet = InputPacket(CMSG_MAIL_TAKE_MONEY, body);
+        MopCompactPackets::MailTakeMoneyRequest request;
+        CHECK(MopCompactPackets::ReadMailTakeMoney(packet, request));
+        CHECK(request.mailboxGuid.GetRawValue() == fixture.expected);
+    }
+
+    std::vector<std::vector<uint8_t>> malformed;
+    for (size_t length = 0; length < dense.size(); ++length)
+    {
+        malformed.push_back(std::vector<uint8_t>(dense.begin(), dense.begin() + length));
+    }
+    std::vector<uint8_t> trailing = dense;
+    trailing.push_back(0xAA);
+    malformed.push_back(trailing);
+    std::vector<uint8_t> nonCanonical = allZero;
+    nonCanonical[12] = 0x80;
+    nonCanonical.push_back(0x01);
+    malformed.push_back(nonCanonical);
+
+    for (std::vector<uint8_t> const& body : malformed)
+    {
+        WorldPacket packet = InputPacket(CMSG_MAIL_TAKE_MONEY, body);
+        MopCompactPackets::MailTakeMoneyRequest request;
+        request.mailId = 0xFFFFFFFFu;
+        request.claimedMoney = UINT64_C(0xFFFFFFFFFFFFFFFF);
+        request.mailboxGuid = ObjectGuid(UINT64_C(0xFFFFFFFFFFFFFFFF));
+        CHECK(!MopCompactPackets::ReadMailTakeMoney(packet, request));
+        CHECK(request.mailId == 0);
+        CHECK(request.claimedMoney == 0);
+        CHECK(request.mailboxGuid.IsEmpty());
+        CHECK(packet.rpos() == packet.size());
+    }
+}
+
 /// CMSG_TOTEM_DESTROYED and CMSG_SET_ACTION_BUTTON, pinned to real 18414 bodies.
 ///
 /// Both are a plain byte, a mask byte, then the present bytes of a packed value.
@@ -2112,6 +2230,30 @@ static void test_send_mail_result_matches_retail_bodies()
             0x00, 0x00, 0x00, 0x00
         }));
     }
+    {   // Take-money success: action 1, no error, fixed zero tail.
+        WorldPacket p(SMSG_SEND_MAIL_RESULT, 24);
+        MopCompactPackets::BuildSendMailResult(p, 0x12345678u, 0, 0, 1, 0, 0);
+        CHECK(BytesEqual(p, {
+            0x78,0x56,0x34,0x12, 0,0,0,0, 0,0,0,0,
+            1,0,0,0, 0,0,0,0, 0,0,0,0
+        }));
+    }
+    {   // Take-money cap failure: equip 77, mail error 1, action 1.
+        WorldPacket p(SMSG_SEND_MAIL_RESULT, 24);
+        MopCompactPackets::BuildSendMailResult(p, 0x12345678u, 77, 1, 1, 0, 0);
+        CHECK(BytesEqual(p, {
+            0x78,0x56,0x34,0x12, 77,0,0,0, 1,0,0,0,
+            1,0,0,0, 0,0,0,0, 0,0,0,0
+        }));
+    }
+    {   // Take-money internal failure: no equip error, mail error 6, action 1.
+        WorldPacket p(SMSG_SEND_MAIL_RESULT, 24);
+        MopCompactPackets::BuildSendMailResult(p, 0x12345678u, 0, 6, 1, 0, 0);
+        CHECK(BytesEqual(p, {
+            0x78,0x56,0x34,0x12, 0,0,0,0, 6,0,0,0,
+            1,0,0,0, 0,0,0,0, 0,0,0,0
+        }));
+    }
 }
 
 /// The can-fly family, all four opcodes, pinned to real 18414 bodies.
@@ -2270,6 +2412,7 @@ int main(int /*argc*/, char** /*argv*/)
     test_pet_name_query_matches_retail_bodies();
     test_lfg_join_matches_retail_bodies();
     test_mail_family_matches_retail_bodies();
+    test_mail_take_money_matches_retail_and_rejects_malformed_bodies();
     test_send_mail_result_matches_retail_bodies();
     test_totem_and_action_button_bodies();
     test_can_fly_family_matches_retail_bodies();

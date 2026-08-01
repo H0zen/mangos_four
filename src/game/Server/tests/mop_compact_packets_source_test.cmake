@@ -6,6 +6,7 @@ file(READ "${SOURCE_ROOT}/src/game/Object/PlayerDeath.cpp" player_death)
 file(READ "${SOURCE_ROOT}/src/game/Object/RuneMgr.cpp" rune_source)
 file(READ "${SOURCE_ROOT}/src/game/Object/RuneMgr.h" rune_header)
 file(READ "${SOURCE_ROOT}/src/game/Object/Player.h" player_header)
+file(READ "${SOURCE_ROOT}/src/game/Object/PlayerSave.cpp" player_save)
 file(READ "${SOURCE_ROOT}/src/game/WorldHandlers/SpellEffectObjectCombat.cpp" spell_effect_object_combat)
 file(READ "${SOURCE_ROOT}/src/game/Object/UnitSpeed.cpp" unit_speed)
 file(READ "${SOURCE_ROOT}/src/game/ChatCommands/PlayerStatsMods.cpp" player_stats_mods)
@@ -18,6 +19,7 @@ file(READ "${SOURCE_ROOT}/src/game/Server/Opcodes.h" opcode_header)
 file(READ "${SOURCE_ROOT}/src/game/WorldHandlers/SpellHandler.cpp" spell_handler)
 file(READ "${SOURCE_ROOT}/src/game/WorldHandlers/MovementHandler.cpp" movement_handler)
 file(READ "${SOURCE_ROOT}/src/game/WorldHandlers/MailHandler.cpp" mail_handler)
+file(READ "${SOURCE_ROOT}/src/game/WorldHandlers/MailMoneyPolicy.h" mail_money_policy)
 file(READ "${SOURCE_ROOT}/src/game/Object/UnitCombat.cpp" unit_combat)
 file(READ "${SOURCE_ROOT}/src/game/Object/Unit.cpp" unit)
 file(READ "${SOURCE_ROOT}/src/game/Object/Unit.h" unit_header)
@@ -29,6 +31,9 @@ file(READ "${SOURCE_ROOT}/src/game/Server/Opcodes_reference.h" opcode_reference)
 
 string(CONCAT original_totem_sources "${unit_header}" "${opcode_header}"
     "${opcode_registry}" "${opcode_reference}" "${spell_handler}")
+string(CONCAT original_money_sources "${unit_header}" "${mail_money_policy}"
+    "${player_header}" "${player_save}" "${mail_handler}" "${opcode_registry}"
+    "${opcode_reference}")
 
 if(MUTATION STREQUAL "cancel_sender")
     string(REPLACE
@@ -499,12 +504,177 @@ elseif(MUTATION STREQUAL "totem_accept_noncanonical_zero_byte")
         "if (in[index] == 0x01)"
         "if (false)"
         unit_header "${unit_header}")
+elseif(MUTATION STREQUAL "money_mask_order")
+    string(REPLACE
+        "uint8 const maskOrder[] = { 7, 6, 3, 2, 4, 5, 0, 1 };"
+        "uint8 const maskOrder[] = { 6, 7, 3, 2, 4, 5, 0, 1 };"
+        unit_header "${unit_header}")
+elseif(MUTATION STREQUAL "money_byte_order")
+    string(REPLACE
+        "uint8 const byteOrder[] = { 7, 1, 4, 0, 3, 2, 6, 5 };"
+        "uint8 const byteOrder[] = { 1, 7, 4, 0, 3, 2, 6, 5 };"
+        unit_header "${unit_header}")
+elseif(MUTATION STREQUAL "money_scalar_order")
+    string(REPLACE
+        "in >> parsed.mailId;"
+        "in >> parsed.claimedMoney;"
+        unit_header "${unit_header}")
+elseif(MUTATION STREQUAL "money_scalar_width")
+    string(REPLACE "uint64 claimedMoney = 0;" "uint32 claimedMoney = 0;"
+        unit_header "${unit_header}")
+elseif(MUTATION STREQUAL "money_drop_xor")
+    string(REPLACE
+        "in.ReadByteSeq(guid[byteOrder[index]]);"
+        "in >> guid[byteOrder[index]];"
+        unit_header "${unit_header}")
+elseif(MUTATION STREQUAL "money_accept_noncanonical_zero")
+    string(REPLACE "if (in[index] == 0x01)" "if (false)"
+        unit_header "${unit_header}")
+elseif(MUTATION STREQUAL "money_accept_trailing")
+    string(REPLACE
+        "if (in.size() - start != 13 + presentBytes)"
+        "if (in.size() - start < 13 + presentBytes)"
+        unit_header "${unit_header}")
+elseif(MUTATION STREQUAL "money_restore_legacy_reader")
+    string(REPLACE
+        "if (!MopCompactPackets::ReadMailTakeMoney(recv_data, request))"
+        "recv_data >> request.mailboxGuid >> request.mailId >> request.claimedMoney; if (false)"
+        mail_handler "${mail_handler}")
+elseif(MUTATION STREQUAL "money_trust_claimed_amount")
+    string(REPLACE
+        "PlanMailMoneyTake(currentMoney, mailMoney, MAX_MONEY_AMOUNT)"
+        "PlanMailMoneyTake(currentMoney, request.claimedMoney, MAX_MONEY_AMOUNT)"
+        mail_handler "${mail_handler}")
+elseif(MUTATION STREQUAL "money_drop_mailbox_authority")
+    string(REPLACE "if (!CheckMailBox(request.mailboxGuid))" "if (false)"
+        mail_handler "${mail_handler}")
+elseif(MUTATION STREQUAL "money_drop_player_mail_lookup")
+    string(REPLACE "Mail* m = pl->GetMail(mailId);" "Mail* m = NULL;"
+        mail_handler "${mail_handler}")
+elseif(MUTATION STREQUAL "money_drop_delivery_guard")
+    string(REPLACE
+        "m->state == MAIL_STATE_DELETED || m->deliver_time > time(NULL)"
+        "m->state == MAIL_STATE_DELETED"
+        mail_handler "${mail_handler}")
+elseif(MUTATION STREQUAL "money_use_addition_cap_check")
+    string(REPLACE
+        "mailMoney > moneyLimit - currentMoney"
+        "currentMoney + mailMoney > moneyLimit"
+        mail_money_policy "${mail_money_policy}")
+elseif(MUTATION STREQUAL "money_reject_exact_cap")
+    string(REPLACE
+        "mailMoney > moneyLimit - currentMoney"
+        "mailMoney >= moneyLimit - currentMoney"
+        mail_money_policy "${mail_money_policy}")
+elseif(MUTATION STREQUAL "money_partial_credit")
+    string(REPLACE
+        "{ MailMoneyTakeDecision::GoldCapExceeded, currentMoney }"
+        "{ MailMoneyTakeDecision::Success, moneyLimit }"
+        mail_money_policy "${mail_money_policy}")
+elseif(MUTATION STREQUAL "money_restore_modify_money")
+    string(REPLACE "pl->SetMoney(plan.nextMoney);" "pl->ModifyMoney(mailMoney);"
+        mail_handler "${mail_handler}")
+elseif(MUTATION STREQUAL "money_wrong_cap_mail_error")
+    string(REPLACE
+        "MAIL_MONEY_TAKEN, MAIL_ERR_EQUIP_ERROR,\n            EQUIP_ERR_TOO_MUCH_GOLD"
+        "MAIL_MONEY_TAKEN, MAIL_ERR_INTERNAL_ERROR,\n            EQUIP_ERR_TOO_MUCH_GOLD"
+        mail_handler "${mail_handler}")
+elseif(MUTATION STREQUAL "money_wrong_cap_equip_error")
+    string(REPLACE "EQUIP_ERR_TOO_MUCH_GOLD);" "EQUIP_ERR_NONE);"
+        mail_handler "${mail_handler}")
+elseif(MUTATION STREQUAL "money_standalone_equip_error")
+    string(REPLACE
+        "pl->SendMailResult(mailId, MAIL_MONEY_TAKEN, MAIL_ERR_EQUIP_ERROR,"
+        "pl->SendEquipError(EQUIP_ERR_TOO_MUCH_GOLD, NULL, NULL); pl->SendMailResult(mailId, MAIL_MONEY_TAKEN, MAIL_ERR_EQUIP_ERROR,"
+        mail_handler "${mail_handler}")
+elseif(MUTATION STREQUAL "money_drop_begin_check")
+    string(REPLACE
+        "if (!CharacterDatabase.BeginTransaction())"
+        "CharacterDatabase.BeginTransaction(); if (false)"
+        mail_handler "${mail_handler}")
+elseif(MUTATION STREQUAL "money_drop_stage_check")
+    string(REPLACE
+        "if (!pl->StageMailMoneyTakeToDB(mailId, plan.nextMoney))"
+        "pl->StageMailMoneyTakeToDB(mailId, plan.nextMoney); if (false)"
+        mail_handler "${mail_handler}")
+elseif(MUTATION STREQUAL "money_async_commit")
+    string(REPLACE "CommitTransactionDirect()" "CommitTransaction()"
+        mail_handler "${mail_handler}")
+elseif(MUTATION STREQUAL "money_ignore_direct_result")
+    string(REPLACE
+        "if (!CharacterDatabase.CommitTransactionDirect())"
+        "CharacterDatabase.CommitTransactionDirect(); if (false)"
+        mail_handler "${mail_handler}")
+elseif(MUTATION STREQUAL "money_drop_failure_kick")
+    string(REPLACE "KickPlayer();" "/* removed forced reload */"
+        mail_handler "${mail_handler}")
+elseif(MUTATION STREQUAL "money_live_before_commit")
+    string(REPLACE
+        "if (!CharacterDatabase.CommitTransactionDirect())"
+        "pl->SetMoney(plan.nextMoney); if (!CharacterDatabase.CommitTransactionDirect())"
+        mail_handler "${mail_handler}")
+elseif(MUTATION STREQUAL "money_success_before_live")
+    string(REPLACE
+        "pl->SetMoney(plan.nextMoney);"
+        "pl->SendMailResult(mailId, MAIL_MONEY_TAKEN, MAIL_OK); pl->SetMoney(plan.nextMoney);"
+        mail_handler "${mail_handler}")
+elseif(MUTATION STREQUAL "money_drop_gold_write")
+    string(REPLACE
+        "UPDATE `characters` SET `money` = ? WHERE `guid` = ?"
+        "SELECT 1"
+        player_save "${player_save}")
+elseif(MUTATION STREQUAL "money_drop_mail_zero_write")
+    string(REPLACE
+        "UPDATE `mail` SET `money` = ? WHERE `id` = ? AND `receiver` = ?"
+        "SELECT 1"
+        player_save "${player_save}")
+elseif(MUTATION STREQUAL "money_split_transaction")
+    string(REPLACE
+        "SqlStatement mail = CharacterDatabase.CreateStatement"
+        "CharacterDatabase.CommitTransaction(); CharacterDatabase.BeginTransaction(); SqlStatement mail = CharacterDatabase.CreateStatement"
+        player_save "${player_save}")
+elseif(MUTATION STREQUAL "money_narrow_gold_binding")
+    string(REPLACE "gold.addUInt64(nextMoney);" "gold.addUInt32(uint32(nextMoney));"
+        player_save "${player_save}")
+elseif(MUTATION STREQUAL "money_narrow_mail_binding")
+    string(REPLACE "mail.addUInt64(uint64(0));" "mail.addUInt32(0);"
+        player_save "${player_save}")
+elseif(MUTATION STREQUAL "money_drop_receiver_predicate")
+    string(REPLACE
+        "UPDATE `mail` SET `money` = ? WHERE `id` = ? AND `receiver` = ?"
+        "UPDATE `mail` SET `money` = ? WHERE `id` = ?"
+        player_save "${player_save}")
+elseif(MUTATION STREQUAL "money_registration")
+    string(REPLACE
+        "DefC(CMSG_MAIL_TAKE_MONEY, \"CMSG_MAIL_TAKE_MONEY\", STATUS_LOGGEDIN, PROCESS_THREADUNSAFE, &WorldSession::HandleMailTakeMoney);"
+        "/* removed take-money registration */"
+        opcode_registry "${opcode_registry}")
+elseif(MUTATION STREQUAL "money_reference")
+    string(REPLACE
+        "CMSG_MAIL_TAKE_MONEY                           0x06FA  ACTIVE"
+        "CMSG_MAIL_TAKE_MONEY                           0x06FA  DORMANT"
+        opcode_reference "${opcode_reference}")
+elseif(MUTATION STREQUAL "money_reply_pair")
+    string(REPLACE
+        "DefS(SMSG_SEND_MAIL_RESULT, \"SMSG_SEND_MAIL_RESULT\");"
+        "/* removed take-money reply metadata */"
+        opcode_registry "${opcode_registry}")
 endif()
 
 if(MUTATION MATCHES "^totem_")
     string(CONCAT mutated_totem_sources "${unit_header}" "${opcode_header}"
         "${opcode_registry}" "${opcode_reference}" "${spell_handler}")
     if(mutated_totem_sources STREQUAL original_totem_sources)
+        message(STATUS "MUTATION '${MUTATION}' changed nothing -- dead arm, exiting 0 so WILL_FAIL reports it")
+        return()
+    endif()
+endif()
+
+if(MUTATION MATCHES "^money_")
+    string(CONCAT mutated_money_sources "${unit_header}" "${mail_money_policy}"
+        "${player_header}" "${player_save}" "${mail_handler}" "${opcode_registry}"
+        "${opcode_reference}")
+    if(mutated_money_sources STREQUAL original_money_sources)
         message(STATUS "MUTATION '${MUTATION}' changed nothing -- dead arm, exiting 0 so WILL_FAIL reports it")
         return()
     endif()
@@ -560,6 +730,7 @@ mop_strip_cxx_comments("${spell_handler}" spell_handler_code)
 foreach(pairing IN ITEMS
         "CMSG_GET_MAIL_LIST|SMSG_MAIL_LIST_RESULT"
         "CMSG_MAIL_TAKE_ITEM|SMSG_SEND_MAIL_RESULT"
+        "CMSG_MAIL_TAKE_MONEY|SMSG_SEND_MAIL_RESULT"
         "CMSG_GUILD_BANK_QUERY_TAB|SMSG_GUILD_BANK_LIST")
     string(REPLACE "|" ";" pairing_parts "${pairing}")
     list(GET pairing_parts 0 request_name)
@@ -586,6 +757,120 @@ if(NOT mail_handler_code MATCHES "MAIL_ERR_EQUIP_ERROR${ws}*,${ws}*msg${ws}*,${w
     message(FATAL_ERROR
         "the equip-error mail reply no longer passes the item id, so a failed take "
         "would not tell the client which item it was")
+endif()
+
+# CMSG_MAIL_TAKE_MONEY is one coherent persistence-before-live route. Its
+# client-supplied amount is parsed for canonical framing but never enters the
+# accounting plan; the player-owned Mail record remains the authority.
+foreach(required IN ITEMS
+        "uint8 const maskOrder[] = { 7, 6, 3, 2, 4, 5, 0, 1 };"
+        "uint8 const byteOrder[] = { 7, 1, 4, 0, 3, 2, 6, 5 };"
+        "if (in.size() - start != 13 + presentBytes)"
+        "if (in[index] == 0x01)"
+        "uint64 claimedMoney = 0;"
+        "in >> parsed.mailId;"
+        "in >> parsed.claimedMoney;"
+        "in.ReadByteSeq(guid[byteOrder[index]]);")
+    string(FIND "${unit_header}" "${required}" required_at)
+    if(required_at EQUAL -1)
+        message(FATAL_ERROR "mail take-money reader invariant is missing: ${required}")
+    endif()
+endforeach()
+if(NOT mail_money_policy MATCHES "PlanMailMoneyTake${ws}*[(]${ws}*uint64${ws}+currentMoney,${ws}*uint64${ws}+mailMoney,${ws}*uint64${ws}+moneyLimit")
+    message(FATAL_ERROR "mail take-money plan is absent or accepts an untrusted extra input")
+endif()
+foreach(required IN ITEMS
+        "if (currentMoney > moneyLimit)"
+        "if (mailMoney > moneyLimit - currentMoney)"
+        "{ MailMoneyTakeDecision::GoldCapExceeded, currentMoney }"
+        "{ MailMoneyTakeDecision::Success, currentMoney + mailMoney }")
+    string(FIND "${mail_money_policy}" "${required}" required_at)
+    if(required_at EQUAL -1)
+        message(FATAL_ERROR "mail take-money plan invariant is missing: ${required}")
+    endif()
+endforeach()
+foreach(required IN ITEMS
+        "bool Player::StageMailMoneyTakeToDB(uint32 mailId, uint64 nextMoney)"
+        "UPDATE `characters` SET `money` = ? WHERE `guid` = ?"
+        "UPDATE `mail` SET `money` = ? WHERE `id` = ? AND `receiver` = ?"
+        "addUInt64(nextMoney)"
+        "addUInt64(uint64(0))")
+    string(FIND "${player_save}" "${required}" required_at)
+    if(required_at EQUAL -1)
+        message(FATAL_ERROR "mail take-money staging invariant is missing: ${required}")
+    endif()
+endforeach()
+string(FIND "${player_save}" "bool Player::StageMailMoneyTakeToDB" stage_money_at)
+string(FIND "${player_save}" "/**\n * @brief Saves changed action bar" stage_money_end)
+if(stage_money_at EQUAL -1 OR stage_money_end EQUAL -1 OR NOT stage_money_at LESS stage_money_end)
+    message(FATAL_ERROR "mail take-money staging helper cannot be isolated")
+endif()
+math(EXPR stage_money_length "${stage_money_end} - ${stage_money_at}")
+string(SUBSTRING "${player_save}" ${stage_money_at} ${stage_money_length} stage_money_body)
+if(stage_money_body MATCHES "BeginTransaction|CommitTransaction|SetMoney|m->money")
+    message(FATAL_ERROR "mail take-money staging helper owns transaction or live state")
+endif()
+string(FIND "${mail_handler_code}" "void WorldSession::HandleMailTakeMoney" take_money_at)
+string(FIND "${mail_handler_code}" "void WorldSession::HandleGetMailList" take_money_end)
+if(take_money_at EQUAL -1 OR take_money_end EQUAL -1 OR NOT take_money_at LESS take_money_end)
+    message(FATAL_ERROR "mail take-money handler cannot be isolated")
+endif()
+math(EXPR take_money_length "${take_money_end} - ${take_money_at}")
+string(SUBSTRING "${mail_handler_code}" ${take_money_at} ${take_money_length} take_money_body)
+foreach(required IN ITEMS
+        "MopCompactPackets::ReadMailTakeMoney(recv_data, request)"
+        "CheckMailBox(request.mailboxGuid)"
+        "pl->GetMail(mailId)"
+        "m->state == MAIL_STATE_DELETED"
+        "m->deliver_time > time(NULL)"
+        "MailMoneyPolicy::PlanMailMoneyTake(currentMoney, mailMoney, MAX_MONEY_AMOUNT)"
+        "CharacterDatabase.BeginTransaction()"
+        "pl->StageMailMoneyTakeToDB(mailId, plan.nextMoney)"
+        "CharacterDatabase.CommitTransactionDirect()"
+        "pl->SetMoney(plan.nextMoney)"
+        "m->money = 0"
+        "KickPlayer()")
+    string(FIND "${take_money_body}" "${required}" required_at)
+    if(required_at EQUAL -1)
+        message(FATAL_ERROR "mail take-money handler invariant is missing: ${required}")
+    endif()
+endforeach()
+foreach(required IN ITEMS
+        "if (!CharacterDatabase.BeginTransaction())"
+        "if (!pl->StageMailMoneyTakeToDB(mailId, plan.nextMoney))"
+        "if (!CharacterDatabase.CommitTransactionDirect())"
+        "MAIL_MONEY_TAKEN, MAIL_ERR_EQUIP_ERROR,\n            EQUIP_ERR_TOO_MUCH_GOLD")
+    string(FIND "${take_money_body}" "${required}" required_at)
+    if(required_at EQUAL -1)
+        message(FATAL_ERROR "mail take-money checked failure invariant is missing: ${required}")
+    endif()
+endforeach()
+if(take_money_body MATCHES "ModifyMoney|SaveGoldToDB|_SaveMail|CommitTransaction${ws}*[(]")
+    message(FATAL_ERROR "mail take-money restored live-first or asynchronous persistence")
+endif()
+string(FIND "${take_money_body}" "CharacterDatabase.CommitTransactionDirect()" direct_commit_at)
+string(FIND "${take_money_body}" "pl->SetMoney(plan.nextMoney)" live_gold_at)
+string(SUBSTRING "${take_money_body}" ${live_gold_at} -1 take_money_after_live)
+string(FIND "${take_money_after_live}" "pl->SendMailResult(mailId, MAIL_MONEY_TAKEN, MAIL_OK)" success_after_live)
+if(NOT direct_commit_at LESS live_gold_at OR success_after_live EQUAL -1)
+    message(FATAL_ERROR "mail take-money must commit before live mutation before success")
+endif()
+math(EXPR commit_to_live_length "${live_gold_at} - ${direct_commit_at}")
+string(SUBSTRING "${take_money_body}" ${direct_commit_at} ${commit_to_live_length} commit_to_live_body)
+if(commit_to_live_body MATCHES "MAIL_MONEY_TAKEN${ws}*,${ws}*MAIL_OK")
+    message(FATAL_ERROR "mail take-money sends success before applying acknowledged live state")
+endif()
+if(take_money_body MATCHES "SendEquipError")
+    message(FATAL_ERROR "mail take-money sends a standalone equip error instead of the fixed mail result")
+endif()
+if(take_money_body MATCHES "PlanMailMoneyTake[^\n]*claimedMoney|SetMoney[^\n]*claimedMoney|money${ws}*=${ws}*request.claimedMoney")
+    message(FATAL_ERROR "mail take-money trusts the client-supplied claimed amount")
+endif()
+if(NOT registry_code MATCHES "DefC${ws}*[(]${ws}*CMSG_MAIL_TAKE_MONEY${ws}*,${ws}*\"CMSG_MAIL_TAKE_MONEY\"${ws}*,${ws}*STATUS_LOGGEDIN${ws}*,${ws}*PROCESS_THREADUNSAFE${ws}*,${ws}*&WorldSession::HandleMailTakeMoney${ws}*[)]")
+    message(FATAL_ERROR "CMSG_MAIL_TAKE_MONEY is not registered on the logged-in world thread")
+endif()
+if(NOT opcode_reference MATCHES "CMSG_MAIL_TAKE_MONEY${ws}+0x06FA${ws}+ACTIVE")
+    message(FATAL_ERROR "CMSG_MAIL_TAKE_MONEY is not ACTIVE at binary-proven 0x06FA")
 endif()
 
 # CMSG_SET_ACTION_BUTTON is held: its body is proven but the handler's type

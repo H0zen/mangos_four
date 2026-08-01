@@ -470,7 +470,6 @@ foreach(mutation IN ITEMS
         cod_limit_plus_one cod_exclusive_limit
         debit_addition debit_drop_fee_guard
         credit_addition credit_drop_current_guard
-        register_take_money activate_take_money
         register_send_mail activate_send_mail)
     add_test(NAME mop_mail_money_width_source_mutation_${mutation}
         COMMAND ${CMAKE_COMMAND} -DSOURCE_ROOT=${CMAKE_SOURCE_DIR}
@@ -544,7 +543,19 @@ foreach(mutation IN ITEMS cancel_sender cancel_registration cancel_allowlist can
         totem_reference totem_handler_route totem_drop_self_mover_guard
         totem_drop_slot_bound totem_increment_slot totem_accept_nonempty_mismatch
         totem_reject_empty_sentinel totem_drop_exact_tail
-        totem_accept_noncanonical_zero_byte)
+        totem_accept_noncanonical_zero_byte
+        money_mask_order money_byte_order money_scalar_order money_scalar_width
+        money_drop_xor money_accept_noncanonical_zero money_accept_trailing
+        money_restore_legacy_reader money_trust_claimed_amount
+        money_drop_mailbox_authority money_drop_player_mail_lookup
+        money_drop_delivery_guard money_use_addition_cap_check money_reject_exact_cap
+        money_partial_credit money_restore_modify_money money_wrong_cap_mail_error
+        money_wrong_cap_equip_error money_standalone_equip_error
+        money_drop_begin_check money_drop_stage_check money_async_commit
+        money_ignore_direct_result money_drop_failure_kick money_live_before_commit
+        money_success_before_live money_drop_gold_write money_drop_mail_zero_write
+        money_split_transaction money_narrow_gold_binding money_narrow_mail_binding
+        money_drop_receiver_predicate money_registration money_reference money_reply_pair)
     add_test(NAME mop_compact_packets_source_mutation_${mutation}
         COMMAND ${CMAKE_COMMAND} -DSOURCE_ROOT=${CMAKE_SOURCE_DIR}
             -DMUTATION=${mutation}

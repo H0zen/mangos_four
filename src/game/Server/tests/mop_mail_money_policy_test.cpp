@@ -50,10 +50,42 @@ static void TestDebitWithFee()
         std::numeric_limits<uint64>::max()));
 }
 
+static void TestMailMoneyTakePlan()
+{
+    uint64 const limit = UI64LIT(9999999999);
+
+    MailMoneyPolicy::MailMoneyTakePlan plan =
+        MailMoneyPolicy::PlanMailMoneyTake(limit - 5000, 5000, limit);
+    CHECK(plan.decision == MailMoneyPolicy::MailMoneyTakeDecision::Success);
+    CHECK(plan.nextMoney == limit);
+
+    plan = MailMoneyPolicy::PlanMailMoneyTake(limit - 1000, 2000, limit);
+    CHECK(plan.decision == MailMoneyPolicy::MailMoneyTakeDecision::GoldCapExceeded);
+    CHECK(plan.nextMoney == limit - 1000);
+
+    plan = MailMoneyPolicy::PlanMailMoneyTake(limit + 1, 0, limit);
+    CHECK(plan.decision == MailMoneyPolicy::MailMoneyTakeDecision::InvalidBalance);
+    CHECK(plan.nextMoney == limit + 1);
+
+    plan = MailMoneyPolicy::PlanMailMoneyTake(123, 0, limit);
+    CHECK(plan.decision == MailMoneyPolicy::MailMoneyTakeDecision::Success);
+    CHECK(plan.nextMoney == 123);
+
+    plan = MailMoneyPolicy::PlanMailMoneyTake(0, UI64LIT(0x100000000), limit);
+    CHECK(plan.decision == MailMoneyPolicy::MailMoneyTakeDecision::Success);
+    CHECK(plan.nextMoney == UI64LIT(0x100000000));
+
+    plan = MailMoneyPolicy::PlanMailMoneyTake(
+        0, std::numeric_limits<uint64>::max(), limit);
+    CHECK(plan.decision == MailMoneyPolicy::MailMoneyTakeDecision::GoldCapExceeded);
+    CHECK(plan.nextMoney == 0);
+}
+
 int main()
 {
     TestCodDomain();
     TestCreditHeadroom();
     TestDebitWithFee();
+    TestMailMoneyTakePlan();
     return g_fail == 0 ? 0 : 1;
 }
