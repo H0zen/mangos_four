@@ -51,20 +51,36 @@ class PlayerTaxi
 
         void LoadTaxiMask(const char* data);
 
+        bool IsValidNodeId(uint32 nodeidx) const
+        {
+            TaxiMaskPosition position = {};
+            return GetTaxiMaskPosition(nodeidx, position);
+        }
+
         bool IsTaximaskNodeKnown(uint32 nodeidx) const
         {
-            uint8 field   = uint8((nodeidx - 1) / 8);
-            uint8 submask = 1 << ((nodeidx - 1) % 8);
-            return (m_taximask[field] & submask) == submask;
+            if (!IsValidNodeId(nodeidx))
+            {
+                return false;
+            }
+
+            TaxiMaskPosition position = {};
+            GetTaxiMaskPosition(nodeidx, position);
+            return (m_taximask[position.byteIndex] & position.bitMask) == position.bitMask;
         }
 
         bool SetTaximaskNode(uint32 nodeidx)
         {
-            uint8 field   = uint8((nodeidx - 1) / 8);
-            uint8 submask = 1 << ((nodeidx - 1) % 8);
-            if ((m_taximask[field] & submask) != submask)
+            if (!IsValidNodeId(nodeidx))
             {
-                m_taximask[field] |= submask;
+                return false;
+            }
+
+            TaxiMaskPosition position = {};
+            GetTaxiMaskPosition(nodeidx, position);
+            if ((m_taximask[position.byteIndex] & position.bitMask) != position.bitMask)
+            {
+                m_taximask[position.byteIndex] |= position.bitMask;
                 return true;
             }
             else

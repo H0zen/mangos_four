@@ -2858,6 +2858,30 @@ typedef std::vector<TaxiPathNodeList> TaxiPathNodesByPath;
 typedef std::unordered_map<uint32 /*frame*/, TransportAnimationEntry const*> TransportAnimationEntryMap;
 typedef std::unordered_map<uint32, TransportAnimationEntryMap> TransportAnimationsByEntry;
 
-#define TaxiMaskSize 114
+#define TaxiMaskSize 162
 typedef uint8 TaxiMask[TaxiMaskSize];
+
+struct TaxiMaskPosition
+{
+    size_t byteIndex;
+    uint8 bitMask;
+};
+
+inline size_t TaxiMaskRequiredBytes(uint32 maxNodeId)
+{
+    return size_t(maxNodeId / 8U) + (maxNodeId % 8U == 0 ? 0U : 1U);
+}
+
+inline bool GetTaxiMaskPosition(uint32 nodeId, TaxiMaskPosition& position)
+{
+    if (nodeId == 0 || nodeId > uint32(TaxiMaskSize) * 8U)
+    {
+        return false;
+    }
+
+    uint32 const zeroBased = nodeId - 1U;
+    position.byteIndex = zeroBased / 8U;
+    position.bitMask = uint8(1U << (zeroBased % 8U));
+    return true;
+}
 #endif

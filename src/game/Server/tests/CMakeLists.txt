@@ -1770,6 +1770,32 @@ foreach(mutation IN ITEMS
         PROPERTIES WILL_FAIL TRUE)
 endforeach()
 
+add_executable(mop_taxi_mask_domain_test mop_taxi_mask_domain_test.cpp)
+target_include_directories(mop_taxi_mask_domain_test PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}/..
+    ${CMAKE_SOURCE_DIR}/src/shared)
+set_target_properties(mop_taxi_mask_domain_test PROPERTIES CXX_STANDARD 17 CXX_STANDARD_REQUIRED ON)
+target_link_libraries(mop_taxi_mask_domain_test PRIVATE game)
+add_test(NAME mop_taxi_mask_domain_test COMMAND mop_taxi_mask_domain_test)
+
+add_test(NAME mop_taxi_mask_domain_source
+    COMMAND ${CMAKE_COMMAND} -DSOURCE_ROOT=${CMAKE_SOURCE_DIR}
+        -P ${CMAKE_CURRENT_SOURCE_DIR}/mop_taxi_mask_domain_source_test.cmake)
+
+foreach(mutation IN ITEMS
+        restore_114 required_bytes_overflow drop_zero_guard drop_upper_guard narrow_index
+        startup_guard_missing startup_guard_after_global_writes startup_record_count
+        global_write_unchecked nearest_read_unchecked player_known_unchecked
+        player_set_unchecked load_no_clear load_legacy_limit
+        append_all_narrow_loop append_known_narrow_loop save_narrow_loop)
+    add_test(NAME mop_taxi_mask_domain_source_mutation_${mutation}
+        COMMAND ${CMAKE_COMMAND} -DSOURCE_ROOT=${CMAKE_SOURCE_DIR}
+            -DMUTATION=${mutation}
+            -P ${CMAKE_CURRENT_SOURCE_DIR}/mop_taxi_mask_domain_source_test.cmake)
+    set_tests_properties(mop_taxi_mask_domain_source_mutation_${mutation}
+        PROPERTIES WILL_FAIL TRUE)
+endforeach()
+
 add_executable(mop_death_packets_test mop_death_packets_test.cpp)
 target_include_directories(mop_death_packets_test PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/..

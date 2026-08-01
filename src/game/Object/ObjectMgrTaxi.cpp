@@ -61,11 +61,14 @@ uint32 ObjectMgr::GetNearestTaxiNode(float x, float y, float z, uint32 mapid, Te
             continue;
         }
 
-        uint8 field   = (uint8)((i - 1) / 8);
-        uint8 submask = 1 << ((i - 1) % 8);
+        TaxiMaskPosition maskPosition = {};
+        if (!GetTaxiMaskPosition(node->ID, maskPosition))
+        {
+            continue;
+        }
 
         // skip not taxi network nodes
-        if ((sTaxiNodesMask[field] & submask) == 0)
+        if ((sTaxiNodesMask[maskPosition.byteIndex] & maskPosition.bitMask) == 0)
         {
             continue;
         }

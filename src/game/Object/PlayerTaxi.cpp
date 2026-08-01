@@ -61,7 +61,7 @@ void PlayerTaxi::InitTaxiNodesForClass(uint32 chrClass)
     {
         case CLASS_DEATH_KNIGHT:
         {
-            for (int i = 0; i < TaxiMaskSize; ++i)
+            for (size_t i = 0; i < TaxiMaskSize; ++i)
             {
                 m_taximask[i] |= sOldContinentsNodesMask[i];
             }
@@ -154,9 +154,10 @@ void PlayerTaxi::InitTaxiNodesForLvl(uint8 level)
 
 void PlayerTaxi::LoadTaxiMask(const char* data)
 {
+    memset(m_taximask, 0, sizeof(m_taximask));
     Tokens tokens = StrSplit(data, " ");
 
-    int index;
+    size_t index;
     Tokens::iterator iter;
     for (iter = tokens.begin(), index = 0; (index < TaxiMaskSize) && (iter != tokens.end()); ++iter, ++index)
     {
@@ -170,14 +171,14 @@ void PlayerTaxi::AppendTaximaskTo(ByteBuffer& data, bool all)
     data << uint32(TaxiMaskSize);
     if (all)
     {
-        for (uint8 i = 0; i < TaxiMaskSize; ++i)
+        for (size_t i = 0; i < TaxiMaskSize; ++i)
         {
             data << uint8(sTaxiNodesMask[i]);               // all existing nodes
         }
     }
     else
     {
-        for (uint8 i = 0; i < TaxiMaskSize; ++i)
+        for (size_t i = 0; i < TaxiMaskSize; ++i)
         {
             data << uint8(m_taximask[i]);                   // known nodes
         }
@@ -268,7 +269,7 @@ uint32 PlayerTaxi::GetCurrentTaxiPath() const
 
 std::ostringstream& operator<< (std::ostringstream& ss, PlayerTaxi const& taxi)
 {
-    for (int i = 0; i < TaxiMaskSize; ++i)
+    for (size_t i = 0; i < TaxiMaskSize; ++i)
     {
         ss << uint32(taxi.m_taximask[i]) << " ";    // cast to prevent conversion to char
     }

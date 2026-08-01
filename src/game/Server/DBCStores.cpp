@@ -974,6 +974,24 @@ void LoadDBCStores(const std::string& dataPath)
 
     LoadDBC(availableDbcLocales, bar, bad_dbc_files, sTaxiNodesStore,           dbcPath, "TaxiNodes.dbc");
 
+    uint32 maxTaxiNodeId = 0;
+    for (uint32 i = 1; i < sTaxiNodesStore.GetNumRows(); ++i)
+    {
+        if (TaxiNodesEntry const* node = sTaxiNodesStore.LookupEntry(i))
+        {
+            maxTaxiNodeId = std::max(maxTaxiNodeId, node->ID);
+        }
+    }
+
+    size_t const taxiMaskBytesRequired = TaxiMaskRequiredBytes(maxTaxiNodeId);
+    if (taxiMaskBytesRequired > TaxiMaskSize)
+    {
+        sLog.outError("TaxiNodes.dbc requires %zu taxi-mask bytes for node %u, but this server supports only %u bytes.",
+            taxiMaskBytesRequired, maxTaxiNodeId, uint32(TaxiMaskSize));
+        Log::WaitBeforeContinueIfNeed();
+        exit(1);
+    }
+
     LoadDBC(availableDbcLocales, bar, bad_dbc_files, sTaxiPathStore,            dbcPath, "TaxiPath.dbc");
     for (uint32 i = 1; i < sTaxiPathStore.GetNumRows(); ++i)
         if (TaxiPathEntry const* entry = sTaxiPathStore.LookupEntry(i))
@@ -1034,6 +1052,14 @@ void LoadDBCStores(const std::string& dataPath)
                 continue;
             }
 
+            TaxiMaskPosition maskPosition = {};
+            if (!GetTaxiMaskPosition(node->ID, maskPosition))
+            {
+                sLog.outError("Taxi node %u is outside the %u-byte taxi-mask domain.", node->ID, uint32(TaxiMaskSize));
+                Log::WaitBeforeContinueIfNeed();
+                exit(1);
+            }
+
             TaxiPathSetBySource::const_iterator src_i = sTaxiPathSetBySource.find(i);
             if (src_i != sTaxiPathSetBySource.end() && !src_i->second.empty())
             {
@@ -1055,27 +1081,25 @@ void LoadDBCStores(const std::string& dataPath)
             }
 
             // valid taxi network node
-            uint8  field   = (uint8)((i - 1) / 8);
-            uint32 submask = 1 << ((i-1) % 8);
-            sTaxiNodesMask[field] |= submask;
+            sTaxiNodesMask[maskPosition.byteIndex] |= maskPosition.bitMask;
 
             if (node->MountCreatureID[0] && node->MountCreatureID[0] != 32981)
             {
-                sHordeTaxiNodesMask[field] |= submask;
+                sHordeTaxiNodesMask[maskPosition.byteIndex] |= maskPosition.bitMask;
             }
             if (node->MountCreatureID[1] && node->MountCreatureID[1] != 32981)
             {
-                sAllianceTaxiNodesMask[field] |= submask;
+                sAllianceTaxiNodesMask[maskPosition.byteIndex] |= maskPosition.bitMask;
             }
             if (node->MountCreatureID[0] == 32981 || node->MountCreatureID[1] == 32981)
             {
-                sDeathKnightTaxiNodesMask[field] |= submask;
+                sDeathKnightTaxiNodesMask[maskPosition.byteIndex] |= maskPosition.bitMask;
             }
 
             // old continent node (+ nodes virtually at old continents, check explicitly to avoid loading map files for zone info)
-            if (node->ContinentID < 2 || i == 82 || i == 83 || i == 93 || i == 94)
+            if (node->ContinentID < 2 || node->ID == 82 || node->ID == 83 || node->ID == 93 || node->ID == 94)
             {
-                sOldContinentsNodesMask[field] |= submask;
+                sOldContinentsNodesMask[maskPosition.byteIndex] |= maskPosition.bitMask;
             }
 
             // fix DK node at Ebon Hold
