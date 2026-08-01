@@ -2264,7 +2264,7 @@ void Player::SetGameMaster(bool on)
             pet->GetHostileRefManager().setOnlineOfflineState(false);
         }
 
-        SetPhaseMask(PHASEMASK_ANYWHERE, false);            // see and visible in all phases
+        SetGameMasterPhaseOverride(true, false);             // see and visible in all phases
     }
     else
     {
@@ -2273,22 +2273,7 @@ void Player::SetGameMaster(bool on)
         RemoveFlag(UNIT_FIELD_FLAGS, UNIT_FLAG_UNK_0);
         RemoveFlag(PLAYER_FLAGS, PLAYER_FLAGS_GM);
 
-        // restore phase
-        AuraList const& phases = GetAurasByType(SPELL_AURA_PHASE);
-        AuraList const& phases2 = GetAurasByType(SPELL_AURA_PHASE_2);
-
-        if (!phases.empty())
-        {
-            SetPhaseMask(phases.front()->GetMiscValue(), false);
-        }
-        else if (!phases2.empty())
-        {
-            SetPhaseMask(phases2.front()->GetMiscValue(), false);
-        }
-        else
-        {
-            SetPhaseMask(PHASEMASK_NORMAL, false);
-        }
+        SetGameMasterPhaseOverride(false, false);
 
         if (Pet* pet = GetPet())
         {
