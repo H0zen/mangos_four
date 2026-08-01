@@ -7,12 +7,17 @@ file(READ "${SOURCE_ROOT}/src/game/WorldHandlers/MailMoneyPolicy.h" policy_heade
 file(READ "${SOURCE_ROOT}/src/game/WorldHandlers/Mail.cpp" mail_source)
 file(READ "${SOURCE_ROOT}/src/game/WorldHandlers/MailHandler.cpp" mail_handler)
 file(READ "${SOURCE_ROOT}/src/game/WorldHandlers/MopMailPackets.h" packet_builder)
+file(READ "${SOURCE_ROOT}/src/game/ChatCommands/MailCommands.cpp" mail_commands)
+file(READ "${SOURCE_ROOT}/src/game/WorldHandlers/ChatArgExtract.cpp" chat_arg_extract)
 file(READ "${SOURCE_ROOT}/src/game/Object/PlayerLoad.cpp" player_load)
 file(READ "${SOURCE_ROOT}/src/game/Object/PlayerSave.cpp" player_save)
 file(READ "${SOURCE_ROOT}/src/game/Object/ObjectMgr.cpp" object_mgr)
 file(READ "${SOURCE_ROOT}/src/game/Object/Player.cpp" player_source)
 file(READ "${SOURCE_ROOT}/src/game/Server/Opcodes.cpp" opcode_registry)
 file(READ "${SOURCE_ROOT}/src/game/Server/Opcodes_reference.h" opcode_reference)
+file(READ "${SOURCE_ROOT}/src/modules/Eluna/LuaEngine.cpp" eluna_engine)
+file(READ "${SOURCE_ROOT}/src/modules/Eluna/methods/Mangos/GlobalMethods.h"
+    eluna_global_methods)
 
 function(require_literal_once content needle context)
     set(remaining "${content}")
@@ -93,6 +98,66 @@ if(DEFINED MUTATION)
         replace_literal_once(player_source "uint64 money         = fields[6].GetUInt64();" "uint64 money         = fields[6].GetUInt32();" "${MUTATION}")
     elseif(MUTATION STREQUAL "send_debug_money_u32")
         replace_literal_once(mail_handler "${wide_send_log}" "${narrow_send_log}" "${MUTATION}")
+    elseif(MUTATION STREQUAL "gm_send_money_uint32")
+        replace_literal_once(mail_commands
+            "uint64 money;\n    if (!ExtractUInt64(&args, money))"
+            "uint32 money;\n    if (!ExtractUInt32(&args, money))"
+            "${MUTATION}")
+    elseif(MUTATION STREQUAL "gm_uint64_parser_strtoul")
+        replace_literal_once(chat_arg_extract
+            "unsigned long long const valRaw = std::strtoull(*args, &tail, 10);"
+            "unsigned long const valRaw = std::strtoul(*args, &tail, 10);"
+            "${MUTATION}")
+    elseif(MUTATION STREQUAL "gm_uint64_parser_drop_negative")
+        replace_literal_once(chat_arg_extract
+            "if (*first == '-')"
+            "if (false)"
+            "${MUTATION}")
+    elseif(MUTATION STREQUAL "gm_uint64_parser_drop_erange")
+        replace_literal_once(chat_arg_extract
+            "tail == *args || errno == ERANGE || valRaw > std::numeric_limits<uint64>::max()"
+            "tail == *args || valRaw > std::numeric_limits<uint64>::max()"
+            "${MUTATION}")
+    elseif(MUTATION STREQUAL "eluna_uint64_number_uint32")
+        replace_literal_once(eluna_engine
+            "return CheckUnsignedLongLong(L, narg);"
+            "return static_cast<unsigned long long>(CHECKVAL<uint32>(narg));"
+            "${MUTATION}")
+    elseif(MUTATION STREQUAL "eluna_uint64_drop_negative_guard")
+        replace_literal_once(eluna_engine
+            "if (!(value >= 0))"
+            "if (false)"
+            "${MUTATION}")
+    elseif(MUTATION STREQUAL "eluna_uint64_drop_safe_bound")
+        replace_literal_once(eluna_engine
+            "if (value > MAX_SAFE_LUA_INTEGER)"
+            "if (false)"
+            "${MUTATION}")
+    elseif(MUTATION STREQUAL "eluna_mail_money_uint32")
+        replace_literal_once(eluna_global_methods
+            "uint64 money = E->CHECKVAL<uint64>(++i, 0);"
+            "uint32 money = E->CHECKVAL<uint32>(++i, 0);"
+            "${MUTATION}")
+    elseif(MUTATION STREQUAL "eluna_mail_cod_uint32")
+        replace_literal_once(eluna_global_methods
+            "uint64 cod = E->CHECKVAL<uint64>(++i, 0);"
+            "uint32 cod = E->CHECKVAL<uint32>(++i, 0);"
+            "${MUTATION}")
+    elseif(MUTATION STREQUAL "eluna_mail_mists_gate")
+        replace_literal_once(eluna_global_methods
+            "#if defined(ELUNA_MANGOS) && ELUNA_EXPANSION == EXP_MISTS\n        uint64 money = E->CHECKVAL<uint64>(++i, 0);\n        uint64 cod = E->CHECKVAL<uint64>(++i, 0);"
+            "#if defined(ELUNA_MANGOS) && ELUNA_EXPANSION == EXP_CATA\n        uint64 money = E->CHECKVAL<uint64>(++i, 0);\n        uint64 cod = E->CHECKVAL<uint64>(++i, 0);"
+            "${MUTATION}")
+    elseif(MUTATION STREQUAL "eluna_mail_money_doc_uint32")
+        replace_literal_once(eluna_global_methods
+            "@param uint64 money = 0 : money to send (uint32 before Mists)"
+            "@param uint32 money = 0 : money to send"
+            "${MUTATION}")
+    elseif(MUTATION STREQUAL "eluna_mail_cod_doc_uint32")
+        replace_literal_once(eluna_global_methods
+            "@param uint64 cod = 0 : cod money amount (uint32 before Mists)"
+            "@param uint32 cod = 0 : cod money amount"
+            "${MUTATION}")
     elseif(MUTATION STREQUAL "packet_cod_uint32")
         replace_literal_once(packet_builder "uint64 cod = 0;" "uint32 cod = 0;" "${MUTATION}")
     elseif(MUTATION STREQUAL "packet_money_uint32")
@@ -141,6 +206,45 @@ require_literal_once("${mail_source}" "${wide_insert}" "mail insert format width
 require_literal_once("${mail_source}" "uint64(m_money)" "mail insert money argument width")
 require_literal_once("${mail_source}" "uint64(m_COD)" "mail insert COD argument width")
 require_literal_once("${mail_handler}" "${wide_send_log}" "send-mail diagnostic widths")
+require_literal_once("${mail_commands}"
+    "uint64 money;\n    if (!ExtractUInt64(&args, money))"
+    "GM send-money parser width")
+require_literal_once("${chat_arg_extract}"
+    "unsigned long long const valRaw = std::strtoull(*args, &tail, 10);"
+    "GM unsigned-64 platform-width parser")
+require_literal_once("${chat_arg_extract}"
+    "if (*first == '-')"
+    "GM unsigned-64 negative-input rejection")
+require_literal_once("${chat_arg_extract}"
+    "tail == *args || errno == ERANGE || valRaw > std::numeric_limits<uint64>::max()"
+    "GM unsigned-64 conversion and overflow rejection")
+require_literal_once("${eluna_engine}"
+    "constexpr double MAX_SAFE_LUA_INTEGER = 9007199254740991.0;"
+    "Eluna exact Lua-number integer bound")
+require_literal_once("${eluna_engine}"
+    "if (!(value >= 0))"
+    "Eluna unsigned-64 negative and NaN guard")
+require_literal_once("${eluna_engine}"
+    "if (value > MAX_SAFE_LUA_INTEGER)"
+    "Eluna unsigned-64 exactness guard")
+require_literal_once("${eluna_engine}"
+    "return CheckUnsignedLongLong(L, narg);"
+    "Eluna unsigned-64 Lua-number conversion")
+require_literal_once("${eluna_global_methods}"
+    "uint64 money = E->CHECKVAL<uint64>(++i, 0);"
+    "Eluna SendMail money parser width")
+require_literal_once("${eluna_global_methods}"
+    "uint64 cod = E->CHECKVAL<uint64>(++i, 0);"
+    "Eluna SendMail COD parser width")
+require_literal_once("${eluna_global_methods}"
+    "#if defined(ELUNA_MANGOS) && ELUNA_EXPANSION == EXP_MISTS\n        uint64 money = E->CHECKVAL<uint64>(++i, 0);\n        uint64 cod = E->CHECKVAL<uint64>(++i, 0);\n#else\n        uint32 money = E->CHECKVAL<uint32>(++i, 0);\n        uint32 cod = E->CHECKVAL<uint32>(++i, 0);\n#endif"
+    "Mists-only Eluna SendMail width gate")
+require_literal_once("${eluna_global_methods}"
+    "@param uint64 money = 0 : money to send (uint32 before Mists)"
+    "Eluna SendMail money documentation width")
+require_literal_once("${eluna_global_methods}"
+    "@param uint64 cod = 0 : cod money amount (uint32 before Mists)"
+    "Eluna SendMail COD documentation width")
 require_none("${opcode_registry}" "DefC(CMSG_MAIL_TAKE_MONEY" "CMSG_MAIL_TAKE_MONEY registration")
 require_none("${opcode_registry}" "DefC(CMSG_SEND_MAIL" "CMSG_SEND_MAIL registration")
 require_literal_once("${opcode_reference}" "CMSG_MAIL_TAKE_MONEY                           0x06FA  DORMANT" "CMSG_MAIL_TAKE_MONEY dormant reference")

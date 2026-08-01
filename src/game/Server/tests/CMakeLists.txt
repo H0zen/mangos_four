@@ -436,6 +436,18 @@ target_compile_definitions(mop_mail_money_policy_test PRIVATE
     $<TARGET_PROPERTY:game,INTERFACE_COMPILE_DEFINITIONS>)
 add_test(NAME mop_mail_money_policy COMMAND mop_mail_money_policy_test)
 
+add_executable(mop_chat_uint64_extract_test mop_chat_uint64_extract_test.cpp)
+target_include_directories(mop_chat_uint64_extract_test PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}/..
+    ${CMAKE_SOURCE_DIR}/src/shared
+    $<TARGET_PROPERTY:game,INTERFACE_INCLUDE_DIRECTORIES>)
+set_target_properties(mop_chat_uint64_extract_test PROPERTIES
+    CXX_STANDARD 17 CXX_STANDARD_REQUIRED ON)
+target_compile_definitions(mop_chat_uint64_extract_test PRIVATE
+    $<TARGET_PROPERTY:game,INTERFACE_COMPILE_DEFINITIONS>)
+target_link_libraries(mop_chat_uint64_extract_test PRIVATE game)
+add_test(NAME mop_chat_uint64_extract COMMAND mop_chat_uint64_extract_test)
+
 add_test(NAME mop_mail_money_width_source
     COMMAND ${CMAKE_COMMAND} -DSOURCE_ROOT=${CMAKE_SOURCE_DIR}
         -P ${CMAKE_CURRENT_SOURCE_DIR}/mop_mail_money_width_source_test.cmake)
@@ -446,7 +458,15 @@ foreach(mutation IN ITEMS
         load_money_uint32 load_cod_uint32
         save_money_uint32 save_cod_uint32
         expired_cod_uint32 delete_return_money_uint32
-        send_debug_money_u32 packet_cod_uint32 packet_money_uint32
+        send_debug_money_u32 gm_send_money_uint32
+        gm_uint64_parser_strtoul gm_uint64_parser_drop_negative
+        gm_uint64_parser_drop_erange
+        eluna_uint64_number_uint32 eluna_uint64_drop_negative_guard
+        eluna_uint64_drop_safe_bound eluna_mail_money_uint32
+        eluna_mail_cod_uint32 eluna_mail_mists_gate
+        eluna_mail_money_doc_uint32
+        eluna_mail_cod_doc_uint32
+        packet_cod_uint32 packet_money_uint32
         cod_limit_plus_one cod_exclusive_limit
         debit_addition debit_drop_fee_guard
         credit_addition credit_drop_current_guard

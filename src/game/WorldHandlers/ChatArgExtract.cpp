@@ -41,6 +41,9 @@
 #include "DBCStores.h"
 #include "Util.h"
 
+#include <cerrno>
+#include <cstdlib>
+
 /**
  * Function skip all whitespaces in args string
  *
@@ -172,22 +175,36 @@ bool  ChatHandler::ExtractUInt64(char** args, uint64& val)
         return false;
     }
 
-    char* tail = *args;
-
-    unsigned long valRaw = strtoul(*args, &tail, 10);
-
-    if (tail != *args && isWhiteSpace(*tail))
+    char* first = *args;
+    while (*first && isWhiteSpace(*first))
     {
-        *(tail++) = '\0';
+        ++first;
     }
-    else if (tail && *tail)                                 // some not whitespace symbol
+
+    // strtoull accepts a leading minus and returns its unsigned negation.
+    // Command arguments declared unsigned must reject that spelling instead.
+    if (*first == '-')
+    {
+        return false;
+    }
+
+    errno = 0;
+    char* tail = *args;
+    unsigned long long const valRaw = std::strtoull(*args, &tail, 10);
+
+    if (tail == *args || errno == ERANGE || valRaw > std::numeric_limits<uint64>::max())
+    {
+        return false;
+    }
+
+    if (*tail && !isWhiteSpace(*tail))                       // some not whitespace symbol
     {
         return false;                                       // args not modified and can be re-parsed
     }
 
-    if (valRaw > std::numeric_limits<uint64>::max())
+    if (isWhiteSpace(*tail))
     {
-        return false;
+        *(tail++) = '\0';
     }
 
     // value successfully extracted

@@ -350,8 +350,8 @@ bool ChatHandler::HandleSendMoneyHelper(MailDraft& draft, char* args)
         return false;
     }
 
-    uint32 money;
-    if (!ExtractUInt32(&args, money))
+    uint64 money;
+    if (!ExtractUInt64(&args, money))
     {
         return false;
     }
