@@ -302,6 +302,7 @@ typedef std::vector<uint32> AutoSpellList;
 #define PET_FOLLOW_ANGLE (M_PI_F / 4.00f) * 3.50f
 
 class Player;
+struct ItemPrototype;
 
 class Pet : public Creature
 {
