@@ -16,6 +16,7 @@ file(READ "${SOURCE_ROOT}/src/game/Server/WorldSession.h" WORLD_SESSION_H)
 file(READ "${SOURCE_ROOT}/src/game/Server/Opcodes.cpp" OPCODES_CPP)
 file(READ "${SOURCE_ROOT}/src/game/Server/WorldSession.cpp" WORLD_SESSION_CPP)
 file(READ "${SOURCE_ROOT}/src/game/Server/Opcodes_reference.h" OPCODES_REFERENCE_H)
+file(READ "${SOURCE_ROOT}/src/game/Server/tests/CMakeLists.txt" TESTS_CMAKE)
 
 if(DEFINED MUTATION)
     if(MUTATION STREQUAL "request_scalar_order")
@@ -160,6 +161,10 @@ if(DEFINED MUTATION)
         string(REPLACE "CMSG_MOVE_SPLINE_DONE                          0x11D9  DORMANT"
             "CMSG_MOVE_SPLINE_DONE                          0x11D9  ACTIVE"
             OPCODES_REFERENCE_H "${OPCODES_REFERENCE_H}")
+    elseif(MUTATION STREQUAL "runtime_environment")
+        string(REPLACE "PATH=path_list_prepend:$<TARGET_FILE_DIR:lualib>"
+            "PATH=path_list_prepend:removed-lua-runtime"
+            TESTS_CMAKE "${TESTS_CMAKE}")
     else()
         message(FATAL_ERROR "Unknown mutation: ${MUTATION}")
     endif()
@@ -422,5 +427,14 @@ require_text(OPCODES_REFERENCE_H
 require_text(OPCODES_REFERENCE_H
     "CMSG_MOVE_SPLINE_DONE                          0x11D9  DORMANT"
     "completion remains dormant")
+require_text(TESTS_CMAKE
+    "get_filename_component(MOP_TAXI_ACTIVATION_MYSQL_RUNTIME_DIR"
+    "taxi runtime MySQL directory")
+require_text(TESTS_CMAKE
+    "PATH=path_list_prepend:\${MOP_TAXI_ACTIVATION_MYSQL_RUNTIME_DIR}"
+    "taxi runtime MySQL PATH")
+require_text(TESTS_CMAKE
+    "PATH=path_list_prepend:$<TARGET_FILE_DIR:lualib>"
+    "taxi runtime Lua PATH")
 
 message(STATUS "MoP taxi-activation source checks passed")

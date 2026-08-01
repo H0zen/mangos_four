@@ -1865,6 +1865,13 @@ target_include_directories(mop_taxi_activation_runtime_test PRIVATE
 set_target_properties(mop_taxi_activation_runtime_test PROPERTIES CXX_STANDARD 17 CXX_STANDARD_REQUIRED ON)
 target_link_libraries(mop_taxi_activation_runtime_test PRIVATE game)
 add_test(NAME mop_taxi_activation_runtime COMMAND mop_taxi_activation_runtime_test)
+if(WIN32)
+    get_filename_component(MOP_TAXI_ACTIVATION_MYSQL_RUNTIME_DIR
+        "${MySQL_LIBRARY}" DIRECTORY)
+    set_tests_properties(mop_taxi_activation_runtime PROPERTIES
+        ENVIRONMENT_MODIFICATION
+            "PATH=path_list_prepend:${MOP_TAXI_ACTIVATION_MYSQL_RUNTIME_DIR};PATH=path_list_prepend:$<TARGET_FILE_DIR:lualib>")
+endif()
 
 add_test(NAME mop_taxi_activation_source
     COMMAND ${CMAKE_COMMAND} -DSOURCE_ROOT=${CMAKE_SOURCE_DIR}
@@ -1882,7 +1889,7 @@ foreach(mutation IN ITEMS
         insufficient_money launch_failure_cleanup
         duplicate_flight_guard request_registration reply_registration reply_admission
         request_reference reply_reference express_registration completion_registration
-        express_reference completion_reference)
+        express_reference completion_reference runtime_environment)
     add_test(NAME mop_taxi_activation_source_mutation_${mutation}
         COMMAND ${CMAKE_COMMAND} -DSOURCE_ROOT=${CMAKE_SOURCE_DIR}
             -DMUTATION=${mutation}
