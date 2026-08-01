@@ -42,9 +42,124 @@
 #include "DBCStores.h"
 #include "MapManager.h"
 
+#include <charconv>
 #include <cmath>
 #include <limits>
 #include <sstream>
+
+namespace
+{
+    bool ParseTaxiPersistenceValue(std::string const& token, uint32& value)
+    {
+        if (token.empty())
+        {
+            return false;
+        }
+
+        auto const result = std::from_chars(token.data(), token.data() + token.size(), value);
+        return result.ec == std::errc() && result.ptr == token.data() + token.size();
+    }
+
+    void ResetTaxiPersistenceState(PlayerTaxi& taxi)
+    {
+        taxi.ClearTaxiDestinations();
+        taxi.SetFlightMasterFactionTemplateId(0);
+    }
+
+    class ObjectMgrTaxiPersistenceValidator final : public TaxiPersistence::Validator
+    {
+        public:
+            bool HasTaxiPath(uint32 source, uint32 destination) override
+            {
+                uint32 path = 0;
+                uint32 cost = 0;
+                sObjectMgr.GetTaxiPath(source, destination, path, cost);
+                return path != 0;
+            }
+
+            bool HasTaxiMount(uint32 source, Team team) override
+            {
+                return sObjectMgr.GetTaxiMountDisplayId(source, team, true) != 0;
+            }
+    };
+}
+
+bool TaxiPersistence::LoadTaxiDestinations(PlayerTaxi& taxi, std::string const& values,
+    Team team, Validator& validator)
+{
+    ResetTaxiPersistenceState(taxi);
+
+    try
+    {
+        std::istringstream input(values);
+        std::vector<std::string> tokens;
+        for (std::string token; input >> token;)
+        {
+            tokens.push_back(token);
+        }
+
+        if (tokens.empty())
+        {
+            return true;
+        }
+
+        auto token = tokens.begin();
+        uint32 factionId = 0;
+        if (!ParseTaxiPersistenceValue(*token, factionId))
+        {
+            return false;
+        }
+
+        ++token;
+        std::vector<uint32> nodes;
+        for (; token != tokens.end(); ++token)
+        {
+            uint32 node = 0;
+            if (!ParseTaxiPersistenceValue(*token, node))
+            {
+                return false;
+            }
+
+            if (!taxi.IsValidNodeId(node))
+            {
+                return false;
+            }
+
+            nodes.push_back(node);
+        }
+
+        if (nodes.size() < 2)
+        {
+            return false;
+        }
+
+        for (size_t i = 1; i < nodes.size(); ++i)
+        {
+            if (!validator.HasTaxiPath(nodes[i - 1], nodes[i]))
+            {
+                return false;
+            }
+        }
+
+        if (!validator.HasTaxiMount(nodes.front(), team))
+        {
+            return false;
+        }
+
+        taxi.SetFlightMasterFactionTemplateId(factionId);
+        for (uint32 node : nodes)
+        {
+            taxi.AddTaxiDestination(node);
+        }
+
+        return true;
+    }
+    catch (...)
+    {
+        ResetTaxiPersistenceState(taxi);
+        return false;
+    }
+}
 
 void PlayerTaxi::InitTaxiNodes(uint32 race, uint32 chrClass, uint8 level)
 {
@@ -187,49 +302,8 @@ void PlayerTaxi::AppendTaximaskTo(ByteBuffer& data, bool all)
 
 bool PlayerTaxi::LoadTaxiDestinationsFromString(const std::string& values, Team team)
 {
-    ClearTaxiDestinations();
-
-    Tokens tokens = StrSplit(values, " ");
-    for (auto iter = tokens.begin(); iter != tokens.end(); ++iter)
-    {
-        m_flightMasterFactionId = stoul(*iter);
-    }
-
-    for (Tokens::iterator iter = tokens.begin(); iter != tokens.end(); ++iter)
-    {
-        uint32 node = std::stoul(iter->c_str());
-        AddTaxiDestination(node);
-    }
-
-    if (m_TaxiDestinations.empty())
-    {
-        return true;
-    }
-
-    // Check integrity
-    if (m_TaxiDestinations.size() < 2)
-    {
-        return false;
-    }
-
-    for (size_t i = 1; i < m_TaxiDestinations.size(); ++i)
-    {
-        uint32 cost;
-        uint32 path;
-        sObjectMgr.GetTaxiPath(m_TaxiDestinations[i - 1], m_TaxiDestinations[i], path, cost);
-        if (!path)
-        {
-            return false;
-        }
-    }
-
-    // can't load taxi path without mount set (quest taxi path?)
-    if (!sObjectMgr.GetTaxiMountDisplayId(GetTaxiSource(), team, true))
-    {
-        return false;
-    }
-
-    return true;
+    ObjectMgrTaxiPersistenceValidator validator;
+    return TaxiPersistence::LoadTaxiDestinations(*this, values, team, validator);
 }
 
 std::string PlayerTaxi::SaveTaxiDestinationsToString()

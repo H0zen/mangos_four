@@ -35,6 +35,21 @@ class ByteBuffer;
 struct FactionTemplateEntry;
 
 class Player; // forward declaration
+class PlayerTaxi;
+
+namespace TaxiPersistence
+{
+    class Validator
+    {
+        public:
+            virtual ~Validator() = default;
+            virtual bool HasTaxiPath(uint32 source, uint32 destination) = 0;
+            virtual bool HasTaxiMount(uint32 source, Team team) = 0;
+    };
+
+    bool LoadTaxiDestinations(PlayerTaxi& taxi, std::string const& values,
+        Team team, Validator& validator);
+}
 
 class PlayerTaxi
 {
