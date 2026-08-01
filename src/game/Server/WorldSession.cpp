@@ -64,6 +64,7 @@
 #include "ObjectAccessor.h"
 #include "BattleGround/BattleGroundMgr.h"
 #include "MapManager.h"
+#include "MopNotificationPackets.h"
 #include "SocialMgr.h"
 #include "Auth/AuthCrypt.h"
 #include "Auth/HMACSHA1.h"
@@ -1271,10 +1272,12 @@ void WorldSession::SendNotification(const char* format, ...)
             return;
         }
 
-        WorldPacket data(SMSG_NOTIFICATION, (strlen(szStr) + 1));
-        data.WriteBits(strlen(szStr), 12);
-        data.FlushBits();
-        data.append(szStr, strlen(szStr));
+        WorldPacket data;
+        if (!MopNotificationPackets::Build(data, std::string(szStr)))
+        {
+            sLog.outError("A formatted notification violated the 1023-byte NUL-free packet contract; message dropped.");
+            return;
+        }
         SendPacket(&data);
     }
 }
@@ -1302,10 +1305,12 @@ void WorldSession::SendNotification(int32 string_id, ...)
             return;
         }
 
-        WorldPacket data(SMSG_NOTIFICATION, (strlen(szStr) + 1));
-        data.WriteBits(strlen(szStr), 12);
-        data.FlushBits();
-        data.append(szStr, strlen(szStr));
+        WorldPacket data;
+        if (!MopNotificationPackets::Build(data, std::string(szStr)))
+        {
+            sLog.outError("String entry %i produced a notification outside the 1023-byte NUL-free packet contract; message dropped.", string_id);
+            return;
+        }
         SendPacket(&data);
     }
 }

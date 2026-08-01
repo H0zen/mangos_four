@@ -1236,8 +1236,12 @@ add_test(NAME mop_notification_packets_source
     COMMAND ${CMAKE_COMMAND} -DSOURCE_ROOT=${CMAKE_SOURCE_DIR}
         -P ${CMAKE_CURRENT_SOURCE_DIR}/mop_notification_packets_source_test.cmake)
 
-foreach(mutation IN ITEMS length_width registration allowlist area_trigger_route admin_route
-        compatibility_forward legacy_backend legacy_opcode opcode_value)
+foreach(mutation IN ITEMS builder_width builder_flush builder_nul_append builder_limit
+        builder_nul_policy builder_preinit session_bypass notify_bypass
+        notify_legacy_string notify_send_order notify_prefix notify_truncate
+        registration allowlist reference_status opcode_value announce_route
+        server_message_route area_trigger_route admin_route compatibility_forward
+        legacy_backend legacy_opcode)
     add_test(NAME mop_notification_packets_source_mutation_${mutation}
         COMMAND ${CMAKE_COMMAND} -DSOURCE_ROOT=${CMAKE_SOURCE_DIR}
             -DMUTATION=${mutation}

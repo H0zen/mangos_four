@@ -23,8 +23,7 @@
  * and lore are copyrighted by Blizzard Entertainment, Inc.
  */
 
-#include "Opcodes.h"
-#include "WorldPacket.h"
+#include "MopNotificationPackets.h"
 
 #include <cstdint>
 #include <cstdio>
@@ -46,24 +45,60 @@ static bool Equal(WorldPacket const& packet, std::vector<uint8_t> const& expecte
     return true;
 }
 
-static WorldPacket Build(char const* text, size_t length)
+static void CheckAccepted(std::string const& text, uint8_t first, uint8_t second)
 {
-    WorldPacket packet(SMSG_NOTIFICATION, 2 + length);
-    packet.WriteBits(length, 12);
-    packet.FlushBits();
-    packet.append(text, length);
-    return packet;
+    WorldPacket packet;
+    CHECK(MopNotificationPackets::Build(packet, text));
+    CHECK(packet.GetOpcode() == SMSG_NOTIFICATION);
+    CHECK(packet.size() == 2 + text.size());
+    CHECK(packet.contents()[0] == first);
+    CHECK(packet.contents()[1] == second);
+
+    for (size_t index = 0; index < text.size(); ++index)
+        CHECK(packet.contents()[index + 2] == uint8_t(text[index]));
+}
+
+static void CheckRejected(std::string const& text)
+{
+    uint8_t const sentinel[] = { 0xDE, 0xAD, 0xBE, 0xEF };
+    WorldPacket packet(0x0777, sizeof(sentinel));
+    packet.append(sentinel, sizeof(sentinel));
+
+    CHECK(!MopNotificationPackets::Build(packet, text));
+    CHECK(packet.GetOpcode() == 0x0777);
+    CHECK(Equal(packet, { 0xDE, 0xAD, 0xBE, 0xEF }));
 }
 
 int main(int, char**)
 {
     CHECK(uint32(SMSG_NOTIFICATION) == 0x0C2Au);
-    CHECK(Equal(Build("abc", 3), { 0x00, 0x30, 'a', 'b', 'c' }));
 
-    std::vector<uint8_t> expected = { 0x3F, 0xF0 };
-    expected.insert(expected.end(), 1023, uint8_t('X'));
-    std::string longest(1023, 'X');
-    CHECK(Equal(Build(longest.data(), longest.size()), expected));
+    CheckAccepted("", 0x00, 0x00);
+    CheckAccepted("A", 0x00, 0x10);
+    CheckAccepted("abc", 0x00, 0x30);
+    CheckAccepted(std::string(15, 'X'), 0x00, 0xF0);
+    CheckAccepted(std::string(16, 'X'), 0x01, 0x00);
+    CheckAccepted(std::string(255, 'X'), 0x0F, 0xF0);
+    CheckAccepted(std::string(256, 'X'), 0x10, 0x00);
+    CheckAccepted(std::string("\xE2\x82\xAC", 3), 0x00, 0x30);
+    CheckAccepted(std::string(1023, 'X'), 0x3F, 0xF0);
+
+    CheckRejected(std::string(1024, 'X'));
+    CheckRejected(std::string(4095, 'X'));
+    CheckRejected(std::string(4096, 'X'));
+    CheckRejected(std::string("\0A", 2));
+    CheckRejected(std::string("A\0B", 3));
+    CheckRejected(std::string("A\0", 2));
+
+    std::string nulAtBoundary(1023, 'X');
+    nulAtBoundary[511] = '\0';
+    CheckRejected(nulAtBoundary);
+
+    std::string multibyte1024;
+    multibyte1024.reserve(1024);
+    for (size_t index = 0; index < 512; ++index)
+        multibyte1024.append("\xC2\xA2", 2);
+    CheckRejected(multibyte1024);
 
     return g_fail ? 1 : 0;
 }

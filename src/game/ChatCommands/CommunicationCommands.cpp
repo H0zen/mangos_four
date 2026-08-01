@@ -36,6 +36,7 @@
 #include "Chat.h"
 #include "DatabaseEnv.h"
 #include "Language.h"
+#include "MopNotificationPackets.h"
 #include "ObjectMgr.h"
 #include "Player.h"
 #include "World.h"
@@ -74,8 +75,14 @@ bool ChatHandler::HandleNotifyCommand(char* args)
     std::string str = GetMangosString(LANG_GLOBAL_NOTIFY);
     str += args;
 
-    WorldPacket data(SMSG_NOTIFICATION, (str.size() + 1));
-    data << str;
+    WorldPacket data;
+    if (!MopNotificationPackets::Build(data, str))
+    {
+        SendSysMessage(LANG_BAD_VALUE);
+        SetSentErrorMessage(true);
+        return false;
+    }
+
     sWorld.SendGlobalMessage(&data);
 
     return true;
