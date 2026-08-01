@@ -1172,6 +1172,20 @@ int main(int /*argc*/, char** /*argv*/)
         };
         const uint32 legacyCount = uint32(sizeof(legacy) / sizeof(legacy[0]));
 
+        // Taxi and spell mounts change after login. The owner's private
+        // VALUES projection must carry the legacy mount-display field to the
+        // 18414 UnitData slot, not only show it to nearby observers.
+        {
+            const MopUpdateObject::StaticField mount[] =
+            {
+                { 65, 29261u },
+            };
+            std::vector<MopUpdateObject::StaticField> out;
+            MopUpdateObject::TranslateSelfPlayerFields(mount, 1, out);
+            CHECK(out.size() == 1);
+            CHECK(out[0].index == 71 && out[0].value == 29261u);
+        }
+
         // The same three words must also survive the SELF projection - they
         // carry rest state (byte 3 of 162) and gender (byte 0 of 163), which
         // the owner's own client needs for GetRestState() and for voice.

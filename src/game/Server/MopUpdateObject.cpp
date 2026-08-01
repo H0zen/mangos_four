@@ -492,6 +492,7 @@ void MopUpdateObject::TranslateSelfPlayerFields(StaticField const* sourceFields,
             case 62: fields.push_back({ 68, value }); break;
             case 63: fields.push_back({ 69, value }); break;
             case 64: fields.push_back({ 70, value }); break;
+            case 65: fields.push_back({ 71, value }); break;
             // PLAYER_FLAGS, which carries PLAYER_FLAGS_GHOST. Without it the
             // client is never told the character died: no release dialog, so
             // no CMSG_REPOP_REQUEST, so release and .revive have nothing to

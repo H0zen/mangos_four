@@ -644,6 +644,7 @@ void Object::BuildValuesUpdateBlockForPlayer(UpdateData* data, Player* target) c
             addIfChanged(UNIT_FIELD_COMBATREACH);
             addIfChanged(UNIT_FIELD_DISPLAYID);
             addIfChanged(UNIT_FIELD_NATIVEDISPLAYID);
+            addIfChanged(UNIT_FIELD_MOUNTDISPLAYID);
             // PLAYER_FLAGS_GHOST lives here. Until this was projected the
             // client was never told the character had died, so nothing
             // downstream of death worked: no release dialog, therefore no
