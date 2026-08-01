@@ -52,7 +52,6 @@ PhaseDefinitionValidationResult ValidatePhaseDefinition(PhaseDefinitionRecord co
     bool conditionExists, PhaseDefinition& definition);
 uint32 EvaluatePhaseDefinitions(std::vector<PhaseDefinition> const& definitions,
     std::function<bool(uint16)> const& conditionMatches);
-bool PhaseMasksIntersect(uint32 firstMask, uint32 secondMask);
 uint32 ComposePhaseMask(bool gmActive, bool administrativeOverrideActive,
     uint32 administrativeOverrideMask, uint32 definitionMask, uint32 auraMask);
 

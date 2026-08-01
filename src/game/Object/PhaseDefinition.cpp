@@ -53,11 +53,6 @@ uint32 EvaluatePhaseDefinitions(std::vector<PhaseDefinition> const& definitions,
     return phaseMask;
 }
 
-bool PhaseMasksIntersect(uint32 firstMask, uint32 secondMask)
-{
-    return (firstMask & secondMask) != 0;
-}
-
 uint32 ComposePhaseMask(bool gmActive, bool administrativeOverrideActive,
     uint32 administrativeOverrideMask, uint32 definitionMask, uint32 auraMask)
 {

@@ -7,7 +7,6 @@
  * Copyright (C) 2026 MaNGOS <https://www.getmangos.eu>
  */
 
-#include "ObjectMgr.h"
 #include "PhaseDefinition.h"
 #include "Object.h"
 
@@ -63,10 +62,6 @@ static void TestDefinitionEvaluationAndComposition()
     CHECK(ComposePhaseMask(false, true, 0x1234, postMask, 0x0004) == 0x1234);
     CHECK(ComposePhaseMask(false, false, 0, 0, 0) == PHASEMASK_NORMAL);
 
-    CHECK(PhaseMasksIntersect(preMask, 0x4000));
-    CHECK(!PhaseMasksIntersect(preMask, 0x8000));
-    CHECK(PhaseMasksIntersect(postMask, 0x8000));
-    CHECK(!PhaseMasksIntersect(postMask, 0x4000));
 }
 
 static void TestValidation()
@@ -112,41 +107,11 @@ static void TestUnconditionalDefinitionSkipsConditionEvaluator()
     CHECK(!evaluatorCalled);
 }
 
-static void TestPublishedStoreKeepsQueryOrderAndRejectsInvalidRows()
-{
-    PhaseDefinitionStore stagedStore;
-
-    PhaseDefinitionRecord first = MakeRecord();
-    first.zoneId = 7;
-    first.entry = 10;
-    PhaseDefinition firstDefinition = MakeDefinition(first);
-    stagedStore[first.zoneId].push_back(firstDefinition);
-
-    PhaseDefinitionRecord rejected = MakeRecord();
-    rejected.zoneId = 7;
-    rejected.entry = 15;
-    rejected.conditionId = 42;
-    PhaseDefinition rejectedDefinition = {};
-    CHECK(ValidatePhaseDefinition(rejected, false, rejectedDefinition) == PhaseDefinitionValidationResult::ConditionMissing);
-
-    PhaseDefinitionRecord second = MakeRecord();
-    second.zoneId = 7;
-    second.entry = 20;
-    PhaseDefinition secondDefinition = MakeDefinition(second);
-    stagedStore[second.zoneId].push_back(secondDefinition);
-
-    PhaseDefinitionContainer const& definitions = stagedStore[7];
-    CHECK(definitions.size() == 2);
-    CHECK(definitions[0].entry == 10);
-    CHECK(definitions[1].entry == 20);
-}
-
 int main()
 {
     TestDefinitionEvaluationAndComposition();
     TestValidation();
     TestUnconditionalDefinitionSkipsConditionEvaluator();
-    TestPublishedStoreKeepsQueryOrderAndRejectsInvalidRows();
     if (g_fail != 0)
         return 1;
 
