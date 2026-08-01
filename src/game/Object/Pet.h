@@ -408,6 +408,7 @@ class Pet : public Creature
         uint32 GetCurrentEquipmentId() const { return m_equipmentId; }
 
         bool CanTakeMoreActiveSpells(uint32 SpellIconID);
+        bool CanToggleAutocast(uint32 spellId) const;
         void ToggleAutocast(uint32 spellid, bool apply);
 
         void SetModeFlags(PetModeFlags mode);

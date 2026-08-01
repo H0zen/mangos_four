@@ -211,7 +211,7 @@ function(require_text source token context)
 endfunction()
 
 string(FIND "${unit_header}" "inline bool ReadPetStopAttack" reader_start)
-string(FIND "${unit_header}" "inline void ReadPetNameQuery" reader_end)
+string(FIND "${unit_header}" "inline bool ReadPetSetAction" reader_end)
 if(reader_start EQUAL -1 OR reader_end LESS_EQUAL reader_start)
     message(FATAL_ERROR "stop reader seam guard")
 endif()

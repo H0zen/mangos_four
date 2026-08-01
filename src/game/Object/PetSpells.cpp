@@ -1068,6 +1068,24 @@ uint8 Pet::GetMaxTalentPointsForLevel(uint32 level)
 }
 
 /**
+ * @brief Checks whether a pet spell has a safe authoritative autocast state.
+ *
+ * @param spellId The spell to inspect.
+ * @return true when the learned spell is present and explicitly enabled or disabled.
+ */
+bool Pet::CanToggleAutocast(uint32 spellId) const
+{
+    if (!spellId)
+        return false;
+
+    PetSpellMap::const_iterator const itr = m_spells.find(spellId);
+    if (itr == m_spells.end() || itr->second.state == PETSPELL_REMOVED)
+        return false;
+
+    return itr->second.active == ACT_DISABLED || itr->second.active == ACT_ENABLED;
+}
+
+/**
  * @brief Enables or disables autocast for a pet spell.
  *
  * @param spellid The spell to update.

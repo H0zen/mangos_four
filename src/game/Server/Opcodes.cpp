@@ -584,6 +584,7 @@ void InitializeOpcodes()
     // bits interleaved across the pet and target GUIDs.
     DefC(CMSG_PET_ACTION, "CMSG_PET_ACTION", STATUS_LOGGEDIN, PROCESS_THREADUNSAFE, &WorldSession::HandlePetAction);
     DefC(CMSG_PET_STOP_ATTACK, "CMSG_PET_STOP_ATTACK", STATUS_LOGGEDIN, PROCESS_THREADUNSAFE, &WorldSession::HandlePetStopAttack);
+    DefC(CMSG_PET_SET_ACTION, "CMSG_PET_SET_ACTION", STATUS_LOGGEDIN, PROCESS_THREADUNSAFE, &WorldSession::HandlePetSetAction);
     // Request and response both recovered from decoded 18414 payloads. One
     // response answers a request decoded separately and echoes its pet number,
     // which ties the pair together.

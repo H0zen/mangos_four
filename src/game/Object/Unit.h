@@ -221,6 +221,61 @@ namespace MopCompactPackets
         return true;
     }
 
+    /// CMSG_PET_SET_ACTION (0x12E9), the build-18414 single-record body.
+    /// Layout changes and two-record swaps remain deliberately unsupported;
+    /// this reader only establishes the exact wire record consumed by the
+    /// bounded same-slot autocast handler.
+    inline bool ReadPetSetAction(WorldPacket& in, uint32& position,
+        uint32& actionData, ObjectGuid& petGuid)
+    {
+        size_t const start = in.rpos();
+        size_t const remaining = in.size() - start;
+        if (remaining < 9)
+        {
+            in.rfinish();
+            return false;
+        }
+
+        uint8 const mask = in[start + 8];
+        size_t presentByteCount = 0;
+        for (uint8 bit = 0; bit < 8; ++bit)
+            presentByteCount += (mask & (uint8(0x80) >> bit)) != 0;
+
+        if (remaining != 9 + presentByteCount)
+        {
+            in.rfinish();
+            return false;
+        }
+
+        for (size_t index = start + 9; index < in.size(); ++index)
+        {
+            if (in[index] == 1)
+            {
+                in.rfinish();
+                return false;
+            }
+        }
+
+        uint32 parsedPosition = 0;
+        uint32 parsedActionData = 0;
+        ObjectGuid parsedGuid;
+        in >> parsedPosition >> parsedActionData;
+        in.ResetBitReader();
+        in.ReadGuidMask<1, 0, 5, 3, 2, 7, 6, 4>(parsedGuid);
+        in.ReadGuidBytes<5, 6, 7, 3, 2, 1, 4, 0>(parsedGuid);
+
+        if (parsedGuid.IsEmpty() || in.rpos() != in.size())
+        {
+            in.rfinish();
+            return false;
+        }
+
+        position = parsedPosition;
+        actionData = parsedActionData;
+        petGuid = parsedGuid;
+        return true;
+    }
+
     /// CMSG_PET_NAME_QUERY (0x1C62), the 18414 body.
     ///
     /// Sixteen presence bits interleaved across the pet GUID and the pet number,
@@ -3164,6 +3219,7 @@ struct CharmInfo
         }
         UnitActionBarEntry const* GetActionBarEntry(uint8 index) const { return &(PetActionBar[index]); }
 
+        bool CanToggleCreatureAutocast(uint32 spellId) const;
         void ToggleCreatureAutocast(uint32 spellid, bool apply);
 
         CharmSpellEntry* GetCharmSpell(uint8 index) { return &(m_charmspells[index]); }

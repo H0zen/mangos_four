@@ -5042,6 +5042,32 @@ bool CharmInfo::RemoveSpellFromActionBar(uint32 spell_id)
 }
 
 /**
+ * @brief Checks whether every matching charm spell has a safe autocast state.
+ *
+ * @param spellId The spell identifier to inspect.
+ * @return true when at least one matching spell exists and all matches are explicitly enabled or disabled.
+ */
+bool CharmInfo::CanToggleCreatureAutocast(uint32 spellId) const
+{
+    if (!spellId)
+        return false;
+
+    bool found = false;
+    for (uint32 index = 0; index < CREATURE_MAX_SPELLS; ++index)
+    {
+        if (m_charmspells[index].GetAction() != spellId)
+            continue;
+
+        found = true;
+        ActiveStates const state = m_charmspells[index].GetType();
+        if (state != ACT_DISABLED && state != ACT_ENABLED)
+            return false;
+    }
+
+    return found;
+}
+
+/**
  * @brief Enables or disables autocast for a creature charm spell.
  *
  * @param spellid The spell identifier.

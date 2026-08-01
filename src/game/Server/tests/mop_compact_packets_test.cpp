@@ -86,6 +86,107 @@ static WorldPacket InputPacket(uint32_t opcode, std::vector<uint8_t> const& body
     return packet;
 }
 
+static void test_pet_set_action_matches_retail_and_rejects_malformed_bodies()
+{
+    struct Fixture
+    {
+        std::vector<uint8_t> body;
+        uint32_t position;
+        uint32_t actionData;
+        uint64_t guid;
+    };
+
+    Fixture const retail[] = {
+        { { 0x05,0,0,0, 0x59,0x0A,0,0x81, 0xF7,0x62,0x40,0xF0,0x69,0x03,0x8F,0x95 }, 5, 0x81000A59, UINT64_C(0xF141638E68000294) },
+        { { 0x04,0,0,0, 0x44,0xC2,0x01,0xC1, 0xF7,0x0C,0x43,0xF0,0x81,0x33,0x53,0x73 }, 4, 0xC101C244, UINT64_C(0xF1420D5280003272) },
+        { { 0x04,0,0,0, 0x44,0xC2,0x01,0x81, 0x77,0x0C,0x43,0xF0,0x81,0x53,0x0C }, 4, 0x8101C244, UINT64_C(0xF1420D528000000D) },
+        { { 0x05,0,0,0, 0x59,0x0A,0,0x81, 0xF7,0x62,0x40,0xF0,0x69,0x00,0x8F,0xCD }, 5, 0x81000A59, UINT64_C(0xF141638E680001CC) },
+        { { 0x05,0,0,0, 0x59,0x0A,0,0xC1, 0xF7,0x62,0x40,0xF0,0x69,0x00,0x8F,0xCD }, 5, 0xC1000A59, UINT64_C(0xF141638E680001CC) },
+        { { 0x05,0,0,0, 0x59,0x0A,0,0x81, 0xF7,0x62,0x40,0xF0,0x69,0x00,0x8F,0xCD }, 5, 0x81000A59, UINT64_C(0xF141638E680001CC) },
+        { { 0x03,0,0,0, 0xBE,0x1E,0,0x81, 0xFF,0x0C,0x43,0xF0,0x81,0x03,0xA6,0x53,0x44 }, 3, 0x81001EBE, UINT64_C(0xF1420D528002A745) },
+        { { 0x03,0,0,0, 0xBE,0x1E,0,0xC1, 0xFF,0x0C,0x43,0xF0,0x81,0x03,0xA6,0x53,0x44 }, 3, 0xC1001EBE, UINT64_C(0xF1420D528002A745) }
+    };
+
+    for (Fixture const& fixture : retail)
+    {
+        WorldPacket packet = InputPacket(CMSG_PET_SET_ACTION, fixture.body);
+        uint32 position = 0xAAAAAAAA;
+        uint32 actionData = 0xBBBBBBBB;
+        ObjectGuid guid(UINT64_C(0xCCCCCCCCCCCCCCCC));
+        CHECK(MopCompactPackets::ReadPetSetAction(packet, position, actionData, guid));
+        CHECK(position == fixture.position);
+        CHECK(actionData == fixture.actionData);
+        CHECK(guid.GetRawValue() == fixture.guid);
+        CHECK(packet.rpos() == packet.size());
+    }
+
+    std::vector<uint8_t> const dense = {
+        0x09,0,0,0, 0x56,0x34,0x12,0xC1, 0xFF,
+        0x64,0x77,0x86,0x42,0x33,0x20,0x55,0x11
+    };
+    {
+        WorldPacket packet = InputPacket(CMSG_PET_SET_ACTION, dense);
+        uint32 position = 0, actionData = 0;
+        ObjectGuid guid;
+        CHECK(MopCompactPackets::ReadPetSetAction(packet, position, actionData, guid));
+        CHECK(position == 9);
+        CHECK(actionData == 0xC1123456);
+        CHECK(guid.GetRawValue() == UINT64_C(0x8776655443322110));
+    }
+
+    struct OneHot { uint8_t mask; uint8_t wire; uint64_t expected; };
+    OneHot const oneHot[] = {
+        { 0x80,0x20,UINT64_C(0x0000000000002100) },
+        { 0x40,0x11,UINT64_C(0x0000000000000010) },
+        { 0x20,0x64,UINT64_C(0x0000650000000000) },
+        { 0x10,0x42,UINT64_C(0x0000000043000000) },
+        { 0x08,0x33,UINT64_C(0x0000000000320000) },
+        { 0x04,0x86,UINT64_C(0x8700000000000000) },
+        { 0x02,0x77,UINT64_C(0x0076000000000000) },
+        { 0x01,0x55,UINT64_C(0x0000005400000000) }
+    };
+    for (OneHot const& fixture : oneHot)
+    {
+        std::vector<uint8_t> body = { 0x0A,0,0,0, 0x59,0x0A,0,0x81, fixture.mask, fixture.wire };
+        WorldPacket packet = InputPacket(CMSG_PET_SET_ACTION, body);
+        uint32 position = 0, actionData = 0;
+        ObjectGuid guid;
+        CHECK(MopCompactPackets::ReadPetSetAction(packet, position, actionData, guid));
+        CHECK(position == 10); // structurally valid; handler policy owns this bound
+        CHECK(guid.GetRawValue() == fixture.expected);
+    }
+
+    std::vector<std::vector<uint8_t>> malformed;
+    for (size_t length = 0; length < dense.size(); ++length)
+        malformed.emplace_back(dense.begin(), dense.begin() + length);
+    std::vector<uint8_t> trailing = dense;
+    trailing.push_back(0x00);
+    malformed.push_back(trailing);
+    std::vector<uint8_t> doubled = dense;
+    doubled.insert(doubled.end(), dense.begin(), dense.end());
+    malformed.push_back(doubled);
+    malformed.push_back({ 0,0,0,0, 0,0,0,0, 0x00 });
+    for (size_t i = 9; i < dense.size(); ++i)
+    {
+        std::vector<uint8_t> nonCanonical = dense;
+        nonCanonical[i] = 0x01;
+        malformed.push_back(nonCanonical);
+    }
+
+    for (std::vector<uint8_t> const& body : malformed)
+    {
+        WorldPacket packet = InputPacket(CMSG_PET_SET_ACTION, body);
+        uint32 position = 0xAAAAAAAA;
+        uint32 actionData = 0xBBBBBBBB;
+        ObjectGuid guid(UINT64_C(0xCCCCCCCCCCCCCCCC));
+        CHECK(!MopCompactPackets::ReadPetSetAction(packet, position, actionData, guid));
+        CHECK(packet.rpos() == packet.size());
+        CHECK(position == 0xAAAAAAAA);
+        CHECK(actionData == 0xBBBBBBBB);
+        CHECK(guid.GetRawValue() == UINT64_C(0xCCCCCCCCCCCCCCCC));
+    }
+}
+
 static void test_attack_swing_reasons()
 {
     const uint8_t expected[] = { 0x00, 0x40, 0x80, 0xC0 };
@@ -2111,6 +2212,8 @@ static void test_opcode_values_are_framable()
     CHECK(uint32_t(SMSG_PRE_RESURRECT) == 0x19C0u);
     CHECK(uint32_t(SMSG_UPDATE_COMBO_POINTS) == 0x082Fu);
     CHECK(uint32_t(CMSG_PET_STOP_ATTACK) == 0x065Bu);
+    CHECK(uint32_t(CMSG_PET_SET_ACTION) == 0x12E9u);
+    CHECK(uint32_t(CMSG_PET_SET_ACTION) != uint32_t(CMSG_PET_SPELL_AUTOCAST));
 
     CHECK(uint32_t(SMSG_ATTACKSWING_ERROR) <= 0x1FFFu);
     CHECK(uint32_t(SMSG_MOVE_SET_SWIM_SPEED) <= 0x1FFFu);
@@ -2142,6 +2245,7 @@ static void test_opcode_values_are_framable()
     CHECK(uint32_t(SMSG_PRE_RESURRECT) <= 0x1FFFu);
     CHECK(uint32_t(SMSG_UPDATE_COMBO_POINTS) <= 0x1FFFu);
     CHECK(uint32_t(CMSG_PET_STOP_ATTACK) <= 0x1FFFu);
+    CHECK(uint32_t(CMSG_PET_SET_ACTION) <= 0x1FFFu);
 }
 
 int main(int /*argc*/, char** /*argv*/)
@@ -2162,6 +2266,7 @@ int main(int /*argc*/, char** /*argv*/)
     test_spline_speed_family_mask_order();
     test_pet_action_matches_retail_bodies();
     test_pet_stop_attack_matches_retail_and_rejects_malformed_bodies();
+    test_pet_set_action_matches_retail_and_rejects_malformed_bodies();
     test_pet_name_query_matches_retail_bodies();
     test_lfg_join_matches_retail_bodies();
     test_mail_family_matches_retail_bodies();

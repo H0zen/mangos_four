@@ -276,6 +276,51 @@ target_compile_definitions(mop_compact_packets_test PRIVATE
 target_link_libraries(mop_compact_packets_test PRIVATE shared)
 add_test(NAME mop_compact_packets COMMAND mop_compact_packets_test)
 
+add_executable(mop_pet_set_action_capability_test
+    mop_pet_set_action_capability_test.cpp)
+target_include_directories(mop_pet_set_action_capability_test PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}/..
+    ${CMAKE_SOURCE_DIR}/src/shared)
+set_target_properties(mop_pet_set_action_capability_test PROPERTIES
+    CXX_STANDARD 17 CXX_STANDARD_REQUIRED ON)
+target_link_libraries(mop_pet_set_action_capability_test PRIVATE game)
+add_test(NAME mop_pet_set_action_capability
+    COMMAND mop_pet_set_action_capability_test)
+if(WIN32)
+    get_filename_component(MOP_PET_SET_ACTION_MYSQL_RUNTIME_DIR "${MySQL_LIBRARY}" DIRECTORY)
+    set_tests_properties(mop_pet_set_action_capability PROPERTIES
+        ENVIRONMENT_MODIFICATION "PATH=path_list_prepend:${MOP_PET_SET_ACTION_MYSQL_RUNTIME_DIR}")
+endif()
+
+add_test(NAME mop_pet_set_action_source
+    COMMAND ${CMAKE_COMMAND} -DSOURCE_ROOT=${CMAKE_SOURCE_DIR}
+        -P ${CMAKE_CURRENT_SOURCE_DIR}/mop_pet_set_action_source_test.cmake)
+
+foreach(mutation IN ITEMS
+        reader_swap_scalars reader_mask_order reader_byte_order
+        reader_drop_exact_length reader_drop_canonical_byte reader_drop_empty_guid
+        reader_drop_tail reader_assign_outputs_early
+        pet_drop_zero pet_drop_missing pet_drop_removed pet_admit_arbitrary pet_nonconst
+        charm_drop_zero charm_drop_found charm_first_match_only charm_admit_arbitrary charm_nonconst
+        handler_restore_raw_guid handler_restore_size_count handler_drop_position
+        handler_lookup_before_active_guid handler_drop_active_guid handler_drop_reverse_owner
+        handler_weaken_authority_conjunction handler_drop_actions_disabled handler_drop_charminfo
+        handler_mask_requested_type handler_accept_clear handler_accept_state01
+        handler_accept_reaction handler_accept_command handler_accept_arbitrary
+        handler_drop_zero_spell handler_drop_spell_lookup handler_drop_owned_spell
+        handler_drop_dbc_passive handler_drop_slot_spell handler_drop_slot_type
+        handler_drop_pet_capability handler_drop_charm_capability handler_add_alive_gate
+        handler_mirror_before_toggle handler_call_both_toggles handler_second_slot_write
+        handler_add_rejection_log registration_wrong_status registration_wrong_processing
+        registration_route_06f0 reference_keep_dormant)
+    add_test(NAME mop_pet_set_action_source_mutation_${mutation}
+        COMMAND ${CMAKE_COMMAND} -DSOURCE_ROOT=${CMAKE_SOURCE_DIR}
+            -DMUTATION=${mutation}
+            -P ${CMAKE_CURRENT_SOURCE_DIR}/mop_pet_set_action_source_test.cmake)
+    set_tests_properties(mop_pet_set_action_source_mutation_${mutation}
+        PROPERTIES WILL_FAIL TRUE)
+endforeach()
+
 add_test(NAME mop_pet_stop_attack_source
     COMMAND ${CMAKE_COMMAND} -DSOURCE_ROOT=${CMAKE_SOURCE_DIR}
         -P ${CMAKE_CURRENT_SOURCE_DIR}/mop_pet_stop_attack_source_test.cmake)
@@ -555,6 +600,11 @@ set_target_properties(mop_group_invite_response_packets_test PROPERTIES
 target_link_libraries(mop_group_invite_response_packets_test PRIVATE game)
 add_test(NAME mop_group_invite_response_packets
     COMMAND mop_group_invite_response_packets_test)
+if(WIN32)
+    get_filename_component(MOP_GROUP_INVITE_MYSQL_RUNTIME_DIR "${MySQL_LIBRARY}" DIRECTORY)
+    set_tests_properties(mop_group_invite_response_packets PROPERTIES
+        ENVIRONMENT_MODIFICATION "PATH=path_list_prepend:${MOP_GROUP_INVITE_MYSQL_RUNTIME_DIR}")
+endif()
 
 add_test(NAME mop_group_invite_response_source
     COMMAND ${CMAKE_COMMAND} -DSOURCE_ROOT=${CMAKE_SOURCE_DIR}

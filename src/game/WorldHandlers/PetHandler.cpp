@@ -578,129 +578,58 @@ void WorldSession::SendPetNameQuery(ObjectGuid petguid, uint64 petnumber)
  */
 void WorldSession::HandlePetSetAction(WorldPacket& recv_data)
 {
-    DETAIL_LOG("HandlePetSetAction. CMSG_PET_SET_ACTION");
-
+    uint32 position = 0;
+    uint32 actionData = 0;
     ObjectGuid petGuid;
-    uint8  count;
-
-    recv_data >> petGuid;
-
-    Creature* pet = _player->GetMap()->GetAnyTypeCreature(petGuid);
-
-    if (!pet || (pet != _player->GetPet() && pet != _player->GetCharm()))
-    {
-        sLog.outError("HandlePetSetAction: Unknown pet or pet owner.");
+    if (!MopCompactPackets::ReadPetSetAction(recv_data, position, actionData, petGuid))
         return;
-    }
-
-    // pet can have action bar disabled
-    if (pet->IsPet() && ((Pet*)pet)->GetModeFlags() & PET_MODE_DISABLE_ACTIONS)
-    {
+    if (position >= MAX_UNIT_ACTION_BAR_INDEX)
         return;
-    }
+    if (petGuid != _player->GetPetGuid() && petGuid != _player->GetCharmGuid())
+        return;
 
-    CharmInfo* charmInfo = pet->GetCharmInfo();
+    Creature* controlled = _player->GetMap()->GetAnyTypeCreature(petGuid);
+    if (!controlled || controlled->GetObjectGuid() != petGuid ||
+        controlled->GetCharmerOrOwnerGuid() != _player->GetObjectGuid())
+        return;
+
+    Pet* pet = controlled->IsPet() ? static_cast<Pet*>(controlled) : nullptr;
+    bool const eligibleCharm = !pet && petGuid == _player->GetCharmGuid() &&
+        controlled->IsCharmed() && !controlled->IsVehicle();
+    if (!pet && !eligibleCharm)
+        return;
+    if (pet && (pet->GetModeFlags() & PET_MODE_DISABLE_ACTIONS))
+        return;
+
+    CharmInfo* charmInfo = controlled->GetCharmInfo();
     if (!charmInfo)
-    {
-        sLog.outError("WorldSession::HandlePetSetAction: object (GUID: %u TypeId: %u) is considered pet-like but doesn't have a charminfo!", pet->GetGUIDLow(), pet->GetTypeId());
         return;
-    }
 
-    count = (recv_data.size() == 24) ? 2 : 1;
+    uint32 const spellId = UNIT_ACTION_BUTTON_ACTION(actionData);
+    uint8 const requestedType = UNIT_ACTION_BUTTON_TYPE(actionData);
+    if (!spellId || (requestedType != ACT_DISABLED && requestedType != ACT_ENABLED))
+        return;
 
-    uint32 position[2];
-    uint32 data[2];
-    bool move_command = false;
+    SpellEntry const* spellInfo = sSpellStore.LookupEntry(spellId);
+    if (!spellInfo || !controlled->HasSpell(spellId) || IsPassiveSpell(spellInfo))
+        return;
 
-    for (uint8 i = 0; i < count; ++i)
-    {
-        recv_data >> position[i];
-        recv_data >> data[i];
+    UnitActionBarEntry const* current = charmInfo->GetActionBarEntry(uint8(position));
+    if (!current || current->GetAction() != spellId ||
+        (current->GetType() != ACT_DISABLED && current->GetType() != ACT_ENABLED))
+        return;
 
-        uint8 act_state = UNIT_ACTION_BUTTON_TYPE(data[i]);
+    if ((pet && !pet->CanToggleAutocast(spellId)) ||
+        (eligibleCharm && !charmInfo->CanToggleCreatureAutocast(spellId)))
+        return;
 
-        // ignore invalid position
-        if (position[i] >= MAX_UNIT_ACTION_BAR_INDEX)
-        {
-            return;
-        }
+    bool const enabled = requestedType == ACT_ENABLED;
+    if (pet)
+        pet->ToggleAutocast(spellId, enabled);
+    else
+        charmInfo->ToggleCreatureAutocast(spellId, enabled);
 
-        // in the normal case, command and reaction buttons can only be moved, not removed
-        // at moving count ==2, at removing count == 1
-        // ignore attempt to remove command|reaction buttons (not possible at normal case)
-        if (act_state == ACT_COMMAND || act_state == ACT_REACTION)
-        {
-            if (count == 1)
-            {
-                return;
-            }
-
-            move_command = true;
-        }
-    }
-
-    // check swap (at command->spell swap client remove spell first in another packet, so check only command move correctness)
-    if (move_command)
-    {
-        uint8 act_state_0 = UNIT_ACTION_BUTTON_TYPE(data[0]);
-        if (act_state_0 == ACT_COMMAND || act_state_0 == ACT_REACTION)
-        {
-            uint32 spell_id_0 = UNIT_ACTION_BUTTON_ACTION(data[0]);
-            UnitActionBarEntry const* actionEntry_1 = charmInfo->GetActionBarEntry(position[1]);
-            if (!actionEntry_1 || spell_id_0 != actionEntry_1->GetAction() ||
-                    act_state_0 != actionEntry_1->GetType())
-                return;
-        }
-
-        uint8 act_state_1 = UNIT_ACTION_BUTTON_TYPE(data[1]);
-        if (act_state_1 == ACT_COMMAND || act_state_1 == ACT_REACTION)
-        {
-            uint32 spell_id_1 = UNIT_ACTION_BUTTON_ACTION(data[1]);
-            UnitActionBarEntry const* actionEntry_0 = charmInfo->GetActionBarEntry(position[0]);
-            if (!actionEntry_0 || spell_id_1 != actionEntry_0->GetAction() ||
-                    act_state_1 != actionEntry_0->GetType())
-                return;
-        }
-    }
-
-    for (uint8 i = 0; i < count; ++i)
-    {
-        uint32 spell_id = UNIT_ACTION_BUTTON_ACTION(data[i]);
-        uint8 act_state = UNIT_ACTION_BUTTON_TYPE(data[i]);
-
-        DETAIL_LOG("Player %s has changed pet spell action. Position: %u, Spell: %u, State: 0x%X", _player->GetName(), position[i], spell_id, uint32(act_state));
-
-        // if it's act for spell (en/disable/cast) and there is a spell given (0 = remove spell) which pet doesn't know, don't add
-        if (!((act_state == ACT_ENABLED || act_state == ACT_DISABLED || act_state == ACT_PASSIVE) && spell_id && !pet->HasSpell(spell_id)))
-        {
-            // sign for autocast
-            if (act_state == ACT_ENABLED && spell_id)
-            {
-                if (pet->IsCharmed())
-                {
-                    charmInfo->ToggleCreatureAutocast(spell_id, true);
-                }
-                else
-                {
-                    ((Pet*)pet)->ToggleAutocast(spell_id, true);
-                }
-            }
-            // sign for no/turn off autocast
-            else if (act_state == ACT_DISABLED && spell_id)
-            {
-                if (pet->IsCharmed())
-                {
-                    charmInfo->ToggleCreatureAutocast(spell_id, false);
-                }
-                else
-                {
-                    ((Pet*)pet)->ToggleAutocast(spell_id, false);
-                }
-            }
-
-            charmInfo->SetActionBar(position[i], spell_id, ActiveStates(act_state));
-        }
-    }
+    charmInfo->SetActionBar(uint8(position), spellId, ActiveStates(requestedType));
 }
 
 /**

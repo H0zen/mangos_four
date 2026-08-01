@@ -175,9 +175,9 @@
  *   TOTAL SMSG rows                   925
  *
  * SUBSYSTEM CONFIDENCE: high=365, low=221, medium=182, none=157
- * STATUS TOTALS: ACTIVE=534, DOC=434, DORMANT=552
+ * STATUS TOTALS: ACTIVE=535, DOC=434, DORMANT=551
  *   SMSG: ACTIVE=317, DOC=271, DORMANT=337
- *   CMSG: ACTIVE=217, DOC=163, DORMANT=215
+ *   CMSG: ACTIVE=218, DOC=163, DORMANT=214
  */
 
 // CAVEATS -- read before trusting any single row:
@@ -1739,7 +1739,7 @@ typedef uint16_t uint16;
  *   CMSG_PETITION_BUY                              0x12D9  DORMANT
  *   CMSG_PET_CANCEL_AURA                           0x12DA  DORMANT
  *   CMSG_DISMISS_CRITTER                           0x12DB  DORMANT
- *   CMSG_PET_SET_ACTION                            0x12E9  DORMANT
+ *   CMSG_PET_SET_ACTION                            0x12E9  ACTIVE
  *   CMSG_RETURN_TO_GRAVEYARD                       0x12EA  ACTIVE
  *   CMSG_QUESTGIVER_QUERY_QUEST                    0x12F0  ACTIVE   [high-conf]
  *   CMSG_BUY_BANK_SLOT                             0x12F2  DORMANT
