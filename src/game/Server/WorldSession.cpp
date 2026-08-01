@@ -314,6 +314,7 @@ static bool IsEnterWorldConverted(uint16 opcode)
         case SMSG_TAXINODE_STATUS:                 // MopTaxiPackets::BuildStatusBody
         case SMSG_SHOWTAXINODES:                   // MopTaxiPackets::BuildShowTaxiNodes
         case SMSG_NEW_TAXI_PATH:                   // empty taxi-node discovery notification
+        case SMSG_ACTIVATETAXIREPLY:               // MopTaxiPackets::BuildActivateTaxiReply
         case SMSG_INIT_WORLD_STATES:                // map, area, zone, 21-bit count, uint32 pairs; sub_732740
         case SMSG_UPDATE_WORLD_STATE:              // hidden bit, value, field; sub_6E8FA4 -> sub_CC00A4
         case SMSG_ITEM_TIME_UPDATE:                  // packed item GUID then uint32 duration; sub_6F06A8

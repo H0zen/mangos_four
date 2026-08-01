@@ -581,27 +581,34 @@ void MotionMaster::MoveWaypoint(int32 id /*=0*/, uint32 source /*=0==PATH_NO_PAT
  * @param path ID of the flight path.
  * @param pathnode Node of the flight path.
  */
-void MotionMaster::MoveTaxiFlight(uint32 path, uint32 pathnode)
+bool MotionMaster::MoveTaxiFlight(uint32 path, uint32 pathnode)
 {
-    if (m_owner->GetTypeId() == TYPEID_PLAYER)
-    {
-        if (path < sTaxiPathNodesByPath.size())
-        {
-            DEBUG_FILTER_LOG(LOG_FILTER_AI_AND_MOVEGENSS, "%s taxi to (Path %u node %u)", m_owner->GetGuidStr().c_str(), path, pathnode);
-            FlightPathMovementGenerator* mgen = new FlightPathMovementGenerator(sTaxiPathNodesByPath[path], pathnode);
-            Mutate(mgen);
-        }
-        else
-        {
-            sLog.outError("%s attempt taxi to (nonexistent Path %u node %u)",
-                          m_owner->GetGuidStr().c_str(), path, pathnode);
-        }
-    }
-    else
+    if (m_owner->GetTypeId() != TYPEID_PLAYER)
     {
         sLog.outError("%s attempt taxi to (Path %u node %u)",
                       m_owner->GetGuidStr().c_str(), path, pathnode);
+        return false;
     }
+
+    if (path >= sTaxiPathNodesByPath.size() ||
+        sTaxiPathNodesByPath[path].empty() ||
+        pathnode >= sTaxiPathNodesByPath[path].size())
+    {
+        sLog.outError("%s attempt taxi to (nonexistent Path %u node %u)",
+                      m_owner->GetGuidStr().c_str(), path, pathnode);
+        return false;
+    }
+
+    DEBUG_FILTER_LOG(LOG_FILTER_AI_AND_MOVEGENSS, "%s taxi to (Path %u node %u)", m_owner->GetGuidStr().c_str(), path, pathnode);
+    FlightPathMovementGenerator* mgen = new FlightPathMovementGenerator(sTaxiPathNodesByPath[path], pathnode);
+    Mutate(mgen);
+    if (!mgen->HasLaunched())
+    {
+        MovementExpired(false);
+        return false;
+    }
+
+    return true;
 }
 
 /**

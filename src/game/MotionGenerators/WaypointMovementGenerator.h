@@ -317,6 +317,7 @@ class FlightPathMovementGenerator
          * @param startNode Starting node index
          */
         explicit FlightPathMovementGenerator(TaxiPathNodeList const& pathnodes, uint32 startNode = 0)
+            : m_splineLaunched(false)
         {
             i_path = &pathnodes;
             i_currentNode = startNode;
@@ -360,6 +361,9 @@ class FlightPathMovementGenerator
          */
         MovementGeneratorType GetMovementGeneratorType() const override { return FLIGHT_MOTION_TYPE; }
 
+        /** @return True only when the current taxi spline launched with positive duration. */
+        bool HasLaunched() const { return m_splineLaunched; }
+
         /**
          * @brief Get the flight path
          * @return Reference to path nodes
@@ -399,6 +403,9 @@ class FlightPathMovementGenerator
          * @return True if reset position obtained
          */
         bool GetResetPosition(Player& player, float& x, float& y, float& z, float& o) const;
+
+    private:
+        bool m_splineLaunched;
 };
 
 #endif // MANGOS_WAYPOINTMOVEMENTGENERATOR_H

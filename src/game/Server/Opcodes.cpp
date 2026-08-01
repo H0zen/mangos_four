@@ -679,6 +679,10 @@ void InitializeOpcodes()
     DefC(CMSG_TAXIQUERYAVAILABLENODES, "CMSG_TAXIQUERYAVAILABLENODES", STATUS_LOGGEDIN, PROCESS_THREADUNSAFE, &WorldSession::HandleTaxiQueryAvailableNodes);
     DefS(SMSG_SHOWTAXINODES, "SMSG_SHOWTAXINODES");
     DefS(SMSG_NEW_TAXI_PATH, "SMSG_NEW_TAXI_PATH");
+    // Normal route selection sends destination/source scalars before the
+    // packed flight-master GUID and receives one four-bit result.
+    DefC(CMSG_ACTIVATETAXI, "CMSG_ACTIVATETAXI", STATUS_LOGGEDIN, PROCESS_THREADUNSAFE, &WorldSession::HandleActivateTaxiOpcode);
+    DefS(SMSG_ACTIVATETAXIREPLY, "SMSG_ACTIVATETAXIREPLY");
 
     // Directly verified 18414 inventory-movement requests. Each handler
     // decodes the packed request before reusing the established item logic.

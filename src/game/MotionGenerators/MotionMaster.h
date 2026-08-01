@@ -243,7 +243,7 @@ class MotionMaster : private std::stack<MovementGenerator*>
          * @param path ID of the flight path.
          * @param pathnode Node of the flight path.
          */
-        void MoveTaxiFlight(uint32 path, uint32 pathnode);
+        bool MoveTaxiFlight(uint32 path, uint32 pathnode);
 
         /**
          * @brief Makes the unit distract for a specified time.

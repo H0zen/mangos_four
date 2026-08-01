@@ -159,7 +159,7 @@ void WorldSession::SendTaxiMenu(Creature* unit)
  * @param path The taxi path id.
  * @param pathNode The starting node index.
  */
-void WorldSession::SendDoFlight(uint32 mountDisplayId, uint32 path, uint32 pathNode)
+bool WorldSession::SendDoFlight(uint32 mountDisplayId, uint32 path, uint32 pathNode)
 {
     // remove fake death
     if (GetPlayer()->hasUnitState(UNIT_STAT_DIED))
@@ -175,7 +175,16 @@ void WorldSession::SendDoFlight(uint32 mountDisplayId, uint32 path, uint32 pathN
         GetPlayer()->Mount(mountDisplayId);
     }
 
-    GetPlayer()->GetMotionMaster()->MoveTaxiFlight(path, pathNode);
+    if (!GetPlayer()->GetMotionMaster()->MoveTaxiFlight(path, pathNode))
+    {
+        if (mountDisplayId)
+        {
+            GetPlayer()->Unmount();
+        }
+        return false;
+    }
+
+    return true;
 }
 
 /**
@@ -219,8 +228,8 @@ bool WorldSession::SendLearnNewTaxiNode(Creature* unit)
  */
 void WorldSession::SendActivateTaxiReply(ActivateTaxiReply reply)
 {
-    WorldPacket data(SMSG_ACTIVATETAXIREPLY, 4);
-    data << uint32(reply);
+    WorldPacket data(SMSG_ACTIVATETAXIREPLY, 1);
+    MopTaxiPackets::BuildActivateTaxiReply(data, reply);
     SendPacket(&data);
 
     DEBUG_LOG("WORLD: Sent SMSG_ACTIVATETAXIREPLY");
@@ -363,27 +372,67 @@ void WorldSession::HandleActivateTaxiOpcode(WorldPacket& recv_data)
 {
     DEBUG_LOG("WORLD: Received opcode CMSG_ACTIVATETAXI");
 
-    ObjectGuid guid;
-    std::vector<uint32> nodes;
-    nodes.resize(2);
+    MopTaxiPackets::TaxiActivationRequest request;
+    if (!MopTaxiPackets::ParseActivateTaxi(recv_data, request))
+    {
+        return;
+    }
 
-    recv_data >> guid >> nodes[0] >> nodes[1];
-    DEBUG_LOG("WORLD: Received opcode CMSG_ACTIVATETAXI from %d to %d" , nodes[0], nodes[1]);
-    Creature* npc = GetPlayer()->GetNPCIfCanInteractWith(guid, UNIT_NPC_FLAG_FLIGHTMASTER);
+    DEBUG_LOG("WORLD: Received opcode CMSG_ACTIVATETAXI from %u to %u",
+        request.sourceNode, request.destinationNode);
+    Creature* npc = GetPlayer()->GetNPCIfCanInteractWith(
+        request.flightMaster, UNIT_NPC_FLAG_FLIGHTMASTER);
     if (!npc)
     {
-        DEBUG_LOG("WORLD: HandleActivateTaxiOpcode - %s not found or you can't interact with it.", guid.GetString().c_str());
+        DEBUG_LOG("WORLD: HandleActivateTaxiOpcode - %s not found or you can't interact with it.",
+            request.flightMaster.GetString().c_str());
+        return;
+    }
+
+    uint32 currentNode = sObjectMgr.GetNearestTaxiNode(
+        npc->GetPositionX(), npc->GetPositionY(), npc->GetPositionZ(),
+        npc->GetMapId(), GetPlayer()->GetTeam());
+    if (currentNode == 0 || request.sourceNode != currentNode)
+    {
+        SendActivateTaxiReply(ERR_TAXITOOFARAWAY);
+        return;
+    }
+
+    if (!GetPlayer()->m_taxi.IsValidNodeId(currentNode) ||
+        !GetPlayer()->m_taxi.IsValidNodeId(request.destinationNode))
+    {
+        SendActivateTaxiReply(ERR_TAXINOSUCHPATH);
+        return;
+    }
+
+    TaxiNodesEntry const* currentNodeEntry = sTaxiNodesStore.LookupEntry(currentNode);
+    TaxiNodesEntry const* destinationNodeEntry =
+        sTaxiNodesStore.LookupEntry(request.destinationNode);
+    uint32 path = 0;
+    uint32 cost = 0;
+    sObjectMgr.GetTaxiPath(currentNode, request.destinationNode, path, cost);
+    if (currentNode == request.destinationNode ||
+        !currentNodeEntry || !destinationNodeEntry ||
+        currentNodeEntry->ContinentID != npc->GetMapId() ||
+        destinationNodeEntry->ContinentID != npc->GetMapId() || !path ||
+        path >= sTaxiPathNodesByPath.size() ||
+        !MopTaxiPackets::IsSameMapTaxiPath(
+            sTaxiPathNodesByPath[path], npc->GetMapId()))
+    {
+        SendActivateTaxiReply(ERR_TAXINOSUCHPATH);
         return;
     }
 
     if (!_player->IsTaxiCheater())
     {
-        if (!_player->m_taxi.IsTaximaskNodeKnown(nodes[0]) || !_player->m_taxi.IsTaximaskNodeKnown(nodes[1]))
+        if (!_player->m_taxi.IsTaximaskNodeKnown(currentNode) ||
+            !_player->m_taxi.IsTaximaskNodeKnown(request.destinationNode))
         {
             SendActivateTaxiReply(ERR_TAXINOTVISITED);
             return;
         }
     }
 
+    std::vector<uint32> nodes = { currentNode, request.destinationNode };
     GetPlayer()->ActivateTaxiPathTo(nodes, npc);
 }

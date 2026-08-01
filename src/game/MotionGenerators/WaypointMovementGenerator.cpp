@@ -891,6 +891,12 @@ void FlightPathMovementGenerator::Reset(Player& player)
     // Initialize the movement spline for the player
     Movement::MoveSplineInit init(player);
     uint32 end = GetPathAtMapEnd();
+    if (end - GetCurrentNode() < 2)
+    {
+        m_splineLaunched = false;
+        return;
+    }
+
     for (uint32 i = GetCurrentNode(); i != end; ++i)
     {
         G3D::Vector3 vertice((*i_path)[i].x, (*i_path)[i].y, (*i_path)[i].z);
@@ -901,7 +907,7 @@ void FlightPathMovementGenerator::Reset(Player& player)
     init.SetSmooth();
     init.SetWalk(true);
     init.SetVelocity(PLAYER_FLIGHT_SPEED);
-    init.Launch();
+    m_splineLaunched = init.Launch() > 0;
 }
 
 /**

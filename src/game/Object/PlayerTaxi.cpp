@@ -559,16 +559,32 @@ bool Player::ActivateTaxiPathTo(std::vector<uint32> const& nodes, Creature* npc 
         return false;
     }
 
-    // Checks and preparations done, DO FLIGHT
-    ModifyMoney(-(int64)totalcost);
-    GetAchievementMgr().UpdateAchievementCriteria(ACHIEVEMENT_CRITERIA_TYPE_GOLD_SPENT_FOR_TRAVELLING, totalcost);
-    GetAchievementMgr().UpdateAchievementCriteria(ACHIEVEMENT_CRITERIA_TYPE_FLIGHT_PATHS_TAKEN, 1);
+    return StartTaxiFlight(mount_display_id, sourcepath, totalcost);
+}
 
-    // prevent stealth flight
+/**
+ * @brief Debits and launches a taxi route after route and fare validation.
+ * @param mountDisplayId Taxi mount display identifier.
+ * @param path Taxi path identifier.
+ * @param totalCost Full fare to debit and refund if launch fails.
+ * @return True only after the movement spline launches successfully.
+ */
+bool Player::StartTaxiFlight(uint32 mountDisplayId, uint32 path, uint32 totalCost)
+{
+    ModifyMoney(-(int64)totalCost);
     RemoveSpellsCausingAura(SPELL_AURA_MOD_STEALTH);
 
+    if (!GetSession()->SendDoFlight(mountDisplayId, path))
+    {
+        ModifyMoney(totalCost);
+        m_taxi.ClearTaxiDestinations();
+        GetSession()->SendActivateTaxiReply(ERR_TAXIUNSPECIFIEDSERVERERROR);
+        return false;
+    }
+
+    GetAchievementMgr().UpdateAchievementCriteria(ACHIEVEMENT_CRITERIA_TYPE_GOLD_SPENT_FOR_TRAVELLING, totalCost);
+    GetAchievementMgr().UpdateAchievementCriteria(ACHIEVEMENT_CRITERIA_TYPE_FLIGHT_PATHS_TAKEN, 1);
     GetSession()->SendActivateTaxiReply(ERR_TAXIOK);
-    GetSession()->SendDoFlight(mount_display_id, sourcepath);
 
     return true;
 }

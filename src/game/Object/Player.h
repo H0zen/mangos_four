@@ -1145,6 +1145,64 @@ namespace MopTaxiPackets
         return true;
     }
 
+    struct TaxiActivationRequest
+    {
+        uint32 destinationNode = 0;
+        uint32 sourceNode = 0;
+        ObjectGuid flightMaster;
+    };
+
+    inline bool IsSameMapTaxiPath(TaxiPathNodeList const& path,
+        uint32 mapId)
+    {
+        if (path.empty())
+        {
+            return false;
+        }
+
+        for (size_t i = 0; i < path.size(); ++i)
+        {
+            if (path[i].ContinentID != mapId)
+            {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    inline bool ParseActivateTaxi(WorldPacket& in,
+        TaxiActivationRequest& request)
+    {
+        // Writer sub_688F62 emits destination and source before the packed
+        // flight-master GUID. Validate the complete body before reading it.
+        size_t const remaining = in.size() - in.rpos();
+        if (remaining < 9)
+        {
+            return RejectMalformedRequest(in);
+        }
+
+        size_t const guidByteCount = PackedGuidByteCount(in[in.rpos() + 8]);
+        if (remaining != 9 + guidByteCount ||
+            !HasCanonicalPackedGuidBytes(in, in.rpos() + 9, guidByteCount))
+        {
+            return RejectMalformedRequest(in);
+        }
+
+        TaxiActivationRequest parsed;
+        in >> parsed.destinationNode >> parsed.sourceNode;
+        in.ResetBitReader();
+        in.ReadGuidMask<4, 0, 1, 2, 5, 6, 7, 3>(parsed.flightMaster);
+        in.ReadGuidBytes<1, 0, 6, 5, 2, 4, 3, 7>(parsed.flightMaster);
+        if (in.rpos() != in.size() || parsed.flightMaster.IsEmpty())
+        {
+            return RejectMalformedRequest(in);
+        }
+
+        request = parsed;
+        return true;
+    }
+
     inline TaxiNodeStatus StatusForKnown(bool known)
     {
         return known ? TaxiNodeStatus::Learned : TaxiNodeStatus::Unlearned;
@@ -1159,6 +1217,31 @@ namespace MopTaxiPackets
         out.WriteGuidMask<3, 0>(guid);
         out.FlushBits();
         out.WriteGuidBytes<0, 5, 2, 1, 4, 6, 7, 3>(guid);
+    }
+
+    inline uint8 ActivateTaxiReplyValue(ActivateTaxiReply reply)
+    {
+        switch (reply)
+        {
+            case ERR_TAXIOK: return 8;
+            case ERR_TAXIUNSPECIFIEDSERVERERROR: return 5;
+            case ERR_TAXINOSUCHPATH: return 6;
+            case ERR_TAXINOTENOUGHMONEY: return 4;
+            case ERR_TAXITOOFARAWAY: return 13;
+            case ERR_TAXINOVENDORNEARBY: return 12;
+            case ERR_TAXINOTVISITED: return 15;
+            case ERR_TAXIPLAYERBUSY: return 10;
+            case ERR_TAXIPLAYERALREADYMOUNTED: return 7;
+            case ERR_TAXIPLAYERSHAPESHIFTED: return 9;
+            default: return 5;
+        }
+    }
+
+    inline void BuildActivateTaxiReply(WorldPacket& out,
+        ActivateTaxiReply reply)
+    {
+        out.WriteBits(ActivateTaxiReplyValue(reply), 4);
+        out.FlushBits();
     }
 
     inline void BuildShowTaxiNodes(WorldPacket& out, ObjectGuid guid,
@@ -3255,6 +3338,9 @@ class Player : public Unit
 
         // Activate taxi path to specified taxi path ID
         bool ActivateTaxiPathTo(uint32 taxi_path_id, uint32 spellid = 0);
+
+        // Debit and launch a fully validated taxi route.
+        bool StartTaxiFlight(uint32 mountDisplayId, uint32 path, uint32 totalCost);
 
         // Continue the taxi flight
         void ContinueTaxiFlight();

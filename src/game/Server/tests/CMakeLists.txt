@@ -1849,6 +1849,48 @@ foreach(mutation IN ITEMS
         PROPERTIES WILL_FAIL TRUE)
 endforeach()
 
+add_executable(mop_taxi_activation_packets_test mop_taxi_activation_packets_test.cpp)
+target_include_directories(mop_taxi_activation_packets_test PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}/..
+    ${CMAKE_SOURCE_DIR}/src/shared)
+set_target_properties(mop_taxi_activation_packets_test PROPERTIES CXX_STANDARD 17 CXX_STANDARD_REQUIRED ON)
+target_link_libraries(mop_taxi_activation_packets_test PRIVATE game)
+add_test(NAME mop_taxi_activation_packets COMMAND mop_taxi_activation_packets_test)
+
+add_executable(mop_taxi_activation_runtime_test mop_taxi_activation_runtime_test.cpp)
+target_include_directories(mop_taxi_activation_runtime_test PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}/..
+    ${CMAKE_SOURCE_DIR}/src/proto
+    ${CMAKE_SOURCE_DIR}/src/shared)
+set_target_properties(mop_taxi_activation_runtime_test PROPERTIES CXX_STANDARD 17 CXX_STANDARD_REQUIRED ON)
+target_link_libraries(mop_taxi_activation_runtime_test PRIVATE game)
+add_test(NAME mop_taxi_activation_runtime COMMAND mop_taxi_activation_runtime_test)
+
+add_test(NAME mop_taxi_activation_source
+    COMMAND ${CMAKE_COMMAND} -DSOURCE_ROOT=${CMAKE_SOURCE_DIR}
+        -P ${CMAKE_CURRENT_SOURCE_DIR}/mop_taxi_activation_source_test.cmake)
+
+foreach(mutation IN ITEMS
+        request_scalar_order request_mask request_bytes request_xor request_canonical
+        request_eof request_zero_guid handler_parser interaction_before_parse
+        npc_authority current_node_lookup source_authority too_far_reply
+        node_bounds same_node_guard same_map_guard path_node_map_guard no_path_guard known_nodes
+        activation_nodes reply_ok_mapping reply_no_path_mapping reply_too_far_mapping
+        reply_width reply_flush reply_builder launch_result spline_launch_result
+        flight_min_nodes failed_generator_cleanup send_flight_result
+        success_before_launch achievement_before_launch fare_after_launch
+        insufficient_money launch_failure_cleanup
+        duplicate_flight_guard request_registration reply_registration reply_admission
+        request_reference reply_reference express_registration completion_registration
+        express_reference completion_reference)
+    add_test(NAME mop_taxi_activation_source_mutation_${mutation}
+        COMMAND ${CMAKE_COMMAND} -DSOURCE_ROOT=${CMAKE_SOURCE_DIR}
+            -DMUTATION=${mutation}
+            -P ${CMAKE_CURRENT_SOURCE_DIR}/mop_taxi_activation_source_test.cmake)
+    set_tests_properties(mop_taxi_activation_source_mutation_${mutation}
+        PROPERTIES WILL_FAIL TRUE)
+endforeach()
+
 add_executable(mop_death_packets_test mop_death_packets_test.cpp)
 target_include_directories(mop_death_packets_test PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/..
