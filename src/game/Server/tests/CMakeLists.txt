@@ -104,6 +104,33 @@ set_target_properties(mop_updateobject_test PROPERTIES CXX_STANDARD 17 CXX_STAND
 target_link_libraries(mop_updateobject_test PRIVATE game)
 add_test(NAME mop_updateobject COMMAND mop_updateobject_test)
 
+add_executable(mop_transport_updateformap_packet_test
+    mop_transport_updateformap_packet_test.cpp)
+target_include_directories(mop_transport_updateformap_packet_test PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}/..
+    ${CMAKE_SOURCE_DIR}/src/shared
+    $<TARGET_PROPERTY:game,INTERFACE_INCLUDE_DIRECTORIES>)
+set_target_properties(mop_transport_updateformap_packet_test
+    PROPERTIES CXX_STANDARD 17 CXX_STANDARD_REQUIRED ON)
+target_compile_definitions(mop_transport_updateformap_packet_test PRIVATE
+    $<TARGET_PROPERTY:game,INTERFACE_COMPILE_DEFINITIONS>)
+target_link_libraries(mop_transport_updateformap_packet_test PRIVATE shared)
+add_test(NAME mop_transport_updateformap_packet
+    COMMAND mop_transport_updateformap_packet_test)
+
+add_test(NAME mop_transport_updateformap_source
+    COMMAND ${CMAKE_COMMAND} -DSOURCE_ROOT=${CMAKE_SOURCE_DIR}
+        -P ${CMAKE_CURRENT_SOURCE_DIR}/mop_transport_updateformap_source_test.cmake)
+
+foreach(mutation IN ITEMS create_sequential_read out_sequential_read out_current_map mismatch_return)
+    add_test(NAME mop_transport_updateformap_source_mutation_${mutation}
+        COMMAND ${CMAKE_COMMAND} -DSOURCE_ROOT=${CMAKE_SOURCE_DIR}
+            -DMUTATION=${mutation}
+            -P ${CMAKE_CURRENT_SOURCE_DIR}/mop_transport_updateformap_source_test.cmake)
+    set_tests_properties(mop_transport_updateformap_source_mutation_${mutation}
+        PROPERTIES WILL_FAIL TRUE)
+endforeach()
+
 add_test(NAME mop_self_values_source
     COMMAND ${CMAKE_COMMAND} -DSOURCE_ROOT=${CMAKE_SOURCE_DIR}
         -P ${CMAKE_CURRENT_SOURCE_DIR}/mop_self_values_source_test.cmake)

@@ -635,7 +635,7 @@ void Transport::UpdateForMap(Map const* targetMap)
         {
             if (this != itr->getSource()->GetTransport())
             {
-                UpdateData transData(itr->getSource()->GetMapId());
+                UpdateData transData(targetMap->GetId());
                 BuildCreateUpdateBlockForPlayer(&transData, itr->getSource());
                 if (!transData.HasData())
                 {
@@ -645,9 +645,9 @@ void Transport::UpdateForMap(Map const* targetMap)
                 transData.BuildPacket(&packet);
 
                 // Prevent sending transport maps in player update object
-                if (packet.ReadUInt16() != itr->getSource()->GetMapId())
+                if (packet.read<uint16>(0) != itr->getSource()->GetMapId())
                 {
-                    return;
+                    continue;
                 }
 
                 itr->getSource()->SendDirectMessage(&packet);
@@ -656,7 +656,7 @@ void Transport::UpdateForMap(Map const* targetMap)
     }
     else
     {
-        UpdateData transData(GetMapId());
+        UpdateData transData(targetMap->GetId());
         BuildOutOfRangeUpdateBlock(&transData);
         WorldPacket out_packet;
         transData.BuildPacket(&out_packet);
@@ -666,9 +666,9 @@ void Transport::UpdateForMap(Map const* targetMap)
             if (this != itr->getSource()->GetTransport())
             {
                 // Prevent sending transport maps in player update object
-                if (out_packet.ReadUInt16() != itr->getSource()->GetMapId())
+                if (out_packet.read<uint16>(0) != itr->getSource()->GetMapId())
                 {
-                    return;
+                    continue;
                 }
 
                 itr->getSource()->SendDirectMessage(&out_packet);
