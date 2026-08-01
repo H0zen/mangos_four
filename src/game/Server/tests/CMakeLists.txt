@@ -1642,6 +1642,10 @@ foreach(mutation IN ITEMS root_then_clear_flags drop_back_speed_snare_calls spee
         force_swim_sequence force_swim_flags2_width flags2_width inbound_registration movement_gap_registration force_swim_registration
         force_swim_handler_order output_metadata heartbeat_framing mover_guid_validation
         spline_state_builder spline_state_registration monster_move_writer monster_move_registration
+        spline_mode_run_mask spline_mode_run_bytes spline_mode_walk_mask spline_mode_walk_bytes
+        spline_mode_raw_guid spline_mode_swap_builders spline_mode_reverse_selector
+        spline_mode_run_registration spline_mode_walk_registration
+        spline_mode_run_gate spline_mode_walk_gate spline_mode_run_reference spline_mode_walk_reference
         monster_move_integration monster_move_gate teleport_ack_registration
         flight_sequence_order flight_flags2_width flight_set_fly_selector
         flight_registration_atomic flight_invent_stop_descend)

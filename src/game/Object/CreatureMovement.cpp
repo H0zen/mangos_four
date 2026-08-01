@@ -76,13 +76,11 @@ void Creature::SetWalk(bool enable, bool asDefault)
         WorldPacket data(enable ? SMSG_SPLINE_MOVE_SET_WALK_MODE : SMSG_SPLINE_MOVE_SET_RUN_MODE, 9);
         if (enable)
         {
-            data.WriteGuidMask<7, 6, 5, 1, 3, 4, 2, 0>(GetObjectGuid());
-            data.WriteGuidBytes<4, 2, 1, 6, 5, 0, 7, 3>(GetObjectGuid());
+            MopCompactPackets::BuildSplineMoveSetWalkMode(data, GetObjectGuid());
         }
         else
         {
-            data.WriteGuidMask<5, 6, 3, 7, 2, 0, 4, 1>(GetObjectGuid());
-            data.WriteGuidBytes<7, 0, 4, 6, 5, 1, 2, 3>(GetObjectGuid());
+            MopCompactPackets::BuildSplineMoveSetRunMode(data, GetObjectGuid());
         }
 
         SendMessageToSet(&data, true);

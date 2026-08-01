@@ -1833,6 +1833,18 @@ namespace MopCompactPackets
         out.WriteGuidBytes<7, 5, 1, 0, 6, 4, 2, 3>(guid);
     }
 
+    inline void BuildSplineMoveSetRunMode(WorldPacket& out, ObjectGuid guid)
+    {
+        out.WriteGuidMask<5, 6, 2, 4, 7, 1, 3, 0>(guid);
+        out.WriteGuidBytes<5, 1, 4, 0, 7, 3, 6, 2>(guid);
+    }
+
+    inline void BuildSplineMoveSetWalkMode(WorldPacket& out, ObjectGuid guid)
+    {
+        out.WriteGuidMask<4, 3, 0, 2, 1, 6, 5, 7>(guid);
+        out.WriteGuidBytes<1, 4, 5, 6, 2, 0, 3, 7>(guid);
+    }
+
     inline void BuildSplineMoveSetWaterWalk(WorldPacket& out, ObjectGuid guid)
     {
         out.WriteGuidMask<3, 1, 5, 6, 4, 0, 7, 2>(guid);

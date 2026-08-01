@@ -400,6 +400,8 @@ static bool IsEnterWorldConverted(uint16 opcode)
         case SMSG_MOVE_FEATHER_FALL:               // MopCompactPackets::BuildMoveFeatherFall
         case SMSG_MOVE_NORMAL_FALL:                // MopCompactPackets::BuildMoveNormalFall
         case SMSG_SPLINE_MOVE_SET_NORMAL_FALL:     // MopMovementPackets::BuildSplineState
+        case SMSG_SPLINE_MOVE_SET_RUN_MODE:        // MopCompactPackets::BuildSplineMoveSetRunMode -- observers
+        case SMSG_SPLINE_MOVE_SET_WALK_MODE:       // MopCompactPackets::BuildSplineMoveSetWalkMode -- observers
         case SMSG_SPLINE_MOVE_SET_WATER_WALK:      // MopMovementPackets::BuildSplineState
         case SMSG_SPLINE_MOVE_SET_FEATHER_FALL:    // MopMovementPackets::BuildSplineState
         case SMSG_SPLINE_MOVE_SET_LAND_WALK:       // MopMovementPackets::BuildSplineState

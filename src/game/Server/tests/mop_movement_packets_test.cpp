@@ -742,6 +742,37 @@ static void test_spline_state_packets()
         { 1, 5, 6, 0, 7, 2, 3, 4 }, { 1, 6, 4, 3, 7, 0, 2, 5 });
 }
 
+static void CheckSplineModePacket(OpcodesList opcode, SplineStateBuilder builder,
+    uint64 guid, std::initializer_list<uint8> expected)
+{
+    WorldPacket packet(opcode, 9);
+    builder(packet, ObjectGuid(guid));
+
+    CHECK(packet.GetOpcode() == opcode);
+    CHECK(packet.size() == expected.size());
+    CHECK(Equal(packet, std::vector<uint8>(expected)));
+}
+
+static void test_spline_run_walk_mode_packets()
+{
+    // Binary-reader-derived synthetic fixtures. The active build-18414 corpus
+    // has no 0x0B18 or 0x1865 bodies, so these prove the recovered grammar but
+    // are not described as captured retail traffic. The sparse GUID makes the
+    // mask order observable; the full GUID makes every XOR byte observable.
+    CheckSplineModePacket(SMSG_SPLINE_MOVE_SET_RUN_MODE,
+        &MopCompactPackets::BuildSplineMoveSetRunMode,
+        0x0807060504030201ull, { 0xFF, 0x07, 0x03, 0x04, 0x00, 0x09, 0x05, 0x06, 0x02 });
+    CheckSplineModePacket(SMSG_SPLINE_MOVE_SET_RUN_MODE,
+        &MopCompactPackets::BuildSplineMoveSetRunMode,
+        0x00B20000000000A1ull, { 0x41, 0xA0, 0xB3 });
+    CheckSplineModePacket(SMSG_SPLINE_MOVE_SET_WALK_MODE,
+        &MopCompactPackets::BuildSplineMoveSetWalkMode,
+        0x0807060504030201ull, { 0xFF, 0x03, 0x04, 0x07, 0x06, 0x02, 0x00, 0x05, 0x09 });
+    CheckSplineModePacket(SMSG_SPLINE_MOVE_SET_WALK_MODE,
+        &MopCompactPackets::BuildSplineMoveSetWalkMode,
+        0x00B20000000000A1ull, { 0x24, 0xB3, 0xA0 });
+}
+
 static void CheckDecoded(MovementInfo const& info, RefState const& s, OpcodesList opcode)
 {
     CHECK(info.GetGuid().GetRawValue() == s.guid);
@@ -2568,6 +2599,7 @@ int main(int, char**)
     test_all_speed_ack_sequences_differ();
     test_speed_ack_sequences_are_distinct();
     test_spline_state_packets();
+    test_spline_run_walk_mode_packets();
     test_water_walk_mover_retail_bodies();
     test_water_and_land_walk_layouts_differ();
     test_fall_mover_retail_bodies();

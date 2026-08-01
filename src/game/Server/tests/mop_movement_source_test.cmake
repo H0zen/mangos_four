@@ -7,6 +7,7 @@ file(READ "${SOURCE_ROOT}/src/game/Object/CreatureMovement.cpp" creature_movemen
 file(READ "${SOURCE_ROOT}/src/game/movement/MovementInfo.cpp" movement_codec)
 file(READ "${SOURCE_ROOT}/src/game/Server/Opcodes.cpp" opcode_registry)
 file(READ "${SOURCE_ROOT}/src/game/Server/Opcodes.h" opcode_header)
+file(READ "${SOURCE_ROOT}/src/game/Server/Opcodes_reference.h" opcode_reference)
 file(READ "${SOURCE_ROOT}/src/game/WorldHandlers/MovementHandler.cpp" movement_handler)
 file(READ "${SOURCE_ROOT}/src/game/movement/packet_builder.h" spline_packet_header)
 file(READ "${SOURCE_ROOT}/src/game/movement/packet_builder.cpp" spline_packet_source)
@@ -14,7 +15,11 @@ file(READ "${SOURCE_ROOT}/src/game/movement/MoveSplineInit.cpp" spline_init_sour
 file(READ "${SOURCE_ROOT}/src/game/Server/WorldSession.cpp" world_session_source)
 
 set(original_movement_structures "${movement_structures}")
+set(original_unit_header "${unit_header}")
+set(original_creature_movement_source "${creature_movement_source}")
 set(original_opcode_registry "${opcode_registry}")
+set(original_opcode_reference "${opcode_reference}")
+set(original_world_session_source "${world_session_source}")
 
 if(MUTATION STREQUAL "root_then_clear_flags")
     string(REPLACE "            ((Player*)target)->m_movementInfo.SetMovementFlags(MOVEFLAG_NONE);
@@ -109,6 +114,53 @@ elseif(MUTATION STREQUAL "spline_state_registration")
     string(REPLACE "DefS(SMSG_SPLINE_MOVE_SET_NORMAL_FALL, \"SMSG_SPLINE_MOVE_SET_NORMAL_FALL\");"
         "DefS_disabled(SMSG_SPLINE_MOVE_SET_NORMAL_FALL, \"SMSG_SPLINE_MOVE_SET_NORMAL_FALL\");"
         opcode_registry "${opcode_registry}")
+elseif(MUTATION STREQUAL "spline_mode_run_mask")
+    string(REPLACE "WriteGuidMask<5, 6, 2, 4, 7, 1, 3, 0>(guid)"
+        "WriteGuidMask<6, 5, 2, 4, 7, 1, 3, 0>(guid)" unit_header "${unit_header}")
+elseif(MUTATION STREQUAL "spline_mode_run_bytes")
+    string(REPLACE "WriteGuidBytes<5, 1, 4, 0, 7, 3, 6, 2>(guid)"
+        "WriteGuidBytes<1, 5, 4, 0, 7, 3, 6, 2>(guid)" unit_header "${unit_header}")
+elseif(MUTATION STREQUAL "spline_mode_walk_mask")
+    string(REPLACE "WriteGuidMask<4, 3, 0, 2, 1, 6, 5, 7>(guid)"
+        "WriteGuidMask<3, 4, 0, 2, 1, 6, 5, 7>(guid)" unit_header "${unit_header}")
+elseif(MUTATION STREQUAL "spline_mode_walk_bytes")
+    string(REPLACE "WriteGuidBytes<1, 4, 5, 6, 2, 0, 3, 7>(guid)"
+        "WriteGuidBytes<4, 1, 5, 6, 2, 0, 3, 7>(guid)" unit_header "${unit_header}")
+elseif(MUTATION STREQUAL "spline_mode_raw_guid")
+    string(REPLACE "out.WriteGuidBytes<1, 4, 5, 6, 2, 0, 3, 7>(guid);"
+        "out << guid;" unit_header "${unit_header}")
+elseif(MUTATION STREQUAL "spline_mode_swap_builders")
+    string(REPLACE
+        "MopCompactPackets::BuildSplineMoveSetWalkMode(data, GetObjectGuid());\n        }\n        else\n        {\n            MopCompactPackets::BuildSplineMoveSetRunMode(data, GetObjectGuid());"
+        "MopCompactPackets::BuildSplineMoveSetRunMode(data, GetObjectGuid());\n        }\n        else\n        {\n            MopCompactPackets::BuildSplineMoveSetWalkMode(data, GetObjectGuid());"
+        creature_movement_source "${creature_movement_source}")
+elseif(MUTATION STREQUAL "spline_mode_reverse_selector")
+    string(REPLACE
+        "WorldPacket data(enable ? SMSG_SPLINE_MOVE_SET_WALK_MODE : SMSG_SPLINE_MOVE_SET_RUN_MODE, 9);"
+        "WorldPacket data(enable ? SMSG_SPLINE_MOVE_SET_RUN_MODE : SMSG_SPLINE_MOVE_SET_WALK_MODE, 9);"
+        creature_movement_source "${creature_movement_source}")
+elseif(MUTATION STREQUAL "spline_mode_run_registration")
+    string(REPLACE "DefS(SMSG_SPLINE_MOVE_SET_RUN_MODE, \"SMSG_SPLINE_MOVE_SET_RUN_MODE\");"
+        "DefS_disabled(SMSG_SPLINE_MOVE_SET_RUN_MODE, \"SMSG_SPLINE_MOVE_SET_RUN_MODE\");"
+        opcode_registry "${opcode_registry}")
+elseif(MUTATION STREQUAL "spline_mode_walk_registration")
+    string(REPLACE "DefS(SMSG_SPLINE_MOVE_SET_WALK_MODE, \"SMSG_SPLINE_MOVE_SET_WALK_MODE\");"
+        "DefS_disabled(SMSG_SPLINE_MOVE_SET_WALK_MODE, \"SMSG_SPLINE_MOVE_SET_WALK_MODE\");"
+        opcode_registry "${opcode_registry}")
+elseif(MUTATION STREQUAL "spline_mode_run_gate")
+    string(REPLACE "case SMSG_SPLINE_MOVE_SET_RUN_MODE:"
+        "case SMSG_SPLINE_MOVE_SET_RUN_MODE_REMOVED:" world_session_source "${world_session_source}")
+elseif(MUTATION STREQUAL "spline_mode_walk_gate")
+    string(REPLACE "case SMSG_SPLINE_MOVE_SET_WALK_MODE:"
+        "case SMSG_SPLINE_MOVE_SET_WALK_MODE_REMOVED:" world_session_source "${world_session_source}")
+elseif(MUTATION STREQUAL "spline_mode_run_reference")
+    string(REPLACE "SMSG_SPLINE_MOVE_SET_RUN_MODE                  0x0B18  ACTIVE"
+        "SMSG_SPLINE_MOVE_SET_RUN_MODE                  0x0B18  DORMANT"
+        opcode_reference "${opcode_reference}")
+elseif(MUTATION STREQUAL "spline_mode_walk_reference")
+    string(REPLACE "SMSG_SPLINE_MOVE_SET_WALK_MODE                 0x1865  ACTIVE"
+        "SMSG_SPLINE_MOVE_SET_WALK_MODE                 0x1865  DORMANT"
+        opcode_reference "${opcode_reference}")
 elseif(MUTATION STREQUAL "monster_move_writer")
     string(REPLACE "data.WriteBits(type, 3)" "data.WriteBits(type, 2)"
         spline_packet_source "${spline_packet_source}")
@@ -150,6 +202,16 @@ elseif(MUTATION STREQUAL "flight_registration_atomic")
 elseif(MUTATION STREQUAL "flight_invent_stop_descend")
     string(APPEND opcode_registry
         "\nDefC(CMSG_MOVE_STOP_DESCEND, \"CMSG_MOVE_STOP_DESCEND\", STATUS_LOGGEDIN, PROCESS_THREADUNSAFE, &WorldSession::HandleMovementOpcodes);\n")
+endif()
+
+if(MUTATION MATCHES "^spline_mode_" AND
+        unit_header STREQUAL original_unit_header AND
+        creature_movement_source STREQUAL original_creature_movement_source AND
+        opcode_registry STREQUAL original_opcode_registry AND
+        opcode_reference STREQUAL original_opcode_reference AND
+        world_session_source STREQUAL original_world_session_source)
+    message(STATUS "MUTATION '${MUTATION}' changed nothing -- dead arm")
+    return()
 endif()
 
 if(MUTATION MATCHES "^flight_" AND
@@ -218,6 +280,7 @@ strip_cpp_comments(unit_source "${unit_source}")
 strip_cpp_comments(creature_movement_source "${creature_movement_source}")
 strip_cpp_comments(movement_codec "${movement_codec}")
 strip_cpp_comments(opcode_registry "${opcode_registry}")
+strip_cpp_comments(world_session_source "${world_session_source}")
 strip_cpp_comments(opcode_header "${opcode_header}")
 strip_cpp_comments(movement_handler "${movement_handler}")
 strip_cpp_comments(spline_packet_header "${spline_packet_header}")
@@ -384,6 +447,63 @@ foreach(name IN ITEMS NORMAL_FALL WATER_WALK FEATHER_FALL LAND_WALK)
     require_once("${opcode_registry}"
         "DefS(SMSG_SPLINE_MOVE_SET_${name}, \"SMSG_SPLINE_MOVE_SET_${name}\");"
         "SMSG_SPLINE_MOVE_SET_${name} metadata")
+endforeach()
+
+foreach(required IN ITEMS
+        "inline void BuildSplineMoveSetRunMode(WorldPacket& out, ObjectGuid guid)"
+        "out.WriteGuidMask<5, 6, 2, 4, 7, 1, 3, 0>(guid);"
+        "out.WriteGuidBytes<5, 1, 4, 0, 7, 3, 6, 2>(guid);"
+        "inline void BuildSplineMoveSetWalkMode(WorldPacket& out, ObjectGuid guid)"
+        "out.WriteGuidMask<4, 3, 0, 2, 1, 6, 5, 7>(guid);"
+        "out.WriteGuidBytes<1, 4, 5, 6, 2, 0, 3, 7>(guid);")
+    require_once("${unit_header}" "${required}" "18414 spline run/walk builder")
+endforeach()
+
+string(REGEX MATCH "void Creature::SetWalk\\(bool enable, bool asDefault\\)(.*)void Creature::SetLevitate" set_walk_body "${creature_movement_source}")
+if(NOT set_walk_body)
+    message(FATAL_ERROR "Creature::SetWalk body missing")
+endif()
+foreach(required IN ITEMS
+        "WorldPacket data(enable ? SMSG_SPLINE_MOVE_SET_WALK_MODE : SMSG_SPLINE_MOVE_SET_RUN_MODE, 9);"
+        "MopCompactPackets::BuildSplineMoveSetWalkMode(data, GetObjectGuid());"
+        "MopCompactPackets::BuildSplineMoveSetRunMode(data, GetObjectGuid());"
+        "SendMessageToSet(&data, true);")
+    require_once("${set_walk_body}" "${required}" "Creature::SetWalk 18414 observer integration")
+endforeach()
+set(expected_mode_branches "MopCompactPackets::BuildSplineMoveSetWalkMode(data, GetObjectGuid());\n        }\n        else\n        {\n            MopCompactPackets::BuildSplineMoveSetRunMode(data, GetObjectGuid());")
+string(FIND "${set_walk_body}" "${expected_mode_branches}" mode_branch_position)
+if(mode_branch_position EQUAL -1)
+    message(FATAL_ERROR "Creature::SetWalk RUN/WALK branch mapping is wrong")
+endif()
+foreach(forbidden IN ITEMS "data.WriteGuidMask" "data.WriteGuidBytes" "data << GetObjectGuid()")
+    string(FIND "${set_walk_body}" "${forbidden}" position)
+    if(NOT position EQUAL -1)
+        message(FATAL_ERROR "Creature::SetWalk bypasses the tested 18414 builder: ${forbidden}")
+    endif()
+endforeach()
+
+foreach(name IN ITEMS RUN WALK)
+    require_once("${opcode_registry}"
+        "DefS(SMSG_SPLINE_MOVE_SET_${name}_MODE, \"SMSG_SPLINE_MOVE_SET_${name}_MODE\");"
+        "SMSG_SPLINE_MOVE_SET_${name}_MODE metadata")
+    require_once("${world_session_source}"
+        "case SMSG_SPLINE_MOVE_SET_${name}_MODE:"
+        "SMSG_SPLINE_MOVE_SET_${name}_MODE converted-send gate")
+endforeach()
+
+foreach(required IN ITEMS
+        "SMSG_SPLINE_MOVE_SET_RUN_MODE                = 0x0B18"
+        "SMSG_SPLINE_MOVE_SET_WALK_MODE               = 0x1865")
+    string(FIND "${opcode_header}" "${required}" position)
+    if(position EQUAL -1)
+        message(FATAL_ERROR "5.4.8 spline run/walk opcode value missing: ${required}")
+    endif()
+endforeach()
+
+foreach(required IN ITEMS
+        "SMSG_SPLINE_MOVE_SET_RUN_MODE                  0x0B18  ACTIVE"
+        "SMSG_SPLINE_MOVE_SET_WALK_MODE                 0x1865  ACTIVE")
+    require_once("${opcode_reference}" "${required}" "18414 spline run/walk ACTIVE reference")
 endforeach()
 
 foreach(required IN ITEMS
