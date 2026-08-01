@@ -6386,6 +6386,7 @@ class Player : public Unit
     private:
         void SetPhaseMask(uint32 newPhaseMask, bool update) override;
         void ApplyComposedPhaseMask(uint32 newPhaseMask, bool update);
+        void RecalculateQuestPhase(bool update);
         friend class PlayerPhaseController;
 
         void _HandleDeadlyPoison(Unit* Target, WeaponAttackType attType, SpellEntry const* spellInfo);
