@@ -73,6 +73,7 @@
 #include "WorldSession.h"
 #include "Pet.h"
 #include "PetMgr.h"
+#include "PlayerPhaseController.h"
 #include "MapReference.h"
 #include "Util.h"                                           // for Tokens typedef
 #include "AchievementMgr.h"
@@ -3500,6 +3501,15 @@ class Player : public Unit
         // Set the game master state
         void SetGameMaster(bool on);
 
+        void InitializePhaseForMapEntry(uint32 zoneId) { m_phaseController.InitializeForMapEntry(zoneId); }
+        void RecalculatePhaseDefinitions(uint32 zoneId, bool update, PlayerPhaseReason reason) { m_phaseController.RecalculateDefinitions(zoneId, update, reason); }
+        void SetPhaseAuraMask(uint32 mask, bool update) { m_phaseController.SetAuraMask(mask, update); }
+        void ClearPhaseAuraMask(bool update) { m_phaseController.ClearAuraMask(update); }
+        void SetGameMasterPhaseOverride(bool active, bool update) { m_phaseController.SetGameMasterOverride(active, update); }
+        void SetAdministrativePhaseOverride(uint32 mask, bool update) { m_phaseController.SetAdministrativeOverride(mask, update); }
+        void ClearAdministrativePhaseOverride(bool update) { m_phaseController.ClearAdministrativeOverride(update); }
+        PlayerPhaseController const& GetPhaseController() const { return m_phaseController; }
+
         // Check if the player has GM chat enabled
         bool isGMChat() const { return GetSession()->GetSecurity() >= SEC_MODERATOR && (m_ExtraFlags & PLAYER_EXTRA_GM_CHAT); }
 
@@ -6374,6 +6384,10 @@ class Player : public Unit
         static const float m_diminishing_k[MAX_CLASSES];
 
     private:
+        void SetPhaseMask(uint32 newPhaseMask, bool update) override;
+        void ApplyComposedPhaseMask(uint32 newPhaseMask, bool update);
+        friend class PlayerPhaseController;
+
         void _HandleDeadlyPoison(Unit* Target, WeaponAttackType attType, SpellEntry const* spellInfo);
         // internal common parts for CanStore/StoreItem functions
         uint32 m_created_date = 0;
@@ -6481,6 +6495,7 @@ class Player : public Unit
 
         AchievementMgr m_achievementMgr;
         ReputationMgr  m_reputationMgr;
+        PlayerPhaseController m_phaseController;
 
         uint32 m_timeSyncCounter;
         uint32 m_timeSyncTimer;

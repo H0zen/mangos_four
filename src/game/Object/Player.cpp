@@ -306,7 +306,7 @@ UpdateMask Player::updateVisualBits;
  *
  * @param session The owning world session.
  */
-Player::Player(WorldSession* session): Unit(), m_mover(this), m_camera(this), m_petMgr(this), m_achievementMgr(this), m_reputationMgr(this), m_glyphMgr(this), m_honorMgr(this), m_currencyMgr(this), m_runeMgr(this), m_spellCooldownMgr(this)
+Player::Player(WorldSession* session): Unit(), m_mover(this), m_camera(this), m_petMgr(this), m_achievementMgr(this), m_reputationMgr(this), m_glyphMgr(this), m_honorMgr(this), m_currencyMgr(this), m_runeMgr(this), m_spellCooldownMgr(this), m_phaseController(*this)
 {
     m_transport = 0;
 
@@ -2225,6 +2225,16 @@ struct SetGameMasterOffHelper
     }
     uint32 faction;
 };
+
+void Player::SetPhaseMask(uint32 newPhaseMask, bool update)
+{
+    m_phaseController.SetAdministrativeOverride(newPhaseMask, update);
+}
+
+void Player::ApplyComposedPhaseMask(uint32 newPhaseMask, bool update)
+{
+    Unit::SetPhaseMask(newPhaseMask, update);
+}
 
 /**
  * @brief Enables or disables game master mode for the player.
