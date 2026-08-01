@@ -105,6 +105,8 @@ class PlayerTaxi
         }
 
         void AppendTaximaskTo(ByteBuffer& data, bool all);
+        uint8 const* GetTaxiMask(bool all) const;
+        size_t GetTaxiMaskSize() const;
 
         // Destinations
         bool LoadTaxiDestinationsFromString(const std::string& values, Team team);

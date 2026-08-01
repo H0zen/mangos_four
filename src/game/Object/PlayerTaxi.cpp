@@ -300,6 +300,16 @@ void PlayerTaxi::AppendTaximaskTo(ByteBuffer& data, bool all)
     }
 }
 
+uint8 const* PlayerTaxi::GetTaxiMask(bool all) const
+{
+    return all ? sTaxiNodesMask : m_taximask;
+}
+
+size_t PlayerTaxi::GetTaxiMaskSize() const
+{
+    return TaxiMaskSize;
+}
+
 bool PlayerTaxi::LoadTaxiDestinationsFromString(const std::string& values, Team team)
 {
     ObjectMgrTaxiPersistenceValidator validator;

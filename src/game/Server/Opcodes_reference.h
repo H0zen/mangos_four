@@ -175,9 +175,9 @@
  *   TOTAL SMSG rows                   925
  *
  * SUBSYSTEM CONFIDENCE: high=365, low=221, medium=182, none=157
- * STATUS TOTALS: ACTIVE=539, DOC=434, DORMANT=547
- *   SMSG: ACTIVE=319, DOC=271, DORMANT=335
- *   CMSG: ACTIVE=220, DOC=163, DORMANT=212
+ * STATUS TOTALS: ACTIVE=542, DOC=434, DORMANT=544
+ *   SMSG: ACTIVE=321, DOC=271, DORMANT=333
+ *   CMSG: ACTIVE=221, DOC=163, DORMANT=211
  */
 
 // CAVEATS -- read before trusting any single row:
@@ -849,7 +849,7 @@ typedef uint16_t uint16;
  *   SMSG_SET_ITEM_PURCHASE_DATA                    0x1C9A  DORMANT
  *   SMSG_VOID_TRANSFER_RESULT                      0x1C9E  DORMANT  [medium-conf]
  *   SMSG_PET_REMOVED_SPELL                         0x1CAE  ACTIVE
- *   SMSG_SHOWTAXINODES                             0x1E1A  DORMANT  [medium-conf]
+ *   SMSG_SHOWTAXINODES                             0x1E1A  ACTIVE   [medium-conf]
  *   SMSG_BATTLEGROUND_INFO_THROTTLED               0x1E1E  DORMANT  [medium-conf]
  *   SMSG_CROSSED_INEBRIATION_THRESHOLD             0x1E9E  ACTIVE
  *   SMSG_SPIRIT_HEALER_CONFIRM                     0x1EAA  ACTIVE   [medium-conf]
@@ -952,7 +952,7 @@ typedef uint16_t uint16;
  *
  *  -- TaxiMapFrame.cpp (3) --
  *   SMSG_ACTIVATETAXIREPLY                         0x02A7  DORMANT  [low-conf]
- *   SMSG_NEW_TAXI_PATH                             0x141B  DORMANT  [low-conf]
+ *   SMSG_NEW_TAXI_PATH                             0x141B  ACTIVE   [low-conf]
  *   SMSG_TAXINODE_STATUS                           0x169E  ACTIVE
  *
  *  -- TradeFrame.cpp (3) --
@@ -1403,7 +1403,7 @@ typedef uint16_t uint16;
  *   CMSG_WRAP_ITEM                                 0x02DF  DORMANT
  *   CMSG_TAXINODE_STATUS_QUERY                     0x02E1  ACTIVE
  *   CMSG_BUY_ITEM                                  0x02E2  ACTIVE
- *   CMSG_TAXIQUERYAVAILABLENODES                   0x02E3  DORMANT
+ *   CMSG_TAXIQUERYAVAILABLENODES                   0x02E3  ACTIVE
  *   CMSG_ATTACKSWING                               0x02E7  ACTIVE
  *   CMSG_EQUIPMENT_SET_DELETE                      0x02E8  DORMANT
  *   CMSG_BANKER_ACTIVATE                           0x02E9  DORMANT

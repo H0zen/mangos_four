@@ -1115,6 +1115,36 @@ namespace MopTaxiPackets
         return true;
     }
 
+    inline bool ParseTaxiQueryAvailableNodes(WorldPacket& in,
+        ObjectGuid& guid)
+    {
+        // The 18414 client emits only this packed flight-master GUID.
+        size_t const remaining = in.size() - in.rpos();
+        if (remaining < 1)
+        {
+            return RejectMalformedRequest(in);
+        }
+
+        size_t const guidByteCount = PackedGuidByteCount(in[in.rpos()]);
+        if (remaining != 1 + guidByteCount ||
+            !HasCanonicalPackedGuidBytes(in, in.rpos() + 1, guidByteCount))
+        {
+            return RejectMalformedRequest(in);
+        }
+
+        ObjectGuid parsed;
+        in.ResetBitReader();
+        in.ReadGuidMask<7, 1, 0, 4, 2, 5, 6, 3>(parsed);
+        in.ReadGuidBytes<0, 3, 7, 5, 2, 6, 4, 1>(parsed);
+        if (in.rpos() != in.size())
+        {
+            return RejectMalformedRequest(in);
+        }
+
+        guid = parsed;
+        return true;
+    }
+
     inline TaxiNodeStatus StatusForKnown(bool known)
     {
         return known ? TaxiNodeStatus::Learned : TaxiNodeStatus::Unlearned;
@@ -1129,6 +1159,21 @@ namespace MopTaxiPackets
         out.WriteGuidMask<3, 0>(guid);
         out.FlushBits();
         out.WriteGuidBytes<0, 5, 2, 1, 4, 6, 7, 3>(guid);
+    }
+
+    inline void BuildShowTaxiNodes(WorldPacket& out, ObjectGuid guid,
+        uint32 currentNode, uint8 const* mask, size_t maskSize)
+    {
+        // The 18414 client consumes the menu flag, packed flight-master
+        // GUID, 24-bit raw-mask size, current node, and mask tail in this order.
+        out.WriteBit(true);
+        out.WriteGuidMask<3, 0, 4, 2, 1, 7, 6, 5>(guid);
+        out.WriteBits(uint32(maskSize), 24);
+        out.FlushBits();
+        out.WriteGuidBytes<0, 3>(guid);
+        out << currentNode;
+        out.WriteGuidBytes<5, 2, 6, 1, 7, 4>(guid);
+        out.append(mask, maskSize);
     }
 }
 

@@ -674,6 +674,11 @@ void InitializeOpcodes()
     // Directly verified 18414 flight-master status request/reply pair.
     DefC(CMSG_TAXINODE_STATUS_QUERY, "CMSG_TAXINODE_STATUS_QUERY", STATUS_LOGGEDIN, PROCESS_THREADUNSAFE, &WorldSession::HandleTaxiNodeStatusQueryOpcode);
     DefS(SMSG_TAXINODE_STATUS, "SMSG_TAXINODE_STATUS");
+    // The menu request and reply use distinct 18414 packed-GUID layouts;
+    // discovery is the client's empty notification before the learned status.
+    DefC(CMSG_TAXIQUERYAVAILABLENODES, "CMSG_TAXIQUERYAVAILABLENODES", STATUS_LOGGEDIN, PROCESS_THREADUNSAFE, &WorldSession::HandleTaxiQueryAvailableNodes);
+    DefS(SMSG_SHOWTAXINODES, "SMSG_SHOWTAXINODES");
+    DefS(SMSG_NEW_TAXI_PATH, "SMSG_NEW_TAXI_PATH");
 
     // Directly verified 18414 inventory-movement requests. Each handler
     // decodes the packed request before reusing the established item logic.

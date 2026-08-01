@@ -1820,6 +1820,35 @@ foreach(mutation IN ITEMS
         PROPERTIES WILL_FAIL TRUE)
 endforeach()
 
+add_executable(mop_taxi_menu_packets_test mop_taxi_menu_packets_test.cpp)
+target_include_directories(mop_taxi_menu_packets_test PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}/..
+    ${CMAKE_SOURCE_DIR}/src/shared)
+set_target_properties(mop_taxi_menu_packets_test PROPERTIES CXX_STANDARD 17 CXX_STANDARD_REQUIRED ON)
+target_link_libraries(mop_taxi_menu_packets_test PRIVATE game)
+add_test(NAME mop_taxi_menu_packets COMMAND mop_taxi_menu_packets_test)
+
+add_test(NAME mop_taxi_menu_source
+    COMMAND ${CMAKE_COMMAND} -DSOURCE_ROOT=${CMAKE_SOURCE_DIR}
+        -P ${CMAKE_CURRENT_SOURCE_DIR}/mop_taxi_menu_source_test.cmake)
+
+foreach(mutation IN ITEMS
+        request_mask request_bytes request_xor request_eof reply_menu_bit reply_mask
+        reply_count_width reply_flush reply_prefix_bytes reply_suffix_bytes
+        reply_xor reply_raw_tail handler_parser handler_zero_guid npc_authority
+        interaction_before_parse feign_death_branch learn_branch known_menu_branch
+        menu_builder menu_legacy_append new_path_body request_registration
+        menu_registration new_path_registration menu_admission new_path_admission
+        request_reference menu_reference new_path_reference mask_accessor
+        mask_size_accessor neighbor_registration)
+    add_test(NAME mop_taxi_menu_source_mutation_${mutation}
+        COMMAND ${CMAKE_COMMAND} -DSOURCE_ROOT=${CMAKE_SOURCE_DIR}
+            -DMUTATION=${mutation}
+            -P ${CMAKE_CURRENT_SOURCE_DIR}/mop_taxi_menu_source_test.cmake)
+    set_tests_properties(mop_taxi_menu_source_mutation_${mutation}
+        PROPERTIES WILL_FAIL TRUE)
+endforeach()
+
 add_executable(mop_death_packets_test mop_death_packets_test.cpp)
 target_include_directories(mop_death_packets_test PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/..

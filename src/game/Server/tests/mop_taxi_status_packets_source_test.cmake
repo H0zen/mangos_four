@@ -179,16 +179,25 @@ endif()
 math(EXPR packets_length "${packets_end} - ${packets_start}")
 string(SUBSTRING "${player_header}" ${packets_start} ${packets_length} packets)
 
-require_once("${packets}" "ReadGuidMask<7, 4, 1, 3, 0, 5, 2, 6>"
+string(FIND "${packets}" "inline bool ParseStatusQuery" status_parser_start)
+string(FIND "${packets}" "inline bool ParseTaxiQueryAvailableNodes" status_parser_end)
+if(status_parser_start EQUAL -1 OR status_parser_end LESS_EQUAL status_parser_start)
+    message(FATAL_ERROR "status request parser seam guard: could not isolate helper")
+endif()
+math(EXPR status_parser_length "${status_parser_end} - ${status_parser_start}")
+string(SUBSTRING "${packets}" ${status_parser_start} ${status_parser_length}
+    status_request_parser)
+
+require_once("${status_request_parser}" "ReadGuidMask<7, 4, 1, 3, 0, 5, 2, 6>"
     "request mask order")
-require_text("${packets}"
+require_text("${status_request_parser}"
     "in.ResetBitReader();\n        in.ReadGuidMask<7, 4, 1, 3, 0, 5, 2, 6>(parsed);"
     "request bit-reader reset")
-require_once("${packets}" "ReadGuidBytes<7, 1, 5, 2, 4, 0, 6, 3>"
+require_once("${status_request_parser}" "ReadGuidBytes<7, 1, 5, 2, 4, 0, 6, 3>"
     "request byte order and XOR")
-require_once("${packets}" "remaining != 1 [+] guidByteCount"
+require_once("${status_request_parser}" "remaining != 1 [+] guidByteCount"
     "exact request body")
-require_once("${packets}" "if [(]in[.]rpos[(][)] != in[.]size[(][)][)]"
+require_once("${status_request_parser}" "if [(]in[.]rpos[(][)] != in[.]size[(][)][)]"
     "exact request tail")
 require_once("${packets}" "WriteGuidMask<6, 2, 7, 5, 4, 1>"
     "reply first mask order")

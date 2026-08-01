@@ -97,7 +97,10 @@ void WorldSession::HandleTaxiQueryAvailableNodes(WorldPacket& recv_data)
     DEBUG_LOG("WORLD: Received opcode CMSG_TAXIQUERYAVAILABLENODES");
 
     ObjectGuid guid;
-    recv_data >> guid;
+    if (!MopTaxiPackets::ParseTaxiQueryAvailableNodes(recv_data, guid) || guid.IsEmpty())
+    {
+        return;
+    }
 
     // cheating checks
     Creature* unit = GetPlayer()->GetNPCIfCanInteractWith(guid, UNIT_NPC_FLAG_FLIGHTMASTER);
@@ -140,11 +143,10 @@ void WorldSession::SendTaxiMenu(Creature* unit)
 
     DEBUG_LOG("WORLD: CMSG_TAXINODE_STATUS_QUERY %u ", curloc);
 
-    WorldPacket data(SMSG_SHOWTAXINODES, (4 + 8 + 4 + 8 * 4));
-    data << uint32(1);
-    data << unit->GetObjectGuid();
-    data << uint32(curloc);
-    GetPlayer()->m_taxi.AppendTaximaskTo(data, GetPlayer()->IsTaxiCheater());
+    size_t const maskSize = GetPlayer()->m_taxi.GetTaxiMaskSize();
+    WorldPacket data(SMSG_SHOWTAXINODES, 17 + maskSize);
+    MopTaxiPackets::BuildShowTaxiNodes(data, unit->GetObjectGuid(), curloc,
+        GetPlayer()->m_taxi.GetTaxiMask(GetPlayer()->IsTaxiCheater()), maskSize);
     SendPacket(&data);
 
     DEBUG_LOG("WORLD: Sent SMSG_SHOWTAXINODES");
