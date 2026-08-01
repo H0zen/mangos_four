@@ -53,6 +53,31 @@ elseif(MUTATION STREQUAL "nonfinite_guard_after_bookkeeping")
     {
         sLog.outError(\"%s: player %s sent a non-finite speed, ignored\","
         movement_handler "${movement_handler}")
+elseif(MUTATION STREQUAL "change_transport_world_xy_order")
+    string(REGEX REPLACE
+        "MovementChngTransportSequence\\[\\]=[ \t\r\n]*\\{[ \t\r\n]*MSEPositionX,[ \t\r\n]*MSEPositionY,"
+        "MovementChngTransportSequence[]=\n{\n    MSEPositionY,\n    MSEPositionX,"
+        movement_structures "${movement_structures}")
+elseif(MUTATION STREQUAL "change_transport_drop_force_count")
+    string(REGEX REPLACE
+        "MSEHasUnknownUInt32,[ \t\r\n]*MSEGuidBit5,[ \t\r\n]*MSEMovementForceCount,[ \t\r\n]*MSEUnknownBit172,[ \t\r\n]*MSEGuidBit6,[ \t\r\n]*MSEUnknownBit148,"
+        "MSEHasUnknownUInt32,\n    MSEGuidBit5,\n    MSEUnknownBit172,\n    MSEGuidBit6,\n    MSEUnknownBit148,"
+        movement_structures "${movement_structures}")
+elseif(MUTATION STREQUAL "change_transport_flags2_12_width")
+    string(REGEX REPLACE
+        "MSEHasFallDirection,[ \t\r\n]*MSEFlags2_13,[ \t\r\n]*MSEGuidByte5,"
+        "MSEHasFallDirection,\n    MSEFlags2,\n    MSEGuidByte5,"
+        movement_structures "${movement_structures}")
+elseif(MUTATION STREQUAL "change_transport_fall_scalar_order")
+    string(REGEX REPLACE
+        "MSEGuidByte4,[ \t\r\n]*MSEGuidByte7,[ \t\r\n]*MSEGuidByte1,[ \t\r\n]*MSEFallVerticalSpeed,[ \t\r\n]*MSEFallSinAngle,[ \t\r\n]*MSEFallHorizontalSpeed,[ \t\r\n]*MSEFallCosAngle,[ \t\r\n]*MSEFallTime,[ \t\r\n]*MSETransportGuidByte6,"
+        "MSEGuidByte4,\n    MSEGuidByte7,\n    MSEGuidByte1,\n    MSEFallVerticalSpeed,\n    MSEFallCosAngle,\n    MSEFallHorizontalSpeed,\n    MSEFallSinAngle,\n    MSEFallTime,\n    MSETransportGuidByte6,"
+        movement_structures "${movement_structures}")
+elseif(MUTATION STREQUAL "change_transport_tail_order")
+    string(REGEX REPLACE
+        "MSEPositionO,[ \t\r\n]*MSESplineElevation,[ \t\r\n]*MSEUnknownUInt32,[ \t\r\n]*MSEPitch,[ \t\r\n]*MSETimestamp,"
+        "MSEPositionO,\n    MSEPitch,\n    MSESplineElevation,\n    MSETimestamp,\n    MSEUnknownUInt32,"
+        movement_structures "${movement_structures}")
 elseif(MUTATION STREQUAL "inbound_sequence")
     string(REPLACE "MSEPositionZ,\n    MSEPositionX,\n    MSEPositionY,\n    MSEHasMovementFlags2"
         "MSEPositionX,\n    MSEPositionZ,\n    MSEPositionY,\n    MSEHasMovementFlags2"
@@ -204,6 +229,11 @@ elseif(MUTATION STREQUAL "flight_invent_stop_descend")
         "\nDefC(CMSG_MOVE_STOP_DESCEND, \"CMSG_MOVE_STOP_DESCEND\", STATUS_LOGGEDIN, PROCESS_THREADUNSAFE, &WorldSession::HandleMovementOpcodes);\n")
 endif()
 
+if(MUTATION MATCHES "^change_transport_" AND
+        movement_structures STREQUAL original_movement_structures)
+    message(FATAL_ERROR "change-transport mutation did not alter its intended source seam: ${MUTATION}")
+endif()
+
 if(MUTATION MATCHES "^spline_mode_" AND
         unit_header STREQUAL original_unit_header AND
         creature_movement_source STREQUAL original_creature_movement_source AND
@@ -307,6 +337,7 @@ set(stop_ascend "MSEPositionZ,MSEPositionX,MSEPositionY,MSEHasOrientation,MSEGui
 set(start_descend "MSEPositionX,MSEPositionY,MSEPositionZ,MSEHasFallData,MSEHasMovementFlags,MSEGuidBit7,MSEGuidBit0,MSEGuidBit4,MSEHasMovementFlags2,MSEHasPitch,MSEGuidBit6,MSEGuidBit2,MSEUnknownBit148,MSEHasUnknownUInt32,MSEMovementForceCount,MSEHasTransportData,MSEHasOrientation,MSEGuidBit1,MSEUnknownBit149,MSEUnknownBit172,MSEGuidBit3,MSEGuidBit5,MSEHasSplineElevation,MSEHasTimestamp,MSETransportGuidBit0,MSEHasTransportTime3,MSETransportGuidBit7,MSEHasTransportTime2,MSETransportGuidBit1,MSETransportGuidBit4,MSETransportGuidBit5,MSETransportGuidBit3,MSETransportGuidBit6,MSETransportGuidBit2,MSEFlags2_13,MSEFlags,MSEHasFallDirection,MSEGuidByte4,MSEGuidByte7,MSEGuidByte1,MSEGuidByte3,MSEMovementForceIds,MSEGuidByte2,MSEGuidByte6,MSEGuidByte0,MSEGuidByte5,MSETransportPositionX,MSETransportGuidByte0,MSETransportGuidByte3,MSETransportGuidByte7,MSETransportSeat,MSETransportGuidByte5,MSETransportGuidByte1,MSETransportPositionY,MSETransportTime3,MSETransportTime,MSETransportGuidByte4,MSETransportTime2,MSETransportPositionO,MSETransportPositionZ,MSETransportGuidByte2,MSETransportGuidByte6,MSEFallTime,MSEFallCosAngle,MSEFallHorizontalSpeed,MSEFallSinAngle,MSEFallVerticalSpeed,MSEPitch,MSEUnknownUInt32,MSESplineElevation,MSEPositionO,MSETimestamp,MSEEnd")
 set(player_move "MSEHasPitch,MSEGuidBit2,MSEUnknownBit148,MSEUnknownBit149,MSEGuidBit0,MSEHasOrientation,MSEHasFallData,MSEHasUnknownUInt32,MSEGuidBit3,MSEHasFallDirection,MSEHasTransportData,MSEGuidBit4,MSETransportGuidBit5,MSETransportGuidBit4,MSETransportGuidBit7,MSETransportGuidBit2,MSETransportGuidBit6,MSEHasTransportTime2,MSETransportGuidBit3,MSETransportGuidBit1,MSEHasTransportTime3,MSETransportGuidBit0,MSEHasSplineElevation,MSEHasMovementFlags,MSEUnknownBit172,MSEFlags,MSEHasMovementFlags2,MSEGuidBit7,MSEGuidBit1,MSEHasTimestamp,MSEFlags2_13,MSEGuidBit5,MSEMovementForceCount,MSEGuidBit6,MSEPositionY,MSETransportGuidByte7,MSETransportTime2,MSETransportPositionX,MSETransportGuidByte5,MSETransportSeat,MSETransportGuidByte2,MSETransportGuidByte0,MSETransportGuidByte3,MSETransportTime,MSETransportGuidByte4,MSETransportPositionZ,MSETransportGuidByte1,MSETransportPositionY,MSETransportPositionO,MSETransportGuidByte6,MSETransportTime3,MSEGuidByte5,MSEGuidByte1,MSEPositionZ,MSEMovementForceIds,MSETimestamp,MSEPositionO,MSEGuidByte3,MSEFallSinAngle,MSEFallHorizontalSpeed,MSEFallCosAngle,MSEFallVerticalSpeed,MSEFallTime,MSEGuidByte0,MSEPitch,MSEGuidByte2,MSEGuidByte6,MSESplineElevation,MSEUnknownUInt32,MSEPositionX,MSEGuidByte4,MSEGuidByte7,MSEEnd")
 set(force_swim_speed_ack "MSEPositionY,MSEMovementCounter,MSEPositionZ,MSEPositionX,MSEGuidBit4,MSEUnknownBit149,MSEHasSplineElevation,MSEGuidBit2,MSEHasMovementFlags2,MSEGuidBit5,MSEGuidBit3,MSEHasMovementFlags,MSEGuidBit0,MSEHasPitch,MSEHasUnknownUInt32,MSEHasOrientation,MSEUnknownBit172,MSEGuidBit1,MSEHasFallData,MSEMovementForceCount,MSEHasTimestamp,MSEGuidBit7,MSEGuidBit6,MSEHasTransportData,MSEUnknownBit148,MSEFlags2_13,MSEHasFallDirection,MSETransportGuidBit4,MSETransportGuidBit2,MSETransportGuidBit7,MSEHasTransportTime3,MSETransportGuidBit1,MSETransportGuidBit6,MSETransportGuidBit3,MSETransportGuidBit0,MSEHasTransportTime2,MSETransportGuidBit5,MSEFlags,MSEGuidByte0,MSEGuidByte4,MSEGuidByte5,MSEGuidByte6,MSEMovementForceIds,MSEGuidByte1,MSEGuidByte3,MSEGuidByte7,MSEGuidByte2,MSETransportGuidByte7,MSETransportTime2,MSETransportSeat,MSETransportTime3,MSETransportGuidByte4,MSETransportPositionY,MSETransportPositionZ,MSETransportGuidByte0,MSETransportGuidByte6,MSETransportGuidByte3,MSETransportGuidByte2,MSETransportPositionO,MSETransportTime,MSETransportGuidByte5,MSETransportGuidByte1,MSETransportPositionX,MSEFallHorizontalSpeed,MSEFallSinAngle,MSEFallCosAngle,MSEFallVerticalSpeed,MSEFallTime,MSETimestamp,MSESplineElevation,MSEUnknownUInt32,MSEPitch,MSEPositionO,MSEEnd")
+set(change_transport "MSEPositionX,MSEPositionY,MSEPositionZ,MSEGuidBit1,MSEHasPitch,MSEHasSplineElevation,MSEGuidBit4,MSEHasUnknownUInt32,MSEGuidBit5,MSEMovementForceCount,MSEUnknownBit172,MSEGuidBit6,MSEUnknownBit148,MSEGuidBit7,MSEGuidBit0,MSEHasTransportData,MSEHasMovementFlags,MSEUnknownBit149,MSEHasMovementFlags2,MSEGuidBit2,MSEGuidBit3,MSEHasTimestamp,MSEHasFallData,MSEHasOrientation,MSEHasTransportTime3,MSETransportGuidBit5,MSETransportGuidBit6,MSETransportGuidBit3,MSETransportGuidBit2,MSETransportGuidBit4,MSEHasTransportTime2,MSETransportGuidBit1,MSETransportGuidBit7,MSETransportGuidBit0,MSEFlags,MSEHasFallDirection,MSEFlags2_13,MSEGuidByte5,MSEGuidByte2,MSEMovementForceIds,MSEGuidByte6,MSEGuidByte3,MSEGuidByte0,MSEGuidByte4,MSEGuidByte7,MSEGuidByte1,MSEFallVerticalSpeed,MSEFallSinAngle,MSEFallHorizontalSpeed,MSEFallCosAngle,MSEFallTime,MSETransportGuidByte6,MSETransportPositionZ,MSETransportGuidByte5,MSETransportGuidByte4,MSETransportTime3,MSETransportGuidByte3,MSETransportTime,MSETransportGuidByte2,MSETransportTime2,MSETransportGuidByte0,MSETransportPositionY,MSETransportGuidByte1,MSETransportSeat,MSETransportPositionO,MSETransportGuidByte7,MSETransportPositionX,MSEPositionO,MSESplineElevation,MSEUnknownUInt32,MSEPitch,MSETimestamp,MSEEnd")
 
 require_sequence("${movement_structures}" MovementStartForwardSequence "${start_forward}")
 require_sequence("${movement_structures}" MovementStartBackwardSequence "${start_backward}")
@@ -327,6 +358,18 @@ require_sequence("${movement_structures}" MovementStopAscendSequence "${stop_asc
 require_sequence("${movement_structures}" MovementStartDescendSequence "${start_descend}")
 require_sequence("${movement_structures}" PlayerMoveSequence "${player_move}")
 require_sequence("${movement_structures}" MovementForceSwimSpeedChangeAckSequence "${force_swim_speed_ack}")
+require_sequence("${movement_structures}" MovementChngTransportSequence "${change_transport}")
+
+require_once("${movement_structures}"
+    "case CMSG_MOVE_CHNG_TRANSPORT:\n            return MovementChngTransportSequence;"
+    "CMSG_MOVE_CHNG_TRANSPORT sequence selector")
+require_once("${opcode_reference}"
+    "CMSG_MOVE_CHNG_TRANSPORT                       0x09DB  DORMANT"
+    "CMSG_MOVE_CHNG_TRANSPORT dormant reference")
+string(FIND "${opcode_registry}" "DefC(CMSG_MOVE_CHNG_TRANSPORT" change_transport_registration)
+if(NOT change_transport_registration EQUAL -1)
+    message(FATAL_ERROR "CMSG_MOVE_CHNG_TRANSPORT must remain unregistered")
+endif()
 
 require_once("${movement_structures}"
     "case CMSG_MOVE_SET_FLY:\n            return MovementSetFlySequence;"

@@ -599,6 +599,29 @@ static RefOp const kMoveWaterWalkAck[] = {
     RefOp::UnknownUInt32, RefOp::PositionO, RefOp::Pitch, RefOp::Timestamp,
     RefOp::SplineElevation, RefOp::End };
 
+// CMSG_MOVE_CHNG_TRANSPORT. Independent transcription of the build-18414
+// client writer sub_67EE69. The opcode remains dormant; this sequence tests
+// only the codec selected by MovementInfo::Read.
+static RefOp const kMoveChangeTransport[] = {
+    RefOp::PositionX, RefOp::PositionY, RefOp::PositionZ,
+    G(1), RefOp::HasPitch, RefOp::HasSplineElevation, G(4),
+    RefOp::HasUnknownUInt32, G(5), RefOp::ForceCount, RefOp::Raw172, G(6),
+    RefOp::Raw148, G(7), G(0), RefOp::HasTransport, RefOp::HasFlags,
+    RefOp::Raw149, RefOp::HasFlags2, G(2), G(3), RefOp::HasTimestamp,
+    RefOp::HasFall, RefOp::HasOrientation,
+    RefOp::HasTransportTime3, T(5), T(6), T(3), T(2), T(4),
+    RefOp::HasTransportTime2, T(1), T(7), T(0),
+    RefOp::Flags, RefOp::HasFallDirection, RefOp::Flags2,
+    GB(5), GB(2), RefOp::ForceIds, GB(6), GB(3), GB(0), GB(4), GB(7), GB(1),
+    RefOp::FallVertical, RefOp::FallSin, RefOp::FallHorizontal, RefOp::FallCos,
+    RefOp::FallTime,
+    TB(6), RefOp::TransportZ, TB(5), TB(4), RefOp::TransportTime3, TB(3),
+    RefOp::TransportTime, TB(2), RefOp::TransportTime2, TB(0),
+    RefOp::TransportY, TB(1), RefOp::TransportSeat, RefOp::TransportO, TB(7),
+    RefOp::TransportX,
+    RefOp::PositionO, RefOp::SplineElevation, RefOp::UnknownUInt32,
+    RefOp::Pitch, RefOp::Timestamp, RefOp::End };
+
 #undef G
 #undef GB
 #undef T
@@ -1277,6 +1300,144 @@ static MovementInfo DecodeRetailAck(OpcodesList opcode, uint8 const* body, size_
     packet >> info;
     CHECK(packet.rpos() == packet.size());
     return info;
+}
+
+static void test_move_change_transport_retail_bodies()
+{
+    // Captured retail bodies, fetched from catalogue generation
+    // 2BE10C899585BAECD237705AC13BBF9262D81B6BDC085B462808C6869CE88752.
+    static uint8 const clearParent[] = {
+        0x9B, 0x85, 0xF1, 0xC5, 0xD5, 0xD8, 0xEC, 0x44, 0x82, 0xED, 0x9A, 0x41,
+        0xE8, 0x00, 0x00, 0x01, 0xC6, 0x00, 0x00, 0x20, 0x00, 0x00, 0x18, 0x00,
+        0x28, 0x07, 0x90, 0x05, 0x63, 0x82, 0xED, 0x9A, 0x41, 0xB6, 0x08, 0x02,
+        0x00, 0xD5, 0xD8, 0xEC, 0x44, 0xFF, 0xE0, 0x35, 0x4C, 0x3F, 0x9B, 0x85,
+        0xF1, 0xC5, 0xE0, 0x35, 0x4C, 0x3F, 0x68, 0x16, 0x04, 0x00 };
+    static uint8 const attached[] = {
+        0x05, 0x01, 0x02, 0xC6, 0x2A, 0xF9, 0xB1, 0x44, 0x42, 0x9E, 0x99, 0x41,
+        0xE8, 0x00, 0x00, 0x01, 0xC6, 0x08, 0x30, 0x20, 0x00, 0x00, 0x58, 0x00,
+        0x3D, 0x04, 0xE9, 0x05, 0xC9, 0xC1, 0x60, 0xF7, 0x99, 0x41, 0x91, 0xEF,
+        0x00, 0x00, 0x29, 0x00, 0x54, 0xA2, 0x3F, 0xFF, 0xEC, 0xE8, 0x86, 0x40,
+        0x1E, 0x00, 0x5E, 0xFB, 0x41, 0xB8, 0xFB, 0x87, 0x3F, 0xDB, 0x46, 0xE3,
+        0x00 };
+    static uint8 const fallDirection[] = {
+        0xBD, 0x4F, 0x03, 0x46, 0xA7, 0xF3, 0x75, 0x44, 0xEB, 0xAB, 0x08, 0x44,
+        0xE8, 0x00, 0x00, 0x01, 0xCE, 0x80, 0x00, 0x00, 0x02, 0x00, 0x20, 0x3D,
+        0x04, 0xE9, 0x05, 0xC9, 0x00, 0x00, 0x00, 0x00, 0x18, 0xBD, 0xF7, 0xBE,
+        0x00, 0x00, 0x00, 0x00, 0x5D, 0x09, 0x60, 0x3F, 0x02, 0x00, 0x00, 0x00,
+        0xEB, 0xAB, 0x08, 0x44, 0x00, 0x00, 0x00, 0x00, 0xA7, 0xF3, 0x75, 0x44,
+        0x00, 0x5C, 0xE6, 0xB8, 0x40, 0xBD, 0x4F, 0x03, 0x46, 0x5C, 0xE6, 0xB8,
+        0x40, 0xB6, 0x2B, 0x14, 0x00 };
+    static uint8 const transportTime2[] = {
+        0x0E, 0xDD, 0x7B, 0xC5, 0x1F, 0xBE, 0xC6, 0x45, 0x33, 0x0B, 0x81, 0x41,
+        0xE8, 0x00, 0x00, 0x01, 0xC6, 0x88, 0xF0, 0x00, 0x02, 0x00, 0x28, 0x00,
+        0x28, 0x07, 0x90, 0x05, 0x63, 0x00, 0x00, 0x00, 0x00, 0x28, 0x89, 0x5F,
+        0xBF, 0x00, 0x00, 0x00, 0x00, 0xAB, 0x8A, 0xF9, 0xBE, 0x00, 0x00, 0x00,
+        0x00, 0xC1, 0x4C, 0xBF, 0x43, 0x40, 0xFE, 0x13, 0x00, 0x00, 0xA5, 0x2C,
+        0x00, 0x00, 0x80, 0x00, 0x00, 0x6E, 0xC0, 0x0A, 0x00, 0x65, 0x81, 0x86,
+        0x40, 0x1E, 0x00, 0xD8, 0xD1, 0x40, 0xA9, 0x32, 0xC4, 0x40, 0x34, 0x5B,
+        0x30, 0x00 };
+
+    MovementInfo const c = DecodeRetailAck(CMSG_MOVE_CHNG_TRANSPORT,
+        clearParent, sizeof(clearParent));
+    CHECK(c.GetGuid().GetRawValue() == UINT64_C(0x0400000006296291));
+    CHECK(c.GetPos()->x == -7728.70068359375f && c.GetPos()->y == 1894.7760009765625f);
+    CHECK(c.GetPos()->z == 19.365970611572266f && c.GetPos()->o == 0.7976970672607422f);
+    CHECK(uint32(c.GetMovementFlags()) == 0x00800000u && uint16(c.GetMovementFlags2()) == 0x0C00u);
+    CHECK(c.GetTransportGuid().IsEmpty());
+    CHECK(c.GetTransportPos()->x == c.GetPos()->x && c.GetTransportPos()->y == c.GetPos()->y);
+    CHECK(c.GetTransportPos()->z == c.GetPos()->z && c.GetTransportPos()->o == c.GetPos()->o);
+    CHECK(c.GetTransportTime() == 133302u && c.GetTransportSeat() == -1);
+    CHECK(c.GetTime() == 267880u);
+
+    MovementInfo const a = DecodeRetailAck(CMSG_MOVE_CHNG_TRANSPORT,
+        attached, sizeof(attached));
+    CHECK(a.GetGuid().GetRawValue() == UINT64_C(0x04000000053CC8E8));
+    CHECK(a.GetTransportGuid().GetRawValue() == UINT64_C(0x1FC0000000000028));
+    CHECK(a.GetPos()->x == -8320.2548828125f && a.GetPos()->y == 1423.786376953125f);
+    CHECK(a.GetPos()->z == 19.202274322509766f && a.GetPos()->o == 1.0623693466186523f);
+    CHECK(a.GetTransportPos()->x == 31.4208984375f && a.GetTransportPos()->y == 1.2681884765625f);
+    CHECK(a.GetTransportPos()->z == 19.24578857421875f && a.GetTransportPos()->o == 4.215932846069336f);
+    CHECK(uint32(a.GetMovementFlags()) == 0x00800001u && uint16(a.GetMovementFlags2()) == 0x0C00u);
+    CHECK(a.GetTransportTime() == 61329u && a.GetTransportSeat() == -1);
+    CHECK(a.GetTime() == 14894811u);
+
+    MovementInfo const f = DecodeRetailAck(CMSG_MOVE_CHNG_TRANSPORT,
+        fallDirection, sizeof(fallDirection));
+    CHECK(f.GetGuid().GetRawValue() == UINT64_C(0x04000000053CC8E8));
+    CHECK(f.GetTransportGuid().IsEmpty());
+    CHECK(uint32(f.GetMovementFlags()) == 0x00000800u);
+    CHECK(f.GetStatusInfo().hasFallDirection && f.GetFallTime() == 2u);
+    CHECK(f.GetJumpInfo().velocity == 0.0f && f.GetJumpInfo().xyspeed == 0.0f);
+    CHECK(f.GetJumpInfo().sinAngle == -0.48386454582214355f);
+    CHECK(f.GetJumpInfo().cosAngle == 0.8751428723335266f);
+    CHECK(f.GetPos()->o == 5.778120040893555f && f.GetTime() == 1321910u);
+
+    MovementInfo const t = DecodeRetailAck(CMSG_MOVE_CHNG_TRANSPORT,
+        transportTime2, sizeof(transportTime2));
+    CHECK(uint32(t.GetMovementFlags()) == 0x00000800u && uint16(t.GetMovementFlags2()) == 0x0800u);
+    CHECK(t.GetTransportGuid().GetRawValue() == UINT64_C(0x1FC0000000000B81));
+    CHECK(t.GetTransportPos()->x == 6.5576171875f && t.GetTransportPos()->y == -3.71875f);
+    CHECK(t.GetTransportPos()->z == 3.0585508346557617f && t.GetTransportPos()->o == 4.2032952308654785f);
+    CHECK(t.GetTransportTime() == 5118u && t.GetTransportTime2() == 11429u);
+    CHECK(t.GetStatusInfo().hasTransportTime2 && t.GetTime() == 3169076u);
+}
+
+static void test_move_change_transport_synthetic_coverage()
+{
+    RefState const state;
+    MovementInfo const info = Decode(CMSG_MOVE_CHNG_TRANSPORT, kMoveChangeTransport, state);
+    WorldPacket relay(SMSG_PLAYER_MOVE, 64);
+    relay << info;
+    CHECK(Equal(relay, Encode(kPlayerMove, state)));
+
+    RefState complementary = state;
+    complementary.raw148 = false;
+    complementary.raw149 = true;
+    complementary.raw172 = false;
+    complementary.hasFlags = false;
+    complementary.hasFlags2 = false;
+    complementary.hasTimestamp = false;
+    complementary.hasOrientation = false;
+    complementary.hasPitch = false;
+    complementary.hasFall = false;
+    complementary.hasFallDirection = false;
+    complementary.hasTransport = false;
+    complementary.hasTransportTime2 = false;
+    complementary.hasTransportTime3 = false;
+    complementary.hasSplineElevation = false;
+    complementary.hasUnknownUInt32 = false;
+    complementary.unknownUInt32 = 0;
+    complementary.forceIds.clear();
+    Decode(CMSG_MOVE_CHNG_TRANSPORT, kMoveChangeTransport, complementary);
+
+    CHECK(Rejects(CMSG_MOVE_CHNG_TRANSPORT, kMoveChangeTransport, state,
+        (1u << 22) - 1u, 0, false));
+    CHECK(Rejects(CMSG_MOVE_CHNG_TRANSPORT, kMoveChangeTransport, state,
+        2, 1, true));
+
+    std::vector<uint8> const body = Encode(kMoveChangeTransport, state);
+    std::vector<uint8> truncated = body;
+    truncated.pop_back();
+    WorldPacket truncatedPacket(CMSG_MOVE_CHNG_TRANSPORT, truncated.size());
+    truncatedPacket.append(truncated.data(), truncated.size());
+    bool threw = false;
+    try
+    {
+        MovementInfo truncatedInfo;
+        truncatedPacket >> truncatedInfo;
+    }
+    catch (ByteBufferException const&)
+    {
+        threw = true;
+    }
+    CHECK(threw);
+
+    WorldPacket trailingPacket(CMSG_MOVE_CHNG_TRANSPORT, body.size() + 1);
+    trailingPacket.append(body.data(), body.size());
+    trailingPacket << uint8(0xA5);
+    MovementInfo trailingInfo;
+    trailingPacket >> trailingInfo;
+    CHECK(trailingPacket.rpos() + 1 == trailingPacket.size());
 }
 
 static void test_forced_movement_ack_retail_bodies()
@@ -2612,6 +2773,8 @@ int main(int, char**)
     test_gravity_family_retail_bodies();
     test_normal_fall_counter_offset_moves();
     test_hostile_counts_rejected();
+    test_move_change_transport_retail_bodies();
+    test_move_change_transport_synthetic_coverage();
     test_forced_movement_ack_retail_bodies();
     test_forced_movement_ack_synthetic_coverage();
     test_opcode_values_are_framable();

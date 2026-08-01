@@ -1735,6 +1735,8 @@ add_test(NAME mop_movement_source
         -P ${CMAKE_CURRENT_SOURCE_DIR}/mop_movement_source_test.cmake)
 
 foreach(mutation IN ITEMS root_then_clear_flags drop_back_speed_snare_calls speed_correction_is_noop back_speed_early_return drop_nonfinite_speed_guard nonfinite_guard_after_bookkeeping inbound_sequence movement_gap_sequence player_move_sequence allocation_bound
+        change_transport_world_xy_order change_transport_drop_force_count change_transport_flags2_12_width
+        change_transport_fall_scalar_order change_transport_tail_order
         force_swim_sequence force_swim_flags2_width flags2_width inbound_registration movement_gap_registration force_swim_registration
         force_swim_handler_order output_metadata heartbeat_framing mover_guid_validation
         spline_state_builder spline_state_registration monster_move_writer monster_move_registration
