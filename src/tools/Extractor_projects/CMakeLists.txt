@@ -183,7 +183,6 @@ target_link_libraries(mmap-extractor
         shared
         RecastNavigation::Recast
         Threads::Threads
-        DL::DL
         mangos_openssl
 )
 

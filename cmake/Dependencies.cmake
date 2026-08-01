@@ -21,18 +21,20 @@
 # =============================================================================
 # Which vendored dependencies this fork builds.
 #
-# `dep` is the shared `mangos/mangosDeps` submodule and is never modified here,
-# so the choice cannot live in its own CMakeLists: that file still lists
-# acelite, which the Stage 2 ACE-removal campaign deleted from this fork's own
-# source but cannot delete from the shared submodule. Adding the subdirectories
-# from the outside is how the selection is attached without touching the
-# submodule -- the same mechanism cmake/SubmoduleCompat.cmake already uses for
-# Eluna/SD3.
+# `dep` is a submodule and is never modified here, so the choice cannot live in
+# its own CMakeLists. Adding the subdirectories from the outside is how the
+# selection is attached without touching the submodule -- the same mechanism as
+# cmake/SubmoduleCompat.cmake.
+#
+# It is also what decides the GATING. The submodule builds StormLib only when
+# BUILD_TOOLS is on, which was true when the extractor was an optional extra; it
+# is not, because the extractor is what produces the tiles the server reads. A
+# core without this file inherits the submodule's answer and fails to compile the
+# MPQ reader.
 #
 # Add a dependency here rather than in dep/CMakeLists.txt. Anything left out is
-# simply never configured, so acelite costs no build time and cannot be linked
-# back in by accident. This fork still uses g3dlite (unlike MangosTwo, which
-# replaced it with src/shared/Geometry and dropped it) -- keep it.
+# simply never configured, so a library the fork has dropped costs no build time
+# and cannot be linked back in by accident.
 # =============================================================================
 
 set(MANGOS_DEP_DIR "${CMAKE_CURRENT_SOURCE_DIR}/dep")

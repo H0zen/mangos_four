@@ -22,6 +22,17 @@ cmake_minimum_required(VERSION 3.18 FATAL_ERROR)
 
 list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/cmake")
 
+project(MaNGOS VERSION 0.22.0 LANGUAGES C CXX)
+
+# Build artefacts never land in the source tree. This is a test, not hygiene:
+# sources here still carry relative includes like "../../dep/foo.h", and an
+# in-source build tree can make those resolve by accident.
+if(CMAKE_BINARY_DIR STREQUAL CMAKE_SOURCE_DIR)
+    message(FATAL_ERROR
+        "In-source builds are not supported. Configure from a separate build "
+        "directory, e.g.  cmake -S . -B ../build")
+endif()
+
 cmake_policy(SET CMP0028 NEW)
 cmake_policy(SET CMP0054 NEW)
 cmake_policy(SET CMP0042 NEW)
@@ -38,6 +49,9 @@ set(CMAKE_C_STANDARD_REQUIRED ON)
 set_property(GLOBAL
     PROPERTY USE_FOLDERS ON
 )
+
+# Always export compile_commands.json for tooling
+set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
 #==================================================================================
 # Define available cmake options below
@@ -66,8 +80,7 @@ message(
     CMAKE_INSTALL_PREFIX    Path where the server should be installed to
     BUILD_MANGOSD           Build the main server
     BUILD_REALMD            Build the login server
-    BUILD_TOOLS             Build the map/vmap/mmap extractors
-    USE_STORMLIB            Use StormLib for reading MPQs
+    BUILD_TOOLS             Build the client-data extractor
     SOAP                    Enable remote access via SOAP
     PCH                     Enable use of precompiled headers
     WITH_IO_URING           Use the io_uring network backend instead of epoll (Linux only,
@@ -94,10 +107,12 @@ if(CMAKE_INSTALL_PREFIX_INITIALIZED_TO_DEFAULT)
   set(CMAKE_INSTALL_PREFIX ${CMAKE_BINARY_DIR}/install CACHE PATH "Default install directory" FORCE)
 endif()
 
-if(DEBUG)
-  set(CMAKE_BUILD_TYPE Debug)
-else()
-  set(CMAKE_BUILD_TYPE Release)
+if(NOT CMAKE_CONFIGURATION_TYPES)
+  if(DEBUG)
+    set(CMAKE_BUILD_TYPE Debug CACHE STRING "" FORCE)
+  else()
+    set(CMAKE_BUILD_TYPE Release CACHE STRING "" FORCE)
+  endif()
 endif()
 
 if(UNIX)
@@ -113,17 +128,32 @@ else()
 endif()
 
 if(NOT WITHOUT_GIT)
-  find_package(Git)
+  find_package(Git QUIET)
 endif()
 
 find_package(Threads REQUIRED)
 find_package(MySQL   REQUIRED)
-find_package(DL      REQUIRED)
 
 find_package(ZLIB  QUIET)
 find_package(BZip2 QUIET)
 
+# dep/lualib (the Lua build used by Eluna) links against readline by its bare
+# library name and is not itself touched here; find_package(Readline) declares a
+# GLOBAL IMPORTED target literally named `readline` (see cmake/FindReadline.cmake)
+# before that subdirectory is added, so its existing bare-name references resolve
+# to a properly-detected library instead of an unqualified linker search -- which
+# is what fails on FreeBSD, where readline lives in /usr/local/lib.
+if(NOT WIN32 AND SCRIPT_LIB_ELUNA)
+  find_package(Readline REQUIRED)
+endif()
+
 find_package(OpenSSL 3.0 REQUIRED)
+
+# OpenSSL 4.x support is intentionally deferred until the OpenSSL 4.2 LTS migration.
+if(OPENSSL_VERSION VERSION_GREATER_EQUAL "4.0.0")
+  message(FATAL_ERROR
+    "Unsupported OpenSSL ${OPENSSL_VERSION}: MaNGOS currently requires >=3.0.0 and <4.0.0")
+endif()
 
 # =============================================================================
 # OpenSSL policy
@@ -188,12 +218,19 @@ include(${CMAKE_SOURCE_DIR}/cmake/EnsureVersion.cmake)
 
 include(${CMAKE_SOURCE_DIR}/cmake/MangosParams.cmake)
 include(${CMAKE_SOURCE_DIR}/cmake/SetDefinitions.cmake)
+include(${CMAKE_SOURCE_DIR}/cmake/SubmoduleCompat.cmake)
 
 if(PCH)
     include(${CMAKE_SOURCE_DIR}/cmake/PCHSupport.cmake)
 endif()
 
 include(${CMAKE_SOURCE_DIR}/cmake/Dependencies.cmake)
+
+if(WITH_TESTS OR WITH_NET_TESTS)
+    set(BUILD_TESTING ON)
+    enable_testing()
+endif()
+
 add_subdirectory(src)
 
 include(${CMAKE_SOURCE_DIR}/cmake/StatusInfo.cmake)

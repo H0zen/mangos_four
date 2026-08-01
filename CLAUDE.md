@@ -26,12 +26,12 @@ target is **4.3.4 only**; do **not** introduce 5.x/MoP or later-expansion assump
 ```sh
 git clone --recursive https://github.com/mangosthree/server.git && cd server
 sudo apt-get install -y git cmake make build-essential \
-  libssl-dev libbz2-dev default-libmysqlclient-dev libace-dev libreadline-dev   # Debian/Ubuntu deps
+  libssl-dev libbz2-dev default-libmysqlclient-dev libreadline-dev   # Debian/Ubuntu deps
 mkdir -p _build _install && cd _build
 cmake .. -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX=../_install \
   -DBUILD_TOOLS=1 -DBUILD_MANGOSD=1 -DBUILD_REALMD=1 -DSOAP=1 \
   -DSCRIPT_LIB_ELUNA=1 -DSCRIPT_LIB_SD3=1 -DPLAYERBOTS=0 \
-  -DUSE_STORMLIB=1 -DPCH=0
+  -DPCH=0
 make -j"$(nproc)" && make install -j"$(nproc)"
 ```
 
