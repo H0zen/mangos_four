@@ -559,6 +559,48 @@ namespace
         packet.WriteGuidBytes<7>(spell.casterGuid);
         return packet;
     }
+
+    static WorldPacket BuildCancelAuraFixture(uint32 spellId, uint64 identifier)
+    {
+        WorldPacket packet(CMSG_CANCEL_AURA, 14);
+        ObjectGuid guid(identifier);
+
+        packet << spellId;
+        packet.WriteBit(guid.IsEmpty());
+        packet.WriteGuidMask<6, 5, 1, 0, 4, 3, 2, 7>(guid);
+        packet.FlushBits();
+        packet.WriteGuidBytes<3, 2, 1, 0, 4, 7, 5, 6>(guid);
+        return packet;
+    }
+
+    static WorldPacket BuildCancelAuraPacket(std::initializer_list<uint8> bytes)
+    {
+        WorldPacket packet(CMSG_CANCEL_AURA, bytes.size());
+        for (uint8 byte : bytes)
+            packet << byte;
+        return packet;
+    }
+
+    static void CheckCancelAuraAccepted(WorldPacket& packet, uint32 spellId, uint64 identifier)
+    {
+        MopSpellPackets::CancelAuraRequest request;
+        CHECK(MopSpellPackets::ReadCancelAuraRequest(packet, request));
+        CHECK(packet.rpos() == packet.size());
+        CHECK(request.spellId == spellId);
+        CHECK(request.identifier.GetRawValue() == identifier);
+    }
+
+    static void CheckCancelAuraRejected(WorldPacket& packet)
+    {
+        MopSpellPackets::CancelAuraRequest request;
+        request.spellId = 0xFFFFFFFFu;
+        request.identifier = ObjectGuid(UINT64_MAX);
+
+        CHECK(!MopSpellPackets::ReadCancelAuraRequest(packet, request));
+        CHECK(packet.rpos() == packet.size());
+        CHECK(request.spellId == 0);
+        CHECK(request.identifier.IsEmpty());
+    }
 }
 
 static void test_dense_and_guid_permutations()
@@ -676,6 +718,89 @@ static void test_opcode_is_framable()
 {
     CHECK(uint32(CMSG_CAST_SPELL) == 0x0206u);
     CHECK(uint32(CMSG_CAST_SPELL) < uint32(OPCODE_TABLE_SIZE));
+}
+
+static void test_cancel_aura_captured_and_synthetic_forms()
+{
+    WorldPacket firstZero = BuildCancelAuraPacket({
+        0x2F, 0xBA, 0x01, 0x00, 0x80, 0x00
+    });
+    CheckCancelAuraAccepted(firstZero, 0x0001BA2Fu, 0);
+
+    WorldPacket secondZero = BuildCancelAuraPacket({
+        0x71, 0x3C, 0x00, 0x00, 0x80, 0x00
+    });
+    CheckCancelAuraAccepted(secondZero, 0x00003C71u, 0);
+
+    WorldPacket firstNonzero = BuildCancelAuraPacket({
+        0xF5, 0x7D, 0x00, 0x00, 0x1B, 0x80, 0x06, 0x2C, 0x4E, 0x02, 0x07
+    });
+    CheckCancelAuraAccepted(firstNonzero, 0x00007DF5u, UINT64_C(0x06000000072D4F03));
+
+    WorldPacket secondNonzero = BuildCancelAuraPacket({
+        0x8F, 0xB4, 0x01, 0x00, 0x1B, 0x80, 0x04, 0x3D, 0xC9, 0xE9, 0x05
+    });
+    CheckCancelAuraAccepted(secondNonzero, 0x0001B48Fu, UINT64_C(0x04000000053CC8E8));
+
+    WorldPacket dense = BuildCancelAuraFixture(0x11223344u, UINT64_C(0x0807060504030201));
+    CHECK(dense.size() == 14);
+    CheckCancelAuraAccepted(dense, 0x11223344u, UINT64_C(0x0807060504030201));
+
+    for (uint8 index = 0; index < 8; ++index)
+    {
+        uint64 const identifier = uint64(index + 1) << (index * 8);
+        WorldPacket single = BuildCancelAuraFixture(0xA1B2C3D4u + index, identifier);
+        CHECK(single.size() == 7);
+        CheckCancelAuraAccepted(single, 0xA1B2C3D4u + index, identifier);
+    }
+
+    WorldPacket zeroSpell = BuildCancelAuraFixture(0, 0);
+    CheckCancelAuraAccepted(zeroSpell, 0, 0);
+}
+
+static void test_cancel_aura_rejects_malformed_forms_atomically()
+{
+    WorldPacket dense = BuildCancelAuraFixture(0x11223344u, UINT64_C(0x0807060504030201));
+    std::vector<uint8> denseBytes(dense.contents(), dense.contents() + dense.size());
+    for (size_t size = 0; size < denseBytes.size(); ++size)
+    {
+        WorldPacket truncated(CMSG_CANCEL_AURA, size);
+        if (size)
+            truncated.append(denseBytes.data(), size);
+        CheckCancelAuraRejected(truncated);
+    }
+
+    WorldPacket zeroFlagWithIdentifier = BuildCancelAuraPacket({
+        0x44, 0x33, 0x22, 0x11, 0xFF, 0x80,
+        0x05, 0x02, 0x03, 0x00, 0x04, 0x09, 0x07, 0x06
+    });
+    CheckCancelAuraRejected(zeroFlagWithIdentifier);
+
+    WorldPacket nonzeroFlagWithoutIdentifier = BuildCancelAuraPacket({
+        0x44, 0x33, 0x22, 0x11, 0x00, 0x00
+    });
+    CheckCancelAuraRejected(nonzeroFlagWithoutIdentifier);
+
+    WorldPacket nonzeroPadding = BuildCancelAuraPacket({
+        0x44, 0x33, 0x22, 0x11, 0x80, 0x01
+    });
+    CheckCancelAuraRejected(nonzeroPadding);
+
+    WorldPacket zeroWithTail = BuildCancelAuraFixture(0x11223344u, 0);
+    zeroWithTail << uint8(0xCC);
+    CheckCancelAuraRejected(zeroWithTail);
+
+    WorldPacket denseWithTail = BuildCancelAuraFixture(0x11223344u, UINT64_C(0x0807060504030201));
+    denseWithTail << uint8(0xCC);
+    CheckCancelAuraRejected(denseWithTail);
+
+    WorldPacket legacyScalar(CMSG_CANCEL_AURA, 4);
+    legacyScalar << uint32(0x11223344u);
+    CheckCancelAuraRejected(legacyScalar);
+
+    WorldPacket legacyRaw(CMSG_CANCEL_AURA, 13);
+    legacyRaw << uint32(0x11223344u) << uint8(1) << uint64(UINT64_C(0x0807060504030201));
+    CheckCancelAuraRejected(legacyRaw);
 }
 
 static void test_cast_failure_result_translation()
@@ -1197,6 +1322,8 @@ int main(int, char**)
     test_every_truncated_dense_prefix_and_trailing_byte_rejected();
     test_declared_string_larger_than_remaining_rejected();
     test_opcode_is_framable();
+    test_cancel_aura_captured_and_synthetic_forms();
+    test_cancel_aura_rejects_malformed_forms_atomically();
     test_cast_failure_result_translation();
     test_cast_failure_wire_layout();
     test_pet_cast_failure_wire_layout();

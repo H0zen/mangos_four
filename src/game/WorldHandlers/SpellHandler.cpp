@@ -591,8 +591,13 @@ void WorldSession::HandleCancelCastOpcode(WorldPacket& recvPacket)
  */
 void WorldSession::HandleCancelAuraOpcode(WorldPacket& recvPacket)
 {
-    uint32 spellId;
-    recvPacket >> spellId;
+    MopSpellPackets::CancelAuraRequest request;
+    if (!MopSpellPackets::ReadCancelAuraRequest(recvPacket, request))
+    {
+        return;
+    }
+
+    uint32 const spellId = request.spellId;
 
     SpellEntry const* spellInfo = sSpellStore.LookupEntry(spellId);
     if (!spellInfo)

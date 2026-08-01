@@ -175,9 +175,9 @@
  *   TOTAL SMSG rows                   925
  *
  * SUBSYSTEM CONFIDENCE: high=365, low=221, medium=182, none=157
- * STATUS TOTALS: ACTIVE=537, DOC=434, DORMANT=549
+ * STATUS TOTALS: ACTIVE=538, DOC=434, DORMANT=548
  *   SMSG: ACTIVE=319, DOC=271, DORMANT=335
- *   CMSG: ACTIVE=218, DOC=163, DORMANT=214
+ *   CMSG: ACTIVE=219, DOC=163, DORMANT=213
  */
 
 // CAVEATS -- read before trusting any single row:
@@ -1825,7 +1825,7 @@ typedef uint16_t uint16;
  *   CMSG_MOVE_START_SWIM                           0x1858  DORMANT
  *   CMSG_FORCE_TURN_RATE_CHANGE_ACK                0x185A  DORMANT
  *   CMSG_SET_VEHICLE_REC_ID_ACK                    0x185B  DORMANT
- *   CMSG_CANCEL_AURA                               0x1861  DORMANT
+ *   CMSG_CANCEL_AURA                               0x1861  ACTIVE
  *   CMSG_GROUP_INITIATE_ROLE_POLL                  0x1882  DOC
  *   CMSG_BATTLE_PAY_START_PURCHASE                 0x1886  DOC
  *   CMSG_BATTLE_PET_MODIFY_NAME                    0x1887  DOC

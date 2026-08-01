@@ -966,6 +966,7 @@ void InitializeOpcodes()
     // Binary-proven 18414 integrated spell-cast request.
     DefC(CMSG_CAST_SPELL, "CMSG_CAST_SPELL", STATUS_LOGGEDIN, PROCESS_THREADUNSAFE, &WorldSession::HandleCastSpellOpcode);
     DefC(CMSG_USE_ITEM, "CMSG_USE_ITEM", STATUS_LOGGEDIN, PROCESS_THREADUNSAFE, &WorldSession::HandleUseItemOpcode);
+    DefC(CMSG_CANCEL_AURA, "CMSG_CANCEL_AURA", STATUS_LOGGEDIN, PROCESS_THREADUNSAFE, &WorldSession::HandleCancelAuraOpcode);
     DefS(SMSG_CAST_FAILED, "SMSG_CAST_FAILED");
     DefS(SMSG_PET_CAST_FAILED, "SMSG_PET_CAST_FAILED");
     DefS(SMSG_SPELL_START, "SMSG_SPELL_START");

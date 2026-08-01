@@ -1953,7 +1953,17 @@ foreach(mutation IN ITEMS reader registration target_initializer target_mapping 
         clear_target_mask_order clear_target_byte_order clear_target_sender
         clear_target_registration clear_target_gate clear_target_reference
         channel_start_mask_order channel_update_byte_order channel_sender
-        channel_registration channel_gate channel_reference)
+        channel_registration channel_gate channel_reference
+        cancel_aura_declaration cancel_aura_mask_order cancel_aura_scalar_order cancel_aura_zero_polarity
+        cancel_aura_byte_order cancel_aura_xor_decode cancel_aura_padding
+        cancel_aura_zero_consistency cancel_aura_full_consumption cancel_aura_validation_drain
+        cancel_aura_exception_drain cancel_aura_initial_reset
+        cancel_aura_staged_assignment cancel_aura_handler_reader cancel_aura_handler_spell
+        cancel_aura_cant_cancel cancel_aura_passive cancel_aura_negative cancel_aura_remote_control
+        cancel_aura_possess_exception cancel_aura_channel cancel_aura_channel_identity
+        cancel_aura_interrupt_actor cancel_aura_area_authority cancel_aura_remove_actor
+        cancel_aura_identifier_lookup cancel_aura_cooldown cancel_aura_registration
+        cancel_aura_reference cancel_aura_pet_activation)
     add_test(NAME mop_spell_cast_packets_source_mutation_${mutation}
         COMMAND ${CMAKE_COMMAND} -DSOURCE_ROOT=${CMAKE_SOURCE_DIR}
             -DMUTATION=${mutation}

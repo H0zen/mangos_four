@@ -655,6 +655,12 @@ namespace MopSpellPackets
         CastSpellRequest cast;
     };
 
+    struct CancelAuraRequest
+    {
+        uint32 spellId = 0;
+        ObjectGuid identifier;
+    };
+
     uint32 ToClientCastResult(SpellCastResult result);
     void BuildCastFailed(WorldPacket& out, uint32 spellId, SpellCastResult result,
         uint8 castCount, bool isPetCastResult, CastFailedArguments const& arguments);
@@ -662,6 +668,7 @@ namespace MopSpellPackets
     bool BuildSpellGo(WorldPacket& out, SpellGoPacket const& spell);
     bool ReadCastSpellRequest(WorldPacket& in, CastSpellRequest& request);
     bool ReadUseItemRequest(WorldPacket& in, UseItemRequest& request);
+    bool ReadCancelAuraRequest(WorldPacket& in, CancelAuraRequest& request);
 }
 
 inline ByteBuffer& operator<< (ByteBuffer& buf, SpellCastTargets const& targets)

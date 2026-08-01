@@ -14,7 +14,157 @@ file(READ "${SOURCE_ROOT}/src/game/Object/PlayerSpell.cpp" player_spell_source)
 file(READ "${SOURCE_ROOT}/src/game/Object/SpellCooldownMgr.cpp" spell_cooldown_mgr_source)
 file(READ "${SOURCE_ROOT}/src/game/Server/Opcodes_reference.h" opcode_reference)
 
-if(MUTATION STREQUAL "reader")
+if(MUTATION STREQUAL "cancel_aura_declaration")
+    string(REPLACE
+        "bool ReadCancelAuraRequest(WorldPacket& in, CancelAuraRequest& request);"
+        "bool ReadRemovedCancelAuraRequest(WorldPacket& in, CancelAuraRequest& request);"
+        spell_header "${spell_header}")
+elseif(MUTATION STREQUAL "cancel_aura_mask_order")
+    string(REPLACE
+        "in.ReadGuidMask<6, 5, 1, 0, 4, 3, 2, 7>(identifier);"
+        "in.ReadGuidMask<5, 6, 1, 0, 4, 3, 2, 7>(identifier);"
+        spell_source "${spell_source}")
+elseif(MUTATION STREQUAL "cancel_aura_scalar_order")
+    string(REPLACE
+        "in >> spellId;\n        bool const identifierIsZero = in.ReadBit();"
+        "bool const identifierIsZero = in.ReadBit();\n        in >> spellId;"
+        spell_source "${spell_source}")
+elseif(MUTATION STREQUAL "cancel_aura_zero_polarity")
+    string(REPLACE
+        "bool const identifierIsZero = in.ReadBit();"
+        "bool const identifierIsZero = !in.ReadBit();"
+        spell_source "${spell_source}")
+elseif(MUTATION STREQUAL "cancel_aura_byte_order")
+    string(REPLACE
+        "in.ReadGuidBytes<3, 2, 1, 0, 4, 7, 5, 6>(identifier);"
+        "in.ReadGuidBytes<2, 3, 1, 0, 4, 7, 5, 6>(identifier);"
+        spell_source "${spell_source}")
+elseif(MUTATION STREQUAL "cancel_aura_xor_decode")
+    string(REPLACE
+        "in.ReadGuidBytes<3, 2, 1, 0, 4, 7, 5, 6>(identifier);"
+        "in.read_skip<uint8>(); /* replaced XOR-aware identifier decoding */"
+        spell_source "${spell_source}")
+elseif(MUTATION STREQUAL "cancel_aura_padding")
+    string(REPLACE
+        "padding != 0 || identifier.IsEmpty() != identifierIsZero || in.rpos() != in.size()"
+        "identifier.IsEmpty() != identifierIsZero || in.rpos() != in.size()"
+        spell_source "${spell_source}")
+elseif(MUTATION STREQUAL "cancel_aura_zero_consistency")
+    string(REPLACE
+        "padding != 0 || identifier.IsEmpty() != identifierIsZero || in.rpos() != in.size()"
+        "padding != 0 || in.rpos() != in.size()"
+        spell_source "${spell_source}")
+elseif(MUTATION STREQUAL "cancel_aura_full_consumption")
+    string(REPLACE
+        "padding != 0 || identifier.IsEmpty() != identifierIsZero || in.rpos() != in.size()"
+        "padding != 0 || identifier.IsEmpty() != identifierIsZero"
+        spell_source "${spell_source}")
+elseif(MUTATION STREQUAL "cancel_aura_validation_drain")
+    string(REPLACE
+        "in.rfinish();\n            return false;\n        }\n\n        CancelAuraRequest parsed;"
+        "return false; /* removed validation drain */\n        }\n\n        CancelAuraRequest parsed;"
+        spell_source "${spell_source}")
+elseif(MUTATION STREQUAL "cancel_aura_exception_drain")
+    string(REPLACE
+        "catch (ByteBufferException const&)\n    {\n        in.rfinish();\n        return false;\n    }\n}\n\n/**\n * @brief Deserializes spell cast targets"
+        "catch (ByteBufferException const&)\n    {\n        return false; /* removed exception drain */\n    }\n}\n\n/**\n * @brief Deserializes spell cast targets"
+        spell_source "${spell_source}")
+elseif(MUTATION STREQUAL "cancel_aura_initial_reset")
+    string(REPLACE
+        "request = CancelAuraRequest();"
+        "/* removed cancel-aura output reset */"
+        spell_source "${spell_source}")
+elseif(MUTATION STREQUAL "cancel_aura_staged_assignment")
+    string(REPLACE
+        "request = parsed;"
+        "request.spellId = spellId; request.identifier = identifier;"
+        spell_source "${spell_source}")
+elseif(MUTATION STREQUAL "cancel_aura_handler_reader")
+    string(REPLACE
+        "MopSpellPackets::ReadCancelAuraRequest(recvPacket, request)"
+        "false /* removed cancel-aura reader */"
+        spell_handler "${spell_handler}")
+elseif(MUTATION STREQUAL "cancel_aura_handler_spell")
+    string(REPLACE
+        "uint32 const spellId = request.spellId;"
+        "uint32 const spellId = 0; /* ignored parsed spell */"
+        spell_handler "${spell_handler}")
+elseif(MUTATION STREQUAL "cancel_aura_cant_cancel")
+    string(REPLACE
+        "spellInfo->HasAttribute(SPELL_ATTR_CANT_CANCEL)"
+        "false /* removed cant-cancel gate */"
+        spell_handler "${spell_handler}")
+elseif(MUTATION STREQUAL "cancel_aura_passive")
+    string(REPLACE
+        "IsPassiveSpell(spellInfo)"
+        "false /* removed passive gate */"
+        spell_handler "${spell_handler}")
+elseif(MUTATION STREQUAL "cancel_aura_negative")
+    string(REPLACE
+        "if (!IsPositiveSpell(spellId))"
+        "if (false /* removed negative-aura gate */)"
+        spell_handler "${spell_handler}")
+elseif(MUTATION STREQUAL "cancel_aura_remote_control")
+    string(REPLACE
+        "if (!_player->IsSelfMover())"
+        "if (false /* removed remote-control exception */)"
+        spell_handler "${spell_handler}")
+elseif(MUTATION STREQUAL "cancel_aura_possess_exception")
+    string(REPLACE
+        "spellEffect->EffectAura == SPELL_AURA_MOD_POSSESS_PET"
+        "spellEffect->EffectAura == SPELL_AURA_MOD_POSSESS"
+        spell_handler "${spell_handler}")
+elseif(MUTATION STREQUAL "cancel_aura_channel")
+    string(REPLACE
+        "if (IsChanneledSpell(spellInfo))"
+        "if (false /* removed channel branch */)"
+        spell_handler "${spell_handler}")
+elseif(MUTATION STREQUAL "cancel_aura_channel_identity")
+    string(REPLACE
+        "curSpell->m_spellInfo->ID == spellId"
+        "curSpell->m_spellInfo->ID != spellId"
+        spell_handler "${spell_handler}")
+elseif(MUTATION STREQUAL "cancel_aura_interrupt_actor")
+    string(REPLACE
+        "_player->InterruptSpell(CURRENT_CHANNELED_SPELL);"
+        "GetPlayer()->InterruptSpell(CURRENT_GENERIC_SPELL);"
+        spell_handler "${spell_handler}")
+elseif(MUTATION STREQUAL "cancel_aura_area_authority")
+    string(REPLACE
+        "holder->GetCasterGuid() != _player->GetObjectGuid() && HasAreaAuraEffect(holder->GetSpellProto())"
+        "false /* removed foreign area-aura gate */"
+        spell_handler "${spell_handler}")
+elseif(MUTATION STREQUAL "cancel_aura_remove_actor")
+    string(REPLACE
+        "_player->RemoveAurasDueToSpellByCancel(spellId);"
+        "GetPlayer()->RemoveAurasDueToSpell(spellId);"
+        spell_handler "${spell_handler}")
+elseif(MUTATION STREQUAL "cancel_aura_identifier_lookup")
+    string(REPLACE
+        "uint32 const spellId = request.spellId;"
+        "uint32 const spellId = request.spellId;\n    _player->GetMap()->GetWorldObject(request.identifier);"
+        spell_handler "${spell_handler}")
+elseif(MUTATION STREQUAL "cancel_aura_cooldown")
+    string(REPLACE
+        "uint32 const spellId = request.spellId;"
+        "uint32 const spellId = request.spellId;\n    _player->AddSpellCooldown(spellId, 0, time(NULL));"
+        spell_handler "${spell_handler}")
+elseif(MUTATION STREQUAL "cancel_aura_registration")
+    string(REPLACE
+        "DefC(CMSG_CANCEL_AURA, \"CMSG_CANCEL_AURA\""
+        "DefC(0xFFFF, \"removed CMSG_CANCEL_AURA\""
+        opcode_registry "${opcode_registry}")
+elseif(MUTATION STREQUAL "cancel_aura_reference")
+    string(REPLACE
+        "CMSG_CANCEL_AURA                               0x1861  ACTIVE"
+        "CMSG_CANCEL_AURA                               0x1861  DORMANT"
+        opcode_reference "${opcode_reference}")
+elseif(MUTATION STREQUAL "cancel_aura_pet_activation")
+    string(REPLACE
+        "CMSG_PET_CANCEL_AURA                           0x12DA  DORMANT"
+        "CMSG_PET_CANCEL_AURA                           0x12DA  ACTIVE"
+        opcode_reference "${opcode_reference}")
+elseif(MUTATION STREQUAL "reader")
     string(REPLACE
         "MopSpellPackets::ReadCastSpellRequest(recvPacket, request)"
         "false /* removed 18414 cast reader */"
@@ -474,6 +624,16 @@ endif()
 math(EXPR cast_length "${cast_end} - ${cast_start}")
 string(SUBSTRING "${spell_handler}" ${cast_start} ${cast_length} cast_handler)
 
+string(FIND "${spell_handler}" "void WorldSession::HandleCancelAuraOpcode" cancel_aura_handler_begin)
+string(FIND "${spell_handler}" "void WorldSession::HandlePetCancelAuraOpcode" cancel_aura_handler_end)
+if(cancel_aura_handler_begin EQUAL -1 OR cancel_aura_handler_end EQUAL -1
+        OR cancel_aura_handler_end LESS_EQUAL cancel_aura_handler_begin)
+    message(FATAL_ERROR "could not isolate HandleCancelAuraOpcode")
+endif()
+math(EXPR cancel_aura_handler_length "${cancel_aura_handler_end} - ${cancel_aura_handler_begin}")
+string(SUBSTRING "${spell_handler}" ${cancel_aura_handler_begin} ${cancel_aura_handler_length}
+    cancel_aura_handler)
+
 string(FIND "${spell_source}" "void ReadCastSpellMovementBits" cast_movement_bits_begin)
 string(FIND "${spell_source}" "void ReadCastSpellMovementBytes" cast_movement_bits_end)
 if(cast_movement_bits_begin EQUAL -1 OR cast_movement_bits_end EQUAL -1
@@ -498,6 +658,16 @@ if(use_item_helpers_begin EQUAL -1 OR use_item_helpers_begin LESS_EQUAL cast_req
 endif()
 math(EXPR cast_request_length "${use_item_helpers_begin} - ${cast_request_begin}")
 string(SUBSTRING "${spell_source}" ${cast_request_begin} ${cast_request_length} cast_request)
+
+string(FIND "${spell_source}" "bool MopSpellPackets::ReadCancelAuraRequest" cancel_aura_reader_begin)
+string(FIND "${spell_source}" "void SpellCastTargets::read" cancel_aura_reader_end)
+if(cancel_aura_reader_begin EQUAL -1 OR cancel_aura_reader_end EQUAL -1
+        OR cancel_aura_reader_end LESS_EQUAL cancel_aura_reader_begin)
+    message(FATAL_ERROR "could not isolate ReadCancelAuraRequest")
+endif()
+math(EXPR cancel_aura_reader_length "${cancel_aura_reader_end} - ${cancel_aura_reader_begin}")
+string(SUBSTRING "${spell_source}" ${cancel_aura_reader_begin} ${cancel_aura_reader_length}
+    cancel_aura_reader)
 
 string(FIND "${spell_packets}" "void Spell::SendSpellStart()" spell_start_begin)
 string(FIND "${spell_packets}" "void Spell::SendSpellGo()" spell_start_end)
@@ -558,6 +728,112 @@ function(forbid source token context)
         message(FATAL_ERROR "${context}: forbidden token remains: ${token}")
     endif()
 endfunction()
+
+require_once("${opcode_header}"
+    "CMSG_CANCEL_AURA                             = 0x1861"
+    "CMSG_CANCEL_AURA opcode value")
+require_once("${spell_header}"
+    "struct CancelAuraRequest"
+    "cancel-aura request type")
+require_once("${spell_header}"
+    "bool ReadCancelAuraRequest(WorldPacket& in, CancelAuraRequest& request);"
+    "cancel-aura reader declaration")
+require_once("${cancel_aura_reader}"
+    "request = CancelAuraRequest();"
+    "cancel-aura failure reset")
+require_once("${cancel_aura_reader}"
+    "in >> spellId;\n        bool const identifierIsZero = in.ReadBit();"
+    "cancel-aura scalar and zero-bit order")
+require_once("${cancel_aura_reader}"
+    "in.ReadGuidMask<6, 5, 1, 0, 4, 3, 2, 7>(identifier);"
+    "cancel-aura identifier mask order")
+require_once("${cancel_aura_reader}"
+    "uint8 const padding = uint8(in.ReadBits(7));"
+    "cancel-aura canonical padding read")
+require_once("${cancel_aura_reader}"
+    "in.ReadGuidBytes<3, 2, 1, 0, 4, 7, 5, 6>(identifier);"
+    "cancel-aura identifier byte order and XOR decode")
+require_once("${cancel_aura_reader}"
+    "padding != 0 || identifier.IsEmpty() != identifierIsZero || in.rpos() != in.size()"
+    "cancel-aura consistency and full-consumption gate")
+require_once("${cancel_aura_reader}"
+    "CancelAuraRequest parsed;"
+    "cancel-aura staged output")
+require_once("${cancel_aura_reader}"
+    "request = parsed;"
+    "cancel-aura success-only assignment")
+require_once("${cancel_aura_reader}"
+    "in.rfinish();\n            return false;\n        }\n\n        CancelAuraRequest parsed;"
+    "cancel-aura validation failure drain")
+require_once("${cancel_aura_reader}"
+    "catch (ByteBufferException const&)\n    {\n        in.rfinish();\n        return false;\n    }"
+    "cancel-aura exception failure drain")
+require_once("${cancel_aura_handler}"
+    "MopSpellPackets::ReadCancelAuraRequest(recvPacket, request)"
+    "cancel-aura reader wiring")
+require_once("${cancel_aura_handler}"
+    "uint32 const spellId = request.spellId;"
+    "cancel-aura parsed spell use")
+require_once("${cancel_aura_handler}"
+    "spellInfo->HasAttribute(SPELL_ATTR_CANT_CANCEL)"
+    "cancel-aura cant-cancel gate")
+require_once("${cancel_aura_handler}"
+    "IsPassiveSpell(spellInfo)"
+    "cancel-aura passive gate")
+require_once("${cancel_aura_handler}"
+    "if (!IsPositiveSpell(spellId))"
+    "cancel-aura negative-aura gate")
+require_once("${cancel_aura_handler}"
+    "if (!_player->IsSelfMover())"
+    "cancel-aura remote-control policy")
+require_once("${cancel_aura_handler}"
+    "spellEffect->EffectAura == SPELL_AURA_MOD_POSSESS_PET"
+    "cancel-aura possess-pet exception")
+require_once("${cancel_aura_handler}"
+    "if (IsChanneledSpell(spellInfo))"
+    "cancel-aura channel branch")
+require_once("${cancel_aura_handler}"
+    "curSpell->m_spellInfo->ID == spellId"
+    "cancel-aura channel identity")
+require_once("${cancel_aura_handler}"
+    "_player->InterruptSpell(CURRENT_CHANNELED_SPELL);"
+    "cancel-aura authenticated-player interrupt")
+require_once("${cancel_aura_handler}"
+    "holder->GetCasterGuid() != _player->GetObjectGuid() && HasAreaAuraEffect(holder->GetSpellProto())"
+    "cancel-aura foreign area-aura gate")
+require_once("${cancel_aura_handler}"
+    "_player->RemoveAurasDueToSpellByCancel(spellId);"
+    "cancel-aura authenticated-player removal")
+forbid("${cancel_aura_handler}"
+    "request.identifier"
+    "cancel-aura identifier-derived authority")
+forbid("${cancel_aura_handler}"
+    "AddSpellCooldown"
+    "cancel-aura direct cooldown mutation")
+require_once("${opcode_registry}"
+    "DefC(CMSG_CANCEL_AURA, \"CMSG_CANCEL_AURA\", STATUS_LOGGEDIN, PROCESS_THREADUNSAFE, &WorldSession::HandleCancelAuraOpcode);"
+    "CMSG_CANCEL_AURA registration")
+require_once("${opcode_reference}"
+    "CMSG_CANCEL_AURA                               0x1861  ACTIVE"
+    "active cancel-aura reference")
+require_once("${opcode_reference}"
+    "CMSG_PET_CANCEL_AURA                           0x12DA  DORMANT"
+    "dormant pet cancel-aura reference")
+forbid("${opcode_registry}"
+    "DefC(CMSG_PET_CANCEL_AURA"
+    "pet cancel-aura registration")
+
+string(FIND "${cancel_aura_handler}" "MopSpellPackets::ReadCancelAuraRequest" cancel_reader_position)
+string(FIND "${cancel_aura_handler}" "sSpellStore.LookupEntry(spellId)" cancel_lookup_position)
+string(FIND "${cancel_aura_handler}" "_player->InterruptSpell" cancel_interrupt_position)
+string(FIND "${cancel_aura_handler}" "_player->RemoveAurasDueToSpellByCancel" cancel_remove_position)
+if(cancel_reader_position EQUAL -1 OR cancel_lookup_position EQUAL -1
+        OR cancel_interrupt_position EQUAL -1 OR cancel_remove_position EQUAL -1
+        OR NOT cancel_reader_position LESS cancel_lookup_position
+        OR NOT cancel_lookup_position LESS cancel_interrupt_position
+        OR NOT cancel_interrupt_position LESS cancel_remove_position)
+    message(FATAL_ERROR "cancel-aura parse/lookup/mutation order drifted")
+endif()
 
 require_once("${opcode_header}"
     "CMSG_CAST_SPELL                              = 0x0206"

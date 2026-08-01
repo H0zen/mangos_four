@@ -866,6 +866,40 @@ bool MopSpellPackets::ReadUseItemRequest(WorldPacket& in, UseItemRequest& reques
     }
 }
 
+bool MopSpellPackets::ReadCancelAuraRequest(WorldPacket& in, CancelAuraRequest& request)
+{
+    request = CancelAuraRequest();
+
+    try
+    {
+        uint32 spellId = 0;
+        ObjectGuid identifier;
+
+        in >> spellId;
+        bool const identifierIsZero = in.ReadBit();
+        in.ReadGuidMask<6, 5, 1, 0, 4, 3, 2, 7>(identifier);
+        uint8 const padding = uint8(in.ReadBits(7));
+        in.ReadGuidBytes<3, 2, 1, 0, 4, 7, 5, 6>(identifier);
+
+        if (padding != 0 || identifier.IsEmpty() != identifierIsZero || in.rpos() != in.size())
+        {
+            in.rfinish();
+            return false;
+        }
+
+        CancelAuraRequest parsed;
+        parsed.spellId = spellId;
+        parsed.identifier = identifier;
+        request = parsed;
+        return true;
+    }
+    catch (ByteBufferException const&)
+    {
+        in.rfinish();
+        return false;
+    }
+}
+
 /**
  * @brief Deserializes spell cast targets from a packet buffer.
  *
