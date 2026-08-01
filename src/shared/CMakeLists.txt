@@ -295,3 +295,7 @@ target_link_libraries(shared
 if(MANGOS_USE_IO_URING)
     target_include_directories(shared PUBLIC ${URING_INCLUDE_DIR})
 endif()
+
+if(WITH_TESTS)
+    add_subdirectory(Database/tests)
+endif()

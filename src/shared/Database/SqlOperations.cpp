@@ -110,7 +110,10 @@ bool SqlTransaction::Execute(SqlConnection* conn)
 
     LOCK_DB_CONN(conn);
 
-    conn->BeginTransaction();
+    if (!conn->BeginTransaction())
+    {
+        return false;
+    }
 
     const int nItems = m_queue.size();
     for (int i = 0; i < nItems; ++i)
