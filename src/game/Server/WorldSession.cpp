@@ -64,6 +64,7 @@
 #include "ObjectAccessor.h"
 #include "BattleGround/BattleGroundMgr.h"
 #include "MapManager.h"
+#include "MopLogoutPackets.h"
 #include "MopNotificationPackets.h"
 #include "SocialMgr.h"
 #include "Auth/AuthCrypt.h"
@@ -284,7 +285,7 @@ static bool IsEnterWorldConverted(uint16 opcode)
         // the player can neither log out nor teleport once in-world.
         case SMSG_LOGOUT_RESPONSE:       // 0x008F -- ack the logout request (bit-packed body, 18414-correct)
         case SMSG_LOGOUT_CANCEL_ACK:     // 0x0AAF -- ack a cancelled logout (empty body)
-        case SMSG_LOGOUT_COMPLETE:       // 0x142F -- final world-leave (empty body)
+        case SMSG_LOGOUT_COMPLETE:       // 0x142F -- final world-leave (leading bit + zero GUID mask: 80 00)
         case SMSG_MOVE_TELEPORT:         // 0x0B39 -- same-map teleport (MopWorldEntryPackets::BuildMoveTeleport, converted)
         case SMSG_NEW_WORLD:             // 0x1C3B -- cross-map teleport target (MopWorldEntryPackets::BuildNewWorld, converted)
         case SMSG_TRANSFER_PENDING:      // 0x061B -- cross-map load-screen preamble (inline bit-packed body; non-transport
@@ -1210,7 +1211,8 @@ void WorldSession::LogoutPlayer(bool Save)
         SetPlayer(NULL);                                    // deleted in Remove/DeleteFromWorld call
 
         ///- Send the 'logout complete' packet to the client
-        WorldPacket data(SMSG_LOGOUT_COMPLETE, 0);
+        WorldPacket data;
+        MopLogoutPackets::BuildComplete(data);
         SendPacket(&data);
 
         ///- Since each account can only have one online character at any given time, ensure all characters for active account are marked as offline

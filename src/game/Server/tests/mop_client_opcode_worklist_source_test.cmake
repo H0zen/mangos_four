@@ -17,6 +17,15 @@ file(READ "${SOURCE_ROOT}/src/game/Object/Unit.h" unit_header)
 file(READ "${SOURCE_ROOT}/src/game/WorldHandlers/QuestHandler.cpp" quest)
 file(READ "${SOURCE_ROOT}/src/game/WorldHandlers/GossipDef.cpp" gossip)
 file(READ "${SOURCE_ROOT}/src/game/BattleGround/BattleGroundHandler.cpp" battleground)
+if(EXISTS "${SOURCE_ROOT}/src/game/Server/MopLogoutPackets.h")
+    file(READ "${SOURCE_ROOT}/src/game/Server/MopLogoutPackets.h" logout_packets)
+else()
+    set(logout_packets "")
+endif()
+
+set(original_misc "${misc}")
+set(original_session "${session}")
+set(original_logout_packets "${logout_packets}")
 
 if(MUTATION STREQUAL "logout_manual_registration")
     string(REPLACE "DefC(CMSG_LOGOUT_REQUEST," "DefC(CMSG_UNUSED_LOGOUT_REQUEST," opcodes "${opcodes}")
@@ -24,6 +33,30 @@ elseif(MUTATION STREQUAL "logout_idle_registration")
     string(REPLACE "DefC(CMSG_LOGOUT_REQUEST_IDLE," "DefC(CMSG_UNUSED_LOGOUT_REQUEST_IDLE," opcodes "${opcodes}")
 elseif(MUTATION STREQUAL "logout_manual_value")
     string(REPLACE "CMSG_LOGOUT_REQUEST                          = 0x0643" "CMSG_LOGOUT_REQUEST                          = 0x0000" opcode_header "${opcode_header}")
+elseif(MUTATION STREQUAL "logout_denial_timer")
+    string(REPLACE
+        "if (reason)\n    {\n        LogoutRequest(0);\n        return;\n    }"
+        "if (reason)\n    {\n        LogoutRequest(time(0));\n        return;\n    }"
+        misc "${misc}")
+elseif(MUTATION STREQUAL "logout_response_sender")
+    string(REPLACE "MopLogoutPackets::BuildResponse(data, reason, instantLogout != 0);"
+        "/* removed logout response builder */" misc "${misc}")
+elseif(MUTATION STREQUAL "logout_cancel_sender")
+    string(REPLACE "MopLogoutPackets::BuildCancelAck(data);"
+        "/* removed logout cancel-ack builder */" misc "${misc}")
+elseif(MUTATION STREQUAL "logout_complete_sender")
+    string(REPLACE "MopLogoutPackets::BuildComplete(data);"
+        "/* removed logout-complete builder */" session "${session}")
+elseif(MUTATION STREQUAL "logout_response_instant_width")
+    string(REPLACE "out.WriteBit(instant);" "out << uint8(instant);"
+        logout_packets "${logout_packets}")
+elseif(MUTATION STREQUAL "logout_complete_leading_bit")
+    string(REPLACE "out.WriteBit(true);" "out.WriteBit(false);"
+        logout_packets "${logout_packets}")
+elseif(MUTATION STREQUAL "logout_complete_mask_width")
+    string(REPLACE "for (uint8 index = 0; index < 8; ++index)"
+        "for (uint8 index = 0; index < 7; ++index)"
+        logout_packets "${logout_packets}")
 elseif(MUTATION STREQUAL "violence_registration")
     string(REPLACE "DefC(CMSG_VIOLENCE_LEVEL," "DefC(CMSG_UNUSED_VIOLENCE_LEVEL," opcodes "${opcodes}")
 elseif(MUTATION STREQUAL "violence_handler")
@@ -41,6 +74,18 @@ elseif(MUTATION STREQUAL "battle_pay_duplicate_raw")
         opcodes "${opcodes}")
 elseif(MUTATION STREQUAL "battle_pay_value")
     string(REPLACE "CMSG_BATTLE_PAY_GET_PURCHASE_LIST            = 0x18B2" "CMSG_BATTLE_PAY_GET_PURCHASE_LIST            = 0x0000" opcode_header "${opcode_header}")
+endif()
+
+set(logout_mutations
+    logout_denial_timer logout_response_sender logout_cancel_sender logout_complete_sender
+    logout_response_instant_width logout_complete_leading_bit logout_complete_mask_width)
+list(FIND logout_mutations "${MUTATION}" logout_mutation_index)
+if(NOT logout_mutation_index EQUAL -1 AND
+        original_misc STREQUAL misc AND
+        original_session STREQUAL session AND
+        original_logout_packets STREQUAL logout_packets)
+    message(STATUS "MUTATION '${MUTATION}' changed nothing -- dead arm")
+    return()
 endif()
 
 string(FIND "${opcode_header}" "CMSG_LOGOUT_REQUEST                          = 0x0643" logout_manual_value)
@@ -97,6 +142,82 @@ string(SUBSTRING "${misc}" ${logout_handler_start} ${logout_handler_length} logo
 if(logout_handler_body MATCHES "recv_data[ \t]*(>>|\\.|->)")
     message(FATAL_ERROR "empty logout-request routes must not read request data")
 endif()
+
+string(FIND "${logout_handler_body}" "MopLogoutPackets::BuildResponse(data, reason, instantLogout != 0);" logout_response_builder)
+if(logout_response_builder EQUAL -1)
+    message(FATAL_ERROR "logout request does not use the tested 18414 response builder")
+endif()
+if(logout_handler_body MATCHES "WorldPacket data\\(SMSG_LOGOUT_RESPONSE")
+    message(FATAL_ERROR "logout request retains the inline response body")
+endif()
+
+string(FIND "${logout_handler_body}" "if (reason)" logout_denial_start)
+string(FIND "${logout_handler_body}" "// instant logout" logout_denial_end)
+if(logout_denial_start EQUAL -1 OR logout_denial_end LESS_EQUAL logout_denial_start)
+    message(FATAL_ERROR "logout denial branch is missing")
+endif()
+math(EXPR logout_denial_length "${logout_denial_end} - ${logout_denial_start}")
+string(SUBSTRING "${logout_handler_body}" ${logout_denial_start} ${logout_denial_length} logout_denial_body)
+string(FIND "${logout_denial_body}" "LogoutRequest(0);" logout_denial_clear)
+if(NOT logout_denial_clear EQUAL -1)
+    math(EXPR logout_denial_after_clear "${logout_denial_clear} + 1")
+    string(SUBSTRING "${logout_denial_body}" ${logout_denial_after_clear} -1 logout_denial_tail)
+    string(FIND "${logout_denial_tail}" "LogoutRequest(0);" logout_denial_duplicate_clear)
+else()
+    set(logout_denial_duplicate_clear -1)
+endif()
+if(logout_denial_clear EQUAL -1 OR NOT logout_denial_duplicate_clear EQUAL -1 OR
+        logout_denial_body MATCHES "LogoutRequest\\(time\\(0\\)\\)|LogoutPlayer")
+    message(FATAL_ERROR "a rejected logout must clear the timer and return without logging out")
+endif()
+
+string(FIND "${misc}" "void WorldSession::HandleLogoutCancelOpcode" logout_cancel_start)
+string(FIND "${misc}" "void WorldSession::HandleTogglePvP" logout_cancel_end)
+if(logout_cancel_start EQUAL -1 OR logout_cancel_end LESS_EQUAL logout_cancel_start)
+    message(FATAL_ERROR "logout-cancel handler body is missing")
+endif()
+math(EXPR logout_cancel_length "${logout_cancel_end} - ${logout_cancel_start}")
+string(SUBSTRING "${misc}" ${logout_cancel_start} ${logout_cancel_length} logout_cancel_body)
+string(FIND "${logout_cancel_body}" "MopLogoutPackets::BuildCancelAck(data);" logout_cancel_builder)
+if(logout_cancel_builder EQUAL -1)
+    message(FATAL_ERROR "logout cancel does not use the tested 18414 cancel-ack builder")
+endif()
+if(logout_cancel_body MATCHES "WorldPacket data\\(SMSG_LOGOUT_CANCEL_ACK")
+    message(FATAL_ERROR "logout cancel retains the inline cancel-ack body")
+endif()
+
+string(FIND "${session}" "void WorldSession::LogoutPlayer(bool Save)" logout_complete_start)
+string(FIND "${session}" "void WorldSession::KickPlayer()" logout_complete_end)
+if(logout_complete_start EQUAL -1 OR logout_complete_end LESS_EQUAL logout_complete_start)
+    message(FATAL_ERROR "logout-player body is missing")
+endif()
+math(EXPR logout_complete_length "${logout_complete_end} - ${logout_complete_start}")
+string(SUBSTRING "${session}" ${logout_complete_start} ${logout_complete_length} logout_complete_body)
+string(FIND "${logout_complete_body}" "MopLogoutPackets::BuildComplete(data);" logout_complete_builder)
+if(logout_complete_builder EQUAL -1)
+    message(FATAL_ERROR "logout completion does not use the tested 18414 complete builder")
+endif()
+if(logout_complete_body MATCHES "WorldPacket data\\(SMSG_LOGOUT_COMPLETE")
+    message(FATAL_ERROR "logout completion retains the inline empty body")
+endif()
+
+foreach(token IN ITEMS
+        "inline void BuildResponse(WorldPacket& out, uint32 reason, bool instant)"
+        "out.Initialize(SMSG_LOGOUT_RESPONSE, 5);"
+        "out << uint32(reason);"
+        "out.WriteBit(instant);"
+        "inline void BuildCancelAck(WorldPacket& out)"
+        "out.Initialize(SMSG_LOGOUT_CANCEL_ACK, 0);"
+        "inline void BuildComplete(WorldPacket& out)"
+        "out.Initialize(SMSG_LOGOUT_COMPLETE, 2);"
+        "out.WriteBit(true);"
+        "for (uint8 index = 0; index < 8; ++index)"
+        "out.WriteBit(false);")
+    string(FIND "${logout_packets}" "${token}" found)
+    if(found EQUAL -1)
+        message(FATAL_ERROR "18414 logout packet helper contract missing: ${token}")
+    endif()
+endforeach()
 
 foreach(route IN ITEMS
         "CMSG_REQUEST_HOTFIX;HandleRequestHotfix"

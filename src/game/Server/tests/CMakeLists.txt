@@ -256,6 +256,8 @@ add_test(NAME mop_client_opcode_worklist_source
 
 foreach(mutation IN ITEMS
         logout_manual_registration logout_idle_registration logout_manual_value
+        logout_denial_timer logout_response_sender logout_cancel_sender logout_complete_sender
+        logout_response_instant_width logout_complete_leading_bit logout_complete_mask_width
         violence_registration violence_handler violence_value
         battlefield_status_registration battle_pay_registration battle_pay_duplicate_raw battle_pay_value)
     add_test(NAME mop_client_opcode_worklist_source_mutation_${mutation}
@@ -264,6 +266,17 @@ foreach(mutation IN ITEMS
             -P ${CMAKE_CURRENT_SOURCE_DIR}/mop_client_opcode_worklist_source_test.cmake)
     set_tests_properties(mop_client_opcode_worklist_source_mutation_${mutation} PROPERTIES WILL_FAIL TRUE)
 endforeach()
+
+add_executable(mop_logout_packets_test mop_logout_packets_test.cpp)
+target_include_directories(mop_logout_packets_test PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}/..
+    ${CMAKE_SOURCE_DIR}/src/shared
+    $<TARGET_PROPERTY:game,INTERFACE_INCLUDE_DIRECTORIES>)
+set_target_properties(mop_logout_packets_test PROPERTIES CXX_STANDARD 17 CXX_STANDARD_REQUIRED ON)
+target_compile_definitions(mop_logout_packets_test PRIVATE
+    $<TARGET_PROPERTY:game,INTERFACE_COMPILE_DEFINITIONS>)
+target_link_libraries(mop_logout_packets_test PRIVATE shared)
+add_test(NAME mop_logout_packets COMMAND mop_logout_packets_test)
 
 add_executable(mop_compact_packets_test mop_compact_packets_test.cpp)
 target_include_directories(mop_compact_packets_test PRIVATE

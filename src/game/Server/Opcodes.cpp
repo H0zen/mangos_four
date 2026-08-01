@@ -452,8 +452,8 @@ void InitializeOpcodes()
     // (the handlers dereference GetPlayer()).
     // The replies (SMSG_LOGOUT_RESPONSE/CANCEL_ACK/COMPLETE) pass the enter-world suppression via
     // IsEnterWorldConverted(); their 18414 bodies are simple (response = uint32 reason + instant bit;
-    // cancel-ack/complete = empty). On the open-world start map logout is the non-instant 20s-timer
-    // path (instant only in rest areas / for GMs).
+    // cancel-ack = empty; complete = leading bit plus zero GUID mask, 80 00). On the open-world start
+    // map logout is the non-instant 20s-timer path (instant only in rest areas / for GMs).
     DefC(CMSG_LOGOUT_REQUEST, "CMSG_LOGOUT_REQUEST", STATUS_LOGGEDIN, PROCESS_THREADUNSAFE, &WorldSession::HandleLogoutRequestOpcode);
     DefC(CMSG_LOGOUT_REQUEST_IDLE, "CMSG_LOGOUT_REQUEST_IDLE", STATUS_LOGGEDIN, PROCESS_THREADUNSAFE, &WorldSession::HandleLogoutRequestOpcode);
     DefC(CMSG_LOGOUT_CANCEL, "CMSG_LOGOUT_CANCEL", STATUS_LOGGEDIN, PROCESS_THREADUNSAFE, &WorldSession::HandleLogoutCancelOpcode);

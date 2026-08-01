@@ -55,6 +55,7 @@
 #include "Database/DatabaseImpl.h"
 #include "WorldPacket.h"
 #include "MopFarSightPackets.h"
+#include "MopLogoutPackets.h"
 #include "Opcodes.h"
 #include "Log.h"
 #include "Player.h"
@@ -411,15 +412,13 @@ void WorldSession::HandleLogoutRequestOpcode(WorldPacket & /*recv_data*/)
         reason = 2;                                         // FIXME - Need the correct value
     }
 
-    WorldPacket data(SMSG_LOGOUT_RESPONSE, 1 + 4);
-    data << uint32(reason);
-    data.WriteBit(instantLogout != 0);                      // 5.4.8.18414: instant flag is a bit, not a uint8 (SkyFire-verified)
-    data.FlushBits();
+    WorldPacket data;
+    MopLogoutPackets::BuildResponse(data, reason, instantLogout != 0);
     SendPacket(&data);
 
     if (reason)
     {
-        LogoutRequest(time(0));
+        LogoutRequest(0);
         return;
     }
 
@@ -467,7 +466,8 @@ void WorldSession::HandleLogoutCancelOpcode(WorldPacket & /*recv_data*/)
 
     LogoutRequest(0);
 
-    WorldPacket data(SMSG_LOGOUT_CANCEL_ACK, 0);
+    WorldPacket data;
+    MopLogoutPackets::BuildCancelAck(data);
     SendPacket(&data);
 
     // not remove flags if can't free move - its not set in Logout request code.
