@@ -28,6 +28,7 @@
 
 #include "Common.h"
 #include "DataStores/DB2Store.h"
+#include "DBCStructure.h"
 #include "DB2Structure.h"
 
 #include <list>
