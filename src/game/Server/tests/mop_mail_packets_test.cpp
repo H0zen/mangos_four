@@ -277,6 +277,40 @@ static void test_optional_gates_are_independent()
     }
 }
 
+static void test_money_and_cod_preserve_high_halves()
+{
+    MopMailPackets::MailRecord mail;
+    mail.cod = UINT64_C(0x1122334455667788);
+    mail.money = UINT64_C(0x8877665544332211);
+
+    WorldPacket packet(SMSG_MAIL_LIST_RESULT, 64);
+    CHECK(MopMailPackets::BuildList(packet, 1, { mail }));
+
+    PacketCursor cursor(packet);
+    CHECK(cursor.ReadBits(18) == 1);
+    CHECK(cursor.ReadBits(1) == 0);  // player sender
+    CHECK(cursor.ReadBits(8) == 0);  // subject length
+    CHECK(cursor.ReadBits(13) == 0); // body length
+    CHECK(cursor.ReadBits(1) == 0);  // optional A
+    CHECK(cursor.ReadBits(1) == 0);  // optional B
+    CHECK(cursor.ReadBits(17) == 0); // items
+    CHECK(cursor.ReadBits(1) == 0);  // sender GUID absent
+    cursor.AlignBytes();
+
+    CHECK(cursor.ReadU32() == 0);          // message ID
+    CHECK(cursor.ReadU32() == 0);          // template ID
+    CHECK(cursor.ReadU32() == 0x55667788); // COD low
+    CHECK(cursor.ReadU32() == 0x11223344); // COD high
+    CHECK(cursor.ReadU32() == 0);          // stationery
+    CHECK(cursor.ReadU32() == 0);          // days-left bits
+    CHECK(cursor.ReadU32() == 0x44332211); // money low
+    CHECK(cursor.ReadU32() == 0x88776655); // money high
+    CHECK(cursor.ReadU32() == 0);          // checked
+    CHECK(cursor.ReadByte() == 0);         // message type
+    CHECK(cursor.ReadU32() == 0);          // unknown
+    CHECK(cursor.bytePosition == packet.size());
+}
+
 static void test_item_layout_and_two_pass_order()
 {
     MopMailPackets::ItemRecord item;
@@ -424,6 +458,7 @@ int main()
     test_player_attachment_captured_body();
     test_guid_mask_and_byte_discrimination();
     test_optional_gates_are_independent();
+    test_money_and_cod_preserve_high_halves();
     test_item_layout_and_two_pass_order();
     test_bounds_and_large_body();
     test_utf8_truncation_keeps_complete_codepoints();

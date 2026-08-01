@@ -760,8 +760,8 @@ void Player::_LoadMails(QueryResult* result)
         m->body = fields[5].GetCppString();
         m->expire_time = (time_t)fields[6].GetUInt64();
         m->deliver_time = (time_t)fields[7].GetUInt64();
-        m->money = fields[8].GetUInt32();
-        m->COD = fields[9].GetUInt32();
+        m->money = fields[8].GetUInt64();
+        m->COD = fields[9].GetUInt64();
         m->checked = fields[10].GetUInt32();
         m->stationery = fields[11].GetUInt8();
         m->mailTemplateId = fields[12].GetInt16();

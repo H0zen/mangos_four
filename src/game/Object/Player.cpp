@@ -3249,7 +3249,7 @@ void Player::DeleteFromDB(ObjectGuid playerguid, uint32 accountId, bool updateRe
                     uint32 sender        = fields[3].GetUInt32();
                     std::string subject  = fields[4].GetCppString();
                     std::string body     = fields[5].GetCppString();
-                    uint64 money         = fields[6].GetUInt32();
+                    uint64 money         = fields[6].GetUInt64();
                     bool has_items       = fields[7].GetBool();
 
                     // we can return mail now

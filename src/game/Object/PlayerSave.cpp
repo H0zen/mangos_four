@@ -627,8 +627,8 @@ void Player::_SaveMail()
             stmt.addUInt32(m->HasItems() ? 1 : 0);
             stmt.addUInt64(uint64(m->expire_time));
             stmt.addUInt64(uint64(m->deliver_time));
-            stmt.addUInt32(m->money);
-            stmt.addUInt32(m->COD);
+            stmt.addUInt64(m->money);
+            stmt.addUInt64(m->COD);
             stmt.addUInt32(m->checked);
             stmt.addUInt32(m->messageID);
             stmt.Execute();

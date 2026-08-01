@@ -425,6 +425,55 @@ target_compile_definitions(mop_mail_packets_test PRIVATE
 target_link_libraries(mop_mail_packets_test PRIVATE shared)
 add_test(NAME mop_mail_packets COMMAND mop_mail_packets_test)
 
+add_executable(mop_mail_money_policy_test mop_mail_money_policy_test.cpp)
+target_include_directories(mop_mail_money_policy_test PRIVATE
+    ${CMAKE_SOURCE_DIR}/src/game/WorldHandlers
+    ${CMAKE_SOURCE_DIR}/src/shared
+    ${CMAKE_SOURCE_DIR}/src/shared/Common)
+set_target_properties(mop_mail_money_policy_test PROPERTIES
+    CXX_STANDARD 17 CXX_STANDARD_REQUIRED ON)
+target_compile_definitions(mop_mail_money_policy_test PRIVATE
+    $<TARGET_PROPERTY:game,INTERFACE_COMPILE_DEFINITIONS>)
+add_test(NAME mop_mail_money_policy COMMAND mop_mail_money_policy_test)
+
+add_test(NAME mop_mail_money_width_source
+    COMMAND ${CMAKE_COMMAND} -DSOURCE_ROOT=${CMAKE_SOURCE_DIR}
+        -P ${CMAKE_CURRENT_SOURCE_DIR}/mop_mail_money_width_source_test.cmake)
+
+foreach(mutation IN ITEMS
+        setcod_uint32 insert_money_format insert_cod_format
+        insert_money_cast insert_cod_cast
+        load_money_uint32 load_cod_uint32
+        save_money_uint32 save_cod_uint32
+        expired_cod_uint32 delete_return_money_uint32
+        send_debug_money_u32 packet_cod_uint32 packet_money_uint32
+        cod_limit_plus_one cod_exclusive_limit
+        debit_addition debit_drop_fee_guard
+        credit_addition credit_drop_current_guard
+        register_take_money activate_take_money
+        register_send_mail activate_send_mail)
+    add_test(NAME mop_mail_money_width_source_mutation_${mutation}
+        COMMAND ${CMAKE_COMMAND} -DSOURCE_ROOT=${CMAKE_SOURCE_DIR}
+            -DMUTATION=${mutation}
+            -P ${CMAKE_CURRENT_SOURCE_DIR}/mop_mail_money_width_source_test.cmake)
+    set_tests_properties(mop_mail_money_width_source_mutation_${mutation}
+        PROPERTIES WILL_FAIL TRUE)
+endforeach()
+
+add_test(NAME mop_mail_money_width_source_mutation_target_drift
+    COMMAND ${CMAKE_COMMAND} -DSOURCE_ROOT=${CMAKE_SOURCE_DIR}
+        -DMUTATION=setcod_uint32 -DMUTATION_TARGET_DRIFT_PROBE=ON
+        -P ${CMAKE_CURRENT_SOURCE_DIR}/mop_mail_money_width_source_test.cmake)
+set_tests_properties(mop_mail_money_width_source_mutation_target_drift
+    PROPERTIES WILL_FAIL TRUE)
+
+add_test(NAME mop_mail_money_width_source_mutation_unknown_name
+    COMMAND ${CMAKE_COMMAND} -DSOURCE_ROOT=${CMAKE_SOURCE_DIR}
+        -DMUTATION=unmapped_probe
+        -P ${CMAKE_CURRENT_SOURCE_DIR}/mop_mail_money_width_source_test.cmake)
+set_tests_properties(mop_mail_money_width_source_mutation_unknown_name
+    PROPERTIES WILL_FAIL TRUE)
+
 add_test(NAME mop_mail_packets_source
     COMMAND ${CMAKE_COMMAND}
         -DSOURCE_ROOT=${CMAKE_SOURCE_DIR}
