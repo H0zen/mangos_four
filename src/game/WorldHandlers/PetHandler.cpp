@@ -83,7 +83,8 @@ void WorldSession::HandlePetAction(WorldPacket& recv_data)
     ObjectGuid targetGuid;
     uint32 data;
     float posY, posZ, posX;
-    MopCompactPackets::ReadPetAction(recv_data, data, posY, posZ, posX, petGuid, targetGuid);
+    if (!MopCompactPackets::ReadPetAction(recv_data, data, posY, posZ, posX, petGuid, targetGuid))
+        return;
 
     uint32 spellid = UNIT_ACTION_BUTTON_ACTION(data);
     uint8 flag = UNIT_ACTION_BUTTON_TYPE(data);             // delete = 0x07 CastSpell = C1

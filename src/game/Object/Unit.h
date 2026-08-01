@@ -131,12 +131,46 @@ namespace MopCompactPackets
     /// supported, not established.
     ///
     /// Nothing consumes the position regardless, so no behaviour depends on it.
-    inline void ReadPetAction(WorldPacket& in, uint32& action,
+    inline bool ReadPetAction(WorldPacket& in, uint32& action,
         float& posY, float& posZ, float& posX,
         ObjectGuid& petGuid, ObjectGuid& targetGuid)
     {
-        in >> action;
-        in >> posY >> posZ >> posX;
+        size_t const start = in.rpos();
+        size_t const remaining = in.size() - start;
+        if (remaining < 18)
+        {
+            in.rfinish();
+            return false;
+        }
+
+        size_t presentByteCount = 0;
+        for (size_t index = start + 16; index < start + 18; ++index)
+        {
+            for (uint8 bits = in[index]; bits; bits >>= 1)
+                presentByteCount += bits & 1;
+        }
+
+        if (remaining != 18 + presentByteCount)
+        {
+            in.rfinish();
+            return false;
+        }
+
+        for (size_t index = start + 18; index < in.size(); ++index)
+        {
+            if (in[index] == 1)
+            {
+                in.rfinish();
+                return false;
+            }
+        }
+
+        uint32 parsedAction = 0;
+        float parsedPosY = 0.0f;
+        float parsedPosZ = 0.0f;
+        float parsedPosX = 0.0f;
+        in >> parsedAction;
+        in >> parsedPosY >> parsedPosZ >> parsedPosX;
 
         uint8 pet[8] = { 0, 0, 0, 0, 0, 0, 0, 0 };
         uint8 target[8] = { 0, 0, 0, 0, 0, 0, 0, 0 };
@@ -167,8 +201,21 @@ namespace MopCompactPackets
             petRaw |= uint64(pet[index]) << (8 * index);
             targetRaw |= uint64(target[index]) << (8 * index);
         }
-        petGuid = ObjectGuid(petRaw);
-        targetGuid = ObjectGuid(targetRaw);
+        ObjectGuid const parsedPetGuid(petRaw);
+        ObjectGuid const parsedTargetGuid(targetRaw);
+        if (parsedPetGuid.IsEmpty() || in.rpos() != in.size())
+        {
+            in.rfinish();
+            return false;
+        }
+
+        action = parsedAction;
+        posY = parsedPosY;
+        posZ = parsedPosZ;
+        posX = parsedPosX;
+        petGuid = parsedPetGuid;
+        targetGuid = parsedTargetGuid;
+        return true;
     }
 
     /// CMSG_PET_STOP_ATTACK (0x065B), the 18414 body: one packed

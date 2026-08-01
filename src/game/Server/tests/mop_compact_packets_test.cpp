@@ -1333,9 +1333,10 @@ static void CheckPetAction(char const* what, uint8_t const* body, size_t length,
     float posY = 0.0f, posZ = 0.0f, posX = 0.0f;
     ObjectGuid pet;
     ObjectGuid target;
-    MopCompactPackets::ReadPetAction(packet, action, posY, posZ, posX, pet, target);
+    bool const parsed = MopCompactPackets::ReadPetAction(
+        packet, action, posY, posZ, posX, pet, target);
 
-    if (action != expectedAction || pet.GetRawValue() != expectedPet ||
+    if (!parsed || action != expectedAction || pet.GetRawValue() != expectedPet ||
         target.GetRawValue() != expectedTarget || packet.rpos() != packet.size())
     {
         std::fprintf(stderr,
@@ -1343,6 +1344,33 @@ static void CheckPetAction(char const* what, uint8_t const* body, size_t length,
             what, action, (unsigned long long)pet.GetRawValue(),
             (unsigned long long)target.GetRawValue(),
             unsigned(packet.rpos()), unsigned(packet.size()));
+        ++g_fail;
+    }
+}
+
+static void CheckPetActionReject(char const* what, std::vector<uint8_t> const& body)
+{
+    WorldPacket packet(CMSG_PET_ACTION, uint32(body.size()));
+    if (!body.empty())
+        packet.append(body.data(), body.size());
+
+    uint32 action = 0xA5A5A5A5u;
+    float posY = 11.25f, posZ = 22.5f, posX = 33.75f;
+    ObjectGuid pet(UINT64_C(0x1122334455667788));
+    ObjectGuid target(UINT64_C(0x8877665544332211));
+
+    bool const parsed = MopCompactPackets::ReadPetAction(
+        packet, action, posY, posZ, posX, pet, target);
+    if (parsed || packet.rpos() != packet.size() || action != 0xA5A5A5A5u ||
+        posY != 11.25f || posZ != 22.5f || posX != 33.75f ||
+        pet.GetRawValue() != UINT64_C(0x1122334455667788) ||
+        target.GetRawValue() != UINT64_C(0x8877665544332211))
+    {
+        std::fprintf(stderr,
+            "FAIL %s: parsed %u consumed %u/%u action 0x%08X pet 0x%016llX target 0x%016llX\n",
+            what, unsigned(parsed), unsigned(packet.rpos()), unsigned(packet.size()),
+            action, (unsigned long long)pet.GetRawValue(),
+            (unsigned long long)target.GetRawValue());
         ++g_fail;
     }
 }
@@ -1441,6 +1469,31 @@ static void test_pet_action_matches_retail_bodies()
     CheckPetAction("pet action vehicle mover two", vehicleMoverTwo, sizeof(vehicleMoverTwo),
         0x07000002u, UINT64_C(0xF1508226004569C3), UINT64_C(0xF13083170040B963));
 
+    std::vector<uint8_t> const valid(abandon, abandon + sizeof(abandon));
+    for (size_t length = 0; length < valid.size(); ++length)
+    {
+        CheckPetActionReject("pet action truncated",
+            std::vector<uint8_t>(valid.begin(), valid.begin() + length));
+    }
+
+    std::vector<uint8_t> trailing = valid;
+    trailing.push_back(0x00);
+    CheckPetActionReject("pet action trailing byte", trailing);
+
+    std::vector<uint8_t> doubled = valid;
+    doubled.insert(doubled.end(), valid.begin(), valid.end());
+    CheckPetActionReject("pet action doubled body", doubled);
+
+    CheckPetActionReject("pet action empty pet guid",
+        { 0x02, 0x00, 0x00, 0x07,
+          0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+          0x00, 0x00, 0x00, 0x00,
+          0x00, 0x00 });
+
+    std::vector<uint8_t> nonCanonical = valid;
+    nonCanonical[18] = 0x01;
+    CheckPetActionReject("pet action non-canonical guid byte", nonCanonical);
+
     // Pin the position itself, so a reordering of the three reads is caught.
     WorldPacket packet(CMSG_PET_ACTION, uint32(sizeof(moveTo)));
     packet.append(moveTo, sizeof(moveTo));
@@ -1449,7 +1502,8 @@ static void test_pet_action_matches_retail_bodies()
     float posY = 0.0f, posZ = 0.0f, posX = 0.0f;
     ObjectGuid pet;
     ObjectGuid target;
-    MopCompactPackets::ReadPetAction(packet, action, posY, posZ, posX, pet, target);
+    CHECK(MopCompactPackets::ReadPetAction(
+        packet, action, posY, posZ, posX, pet, target));
 
     float expectedY, expectedZ, expectedX;
     uint32 const bitsY = 0x44412609u;

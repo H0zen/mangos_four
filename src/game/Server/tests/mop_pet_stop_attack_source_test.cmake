@@ -125,6 +125,49 @@ elseif(MUTATION STREQUAL "action_weaken_conjunction")
         "petGuid != _player->GetCharmGuid()) ||\n        _player->GetObjectGuid() != pet->GetCharmerOrOwnerGuid()"
         "petGuid != _player->GetCharmGuid()) &&\n        _player->GetObjectGuid() != pet->GetCharmerOrOwnerGuid()"
         pet_handler "${pet_handler}")
+elseif(MUTATION STREQUAL "action_reader_minimum")
+    string(REPLACE "if (remaining < 18)" "if (remaining < 17)"
+        unit_header "${unit_header}")
+elseif(MUTATION STREQUAL "action_reader_exact_length")
+    string(REPLACE
+        "if (remaining != 18 + presentByteCount)"
+        "if (remaining < 18 + presentByteCount)"
+        unit_header "${unit_header}")
+elseif(MUTATION STREQUAL "action_reader_canonical_byte")
+    string(REPLACE
+        "for (size_t index = start + 18; index < in.size(); ++index)\n        {\n            if (in[index] == 1)"
+        "for (size_t index = start + 18; index < in.size(); ++index)\n        {\n            if (false)"
+        unit_header "${unit_header}")
+elseif(MUTATION STREQUAL "action_reader_empty_pet")
+    string(REPLACE
+        "if (parsedPetGuid.IsEmpty() || in.rpos() != in.size())"
+        "if (in.rpos() != in.size())"
+        unit_header "${unit_header}")
+elseif(MUTATION STREQUAL "action_reader_tail")
+    string(REPLACE
+        "if (parsedPetGuid.IsEmpty() || in.rpos() != in.size())"
+        "if (parsedPetGuid.IsEmpty())"
+        unit_header "${unit_header}")
+elseif(MUTATION STREQUAL "action_reader_early_output")
+    string(REPLACE
+        "if (parsedPetGuid.IsEmpty() || in.rpos() != in.size())"
+        "action = parsedAction;\n        if (parsedPetGuid.IsEmpty() || in.rpos() != in.size())"
+        unit_header "${unit_header}")
+elseif(MUTATION STREQUAL "action_handler_boolean_gate")
+    string(REPLACE
+        "if (!MopCompactPackets::ReadPetAction(recv_data, data, posY, posZ, posX, petGuid, targetGuid))"
+        "if ((MopCompactPackets::ReadPetAction(recv_data, data, posY, posZ, posX, petGuid, targetGuid), false))"
+        pet_handler "${pet_handler}")
+elseif(MUTATION STREQUAL "action_abandon_registration")
+    string(REPLACE
+        "DefC(CMSG_PET_SET_ACTION, \"CMSG_PET_SET_ACTION\", STATUS_LOGGEDIN, PROCESS_THREADUNSAFE, &WorldSession::HandlePetSetAction);"
+        "DefC(CMSG_PET_SET_ACTION, \"CMSG_PET_SET_ACTION\", STATUS_LOGGEDIN, PROCESS_THREADUNSAFE, &WorldSession::HandlePetSetAction);\n    DefC(CMSG_PET_ABANDON, \"CMSG_PET_ABANDON\", STATUS_LOGGEDIN, PROCESS_THREADUNSAFE, &WorldSession::HandlePetAbandon);"
+        opcode_registry "${opcode_registry}")
+elseif(MUTATION STREQUAL "action_abandon_reference")
+    string(REPLACE
+        "CMSG_PET_ABANDON                               0x07D0  DORMANT"
+        "CMSG_PET_ABANDON                               0x07D0  ACTIVE"
+        opcode_reference "${opcode_reference}")
 elseif(MUTATION STREQUAL "action_move_side_effect_before_membership")
     string(REPLACE
         "    if ((petGuid != _player->GetPetGuid()"
@@ -249,6 +292,49 @@ if(exact_length EQUAL -1 OR canonical_byte LESS_EQUAL exact_length OR
         "stop reader order guard: length, canonicality, bytes, final check")
 endif()
 
+string(FIND "${unit_header}" "inline bool ReadPetAction" action_reader_start)
+string(FIND "${unit_header}" "inline bool ReadPetStopAttack" action_reader_end)
+if(action_reader_start EQUAL -1 OR action_reader_end LESS_EQUAL action_reader_start)
+    message(FATAL_ERROR "pet action reader seam guard")
+endif()
+math(EXPR action_reader_length "${action_reader_end} - ${action_reader_start}")
+string(SUBSTRING "${unit_header}" ${action_reader_start} ${action_reader_length}
+    action_reader)
+
+require_once("${action_reader}"
+    "inline bool ReadPetAction(WorldPacket& in, uint32& action,"
+    "action reader Boolean signature")
+require_once("${action_reader}" "if (remaining < 18)"
+    "action reader minimum length")
+require_once("${action_reader}"
+    "if (remaining != 18 + presentByteCount)"
+    "action reader exact length")
+require_once("${action_reader}"
+    "for (size_t index = start + 18; index < in.size(); ++index)"
+    "action reader canonical byte range")
+require_once("${action_reader}" "if (in[index] == 1)"
+    "action reader canonical byte")
+require_once("${action_reader}"
+    "if (parsedPetGuid.IsEmpty() || in.rpos() != in.size())"
+    "action reader empty pet and exact tail")
+
+string(FIND "${action_reader}" "if (remaining < 18)" action_minimum)
+string(FIND "${action_reader}"
+    "if (remaining != 18 + presentByteCount)" action_exact_length)
+string(FIND "${action_reader}"
+    "for (size_t index = start + 18; index < in.size(); ++index)"
+    action_canonical_range)
+string(FIND "${action_reader}"
+    "if (parsedPetGuid.IsEmpty() || in.rpos() != in.size())" action_final_check)
+string(FIND "${action_reader}" "action = parsedAction;" action_output)
+if(action_minimum EQUAL -1 OR action_exact_length LESS_EQUAL action_minimum OR
+        action_canonical_range LESS_EQUAL action_exact_length OR
+        action_final_check LESS_EQUAL action_canonical_range OR
+        action_output LESS_EQUAL action_final_check)
+    message(FATAL_ERROR
+        "action reader order: minimum, exact length, canonicality, final check, outputs")
+endif()
+
 string(FIND "${pet_handler}"
     "void WorldSession::HandlePetAction" action_start)
 string(FIND "${pet_handler}"
@@ -269,6 +355,9 @@ require_once("${action_handler}"
 require_once("${action_handler}"
     "petGuid != _player->GetCharmGuid()) ||\n        _player->GetObjectGuid() != pet->GetCharmerOrOwnerGuid()"
     "action authority conjunction")
+require_once("${action_handler}"
+    "if (!MopCompactPackets::ReadPetAction(recv_data, data, posY, posZ, posX, petGuid, targetGuid))"
+    "action handler Boolean parser gate")
 
 string(FIND "${action_handler}"
     "MopCompactPackets::ReadPetAction" action_reader)
@@ -390,5 +479,10 @@ require_once("${opcode_registry}"
 require_once("${opcode_reference}"
     "CMSG_PET_STOP_ATTACK                           0x065B  ACTIVE"
     "stop ACTIVE reference")
+require_count("${opcode_registry}" "DefC[(]CMSG_PET_ABANDON," 0
+    "dedicated pet abandon registration hold")
+require_once("${opcode_reference}"
+    "CMSG_PET_ABANDON                               0x07D0  DORMANT"
+    "dedicated pet abandon DORMANT reference")
 
 message(STATUS "mop_pet_stop_attack_source: source checks passed")

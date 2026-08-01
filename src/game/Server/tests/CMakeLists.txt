@@ -333,6 +333,9 @@ foreach(mutation IN ITEMS
         stop_move_attack_before_owner stop_move_attack_before_membership stop_not_found_error
         stop_not_controlled_error stop_log_shape action_drop_owner
         action_drop_slot_membership action_bypass_slot_membership action_weaken_conjunction
+        action_reader_minimum action_reader_exact_length action_reader_canonical_byte
+        action_reader_empty_pet action_reader_tail action_reader_early_output
+        action_handler_boolean_gate action_abandon_registration action_abandon_reference
         action_move_side_effect_before_membership action_not_found_error
         action_not_controlled_error action_unknown_command_error
         action_unknown_spell_error action_unknown_action_error
