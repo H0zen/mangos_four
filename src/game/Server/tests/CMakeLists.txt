@@ -2421,6 +2421,18 @@ set_target_properties(mop_player_phase_test PROPERTIES CXX_STANDARD 17 CXX_STAND
 target_link_libraries(mop_player_phase_test PRIVATE game)
 add_test(NAME mop_player_phase COMMAND mop_player_phase_test)
 
+add_test(NAME mop_player_phase_source
+    COMMAND ${CMAKE_COMMAND} -DSOURCE_ROOT=${CMAKE_SOURCE_DIR}
+        -P ${CMAKE_CURRENT_SOURCE_DIR}/mop_player_phase_source_test.cmake)
+
+foreach(mutation IN ITEMS startup_order query_columns temporary_store publish_once condition_zero missing_condition empty_result)
+    add_test(NAME mop_player_phase_source_mutation_${mutation}
+        COMMAND ${CMAKE_COMMAND} -DSOURCE_ROOT=${CMAKE_SOURCE_DIR}
+            -DMUTATION=${mutation}
+            -P ${CMAKE_CURRENT_SOURCE_DIR}/mop_player_phase_source_test.cmake)
+    set_tests_properties(mop_player_phase_source_mutation_${mutation} PROPERTIES WILL_FAIL TRUE)
+endforeach()
+
 add_executable(mop_character_pane_packets_test mop_character_pane_packets_test.cpp)
 target_include_directories(mop_character_pane_packets_test PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/..
