@@ -89,6 +89,13 @@ void WorldSession::HandleUseItemOpcode(WorldPacket& recvPacket)
     if (!targets.InitializeForCastRequest(pUser, request.cast))
         return;
 
+    if (!pUser->IsEquipmentPos(request.bagIndex, request.slot) &&
+            !pUser->IsInventoryPos(request.bagIndex, request.slot))
+    {
+        pUser->SendEquipError(EQUIP_ERR_ITEM_NOT_FOUND, NULL, NULL);
+        return;
+    }
+
     Item* pItem = pUser->GetItemByPos(request.bagIndex, request.slot);
     if (!pItem)
     {

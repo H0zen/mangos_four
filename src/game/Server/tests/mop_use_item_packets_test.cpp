@@ -14,6 +14,7 @@
 #include "Spell.h"
 #include "Database/DatabaseEnv.h"
 #include "Opcodes.h"
+#include "Player.h"
 #include "WorldPacket.h"
 
 #include <cmath>
@@ -374,6 +375,22 @@ static void test_every_truncated_dense_prefix_and_trailing_byte_rejected()
     CHECK(trailing.rpos() == trailing.size());
 }
 
+static void test_use_item_source_position_policy()
+{
+    auto const isUseItemSourcePosition = [](uint8 bag, uint8 slot)
+    {
+        return Player::IsEquipmentPos(bag, slot) || Player::IsInventoryPos(bag, slot);
+    };
+
+    CHECK(isUseItemSourcePosition(INVENTORY_SLOT_BAG_0, EQUIPMENT_SLOT_HEAD));
+    CHECK(isUseItemSourcePosition(INVENTORY_SLOT_BAG_0, INVENTORY_SLOT_BAG_START));
+    CHECK(isUseItemSourcePosition(INVENTORY_SLOT_BAG_0, INVENTORY_SLOT_ITEM_START));
+    CHECK(isUseItemSourcePosition(INVENTORY_SLOT_BAG_START, 0));
+    CHECK(!isUseItemSourcePosition(INVENTORY_SLOT_BAG_0, BANK_SLOT_ITEM_START));
+    CHECK(!isUseItemSourcePosition(INVENTORY_SLOT_BAG_0, BANK_SLOT_BAG_START));
+    CHECK(!isUseItemSourcePosition(BANK_SLOT_BAG_START, 0));
+}
+
 int main(int, char**)
 {
     test_captured_retail_bodies();
@@ -382,6 +399,7 @@ int main(int, char**)
     test_binary_derived_boundaries_and_guid_masks();
     test_hostile_force_count_and_guid_zero_contradiction_rejected();
     test_every_truncated_dense_prefix_and_trailing_byte_rejected();
+    test_use_item_source_position_policy();
 
     if (g_fail)
     {
