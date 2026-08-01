@@ -54,6 +54,7 @@
 #include "Database/DatabaseEnv.h"
 #include "Database/DatabaseImpl.h"
 #include "WorldPacket.h"
+#include "MopFarSightPackets.h"
 #include "Opcodes.h"
 #include "Log.h"
 #include "Player.h"
@@ -1684,13 +1685,11 @@ void WorldSession::HandleRealmSplitOpcode(WorldPacket& recv_data)
  */
 void WorldSession::HandleFarSightOpcode(WorldPacket& recv_data)
 {
-    DEBUG_LOG("WORLD: Received opcode CMSG_FAR_SIGHT");
+    bool enable = false;
+    if (!MopFarSightPackets::ReadRequest(recv_data, enable))
+        return;
 
-    // 18414 sends a single MSB-first bit, not a uint8 boolean. Every sampled
-    // retail body is 0x80 (enable) or 0x00 (disable), so the inherited
-    // `recv_data >> op` followed by `switch (op) case 0/case 1` never matched an
-    // enable at all -- 0x80 fell through the switch and the view was never set.
-    bool const enable = recv_data.ReadBit();
+    DEBUG_LOG("WORLD: Received opcode CMSG_FAR_SIGHT");
 
     if (!enable)
     {

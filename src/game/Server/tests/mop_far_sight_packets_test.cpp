@@ -3,16 +3,18 @@
  *
  * MaNGOS 5.4.8 far-sight request fixtures.
  *
- * CMSG_FAR_SIGHT carries a single MSB-first bit, not a uint8 boolean. Every
- * sampled 18414 body is 0x80 (enable) or 0x00 (disable), so a handler reading
- * `uint8 op` and switching on 0/1 never matches an enable. These fixtures pin
- * the encoding so that regression cannot return silently.
+ * CMSG_FAR_SIGHT carries exactly one MSB-first bit plus seven zero padding
+ * bits. Every sampled 18414 body is 0x80 (enable) or 0x00 (disable). These
+ * fixtures exercise the production reader so malformed padding and byte tails
+ * cannot drive camera state.
  */
 
+#include "MopFarSightPackets.h"
 #include "Opcodes.h"
 #include "WorldPacket.h"
 
 #include <cstdio>
+#include <initializer_list>
 
 static int g_fail = 0;
 #define CHECK(c) do { if (!(c)) { std::fprintf(stderr, "FAIL %s:%d: %s\n", __FILE__, __LINE__, #c); ++g_fail; } } while (0)
@@ -23,47 +25,54 @@ static void test_far_sight_opcode_value()
     CHECK(uint32(request.GetOpcode()) == 0x1341u);
 }
 
-/// 0x80 is the enable body: one set bit in the most significant position.
-static void test_far_sight_enable_body_is_a_leading_bit()
+static WorldPacket MakeRequest(std::initializer_list<uint8> body)
 {
-    WorldPacket enable(CMSG_FAR_SIGHT, 1);
-    enable << uint8(0x80);
-
-    CHECK(enable.size() == 1);
-    CHECK(enable.ReadBit() == true);
+    WorldPacket request(CMSG_FAR_SIGHT, body.size());
+    for (uint8 byte : body)
+        request << byte;
+    return request;
 }
 
-/// 0x00 is the disable body.
-static void test_far_sight_disable_body_is_a_clear_bit()
+static void CheckAccepted(std::initializer_list<uint8> body, bool expected)
 {
-    WorldPacket disable(CMSG_FAR_SIGHT, 1);
-    disable << uint8(0x00);
-
-    CHECK(disable.size() == 1);
-    CHECK(disable.ReadBit() == false);
+    WorldPacket request = MakeRequest(body);
+    bool enable = !expected;
+    CHECK(MopFarSightPackets::ReadRequest(request, enable));
+    CHECK(enable == expected);
+    CHECK(request.rpos() == request.size());
 }
 
-/// The inherited reader consumed the byte as a scalar, which is why a real
-/// enable was dropped: 0x80 is 128, and the old switch had no case for it.
-static void test_inherited_scalar_read_would_miss_the_enable()
+static void CheckRejected(std::initializer_list<uint8> body, bool sentinel)
 {
-    WorldPacket enable(CMSG_FAR_SIGHT, 1);
-    enable << uint8(0x80);
+    WorldPacket request = MakeRequest(body);
+    bool enable = sentinel;
+    CHECK(!MopFarSightPackets::ReadRequest(request, enable));
+    CHECK(enable == sentinel);
+    CHECK(request.rpos() == request.size());
+}
 
-    uint8 op = 0;
-    enable >> op;
+static void test_far_sight_exact_canonical_bodies()
+{
+    CheckAccepted({0x80}, true);
+    CheckAccepted({0x00}, false);
+}
 
-    CHECK(op == 0x80);
-    CHECK(op != 1);                                         // never matched "add far sight"
-    CHECK(op != 0);                                         // never matched "remove far sight"
+static void test_far_sight_rejects_malformed_frames_without_committing_output()
+{
+    CheckRejected({}, false);
+    CheckRejected({0x01}, true);
+    CheckRejected({0x7F}, false);
+    CheckRejected({0x81}, true);
+    CheckRejected({0xFF}, false);
+    CheckRejected({0x80, 0x00}, true);
+    CheckRejected({0x00, 0x00}, false);
 }
 
 int main(int /*argc*/, char** /*argv*/)
 {
     test_far_sight_opcode_value();
-    test_far_sight_enable_body_is_a_leading_bit();
-    test_far_sight_disable_body_is_a_clear_bit();
-    test_inherited_scalar_read_would_miss_the_enable();
+    test_far_sight_exact_canonical_bodies();
+    test_far_sight_rejects_malformed_frames_without_committing_output();
 
     if (g_fail)
     {

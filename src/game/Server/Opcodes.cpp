@@ -1253,9 +1253,10 @@ void InitializeOpcodes()
     // above because its one-byte body is an MSB-first bit rather than a uint8
     // boolean: every sampled 18414 body is 0x80 or 0x00, and the inherited
     // `switch (op) case 0/case 1` matched neither, so enabling far sight silently
-    // did nothing. HandleFarSightOpcode now reads a bit and only resolves the
-    // far-sight object on enable, so a reset no longer depends on that object
-    // still being in scope. Fixtures pin both bodies in mop_far_sight_packets.
+    // did nothing. HandleFarSightOpcode now accepts only the exact canonical
+    // one-bit byte and resolves the far-sight object only on enable, so a reset
+    // no longer depends on that object still being in scope. Fixtures pin both
+    // legal bodies and reject non-zero padding or byte tails.
     DefC(CMSG_FAR_SIGHT, "CMSG_FAR_SIGHT", STATUS_LOGGEDIN, PROCESS_THREADUNSAFE, &WorldSession::HandleFarSightOpcode);
 
     // Showing helm, once its reader was corrected, for the same bit-versus-byte

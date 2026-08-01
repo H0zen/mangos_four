@@ -2379,6 +2379,22 @@ set_target_properties(mop_far_sight_packets_test PROPERTIES CXX_STANDARD 17 CXX_
 target_link_libraries(mop_far_sight_packets_test PRIVATE shared)
 add_test(NAME mop_far_sight_packets COMMAND mop_far_sight_packets_test)
 
+add_test(NAME mop_far_sight_packets_source
+    COMMAND ${CMAKE_COMMAND} -DSOURCE_ROOT=${CMAKE_SOURCE_DIR}
+        -P ${CMAKE_CURRENT_SOURCE_DIR}/mop_far_sight_packets_source_test.cmake)
+
+foreach(mutation IN ITEMS exact_size disable_literal enable_literal staged_output
+        handler_reader remove_reader_return handler_parse_order handler_readbit
+        authority_guid global_accessor disable_polarity reset_view missing_object
+        set_view direct_response registration opcode reference)
+    add_test(NAME mop_far_sight_packets_source_mutation_${mutation}
+        COMMAND ${CMAKE_COMMAND} -DSOURCE_ROOT=${CMAKE_SOURCE_DIR}
+            -DMUTATION=${mutation}
+            -P ${CMAKE_CURRENT_SOURCE_DIR}/mop_far_sight_packets_source_test.cmake)
+    set_tests_properties(mop_far_sight_packets_source_mutation_${mutation}
+        PROPERTIES WILL_FAIL TRUE)
+endforeach()
+
 add_executable(mop_showing_helm_packets_test mop_showing_helm_packets_test.cpp)
 target_include_directories(mop_showing_helm_packets_test PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/..
