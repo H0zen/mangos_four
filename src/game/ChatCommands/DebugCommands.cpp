@@ -1803,14 +1803,35 @@ bool ChatHandler::HandleDebugSpellModsCommand(char* args)
     return true;
 }
 
-bool ChatHandler::HandleDebugPhaseCommand(char* args)
+bool ChatHandler::HandleDebugPhaseCommand(char* /*args*/)
 {
-    uint32 emote_id;
-    if (!ExtractUInt32(&args, emote_id))
+    Unit* selected = getSelectedUnit();
+    if (!selected || selected->GetTypeId() != TYPEID_PLAYER)
+    {
+        PSendSysMessage("phase: select a player, or clear your selection to inspect yourself.");
+        SetSentErrorMessage(true);
+        return false;
+    }
+
+    Player* player = static_cast<Player*>(selected);
+    if (HasLowerSecurity(player))
     {
         return false;
     }
 
-    m_session->GetPlayer()->HandleEmoteCommand(emote_id);
+    PlayerPhaseController const& phase = player->GetPhaseController();
+    uint32 zoneId = player->IsInWorld() ? player->GetZoneId() : 0;
+
+    PSendSysMessage("Phase for %s: zone %u, definition 0x%08X, aura 0x%08X, GM %s, admin %s (0x%08X), effective 0x%08X, live 0x%08X.",
+                    GetNameLink(player).c_str(), zoneId, phase.GetDefinitionMask(), phase.GetAuraMask(),
+                    phase.IsGameMasterOverrideActive() ? "on" : "off",
+                    phase.IsAdministrativeOverrideActive() ? "on" : "off",
+                    phase.GetAdministrativeOverrideMask(), phase.GetEffectiveMask(), player->GetPhaseMask());
+
+    if (phase.IsGameMasterOverrideActive())
+    {
+        PSendSysMessage("GM phase-anywhere is active; coincident phase representations, such as paired door objects, may both be visible.");
+    }
+
     return true;
 }
