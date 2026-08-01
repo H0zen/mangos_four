@@ -2413,6 +2413,14 @@ set_target_properties(mop_player_progression_packets_test PROPERTIES CXX_STANDAR
 target_link_libraries(mop_player_progression_packets_test PRIVATE game)
 add_test(NAME mop_player_progression_packets COMMAND mop_player_progression_packets_test)
 
+add_executable(mop_player_phase_test mop_player_phase_test.cpp)
+target_include_directories(mop_player_phase_test PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}/..
+    ${CMAKE_SOURCE_DIR}/src/shared)
+set_target_properties(mop_player_phase_test PROPERTIES CXX_STANDARD 17 CXX_STANDARD_REQUIRED ON)
+target_link_libraries(mop_player_phase_test PRIVATE game)
+add_test(NAME mop_player_phase COMMAND mop_player_phase_test)
+
 add_executable(mop_character_pane_packets_test mop_character_pane_packets_test.cpp)
 target_include_directories(mop_character_pane_packets_test PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/..
