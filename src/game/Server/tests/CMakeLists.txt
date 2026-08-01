@@ -1835,7 +1835,8 @@ add_test(NAME mop_questgiver_turnin_packets_source
         -P ${CMAKE_CURRENT_SOURCE_DIR}/mop_questgiver_turnin_packets_source_test.cmake)
 
 foreach(mutation IN ITEMS complete_parser request_reward_parser
-        choose_reward_parser reward_item_resolution request_items_builder
+        choose_reward_parser reward_item_resolution reward_announcement
+        request_items_builder
         offer_reward_builder reward_summary_builder quest_update_builder
         complete_registration request_reward_registration
         choose_reward_registration response_registration response_admission

@@ -36,6 +36,11 @@ if(DEFINED MUTATION)
             "MopQuestGiverPackets::ResolveRewardChoice("
             "MopQuestGiverPackets::ResolveRewardChoice_MUTATED("
             QUEST_HANDLER "${QUEST_HANDLER}")
+    elseif(MUTATION STREQUAL "reward_announcement")
+        string(REPLACE
+            "_player->RewardQuest(pQuest, reward, pObject);"
+            "_player->RewardQuest(pQuest, reward, pObject, false);"
+            QUEST_HANDLER "${QUEST_HANDLER}")
     elseif(MUTATION STREQUAL "request_items_builder")
         string(REPLACE
             "MopQuestGiverPackets::BuildQuestRequestItems(data, response)"
@@ -109,6 +114,9 @@ require_match("${QUEST_HANDLER}"
 require_match("${QUEST_HANDLER}"
     "MopQuestGiverPackets::ResolveRewardChoice\\("
     "reward-item-id to configured-choice resolution")
+require_match("${QUEST_HANDLER}"
+    "_player->RewardQuest\\(pQuest, reward, pObject\\);"
+    "quest-complete acknowledgement after reward selection")
 require_match("${GOSSIP_DEF}"
     "MopQuestGiverPackets::BuildQuestRequestItems\\(data, response\\)"
     "18414 request-items builder")
