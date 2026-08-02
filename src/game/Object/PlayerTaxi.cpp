@@ -351,6 +351,60 @@ uint32 PlayerTaxi::GetCurrentTaxiPath() const
     return path;
 }
 
+bool PlayerTaxi::BuildSameMapTaxiPath(TaxiPathNodeList& route, uint32 mapId) const
+{
+    route.clear();
+    if (m_TaxiDestinations.size() < 3)
+    {
+        return false;
+    }
+
+    for (size_t leg = 1; leg < m_TaxiDestinations.size(); ++leg)
+    {
+        uint32 pathId = 0;
+        uint32 cost = 0;
+        sObjectMgr.GetTaxiPath(m_TaxiDestinations[leg - 1],
+            m_TaxiDestinations[leg], pathId, cost);
+        if (!pathId || pathId >= sTaxiPathNodesByPath.size())
+        {
+            route.clear();
+            return false;
+        }
+
+        TaxiPathNodeList const& legPath = sTaxiPathNodesByPath[pathId];
+        if (legPath.size() < 2)
+        {
+            route.clear();
+            return false;
+        }
+
+        // Retail multi-leg splines do not visit the shared flight-master
+        // endpoint. Keep the first leg's authored start and the last leg's
+        // authored finish, but collapse the duplicated join between them.
+        size_t const nodeBegin = leg > 1 ? 1 : 0;
+        size_t const nodeEnd = leg + 1 < m_TaxiDestinations.size()
+            ? legPath.size() - 1
+            : legPath.size();
+        if (nodeBegin >= nodeEnd)
+        {
+            route.clear();
+            return false;
+        }
+
+        for (size_t node = nodeBegin; node < nodeEnd; ++node)
+        {
+            if (legPath[node].ContinentID != mapId)
+            {
+                route.clear();
+                return false;
+            }
+            route.push_back(TaxiPathNodePtr(&legPath[node]));
+        }
+    }
+
+    return route.size() >= 2;
+}
+
 std::ostringstream& operator<< (std::ostringstream& ss, PlayerTaxi const& taxi)
 {
     for (size_t i = 0; i < TaxiMaskSize; ++i)
@@ -625,6 +679,10 @@ void Player::ContinueTaxiFlight()
     }
 
     DEBUG_LOG("WORLD: Restart character %u taxi flight", GetGUIDLow());
+
+    // Retail resumes an interrupted multi-hop flight only as far as the next
+    // taxi node. The player may choose a new route after landing there.
+    m_taxi.TruncateTaxiDestinationsAfterCurrentLeg();
 
     uint32 mountDisplayId = sObjectMgr.GetTaxiMountDisplayId(sourceNode, GetTeam(), true);
     uint32 path = m_taxi.GetCurrentTaxiPath();

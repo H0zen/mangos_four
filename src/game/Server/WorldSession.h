@@ -1734,7 +1734,7 @@ class WorldSession
         // Taxi
         void SendTaxiStatus(ObjectGuid guid);
         void SendTaxiMenu(Creature* unit);
-        bool SendDoFlight(uint32 mountDisplayId, uint32 path, uint32 pathNode = 0);
+        bool SendDoFlight(uint32 mountDisplayId, uint32 path, uint32 pathNode = 0, bool preserveTaxiRoute = false);
         bool SendLearnNewTaxiNode(Creature* unit);
         void SendActivateTaxiReply(ActivateTaxiReply reply);
 

@@ -2840,7 +2840,7 @@ class MovementInfo
         MovementInfo() : moveFlags(MOVEFLAG_NONE), moveFlags2(MOVEFLAG2_NONE), time(0),
             t_time(0), t_seat(-1), t_time2(0), t_time3(0), s_pitch(0.0f), fallTime(0), splineElevation(0.0f),
             unknownBit148(false), unknownBit149(false), unknownBit172(false), movementCounter(0), movementForceCount(0),
-            hasUnknownUInt32(false), unknownUInt32(0), byteParam(0), speedFloat(0.0f) {}
+            hasUnknownUInt32(false), unknownUInt32(0), nonZeroBitPadding(false), byteParam(0), speedFloat(0.0f) {}
 
         // Read/Write methods
         void Read(ByteBuffer& data, uint16 opcode);
@@ -2941,6 +2941,7 @@ class MovementInfo
         std::vector<uint32> const& GetMovementForceIds() const { return movementForceIds; }
         bool HasUnknownUInt32() const { return hasUnknownUInt32; }
         uint32 GetUnknownUInt32() const { return unknownUInt32; }
+        bool HasNonZeroBitPadding() const { return nonZeroBitPadding; }
 
     private:
         // common
@@ -2973,6 +2974,7 @@ class MovementInfo
         std::vector<uint32> movementForceIds;
         bool hasUnknownUInt32;
         uint32 unknownUInt32;
+        bool nonZeroBitPadding;
         // status info
         StatusInfo si;
         int8 byteParam;

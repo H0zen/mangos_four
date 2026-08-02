@@ -842,7 +842,10 @@ void FlightPathMovementGenerator::Finalize(Player& player)
     // Remove flag to prevent send object build movement packets for flight state and crash (movement generator already not at top of stack)
     player.clearUnitState(UNIT_STAT_TAXI_FLIGHT);
 
-    player.m_taxi.ClearTaxiDestinations();
+    if (!m_preserveTaxiRouteOnFinalize)
+    {
+        player.m_taxi.ClearTaxiDestinations();
+    }
     player.Unmount();
     player.RemoveFlag(UNIT_FIELD_FLAGS, UNIT_FLAG_DISABLE_MOVE | UNIT_FLAG_TAXI_FLIGHT);
     player.SetClientControl(&player, 1);
@@ -890,19 +893,29 @@ void FlightPathMovementGenerator::Reset(Player& player)
 
     // Initialize the movement spline for the player
     Movement::MoveSplineInit init(player);
+    uint32 const splineStart = GetCurrentNode();
     uint32 end = GetPathAtMapEnd();
-    if (end - GetCurrentNode() < 2)
+    if (splineStart >= end || end - splineStart < 2)
     {
         m_splineLaunched = false;
         return;
     }
 
-    for (uint32 i = GetCurrentNode(); i != end; ++i)
+    // MoveSplineInit replaces its first path vertex with the owner's current
+    // position. Keep that control point separate so the first authored taxi
+    // node is not silently discarded from a combined multi-leg route.
+    if (m_continuousRoute)
+    {
+        init.Path().push_back(G3D::Vector3(player.GetPositionX(),
+            player.GetPositionY(), player.GetPositionZ()));
+    }
+
+    for (uint32 i = splineStart; i != end; ++i)
     {
         G3D::Vector3 vertice((*i_path)[i].x, (*i_path)[i].y, (*i_path)[i].z);
         init.Path().push_back(vertice);
     }
-    init.SetFirstPointId(GetCurrentNode());
+    init.SetFirstPointId(splineStart);
     init.SetFly();
     init.SetSmooth();
     init.SetWalk(true);
@@ -916,9 +929,14 @@ void FlightPathMovementGenerator::Reset(Player& player)
  * @param diff Time difference.
  * @return True if the update was successful, false otherwise.
  */
-bool FlightPathMovementGenerator::Update(Player& player, const uint32& diff)
+bool FlightPathMovementGenerator::Update(Player& player, const uint32& /*diff*/)
 {
-    uint32 pointId = (uint32)player.movespline->currentPathIdx();
+    int32 splinePointId = player.movespline->currentPathIdx();
+    if (m_continuousRoute && splinePointId > 0)
+    {
+        --splinePointId;
+    }
+    uint32 pointId = splinePointId > 0 ? uint32(splinePointId) : 0;
     if (pointId > i_currentNode)
     {
         bool departureEvent = true;
@@ -929,10 +947,37 @@ bool FlightPathMovementGenerator::Update(Player& player, const uint32& diff)
             {
                 break;
             }
-            i_currentNode += (uint32)departureEvent;
+            if (departureEvent)
+            {
+                uint32 const previousPathId = (*i_path)[i_currentNode].PathID;
+                ++i_currentNode;
+                if (m_continuousRoute && i_currentNode < i_path->size() &&
+                    (*i_path)[i_currentNode].PathID != previousPathId &&
+                    player.m_taxi.HasNextTaxiDestination())
+                {
+                    player.m_taxi.NextTaxiDestination();
+                }
+            }
             departureEvent = !departureEvent;
         }
         while (true);
+    }
+
+    if (!m_continuousRoute && i_currentNode >= (i_path->size() - 1) &&
+        player.m_taxi.HasNextTaxiDestination())
+    {
+        if (!player.movespline->Finalized())
+        {
+            return true;
+        }
+
+        if (player.m_taxi.GetFlightLedger().MarkServerEndpoint(player.GetMapId(),
+                player.m_taxi.GetCurrentTaxiPath(), i_currentNode,
+                player.movespline->GetId()))
+        {
+            m_preserveTaxiRouteOnFinalize = true;
+            return false;
+        }
     }
 
     return i_currentNode < (i_path->size() - 1);
@@ -943,16 +988,16 @@ bool FlightPathMovementGenerator::Update(Player& player, const uint32& diff)
  */
 void FlightPathMovementGenerator::SetCurrentNodeAfterTeleport()
 {
-    if (i_path->empty())
+    if (i_path->empty() || i_currentNode >= i_path->size())
     {
         return;
     }
 
-    uint32 map0 = (*i_path)[0].ContinentID;
+    uint32 const currentMap = (*i_path)[i_currentNode].ContinentID;
 
-    for (size_t i = 1; i < i_path->size(); ++i)
+    for (size_t i = i_currentNode + 1; i < i_path->size(); ++i)
     {
-        if ((*i_path)[i].ContinentID != map0)
+        if ((*i_path)[i].ContinentID != currentMap)
         {
             i_currentNode = i;
             return;

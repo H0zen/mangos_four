@@ -51,6 +51,81 @@ namespace TaxiPersistence
         Team team, Validator& validator);
 }
 
+enum class TaxiFlightPhase : uint8
+{
+    Inactive,
+    InFlight,
+    AwaitingCompletion,
+    Consumed,
+    Finalized
+};
+
+class TaxiFlightLedger
+{
+    public:
+        void Arm(uint32 mapId, uint32 pathId, uint32 endNode,
+            uint32 sourceNode, uint32 destinationNode, uint32 splineId)
+        {
+            m_mapId = mapId;
+            m_pathId = pathId;
+            m_endNode = endNode;
+            m_sourceNode = sourceNode;
+            m_destinationNode = destinationNode;
+            m_splineId = splineId;
+            m_phase = TaxiFlightPhase::InFlight;
+        }
+
+        bool MarkServerEndpoint(uint32 mapId, uint32 pathId,
+            uint32 serverPathIndex, uint32 splineId)
+        {
+            if (m_phase == TaxiFlightPhase::AwaitingCompletion)
+            {
+                return mapId == m_mapId && pathId == m_pathId &&
+                    serverPathIndex == m_endNode && splineId == m_splineId;
+            }
+
+            if (m_phase != TaxiFlightPhase::InFlight || mapId != m_mapId ||
+                pathId != m_pathId || serverPathIndex != m_endNode ||
+                splineId != m_splineId)
+            {
+                return false;
+            }
+
+            m_phase = TaxiFlightPhase::AwaitingCompletion;
+            return true;
+        }
+
+        bool TryConsumeCompletion(uint32 mapId, uint32 pathId,
+            uint32 sourceNode, uint32 destinationNode, uint32 splineId,
+            uint32 serverPathIndex)
+        {
+            if (m_phase != TaxiFlightPhase::AwaitingCompletion ||
+                mapId != m_mapId || pathId != m_pathId ||
+                sourceNode != m_sourceNode ||
+                destinationNode != m_destinationNode ||
+                splineId != m_splineId || serverPathIndex != m_endNode)
+            {
+                return false;
+            }
+
+            m_phase = TaxiFlightPhase::Consumed;
+            return true;
+        }
+
+        void Finalize() { m_phase = TaxiFlightPhase::Finalized; }
+        TaxiFlightPhase GetPhase() const { return m_phase; }
+        uint32 GetEndNode() const { return m_endNode; }
+
+    private:
+        uint32 m_mapId = 0;
+        uint32 m_pathId = 0;
+        uint32 m_endNode = 0;
+        uint32 m_sourceNode = 0;
+        uint32 m_destinationNode = 0;
+        uint32 m_splineId = 0;
+        TaxiFlightPhase m_phase = TaxiFlightPhase::Inactive;
+};
+
 class PlayerTaxi
 {
     public:
@@ -115,7 +190,11 @@ class PlayerTaxi
         void ClearTaxiDestinations()
         {
             m_TaxiDestinations.clear();
+            m_flightLedger.Finalize();
         }
+
+        TaxiFlightLedger& GetFlightLedger() { return m_flightLedger; }
+        TaxiFlightLedger const& GetFlightLedger() const { return m_flightLedger; }
 
         void AddTaxiDestination(uint32 dest)
         {
@@ -133,6 +212,7 @@ class PlayerTaxi
         }
 
         uint32 GetCurrentTaxiPath() const;
+        bool BuildSameMapTaxiPath(TaxiPathNodeList& path, uint32 mapId) const;
 
         uint32 NextTaxiDestination()
         {
@@ -145,6 +225,19 @@ class PlayerTaxi
             return m_TaxiDestinations.empty();
         }
 
+        bool HasNextTaxiDestination() const
+        {
+            return m_TaxiDestinations.size() > 2;
+        }
+
+        void TruncateTaxiDestinationsAfterCurrentLeg()
+        {
+            while (m_TaxiDestinations.size() > 2)
+            {
+                m_TaxiDestinations.pop_back();
+            }
+        }
+
         FactionTemplateEntry const* GetFlightMasterFactionTemplate() const;
         void SetFlightMasterFactionTemplateId(uint32 factionTemplateId)
         {
@@ -154,6 +247,7 @@ class PlayerTaxi
         friend std::ostringstream& operator<< (std::ostringstream& ss, PlayerTaxi const& taxi);
 
     private:
+        TaxiFlightLedger m_flightLedger;
         TaxiMask m_taximask;
         std::deque<uint32> m_TaxiDestinations;
         uint32 m_flightMasterFactionId;

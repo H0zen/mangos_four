@@ -236,6 +236,17 @@ class ByteBuffer
             _bitpos = 8;
         }
 
+        bool HasNonZeroBitPadding() const
+        {
+            if (_bitpos >= 7)
+            {
+                return false;
+            }
+
+            uint8 const paddingMask = uint8((1u << (7 - _bitpos)) - 1u);
+            return (_curbitval & paddingMask) != 0;
+        }
+
         template <typename T> bool WriteBit(T bit)
         {
             --_bitpos;

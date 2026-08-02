@@ -175,9 +175,9 @@
  *   TOTAL SMSG rows                   925
  *
  * SUBSYSTEM CONFIDENCE: high=365, low=221, medium=182, none=157
- * STATUS TOTALS: ACTIVE=544, DOC=434, DORMANT=542
+ * STATUS TOTALS: ACTIVE=546, DOC=434, DORMANT=540
  *   SMSG: ACTIVE=322, DOC=271, DORMANT=332
- *   CMSG: ACTIVE=222, DOC=163, DORMANT=210
+ *   CMSG: ACTIVE=224, DOC=163, DORMANT=208
  */
 
 // CAVEATS -- read before trusting any single row:
@@ -1529,7 +1529,7 @@ typedef uint16_t uint16;
  *   CMSG_REQUEST_FORCED_REACTIONS                  0x06F5  ACTIVE
  *   CMSG_REPORT_PVP_AFK                            0x06F9  DORMANT
  *   CMSG_MAIL_TAKE_MONEY                           0x06FA  ACTIVE
- *   CMSG_ACTIVATETAXIEXPRESS                       0x06FB  DORMANT
+ *   CMSG_ACTIVATETAXIEXPRESS                       0x06FB  ACTIVE
  *   CMSG_CALENDAR_EVENT_MODERATOR_STATUS           0x0708  DORMANT
  *   CMSG_UNKNOWN_0x0719                            0x0719  DOC
  *   CMSG_GROUP_INVITE                              0x072D  DORMANT
@@ -1712,7 +1712,7 @@ typedef uint16_t uint16;
  *   CMSG_MOVE_STOP_TURN                            0x1170  ACTIVE
  *   CMSG_TABARD_VENDOR_ACTIVATE                    0x11C3  ACTIVE
  *   CMSG_MOVE_GRAVITY_ENABLE_ACK                   0x11D8  DORMANT
- *   CMSG_MOVE_SPLINE_DONE                          0x11D9  DORMANT
+ *   CMSG_MOVE_SPLINE_DONE                          0x11D9  ACTIVE
  *   CMSG_MOVE_SET_CAN_TRANSITION_BETWEEN_SWIM_AND_FLY_ACK 0x11DB  DORMANT
  *   CMSG_MOVE_START_ASCEND                         0x11FA  ACTIVE
  *   CMSG_REQUEST_CATEGORY_COOLDOWNS                0x1203  ACTIVE   [high-conf]

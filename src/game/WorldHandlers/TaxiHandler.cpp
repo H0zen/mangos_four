@@ -34,6 +34,7 @@
 #include "UpdateMask.h"
 #include "Path.h"
 #include "WaypointMovementGenerator.h"
+#include "movement/MoveSpline.h"
 
 /**
  * @brief Handles a client request for the known status of a taxi node.
@@ -159,12 +160,20 @@ void WorldSession::SendTaxiMenu(Creature* unit)
  * @param path The taxi path id.
  * @param pathNode The starting node index.
  */
-bool WorldSession::SendDoFlight(uint32 mountDisplayId, uint32 path, uint32 pathNode)
+bool WorldSession::SendDoFlight(uint32 mountDisplayId, uint32 path,
+    uint32 pathNode, bool preserveTaxiRoute)
 {
     // remove fake death
     if (GetPlayer()->hasUnitState(UNIT_STAT_DIED))
     {
         GetPlayer()->RemoveSpellsCausingAura(SPELL_AURA_FEIGN_DEATH);
+    }
+
+    if (preserveTaxiRoute &&
+        GetPlayer()->GetMotionMaster()->GetCurrentMovementGeneratorType() == FLIGHT_MOTION_TYPE)
+    {
+        static_cast<FlightPathMovementGenerator*>(
+            GetPlayer()->GetMotionMaster()->top())->PrepareForRollover();
     }
 
     while (GetPlayer()->GetMotionMaster()->GetCurrentMovementGeneratorType() == FLIGHT_MOTION_TYPE)
@@ -177,11 +186,28 @@ bool WorldSession::SendDoFlight(uint32 mountDisplayId, uint32 path, uint32 pathN
 
     if (!GetPlayer()->GetMotionMaster()->MoveTaxiFlight(path, pathNode))
     {
+        if (preserveTaxiRoute)
+        {
+            GetPlayer()->m_taxi.ClearTaxiDestinations();
+        }
         if (mountDisplayId)
         {
             GetPlayer()->Unmount();
         }
         return false;
+    }
+
+    FlightPathMovementGenerator* flight = static_cast<FlightPathMovementGenerator*>(
+        GetPlayer()->GetMotionMaster()->top());
+    uint32 const sourceNode = GetPlayer()->m_taxi.GetTaxiSource();
+    uint32 const destinationNode = GetPlayer()->m_taxi.GetTaxiDestination();
+    uint32 const mapEnd = flight->GetPathAtMapEnd();
+    if (!flight->IsContinuousRoute() && sourceNode && destinationNode && mapEnd > pathNode &&
+        MopTaxiPackets::IsSameMapTaxiPath(flight->GetPath(), GetPlayer()->GetMapId()))
+    {
+        GetPlayer()->m_taxi.GetFlightLedger().Arm(GetPlayer()->GetMapId(), path,
+            mapEnd - 1, sourceNode, destinationNode,
+            GetPlayer()->movespline->GetId());
     }
 
     return true;
@@ -244,46 +270,69 @@ void WorldSession::HandleActivateTaxiExpressOpcode(WorldPacket& recv_data)
 {
     DEBUG_LOG("WORLD: Received opcode CMSG_ACTIVATETAXIEXPRESS");
 
-    ObjectGuid guid;
-    uint32 node_count;
-
-    recv_data >> guid >> node_count;
-
-    Creature* npc = GetPlayer()->GetNPCIfCanInteractWith(guid, UNIT_NPC_FLAG_FLIGHTMASTER);
-    if (!npc)
+    MopTaxiPackets::TaxiExpressRequest request;
+    if (!MopTaxiPackets::ParseActivateTaxiExpress(recv_data, request))
     {
-        DEBUG_LOG("WORLD: HandleActivateTaxiExpressOpcode - %s not found or you can't interact with it.", guid.GetString().c_str());
         return;
     }
-    std::vector<uint32> nodes;
 
-    for (uint32 i = 0; i < node_count; ++i)
+    Creature* npc = GetPlayer()->GetNPCIfCanInteractWith(
+        request.flightMaster, UNIT_NPC_FLAG_FLIGHTMASTER);
+    if (!npc)
     {
-        uint32 node;
-        recv_data >> node;
+        DEBUG_LOG("WORLD: HandleActivateTaxiExpressOpcode - %s not found or you can't interact with it.",
+            request.flightMaster.GetString().c_str());
+        return;
+    }
 
-        if (!_player->m_taxi.IsTaximaskNodeKnown(node) && !_player->IsTaxiCheater())
+    uint32 const currentNode = sObjectMgr.GetNearestTaxiNode(
+        npc->GetPositionX(), npc->GetPositionY(), npc->GetPositionZ(),
+        npc->GetMapId(), GetPlayer()->GetTeam());
+    if (currentNode == 0 || request.nodes.front() != currentNode)
+    {
+        SendActivateTaxiReply(ERR_TAXITOOFARAWAY);
+        return;
+    }
+
+    for (uint32 node : request.nodes)
+    {
+        TaxiNodesEntry const* nodeEntry = sTaxiNodesStore.LookupEntry(node);
+        if (!GetPlayer()->m_taxi.IsValidNodeId(node) || !nodeEntry ||
+            nodeEntry->ContinentID != npc->GetMapId())
         {
-            SendActivateTaxiReply(ERR_TAXINOTVISITED);
-            recv_data.rpos(recv_data.wpos()); // prevent additional spam at rejected packet
+            SendActivateTaxiReply(ERR_TAXINOSUCHPATH);
             return;
         }
 
-        nodes.push_back(node);
+        if (!_player->IsTaxiCheater() &&
+            !_player->m_taxi.IsTaximaskNodeKnown(node))
+        {
+            SendActivateTaxiReply(ERR_TAXINOTVISITED);
+            return;
+        }
     }
 
-    if (nodes.empty())
+    for (size_t i = 1; i < request.nodes.size(); ++i)
     {
-        return;
+        uint32 path = 0;
+        uint32 cost = 0;
+        sObjectMgr.GetTaxiPath(request.nodes[i - 1], request.nodes[i], path, cost);
+        if (!path || path >= sTaxiPathNodesByPath.size() ||
+            !MopTaxiPackets::IsSameMapTaxiPath(sTaxiPathNodesByPath[path], npc->GetMapId()))
+        {
+            SendActivateTaxiReply(ERR_TAXINOSUCHPATH);
+            return;
+        }
     }
 
-    DEBUG_LOG("WORLD: Received opcode CMSG_ACTIVATETAXIEXPRESS from %d to %d" , nodes.front(), nodes.back());
+    DEBUG_LOG("WORLD: Received opcode CMSG_ACTIVATETAXIEXPRESS from %u to %u",
+        request.nodes.front(), request.nodes.back());
 
-    GetPlayer()->ActivateTaxiPathTo(nodes, npc);
+    GetPlayer()->ActivateTaxiPathTo(request.nodes, npc);
 }
 
 /**
- * @brief Handles taxi spline completion, including map changes and chained destinations.
+ * @brief Handles authenticated taxi completion, including map handoffs and chained destinations.
  *
  * @param recv_data The incoming move-spline-done packet.
  */
@@ -291,37 +340,88 @@ void WorldSession::HandleMoveSplineDoneOpcode(WorldPacket& recv_data)
 {
     DEBUG_LOG("WORLD: Received opcode CMSG_MOVE_SPLINE_DONE");
 
-    MovementInfo movementInfo;                              // used only for proper packet read
-    recv_data >> movementInfo;
-
-    // in taxi flight packet received in 2 case:
-    // 1) end taxi path in far (multi-node) flight
-    // 2) switch from one map to other in case multi-map taxi path
-    // we need process only (1)
-    uint32 curDest = GetPlayer()->m_taxi.GetTaxiDestination();
-    if (!curDest)
+    MopTaxiPackets::MoveSplineDoneRequest request;
+    if (!MopTaxiPackets::ParseMoveSplineDone(recv_data, request))
     {
+        DEBUG_LOG("WORLD: Rejected CMSG_MOVE_SPLINE_DONE: malformed body");
         return;
     }
 
-    TaxiNodesEntry const* curDestNode = sTaxiNodesStore.LookupEntry(curDest);
-
-    // far teleport case
-    if (curDestNode && curDestNode->ContinentID != GetPlayer()->GetMapId())
+    if (!MopTaxiPackets::MatchesMoveSplinePlayer(request.movement.GetGuid(),
+            GetPlayer()->GetObjectGuid()))
     {
-        if (GetPlayer()->GetMotionMaster()->GetCurrentMovementGeneratorType() == FLIGHT_MOTION_TYPE)
+        DEBUG_LOG("WORLD: Rejected CMSG_MOVE_SPLINE_DONE: mover %s does not match player %s",
+            request.movement.GetGuid().GetString().c_str(), GetPlayer()->GetGuidStr().c_str());
+        return;
+    }
+
+    if (!GetPlayer()->movespline->Finalized())
+    {
+        DEBUG_LOG("WORLD: Rejected CMSG_MOVE_SPLINE_DONE: spline is not finalized");
+        return;
+    }
+
+    if (request.splineId != GetPlayer()->movespline->GetId())
+    {
+        DEBUG_LOG("WORLD: Rejected CMSG_MOVE_SPLINE_DONE: clientSpline=%u serverSpline=%u",
+            request.splineId, GetPlayer()->movespline->GetId());
+        return;
+    }
+
+    int32 const serverPathIndex = GetPlayer()->movespline->currentPathIdx();
+    if (GetPlayer()->m_taxi.GetTaxiDestination() &&
+        GetPlayer()->GetMotionMaster()->GetCurrentMovementGeneratorType() == FLIGHT_MOTION_TYPE)
+    {
+        FlightPathMovementGenerator* flight = static_cast<FlightPathMovementGenerator*>(
+            GetPlayer()->GetMotionMaster()->top());
+        uint32 const mapEnd = flight->GetPathAtMapEnd();
+        TaxiPathNodeList const& path = flight->GetPath();
+        if (mapEnd < path.size() && path[mapEnd].ContinentID != GetPlayer()->GetMapId())
         {
-            // short preparations to continue flight
-            FlightPathMovementGenerator* flight = (FlightPathMovementGenerator*)(GetPlayer()->GetMotionMaster()->top());
+            if (mapEnd == 0 || serverPathIndex < 0 || uint32(serverPathIndex) != mapEnd - 1)
+            {
+                DEBUG_LOG("WORLD: Rejected CMSG_MOVE_SPLINE_DONE at taxi map boundary: "
+                    "pathIndex=%d expected=%u", serverPathIndex, mapEnd ? mapEnd - 1 : 0);
+                return;
+            }
 
-            flight->Interrupt(*GetPlayer());                // will reset at map landing
-
+            TaxiPathNodeEntry const& transitionNode = path[mapEnd];
+            flight->Interrupt(*GetPlayer());
             flight->SetCurrentNodeAfterTeleport();
-            TaxiPathNodeEntry const& node = flight->GetPath()[flight->GetCurrentNode()];
-            flight->SkipCurrentNode();
-
-            GetPlayer()->TeleportTo(curDestNode->ContinentID, node.x, node.y, node.z, GetPlayer()->GetOrientation());
+            if (!GetPlayer()->TeleportTo(transitionNode.ContinentID,
+                    transitionNode.x, transitionNode.y, transitionNode.z,
+                    GetPlayer()->GetOrientation()))
+            {
+                GetPlayer()->m_taxi.ClearTaxiDestinations();
+                GetPlayer()->GetMotionMaster()->MovementExpired(false);
+            }
+            return;
         }
+
+        // Continuous same-map routes complete on the server movement update.
+        // The authenticated client packet is only an acknowledgement; no
+        // per-leg queue rollover or ledger consumption is required here.
+        if (flight->IsContinuousRoute())
+        {
+            return;
+        }
+    }
+
+    TaxiFlightLedger& flightLedger = GetPlayer()->m_taxi.GetFlightLedger();
+    if (serverPathIndex < 0 ||
+        !flightLedger.MarkServerEndpoint(GetPlayer()->GetMapId(),
+            GetPlayer()->m_taxi.GetCurrentTaxiPath(), uint32(serverPathIndex),
+            request.splineId) ||
+        !flightLedger.TryConsumeCompletion(
+            GetPlayer()->GetMapId(), GetPlayer()->m_taxi.GetCurrentTaxiPath(),
+            GetPlayer()->m_taxi.GetTaxiSource(),
+            GetPlayer()->m_taxi.GetTaxiDestination(), request.splineId,
+            uint32(serverPathIndex)))
+    {
+        DEBUG_LOG("WORLD: Rejected CMSG_MOVE_SPLINE_DONE: clientSpline=%u serverSpline=%u "
+            "pathIndex=%d ledgerPhase=%u ledgerEnd=%u",
+            request.splineId, GetPlayer()->movespline->GetId(), serverPathIndex,
+            uint32(flightLedger.GetPhase()), flightLedger.GetEndNode());
         return;
     }
 
@@ -348,18 +448,35 @@ void WorldSession::HandleMoveSplineDoneOpcode(WorldPacket& recv_data)
         uint32 path, cost;
         sObjectMgr.GetTaxiPath(sourcenode, destinationnode, path, cost);
 
-        if (path && mountDisplayId)
+        if (path && mountDisplayId && path < sTaxiPathNodesByPath.size() &&
+            MopTaxiPackets::IsSameMapTaxiPath(sTaxiPathNodesByPath[path],
+                GetPlayer()->GetMapId()))
         {
-            SendDoFlight(mountDisplayId, path, 1);          // skip start fly node
+            uint32 const pathNode = sTaxiPathNodesByPath[path].size() > 2 ? 1 : 0;
+            SendDoFlight(mountDisplayId, path, pathNode, true);
         }
         else
         {
-            GetPlayer()->m_taxi.ClearTaxiDestinations();    // clear problematic path and next
+            if (GetPlayer()->GetMotionMaster()->GetCurrentMovementGeneratorType() == FLIGHT_MOTION_TYPE)
+            {
+                GetPlayer()->GetMotionMaster()->MovementExpired(false);
+            }
+            else
+            {
+                GetPlayer()->m_taxi.ClearTaxiDestinations();
+            }
         }
     }
     else
     {
-        GetPlayer()->m_taxi.ClearTaxiDestinations();        // not destinations, clear source node
+        if (GetPlayer()->GetMotionMaster()->GetCurrentMovementGeneratorType() == FLIGHT_MOTION_TYPE)
+        {
+            GetPlayer()->GetMotionMaster()->MovementExpired(false);
+        }
+        else
+        {
+            GetPlayer()->m_taxi.ClearTaxiDestinations();
+        }
     }
 }
 

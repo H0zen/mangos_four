@@ -316,10 +316,12 @@ class FlightPathMovementGenerator
          * @param pathnodes Reference to path nodes
          * @param startNode Starting node index
          */
-        explicit FlightPathMovementGenerator(TaxiPathNodeList const& pathnodes, uint32 startNode = 0)
-            : m_splineLaunched(false)
+        explicit FlightPathMovementGenerator(TaxiPathNodeList const& pathnodes,
+            uint32 startNode = 0, bool continuousRoute = false)
+            : m_pathNodes(pathnodes), m_splineLaunched(false),
+              m_continuousRoute(continuousRoute)
         {
-            i_path = &pathnodes;
+            i_path = &m_pathNodes;
             i_currentNode = startNode;
         }
 
@@ -364,11 +366,17 @@ class FlightPathMovementGenerator
         /** @return True only when the current taxi spline launched with positive duration. */
         bool HasLaunched() const { return m_splineLaunched; }
 
+        /** @return True when all queued same-map legs share one spline. */
+        bool IsContinuousRoute() const { return m_continuousRoute; }
+
+        /** Preserve the queued route while this leg is replaced by a same-map leg. */
+        void PrepareForRollover() { m_preserveTaxiRouteOnFinalize = true; }
+
         /**
          * @brief Get the flight path
          * @return Reference to path nodes
          */
-        TaxiPathNodeList const& GetPath() { return *i_path; }
+        TaxiPathNodeList const& GetPath() const { return *i_path; }
 
         /**
          * @brief Get node index at map end
@@ -405,7 +413,10 @@ class FlightPathMovementGenerator
         bool GetResetPosition(Player& player, float& x, float& y, float& z, float& o) const;
 
     private:
+        TaxiPathNodeList m_pathNodes;
         bool m_splineLaunched;
+        bool m_continuousRoute;
+        bool m_preserveTaxiRouteOnFinalize = false;
 };
 
 #endif // MANGOS_WAYPOINTMOVEMENTGENERATOR_H

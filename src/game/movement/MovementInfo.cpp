@@ -322,6 +322,10 @@ void MovementInfo::Read(ByteBuffer& data, uint16 opcode)
             case MSESpeedFloat:
                 data >> speedFloat;
                 break;
+            case MSEBitPadding:
+                nonZeroBitPadding = data.HasNonZeroBitPadding();
+                data.ResetBitReader();
+                break;
             default:
                 MANGOS_ASSERT(false && "Wrong movement status element");
                 break;

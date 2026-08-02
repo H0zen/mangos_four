@@ -682,6 +682,10 @@ void InitializeOpcodes()
     // Normal route selection sends destination/source scalars before the
     // packed flight-master GUID and receives one four-bit result.
     DefC(CMSG_ACTIVATETAXI, "CMSG_ACTIVATETAXI", STATUS_LOGGEDIN, PROCESS_THREADUNSAFE, &WorldSession::HandleActivateTaxiOpcode);
+    DefC(CMSG_ACTIVATETAXIEXPRESS, "CMSG_ACTIVATETAXIEXPRESS", STATUS_LOGGEDIN, PROCESS_THREADUNSAFE, &WorldSession::HandleActivateTaxiExpressOpcode);
+    // Completion is admitted only through the exact 18414 movement body and
+    // the active same-map flight ledger. Cross-map transition remains dormant.
+    DefC(CMSG_MOVE_SPLINE_DONE, "CMSG_MOVE_SPLINE_DONE", STATUS_LOGGEDIN, PROCESS_THREADUNSAFE, &WorldSession::HandleMoveSplineDoneOpcode);
     DefS(SMSG_ACTIVATETAXIREPLY, "SMSG_ACTIVATETAXIREPLY");
 
     // Directly verified 18414 inventory-movement requests. Each handler

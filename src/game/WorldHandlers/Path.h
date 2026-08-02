@@ -59,6 +59,7 @@ class Path
         }
 
         void clear() { i_nodes.clear(); }
+        void push_back(PathElem const& elem) { i_nodes.push_back(elem); }
 
         float GetTotalLength(uint32 start, uint32 end) const
         {

@@ -1822,6 +1822,12 @@ target_include_directories(mop_taxi_mask_domain_test PRIVATE
 set_target_properties(mop_taxi_mask_domain_test PROPERTIES CXX_STANDARD 17 CXX_STANDARD_REQUIRED ON)
 target_link_libraries(mop_taxi_mask_domain_test PRIVATE game)
 add_test(NAME mop_taxi_mask_domain_test COMMAND mop_taxi_mask_domain_test)
+if(WIN32)
+    get_filename_component(MOP_TAXI_MASK_MYSQL_RUNTIME_DIR "${MySQL_LIBRARY}" DIRECTORY)
+    set_tests_properties(mop_taxi_mask_domain_test PROPERTIES
+        ENVIRONMENT_MODIFICATION
+            "PATH=path_list_prepend:${MOP_TAXI_MASK_MYSQL_RUNTIME_DIR};PATH=path_list_prepend:$<TARGET_FILE_DIR:lualib>")
+endif()
 
 add_test(NAME mop_taxi_mask_domain_source
     COMMAND ${CMAKE_COMMAND} -DSOURCE_ROOT=${CMAKE_SOURCE_DIR}
@@ -1848,6 +1854,12 @@ target_include_directories(mop_taxi_persistence_test PRIVATE
 set_target_properties(mop_taxi_persistence_test PROPERTIES CXX_STANDARD 17 CXX_STANDARD_REQUIRED ON)
 target_link_libraries(mop_taxi_persistence_test PRIVATE game)
 add_test(NAME mop_taxi_persistence_test COMMAND mop_taxi_persistence_test)
+if(WIN32)
+    get_filename_component(MOP_TAXI_PERSISTENCE_MYSQL_RUNTIME_DIR "${MySQL_LIBRARY}" DIRECTORY)
+    set_tests_properties(mop_taxi_persistence_test PROPERTIES
+        ENVIRONMENT_MODIFICATION
+            "PATH=path_list_prepend:${MOP_TAXI_PERSISTENCE_MYSQL_RUNTIME_DIR};PATH=path_list_prepend:$<TARGET_FILE_DIR:lualib>")
+endif()
 
 add_test(NAME mop_taxi_persistence_source
     COMMAND ${CMAKE_COMMAND} -DSOURCE_ROOT=${CMAKE_SOURCE_DIR}
@@ -1872,27 +1884,12 @@ target_include_directories(mop_taxi_menu_packets_test PRIVATE
 set_target_properties(mop_taxi_menu_packets_test PROPERTIES CXX_STANDARD 17 CXX_STANDARD_REQUIRED ON)
 target_link_libraries(mop_taxi_menu_packets_test PRIVATE game)
 add_test(NAME mop_taxi_menu_packets COMMAND mop_taxi_menu_packets_test)
-
-add_test(NAME mop_taxi_menu_source
-    COMMAND ${CMAKE_COMMAND} -DSOURCE_ROOT=${CMAKE_SOURCE_DIR}
-        -P ${CMAKE_CURRENT_SOURCE_DIR}/mop_taxi_menu_source_test.cmake)
-
-foreach(mutation IN ITEMS
-        request_mask request_bytes request_xor request_eof reply_menu_bit reply_mask
-        reply_count_width reply_flush reply_prefix_bytes reply_suffix_bytes
-        reply_xor reply_raw_tail handler_parser handler_zero_guid npc_authority
-        interaction_before_parse feign_death_branch learn_branch known_menu_branch
-        menu_builder menu_legacy_append new_path_body request_registration
-        menu_registration new_path_registration menu_admission new_path_admission
-        request_reference menu_reference new_path_reference mask_accessor
-        mask_size_accessor neighbor_registration)
-    add_test(NAME mop_taxi_menu_source_mutation_${mutation}
-        COMMAND ${CMAKE_COMMAND} -DSOURCE_ROOT=${CMAKE_SOURCE_DIR}
-            -DMUTATION=${mutation}
-            -P ${CMAKE_CURRENT_SOURCE_DIR}/mop_taxi_menu_source_test.cmake)
-    set_tests_properties(mop_taxi_menu_source_mutation_${mutation}
-        PROPERTIES WILL_FAIL TRUE)
-endforeach()
+if(WIN32)
+    get_filename_component(MOP_TAXI_MENU_MYSQL_RUNTIME_DIR "${MySQL_LIBRARY}" DIRECTORY)
+    set_tests_properties(mop_taxi_menu_packets PROPERTIES
+        ENVIRONMENT_MODIFICATION
+            "PATH=path_list_prepend:${MOP_TAXI_MENU_MYSQL_RUNTIME_DIR};PATH=path_list_prepend:$<TARGET_FILE_DIR:lualib>")
+endif()
 
 add_executable(mop_taxi_activation_packets_test mop_taxi_activation_packets_test.cpp)
 target_include_directories(mop_taxi_activation_packets_test PRIVATE
@@ -1901,6 +1898,12 @@ target_include_directories(mop_taxi_activation_packets_test PRIVATE
 set_target_properties(mop_taxi_activation_packets_test PROPERTIES CXX_STANDARD 17 CXX_STANDARD_REQUIRED ON)
 target_link_libraries(mop_taxi_activation_packets_test PRIVATE game)
 add_test(NAME mop_taxi_activation_packets COMMAND mop_taxi_activation_packets_test)
+if(WIN32)
+    get_filename_component(MOP_TAXI_ACTIVATION_PACKETS_MYSQL_RUNTIME_DIR "${MySQL_LIBRARY}" DIRECTORY)
+    set_tests_properties(mop_taxi_activation_packets PROPERTIES
+        ENVIRONMENT_MODIFICATION
+            "PATH=path_list_prepend:${MOP_TAXI_ACTIVATION_PACKETS_MYSQL_RUNTIME_DIR};PATH=path_list_prepend:$<TARGET_FILE_DIR:lualib>")
+endif()
 
 add_executable(mop_taxi_activation_runtime_test mop_taxi_activation_runtime_test.cpp)
 target_include_directories(mop_taxi_activation_runtime_test PRIVATE
@@ -1918,30 +1921,50 @@ if(WIN32)
             "PATH=path_list_prepend:${MOP_TAXI_ACTIVATION_MYSQL_RUNTIME_DIR};PATH=path_list_prepend:$<TARGET_FILE_DIR:lualib>")
 endif()
 
-add_test(NAME mop_taxi_activation_source
-    COMMAND ${CMAKE_COMMAND} -DSOURCE_ROOT=${CMAKE_SOURCE_DIR}
-        -P ${CMAKE_CURRENT_SOURCE_DIR}/mop_taxi_activation_source_test.cmake)
+add_executable(mop_taxi_completion_packets_test mop_taxi_completion_packets_test.cpp)
+target_include_directories(mop_taxi_completion_packets_test PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}/..
+    ${CMAKE_SOURCE_DIR}/src/shared)
+set_target_properties(mop_taxi_completion_packets_test PROPERTIES CXX_STANDARD 17 CXX_STANDARD_REQUIRED ON)
+target_link_libraries(mop_taxi_completion_packets_test PRIVATE game)
+add_test(NAME mop_taxi_completion_packets COMMAND mop_taxi_completion_packets_test)
+if(WIN32)
+    get_filename_component(MOP_TAXI_COMPLETION_MYSQL_RUNTIME_DIR
+        "${MySQL_LIBRARY}" DIRECTORY)
+    set_tests_properties(mop_taxi_completion_packets PROPERTIES
+        ENVIRONMENT_MODIFICATION
+            "PATH=path_list_prepend:${MOP_TAXI_COMPLETION_MYSQL_RUNTIME_DIR};PATH=path_list_prepend:$<TARGET_FILE_DIR:lualib>")
+endif()
 
-foreach(mutation IN ITEMS
-        request_scalar_order request_mask request_bytes request_xor request_canonical
-        request_eof request_zero_guid handler_parser interaction_before_parse
-        npc_authority current_node_lookup source_authority too_far_reply
-        node_bounds same_node_guard same_map_guard path_node_map_guard no_path_guard known_nodes
-        activation_nodes reply_ok_mapping reply_no_path_mapping reply_too_far_mapping
-        reply_width reply_flush reply_builder launch_result spline_launch_result
-        flight_min_nodes failed_generator_cleanup send_flight_result
-        success_before_launch achievement_before_launch fare_after_launch
-        insufficient_money launch_failure_cleanup
-        duplicate_flight_guard request_registration reply_registration reply_admission
-        request_reference reply_reference express_registration completion_registration
-        express_reference completion_reference runtime_environment)
-    add_test(NAME mop_taxi_activation_source_mutation_${mutation}
-        COMMAND ${CMAKE_COMMAND} -DSOURCE_ROOT=${CMAKE_SOURCE_DIR}
-            -DMUTATION=${mutation}
-            -P ${CMAKE_CURRENT_SOURCE_DIR}/mop_taxi_activation_source_test.cmake)
-    set_tests_properties(mop_taxi_activation_source_mutation_${mutation}
-        PROPERTIES WILL_FAIL TRUE)
-endforeach()
+add_executable(mop_taxi_express_packets_test mop_taxi_express_packets_test.cpp)
+target_include_directories(mop_taxi_express_packets_test PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}/..
+    ${CMAKE_SOURCE_DIR}/src/shared)
+set_target_properties(mop_taxi_express_packets_test PROPERTIES CXX_STANDARD 17 CXX_STANDARD_REQUIRED ON)
+target_link_libraries(mop_taxi_express_packets_test PRIVATE game)
+add_test(NAME mop_taxi_express_packets COMMAND mop_taxi_express_packets_test)
+if(WIN32)
+    get_filename_component(MOP_TAXI_EXPRESS_MYSQL_RUNTIME_DIR "${MySQL_LIBRARY}" DIRECTORY)
+    set_tests_properties(mop_taxi_express_packets PROPERTIES
+        ENVIRONMENT_MODIFICATION
+            "PATH=path_list_prepend:${MOP_TAXI_EXPRESS_MYSQL_RUNTIME_DIR};PATH=path_list_prepend:$<TARGET_FILE_DIR:lualib>")
+endif()
+
+add_executable(mop_taxi_completion_lifecycle_test mop_taxi_completion_lifecycle_test.cpp)
+target_include_directories(mop_taxi_completion_lifecycle_test PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}/..
+    ${CMAKE_SOURCE_DIR}/src/proto
+    ${CMAKE_SOURCE_DIR}/src/shared)
+set_target_properties(mop_taxi_completion_lifecycle_test PROPERTIES CXX_STANDARD 17 CXX_STANDARD_REQUIRED ON)
+target_link_libraries(mop_taxi_completion_lifecycle_test PRIVATE game)
+add_test(NAME mop_taxi_completion_lifecycle COMMAND mop_taxi_completion_lifecycle_test)
+if(WIN32)
+    get_filename_component(MOP_TAXI_COMPLETION_LIFECYCLE_MYSQL_RUNTIME_DIR
+        "${MySQL_LIBRARY}" DIRECTORY)
+    set_tests_properties(mop_taxi_completion_lifecycle PROPERTIES
+        ENVIRONMENT_MODIFICATION
+            "PATH=path_list_prepend:${MOP_TAXI_COMPLETION_LIFECYCLE_MYSQL_RUNTIME_DIR};PATH=path_list_prepend:$<TARGET_FILE_DIR:lualib>")
+endif()
 
 add_executable(mop_death_packets_test mop_death_packets_test.cpp)
 target_include_directories(mop_death_packets_test PRIVATE

@@ -1048,6 +1048,59 @@ namespace MopComboPointPackets
 
 namespace MopTaxiPackets
 {
+    struct MoveSplineDoneRequest
+    {
+        uint32 splineId = 0;
+        MovementInfo movement;
+    };
+
+    inline bool ParseMoveSplineDone(WorldPacket& in,
+        MoveSplineDoneRequest& request)
+    {
+        if (in.size() - in.rpos() < 34)
+        {
+            in.rfinish();
+            return false;
+        }
+
+        MoveSplineDoneRequest parsed;
+        try
+        {
+            in >> parsed.splineId;
+            parsed.movement.Read(in, CMSG_MOVE_SPLINE_DONE);
+        }
+        catch (ByteBufferException const&)
+        {
+            in.rfinish();
+            return false;
+        }
+
+        if (in.rpos() != in.size() ||
+            parsed.movement.GetUnknownBit148() ||
+            parsed.movement.GetUnknownBit149() ||
+            parsed.movement.GetUnknownBit172() ||
+            parsed.movement.HasNonZeroBitPadding())
+        {
+            in.rfinish();
+            return false;
+        }
+
+        request = parsed;
+        return true;
+    }
+
+    inline bool MatchesMoveSplinePlayer(ObjectGuid mover, ObjectGuid player)
+    {
+        if (mover.IsEmpty() || player.IsEmpty() ||
+            mover.GetCounter() != player.GetCounter())
+        {
+            return false;
+        }
+
+        HighGuid const moverHigh = mover.GetHigh();
+        return moverHigh == HIGHGUID_PLAYER || moverHigh == HighGuid(0x040);
+    }
+
     // Wow.exe 18414 enum table off_F4B0B8 defines these four wire values.
     enum class TaxiNodeStatus : uint8
     {
@@ -1151,6 +1204,90 @@ namespace MopTaxiPackets
         uint32 sourceNode = 0;
         ObjectGuid flightMaster;
     };
+
+    struct TaxiExpressRequest
+    {
+        ObjectGuid flightMaster;
+        std::vector<uint32> nodes;
+    };
+
+    inline bool ParseActivateTaxiExpress(WorldPacket& in,
+        TaxiExpressRequest& request)
+    {
+        size_t const remaining = in.size() - in.rpos();
+        if (remaining < 12)
+        {
+            return RejectMalformedRequest(in);
+        }
+
+        TaxiExpressRequest parsed;
+        try
+        {
+            in.ResetBitReader();
+            in.ReadGuidMask<6, 7>(parsed.flightMaster);
+            uint32 const nodeCount = in.ReadBits(22);
+            in.ReadGuidMask<2, 0, 4, 3, 1, 5>(parsed.flightMaster);
+
+            if (in.HasNonZeroBitPadding() || nodeCount < 2 ||
+                nodeCount > TaxiMaskSize * 8)
+            {
+                return RejectMalformedRequest(in);
+            }
+            in.ResetBitReader();
+
+            size_t const prefixGuidBytes =
+                size_t(parsed.flightMaster[2] != 0) +
+                size_t(parsed.flightMaster[7] != 0) +
+                size_t(parsed.flightMaster[1] != 0);
+            size_t const suffixGuidBytes =
+                size_t(parsed.flightMaster[0] != 0) +
+                size_t(parsed.flightMaster[5] != 0) +
+                size_t(parsed.flightMaster[3] != 0) +
+                size_t(parsed.flightMaster[6] != 0) +
+                size_t(parsed.flightMaster[4] != 0);
+            size_t const nodeBytes = size_t(nodeCount) * sizeof(uint32);
+            if (in.size() - in.rpos() != prefixGuidBytes + nodeBytes + suffixGuidBytes ||
+                !HasCanonicalPackedGuidBytes(in, in.rpos(), prefixGuidBytes) ||
+                !HasCanonicalPackedGuidBytes(in, in.rpos() + prefixGuidBytes + nodeBytes,
+                    suffixGuidBytes))
+            {
+                return RejectMalformedRequest(in);
+            }
+
+            in.ReadGuidBytes<2, 7, 1>(parsed.flightMaster);
+            parsed.nodes.reserve(nodeCount);
+            for (uint32 i = 0; i < nodeCount; ++i)
+            {
+                uint32 node = 0;
+                in >> node;
+                if (node == 0 || node > TaxiMaskSize * 8)
+                {
+                    return RejectMalformedRequest(in);
+                }
+                for (uint32 existing : parsed.nodes)
+                {
+                    if (existing == node)
+                    {
+                        return RejectMalformedRequest(in);
+                    }
+                }
+                parsed.nodes.push_back(node);
+            }
+            in.ReadGuidBytes<0, 5, 3, 6, 4>(parsed.flightMaster);
+        }
+        catch (ByteBufferException const&)
+        {
+            return RejectMalformedRequest(in);
+        }
+
+        if (in.rpos() != in.size() || parsed.flightMaster.IsEmpty())
+        {
+            return RejectMalformedRequest(in);
+        }
+
+        request = parsed;
+        return true;
+    }
 
     inline bool IsSameMapTaxiPath(TaxiPathNodeList const& path,
         uint32 mapId)

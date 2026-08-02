@@ -39,6 +39,7 @@
 #include "Creature.h"
 #include "CreatureLinkingMgr.h"
 #include "Pet.h"
+#include "Player.h"
 #include "DBCStores.h"
 
 #include <cassert>
@@ -600,7 +601,26 @@ bool MotionMaster::MoveTaxiFlight(uint32 path, uint32 pathnode)
     }
 
     DEBUG_FILTER_LOG(LOG_FILTER_AI_AND_MOVEGENSS, "%s taxi to (Path %u node %u)", m_owner->GetGuidStr().c_str(), path, pathnode);
-    FlightPathMovementGenerator* mgen = new FlightPathMovementGenerator(sTaxiPathNodesByPath[path], pathnode);
+
+    Player* player = static_cast<Player*>(m_owner);
+    TaxiPathNodeList continuousPath;
+    TaxiPathNodeList const* flightPath = &sTaxiPathNodesByPath[path];
+    bool const continuousRoute = pathnode == 0 &&
+        player->m_taxi.BuildSameMapTaxiPath(continuousPath, player->GetMapId());
+    if (continuousRoute)
+    {
+        if (continuousPath.empty() || pathnode >= continuousPath.size() ||
+            continuousPath[0].PathID != path)
+        {
+            sLog.outError("%s has inconsistent continuous taxi route for Path %u node %u",
+                m_owner->GetGuidStr().c_str(), path, pathnode);
+            return false;
+        }
+        flightPath = &continuousPath;
+    }
+
+    FlightPathMovementGenerator* mgen = new FlightPathMovementGenerator(
+        *flightPath, pathnode, continuousRoute);
     Mutate(mgen);
     if (!mgen->HasLaunched())
     {
