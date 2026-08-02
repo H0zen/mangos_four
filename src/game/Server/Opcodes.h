@@ -95,6 +95,8 @@ enum OpcodesList
     SMSG_CHAR_DELETE                             = 0x0C9F,    // 5.4.8 18414 (Wow.exe leaf; name reference-consensus)
     CMSG_PLAYER_LOGIN                            = 0x158F, // 5.4.8 18414 (Wow.exe binary)
     SMSG_NEW_WORLD                               = 0x1C3B,    // 5.4.8 18414 (Wow.exe leaf; name reference-consensus)
+    CMSG_SUSPEND_TOKEN_RESPONSE                  = 0x0292,    // 5.4.8 18414 (Wow.exe writer sub_66F465; uint32 token)
+    SMSG_SUSPEND_TOKEN                           = 0x18BA,    // 5.4.8 18414 (Wow.exe reader sub_6DAC04; uint32 token + 2-bit reason)
     SMSG_TRANSFER_PENDING                        = 0x061B,    // 5.4.8 18414 (Wow.exe leaf; name reference-consensus)
     SMSG_TRANSFER_ABORTED                        = 0x0C8F,    // 5.4.8 18414 (Wow.exe leaf; name reference-consensus)
     SMSG_CHARACTER_LOGIN_FAILED                  = 0x1A0B,    // 5.4.8 18414 (Wow.exe leaf; name single-source fork)

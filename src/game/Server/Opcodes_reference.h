@@ -175,9 +175,9 @@
  *   TOTAL SMSG rows                   925
  *
  * SUBSYSTEM CONFIDENCE: high=365, low=221, medium=182, none=157
- * STATUS TOTALS: ACTIVE=551, DOC=434, DORMANT=535
- *   SMSG: ACTIVE=322, DOC=271, DORMANT=332
- *   CMSG: ACTIVE=229, DOC=163, DORMANT=203
+ * STATUS TOTALS: ACTIVE=553, DOC=432, DORMANT=535
+ *   SMSG: ACTIVE=323, DOC=270, DORMANT=332
+ *   CMSG: ACTIVE=230, DOC=162, DORMANT=203
  */
 
 // CAVEATS -- read before trusting any single row:
@@ -403,7 +403,7 @@ typedef uint16_t uint16;
  *   SMSG_PLAYED_TIME                               0x11E2  ACTIVE
  *   SMSG_WHOIS                                     0x12BA  DORMANT
  *   SMSG_UNKNOWN_0x188F                            0x188F  DOC
- *   SMSG_UNKNOWN_0x18BA                            0x18BA  DOC
+ *   SMSG_UNKNOWN_0x18BA                            0x18BA  ACTIVE   server-binding=SMSG_SUSPEND_TOKEN
  *   SMSG_LOGIN_VERIFY_WORLD                        0x1C0F  ACTIVE
  *   SMSG_NEW_WORLD                                 0x1C3B  ACTIVE
  *
@@ -1383,7 +1383,7 @@ typedef uint16_t uint16;
  *   CMSG_SET_FACTION_ATWAR                         0x027B  DORMANT
  *   CMSG_NPC_TEXT_QUERY                            0x0287  ACTIVE   [high-conf]
  *   CMSG_MESSAGECHAT_ADDON_PARTY                   0x028E  ACTIVE
- *   CMSG_SUSPEND_TOKEN_RESPONSE                    0x0292  DOC
+ *   CMSG_SUSPEND_TOKEN_RESPONSE                    0x0292  ACTIVE
  *   CMSG_UNREGISTER_ALL_ADDON_PREFIXES             0x029F  ACTIVE
  *   CMSG_GET_MIRRORIMAGE_DATA                      0x02A3  DORMANT
  *   CMSG_LEARN_TALENT                              0x02A7  DORMANT

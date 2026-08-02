@@ -73,6 +73,52 @@
 
 #define MOVEMENT_PACKET_TIME_DELAY 0
 
+void WorldSession::SendSuspendToken(uint32 token)
+{
+    m_pendingSuspendToken = token;
+    m_waitingForSuspendToken = true;
+
+    WorldPacket data(SMSG_SUSPEND_TOKEN, 5);
+    data << token;
+    data.WriteBits(3u, 2); // CLIENT_SUSPEND_FOR_WORLD_PORT
+    SendPacket(&data);
+}
+
+void WorldSession::HandleSuspendTokenResponse(WorldPacket& recvPacket)
+{
+    size_t const remaining = recvPacket.size() - recvPacket.rpos();
+    if (remaining != sizeof(uint32))
+    {
+        DEBUG_LOG("WORLD: ignoring malformed CMSG_SUSPEND_TOKEN_RESPONSE (%u bytes).", uint32(remaining));
+        return;
+    }
+
+    uint32 token = 0;
+    recvPacket >> token;
+
+    if (!_player || !_player->IsBeingTeleportedFar() || !m_waitingForSuspendToken)
+    {
+        DEBUG_LOG("WORLD: ignoring stale CMSG_SUSPEND_TOKEN_RESPONSE token %u.", token);
+        return;
+    }
+
+    if (token != m_pendingSuspendToken)
+    {
+        DEBUG_LOG("WORLD: ignoring mismatched CMSG_SUSPEND_TOKEN_RESPONSE token %u (expected %u).",
+                  token, m_pendingSuspendToken);
+        return;
+    }
+
+    m_waitingForSuspendToken = false;
+
+    WorldLocation const& loc = _player->GetTeleportDest();
+    WorldPacket data(SMSG_NEW_WORLD, 20);
+    MopWorldEntryPackets::BuildNewWorld(data, loc.mapid, loc.coord_x,
+                                        loc.coord_y, loc.coord_z, loc.orientation);
+    SendPacket(&data);
+    _player->SendSavedInstances();
+}
+
 /**
  * @brief Handles the packet-based worldport acknowledgement.
  *
@@ -81,6 +127,13 @@
 void WorldSession::HandleMoveWorldportAckOpcode(WorldPacket& /*recv_data*/)
 {
     DEBUG_LOG("WORLD: got MSG_MOVE_WORLDPORT_ACK.");
+
+    if (m_waitingForSuspendToken)
+    {
+        DEBUG_LOG("WORLD: ignoring premature MSG_MOVE_WORLDPORT_ACK while waiting for the suspend token response.");
+        return;
+    }
+
     HandleMoveWorldportAckOpcode();
 }
 
@@ -89,6 +142,9 @@ void WorldSession::HandleMoveWorldportAckOpcode(WorldPacket& /*recv_data*/)
  */
 void WorldSession::HandleMoveWorldportAckOpcode()
 {
+    m_waitingForSuspendToken = false;
+    m_pendingSuspendToken = 0;
+
     // ignore unexpected far teleports
     if (!GetPlayer()->IsBeingTeleportedFar())
     {

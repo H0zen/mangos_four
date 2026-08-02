@@ -172,7 +172,8 @@ WorldSession::WorldSession(uint32 id, std::shared_ptr<proto::IClientLink> link,
                            AccountTypes sec, uint8 expansion, time_t mute_time, LocaleConstant locale,
                            const uint8 (&sessionKey)[MopAuth::SESSION_KEY_LEN]) :
     m_muteTime(mute_time), _player(NULL), m_Socket(std::move(link)), _security(sec), _accountId(id), m_expansion(expansion), _logoutTime(0),
-    m_inQueue(false), m_playerLoading(false), m_suppressWorldSends(false), m_playerLogout(false), m_playerRecentlyLogout(false), m_playerSave(false),
+    m_pendingSuspendToken(0), m_waitingForSuspendToken(false), m_inQueue(false), m_playerLoading(false), m_suppressWorldSends(false),
+    m_playerLogout(false), m_playerRecentlyLogout(false), m_playerSave(false),
     m_sessionDbcLocale(sWorld.GetAvailableDbcLocale(locale)), m_sessionDbLocaleIndex(sObjectMgr.GetIndexForLocale(locale)),
     m_latency(0), m_clientTimeDelay(0), m_tutorialState(TUTORIALDATA_UNCHANGED)
 {
@@ -288,6 +289,7 @@ static bool IsEnterWorldConverted(uint16 opcode)
         case SMSG_LOGOUT_COMPLETE:       // 0x142F -- final world-leave (leading bit + zero GUID mask: 80 00)
         case SMSG_MOVE_TELEPORT:         // 0x0B39 -- same-map teleport (MopWorldEntryPackets::BuildMoveTeleport, converted)
         case SMSG_NEW_WORLD:             // 0x1C3B -- cross-map teleport target (MopWorldEntryPackets::BuildNewWorld, converted)
+        case SMSG_SUSPEND_TOKEN:         // 0x18BA -- gate NEW_WORLD until the client has torn down the old world
         case SMSG_TRANSFER_PENDING:      // 0x061B -- cross-map load-screen preamble (inline bit-packed body; non-transport
                                          //           path byte-identical to the 18414 reference; transport-case field
                                          //           order unverified -- follow-up when far-teleport-with-transport lands)

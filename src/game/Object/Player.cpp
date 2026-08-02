@@ -1914,19 +1914,7 @@ bool Player::TeleportTo(uint32 mapid, float x, float y, float z, float orientati
             SetSemaphoreTeleportFar(true);
 
             if (!GetSession()->PlayerLogout())
-            {
-                // transfer finished, inform client to start load
-                WorldPacket data
-                (SMSG_NEW_WORLD, 20);
-                // NEW_WORLD always carries destination-world coordinates.
-                // MovementInfo separately retains the deck-local transport
-                // offsets needed by the destination admission path.
-                MopWorldEntryPackets::BuildNewWorld(data, mapid, final_x, final_y,
-                    final_z, NormalizeOrientation(final_o));
-
-                GetSession()->SendPacket(&data);
-                SendSavedInstances();
-            }
+                GetSession()->SendSuspendToken(NextMovementCounter());
         }
         else                                                // !map->CanEnter(this)
         {
