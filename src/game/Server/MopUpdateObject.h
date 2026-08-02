@@ -245,11 +245,14 @@ namespace MopUpdateObject
         float y;
         float z;
         float o;
+        uint32 transportTime;
         uint64 rotation;
+        bool isTransport;
     };
 
-    /// Append the narrow 18414 stationary game-object movement subset. This
-    /// deliberately excludes transports, animation kits, targets and scenes.
+    /// Append the narrow 18414 stationary game-object movement subset,
+    /// including the proved type-15 MO_TRANSPORT time branch. Type-11 frame
+    /// data, animation kits, targets and scenes remain outside this encoder.
     void AppendStationaryGameObjectMovement(ByteBuffer& out, StationaryGameObjectMovement const& movement);
 
     void AppendStationaryGameObjectCreateBlock(ByteBuffer& out, uint8 updateType, uint64 guid, uint8 typeId,

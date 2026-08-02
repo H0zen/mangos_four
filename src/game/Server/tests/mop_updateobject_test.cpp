@@ -33,6 +33,7 @@
 #include "WorldPacket.h"
 
 #include <cstdio>
+#include <cstring>
 
 static int g_failures = 0;
 #define CHECK(cond) do { if (!(cond)) { std::printf("FAIL %s:%d  %s\n", __FILE__, __LINE__, #cond); ++g_failures; } } while (0)
@@ -95,6 +96,37 @@ namespace
 }
 int main(int /*argc*/, char** /*argv*/)
 {
+    // capture-000188 / sequence 1453: a type-15 MO_TRANSPORT must reach the
+    // stationary create serializer before its client-interpolated route can run.
+    MopUpdateObject::StationaryGameObjectEligibility transportEligibility{};
+    transportEligibility.hasTemplate = true;
+    transportEligibility.isTransport = true;
+    transportEligibility.hasStationaryPosition = true;
+    transportEligibility.hasRotation = true;
+    CHECK(MopUpdateObject::CanUseStationaryGameObjectMovement(transportEligibility));
+
+    MopUpdateObject::StationaryGameObjectMovement transportMovement{};
+    uint32 const capturedOrientation = 0x3FC0441Cu;
+    std::memcpy(&transportMovement.o, &capturedOrientation, sizeof(capturedOrientation));
+    transportMovement.transportTime = 0x783D4FA1u;
+    transportMovement.rotation = uint64(0x00000000000AEB1Bull);
+    transportMovement.isTransport = true;
+
+    ByteBuffer transportBody;
+    MopUpdateObject::AppendStationaryGameObjectMovement(transportBody, transportMovement);
+    static uint8 const capturedTransportBody[] = {
+        0x00, 0x00, 0x00, 0x03, 0x00, 0x40,
+        0x00, 0x00, 0x00, 0x00,
+        0x00, 0x00, 0x00, 0x00,
+        0x1C, 0x44, 0xC0, 0x3F,
+        0x00, 0x00, 0x00, 0x00,
+        0xA1, 0x4F, 0x3D, 0x78,
+        0x1B, 0xEB, 0x0A, 0x00, 0x00, 0x00, 0x00, 0x00
+    };
+    CHECK(transportBody.size() == sizeof(capturedTransportBody));
+    CHECK(transportBody.size() == 0 ||
+        std::memcmp(transportBody.contents(), capturedTransportBody, transportBody.size()) == 0);
+
     MopUpdateObject::SelfPlayer const player = MakeSelf();
     WorldPacket packet;
     MopUpdateObject::BuildSelfCreate(packet, player);

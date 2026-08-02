@@ -234,7 +234,7 @@ namespace
     }
 
     void BuildMopGameObjectStaticFields(Object const& object, Player* target,
-        std::vector<MopUpdateObject::StaticField>& fields)
+        uint32 transportTime, std::vector<MopUpdateObject::StaticField>& fields)
     {
         GameObject const* gameObject = static_cast<GameObject const*>(&object);
         auto add = [&fields](uint16 index, uint32 value)
@@ -260,7 +260,21 @@ namespace
                     break;
             }
         }
-        uint32 dynamic = MopUpdateObject::TranslateGameObjectDynamic(0xFFFF0000u | dynamicLow);
+        uint16 pathProgress = 0xFFFFu;
+        if (gameObject->GetGoType() == GAMEOBJECT_TYPE_MO_TRANSPORT)
+        {
+            // The dynamic high word is the route clock normalized to 16 bits,
+            // not the TaxiPath identifier. The client combines it with LEVEL
+            // (the route period) and the transport-time movement branch.
+            uint32 const period = object.GetUInt32Value(GAMEOBJECT_LEVEL);
+            if (period != 0)
+            {
+                float const timer = float(transportTime % period);
+                pathProgress = uint16(timer / float(period) * 65535.0f + 0.5f);
+            }
+        }
+        uint32 const legacyDynamic = (uint32(pathProgress) << 16) | dynamicLow;
+        uint32 dynamic = MopUpdateObject::TranslateGameObjectDynamic(legacyDynamic);
 
         add(0, object.GetUInt32Value(OBJECT_FIELD_GUID));
         add(1, object.GetUInt32Value(OBJECT_FIELD_GUID + 1));
@@ -285,6 +299,9 @@ namespace
         // their type byte here to take the branch that skips the M2 load
         // entirely, so this field is what keeps them off that path.
         add(18, object.GetUInt32Value(GAMEOBJECT_BYTES_1));
+        // Build 18414 has one additional gameobject value slot. Retail type-15
+        // creates include it as zero, producing the 0x000FFFFF values mask.
+        add(19, 0);
     }
 
     void BuildMopObserverPlayerStaticFields(Object const& object,
@@ -456,15 +473,20 @@ void Object::BuildCreateUpdateBlockForPlayer(UpdateData* data, Player* target) c
     else
     {
         GameObject const* gameObject = static_cast<GameObject const*>(this);
+        bool const isMoTransport = gameObject->GetGoType() == GAMEOBJECT_TYPE_MO_TRANSPORT;
         MopUpdateObject::StationaryGameObjectMovement movement{};
-        movement.x = gameObject->GetPositionX();
-        movement.y = gameObject->GetPositionY();
-        movement.z = gameObject->GetPositionZ();
+        // MO_TRANSPORT route coordinates are client-interpolated. Its create
+        // snapshot supplies the local origin and the shared route clock.
+        movement.x = isMoTransport ? 0.0f : gameObject->GetPositionX();
+        movement.y = isMoTransport ? 0.0f : gameObject->GetPositionY();
+        movement.z = isMoTransport ? 0.0f : gameObject->GetPositionZ();
         movement.o = gameObject->GetOrientation();
+        movement.transportTime = isMoTransport ? GameTime::GetGameTimeMS() : 0;
         movement.rotation = uint64(gameObject->GetPackedWorldRotation());
+        movement.isTransport = isMoTransport;
 
-        fields.reserve(19);
-        BuildMopGameObjectStaticFields(*this, target, fields);
+        fields.reserve(20);
+        BuildMopGameObjectStaticFields(*this, target, movement.transportTime, fields);
         MopUpdateObject::AppendStationaryGameObjectCreateBlock(data->GetBuffer(), updateType, guid,
             m_objectTypeId, movement, fields.data(), uint32(fields.size()));
     }
@@ -487,10 +509,19 @@ bool Object::CanBuildMopCreateUpdate() const
     if (GetTypeId() == TYPEID_GAMEOBJECT)
     {
         GameObject const* gameObject = static_cast<GameObject const*>(this);
-        uint16 const supportedFlags = UPDATEFLAG_HAS_POSITION | UPDATEFLAG_ROTATION;
+        bool const isMoTransport = gameObject->GetGoType() == GAMEOBJECT_TYPE_MO_TRANSPORT;
+        if (gameObject->IsTransport() && !isMoTransport)
+        {
+            return false;
+        }
+        uint16 supportedFlags = UPDATEFLAG_HAS_POSITION | UPDATEFLAG_ROTATION;
+        if (isMoTransport)
+        {
+            supportedFlags |= UPDATEFLAG_TRANSPORT;
+        }
         MopUpdateObject::StationaryGameObjectEligibility eligibility{};
         eligibility.hasTemplate = gameObject->GetGOInfo() != NULL;
-        eligibility.isTransport = gameObject->IsTransport();
+        eligibility.isTransport = isMoTransport;
         eligibility.isBoarded = gameObject->IsBoarded();
         eligibility.hasStationaryPosition = (m_updateFlag & UPDATEFLAG_HAS_POSITION) != 0;
         eligibility.hasRotation = (m_updateFlag & UPDATEFLAG_ROTATION) != 0;
@@ -814,8 +845,11 @@ void Object::BuildValuesUpdateBlockForPlayer(UpdateData* data, Player* target) c
     }
     else
     {
-        fields.reserve(19);
-        BuildMopGameObjectStaticFields(*this, target, fields);
+        fields.reserve(20);
+        GameObject const* gameObject = static_cast<GameObject const*>(this);
+        uint32 const transportTime = gameObject->GetGoType() == GAMEOBJECT_TYPE_MO_TRANSPORT ?
+            GameTime::GetGameTimeMS() : 0;
+        BuildMopGameObjectStaticFields(*this, target, transportTime, fields);
     }
     MopUpdateObject::AppendValuesBlock(data->GetBuffer(), GetObjectGuid().GetRawValue(),
         fields.data(), uint32(fields.size()));

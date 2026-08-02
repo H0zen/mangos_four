@@ -207,6 +207,8 @@ bool Transport::Create(uint32 guidlow, uint32 mapid, float x, float y, float z, 
     SetUInt16Value(GAMEOBJECT_DYNAMIC, 1, dynamicHighValue);
 
     SetName(goinfo->name);
+    SetWorldRotationAngles(ang, 0.0f, 0.0f);
+    SetTransportPathRotation(QuaternionData(0.0f, 0.0f, 0.0f, 1.0f));
 
     return true;
 }

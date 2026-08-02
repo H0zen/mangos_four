@@ -228,9 +228,12 @@ bool MopUpdateObject::CanUseStationaryGameObjectMovement(StationaryGameObjectEli
     // returns null, and is dereferenced unchecked. That is now fixed by
     // emitting index 18 in the same projection, which the incremental VALUES
     // path reuses, so the type arrives on both paths.
+    // Type-15 transports use the same stationary-position base plus the
+    // transport-time branch recovered from the 18414 client. Type-11 animated
+    // transports remain gated upstream until their frame layout is supported.
     // Rendering with a default sub-state beats not rendering at all.
-    return eligibility.hasTemplate && !eligibility.isTransport &&
-        !eligibility.isBoarded && eligibility.hasStationaryPosition && eligibility.hasRotation &&
+    return eligibility.hasTemplate && !eligibility.isBoarded &&
+        eligibility.hasStationaryPosition && eligibility.hasRotation &&
         !eligibility.hasUnsupportedMovement;
 }
 
@@ -623,7 +626,7 @@ void MopUpdateObject::AppendStationaryGameObjectMovement(ByteBuffer& out, Statio
     out.WriteBit(0);                 // vehicle
     out.WriteBit(0);
     out.WriteBit(0);
-    out.WriteBit(0);                 // transport time
+    out.WriteBit(movement.isTransport); // transport time
     out.WriteBit(1);                 // packed world rotation follows
     out.WriteBit(0);
     out.WriteBit(0);                 // self
@@ -638,6 +641,10 @@ void MopUpdateObject::AppendStationaryGameObjectMovement(ByteBuffer& out, Statio
     out.FlushBits();
 
     out << movement.y << movement.z << movement.o << movement.x;
+    if (movement.isTransport)
+    {
+        out << movement.transportTime;
+    }
     out << movement.rotation;
 }
 
