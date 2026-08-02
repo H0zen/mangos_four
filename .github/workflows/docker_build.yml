@@ -2,7 +2,7 @@ name: Docker Build
 
 on:
   push:
-      branches: [ master , devel ]
+      branches: [ master ]
   pull_request:
       branches: [ master ]
 
