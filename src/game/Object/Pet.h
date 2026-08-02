@@ -337,6 +337,7 @@ class Pet : public Creature
         void SavePetToDB(PetSaveMode mode);
         void Unsummon(PetSaveMode mode, Unit* owner = NULL);
         Transport* GetTransport() const { return m_transport; }
+        bool MoveTransportFollow(Unit* target, float offset, float angle, bool walking, bool& moved);
 
         /// Active-roster slot this pet currently occupies in
         /// `character_pet.slot` (0..PET_SLOT_LAST_ACTIVE_SLOT for Cata

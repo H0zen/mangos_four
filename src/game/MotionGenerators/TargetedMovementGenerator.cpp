@@ -110,16 +110,22 @@ void TargetedMovementGeneratorMedium<T, D>::_setTargetLocation(T& owner, bool up
                       && owner.hasUnitState(UNIT_STAT_FOLLOW));
 
     // Legacy MO_TRANSPORT passengers use MovementInfo's transport-local
-    // position rather than the vehicle TransportInfo system. Do not generate a
-    // world-space follow spline while both pet and owner share that boat; the
-    // client carries the pet with the hull from its parented create snapshot.
+    // position rather than the vehicle TransportInfo system. Follow the owner
+    // in that local space instead of generating a world-space path that stays
+    // behind when the hull moves.
     if (forceDest)
     {
         Pet* pet = static_cast<Pet*>((Creature*)&owner);
-        Player* targetPlayer = i_target->ToPlayer();
-        if (pet->GetTransport() && targetPlayer && pet->GetTransport() == targetPlayer->GetTransport())
+        bool moved = false;
+        if (pet->MoveTransportFollow(i_target.getTarget(), i_offset, i_angle,
+            ((D*)this)->EnableWalking(), moved))
         {
-            D::_clearUnitStateMove(owner);
+            if (moved)
+            {
+                D::_addUnitStateMove(owner);
+                i_targetReached = false;
+                m_speedChanged = false;
+            }
             return;
         }
     }

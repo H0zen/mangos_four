@@ -283,6 +283,73 @@ void Pet::SendSplineAnchor(ObjectGuid transportGuid, float x, float y, float z, 
     SendMessageToSet(&data, true);
 }
 
+bool Pet::MoveTransportFollow(Unit* target, float offset, float angle, bool walking, bool& moved)
+{
+    moved = false;
+
+    Player* owner = target ? target->ToPlayer() : NULL;
+    Transport* ownerTransport = owner ? owner->GetTransport() : NULL;
+    if (!ownerTransport || ownerTransport != m_transport)
+    {
+        return false;
+    }
+
+    Position const* currentLocal = m_movementInfo.GetTransportPos();
+    Position const* ownerLocal = owner->m_movementInfo.GetTransportPos();
+    float const followDistance = offset + GetObjectBoundingRadius() + owner->GetObjectBoundingRadius();
+    float const followAngle = ownerLocal->o + angle;
+    float const destinationX = ownerLocal->x + std::cos(followAngle) * followDistance;
+    float const destinationY = ownerLocal->y + std::sin(followAngle) * followDistance;
+    float const destinationZ = ownerLocal->z;
+    float const deltaX = destinationX - currentLocal->x;
+    float const deltaY = destinationY - currentLocal->y;
+    float const deltaZ = destinationZ - currentLocal->z;
+    float const distance = std::sqrt(deltaX * deltaX + deltaY * deltaY + deltaZ * deltaZ);
+    if (distance < 0.5f)
+    {
+        return true;
+    }
+
+    float const speed = GetSpeed(walking ? MOVE_WALK : MOVE_RUN);
+    if (speed <= 0.0f)
+    {
+        return true;
+    }
+
+    float const localOrientation = std::atan2(deltaY, deltaX);
+    uint32 const duration = uint32(distance / speed * 1000.0f);
+    G3D::Vector3 const start(currentLocal->x, currentLocal->y, currentLocal->z);
+    G3D::Vector3 const destination(destinationX, destinationY, destinationZ);
+
+    m_movementInfo.SetTransportData(ownerTransport->GetObjectGuid(), destinationX, destinationY,
+        destinationZ, localOrientation, owner->m_movementInfo.GetTransportTime(), -1);
+
+    float const transportOrientation = ownerTransport->GetOrientation();
+    float const cosOrientation = std::cos(transportOrientation);
+    float const sinOrientation = std::sin(transportOrientation);
+    float const worldX = ownerTransport->GetPositionX() + cosOrientation * destinationX - sinOrientation * destinationY;
+    float const worldY = ownerTransport->GetPositionY() + sinOrientation * destinationX + cosOrientation * destinationY;
+    float const worldZ = ownerTransport->GetPositionZ() + destinationZ;
+    GetMap()->CreatureRelocation(this, worldX, worldY, worldZ,
+        NormalizeOrientation(transportOrientation + localOrientation));
+
+    Movement::MonsterMoveData move;
+    move.position = start;
+    move.splineId = Movement::MoveSplineInit::GenerateSplineId();
+    move.type = Movement::MonsterMoveNormal;
+    move.moverGuid = GetObjectGuid();
+    move.transportGuid = ownerTransport->GetObjectGuid();
+    move.transportSeat = -1;
+    move.duration = duration;
+    move.uncompressedPath.push_back(destination);
+
+    WorldPacket data(SMSG_MONSTER_MOVE, 80);
+    Movement::PacketBuilder::WriteMonsterMove(move, data);
+    SendMessageToSet(&data, true);
+    moved = true;
+    return true;
+}
+
 /**
  * @brief Regenerates pet health, power, happiness, and loyalty timers.
  *
