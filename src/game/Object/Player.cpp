@@ -5224,7 +5224,9 @@ void Player::UpdateUnderwaterState(Map* m, float x, float y, float z)
     // All liquids type - check under water position
     if (liquid_status.CreatureTypeFlags & (MAP_LIQUID_TYPE_WATER | MAP_LIQUID_TYPE_OCEAN | MAP_LIQUID_TYPE_MAGMA | MAP_LIQUID_TYPE_SLIME))
     {
-        if (res & LIQUID_MAP_UNDER_WATER)
+        // A transport deck is the player's local ground. Do not let the
+        // underlying ocean start a breath timer while the player is aboard.
+        if ((res & LIQUID_MAP_UNDER_WATER) && !GetTransport())
         {
             m_MirrorTimerFlags |= UNDERWATER_INWATER;
         }
