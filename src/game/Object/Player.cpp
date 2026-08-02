@@ -1862,9 +1862,14 @@ bool Player::TeleportTo(uint32 mapid, float x, float y, float z, float orientati
             // remove auras before removing from map...
             RemoveAurasWithInterruptFlags(AURA_INTERRUPT_FLAG_CHANGE_MAP | AURA_INTERRUPT_FLAG_MOVE | AURA_INTERRUPT_FLAG_TURNING);
 
+            bool const transportWorldPort = m_transport != NULL;
+
             if (!GetSession()->PlayerLogout())
             {
-                GetSession()->SendTransferRoot(NextMovementCounter());
+                if (transportWorldPort)
+                {
+                    GetSession()->SendTransferRoot(NextMovementCounter());
+                }
 
                 // send transfer packet to display load screen
                 WorldPacket data(SMSG_TRANSFER_PENDING, (4 + 4 + 4));
@@ -1914,6 +1919,19 @@ bool Player::TeleportTo(uint32 mapid, float x, float y, float z, float orientati
             // move packet sent by client always after far teleport
             // code for finish transfer to new map called in WorldSession::HandleMoveWorldportAckOpcode at client packet
             SetSemaphoreTeleportFar(true);
+
+            if (!GetSession()->PlayerLogout() && !transportWorldPort)
+            {
+                // Preserve the established generic far-teleport path. The
+                // suspend handshake is required only while retaining a
+                // cross-map transport attachment.
+                WorldPacket data(SMSG_NEW_WORLD, 20);
+                MopWorldEntryPackets::BuildNewWorld(data, mapid, final_x, final_y,
+                    final_z, NormalizeOrientation(final_o));
+
+                GetSession()->SendPacket(&data);
+                SendSavedInstances();
+            }
         }
         else                                                // !map->CanEnter(this)
         {
