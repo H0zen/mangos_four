@@ -185,6 +185,28 @@ inline void BeforeVisibilityDestroy<Creature>(Creature* t, Player* p)
     }
 }
 
+static bool SharesTransportWithPlayer(Player* player, WorldObject* target)
+{
+    Transport* transport = player ? player->GetTransport() : NULL;
+    if (!transport || !target)
+    {
+        return false;
+    }
+
+    if (target->GetTypeId() == TYPEID_PLAYER)
+    {
+        return static_cast<Player*>(target)->GetTransport() == transport;
+    }
+
+    if (target->GetTypeId() == TYPEID_UNIT)
+    {
+        Creature* creature = static_cast<Creature*>(target);
+        return creature->IsPet() && static_cast<Pet*>(creature)->GetTransport() == transport;
+    }
+
+    return false;
+}
+
 /**
  * @brief Updates visibility of a single world object for the player.
  *
@@ -195,7 +217,8 @@ void Player::UpdateVisibilityOf(WorldObject const* viewPoint, WorldObject* targe
 {
     if (HaveAtClient(target))
     {
-        if (!target->IsVisibleForInState(this, viewPoint, true))
+        if (!target->IsVisibleForInState(this, viewPoint, true) &&
+            !SharesTransportWithPlayer(this, target))
         {
             ObjectGuid t_guid = target->GetObjectGuid();
 
@@ -259,7 +282,8 @@ void Player::UpdateVisibilityOf(WorldObject const* viewPoint, T* target, UpdateD
 {
     if (HaveAtClient(target))
     {
-        if (!target->IsVisibleForInState(this, viewPoint, true))
+        if (!target->IsVisibleForInState(this, viewPoint, true) &&
+            !SharesTransportWithPlayer(this, target))
         {
             BeforeVisibilityDestroy<T>(target, this);
 
