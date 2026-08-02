@@ -1916,13 +1916,13 @@ bool Player::TeleportTo(uint32 mapid, float x, float y, float z, float orientati
             if (!GetSession()->PlayerLogout())
             {
                 // transfer finished, inform client to start load
-                float const worldX = m_transport ? transportPosition->x : final_x;
-                float const worldY = m_transport ? transportPosition->y : final_y;
-                float const worldZ = m_transport ? transportPosition->z : final_z;
-                float const worldO = m_transport ? transportPosition->o : NormalizeOrientation(final_o);
                 WorldPacket data
                 (SMSG_NEW_WORLD, 20);
-                MopWorldEntryPackets::BuildNewWorld(data, mapid, worldX, worldY, worldZ, worldO);
+                // NEW_WORLD always carries destination-world coordinates.
+                // MovementInfo separately retains the deck-local transport
+                // offsets needed by the destination admission path.
+                MopWorldEntryPackets::BuildNewWorld(data, mapid, final_x, final_y,
+                    final_z, NormalizeOrientation(final_o));
 
                 GetSession()->SendPacket(&data);
                 SendSavedInstances();
