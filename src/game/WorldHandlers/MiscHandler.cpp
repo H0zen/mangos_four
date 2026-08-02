@@ -1322,7 +1322,18 @@ void WorldSession::HandleMoveRootAck(WorldPacket& recv_data)
 
     m_waitingForTransferRootAck = false;
     m_pendingTransferRootCounter = 0;
-    SendSuspendToken();
+
+    // The 18414 suspend response is hard-routed by the client to connection
+    // channel 1. Four does not yet establish that secondary instance
+    // connection, so gating this single-socket transport seam on the response
+    // leaves the client permanently waiting. The root acknowledgement still
+    // provides the required teardown boundary before NEW_WORLD.
+    WorldLocation const& loc = _player->GetTeleportDest();
+    WorldPacket data(SMSG_NEW_WORLD, 20);
+    MopWorldEntryPackets::BuildNewWorld(data, loc.mapid, loc.coord_x,
+                                        loc.coord_y, loc.coord_z, loc.orientation);
+    SendPacket(&data);
+    _player->SendSavedInstances();
 }
 
 /**
