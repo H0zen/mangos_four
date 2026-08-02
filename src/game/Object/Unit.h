@@ -75,6 +75,7 @@
 #include "WorldPacket.h"
 #include "Timer.h"
 
+#include <array>
 #include <vector>
 
 namespace MopCompactPackets
@@ -532,6 +533,256 @@ namespace MopCompactPackets
             raw |= uint64(guid[index]) << (8 * index);
         }
         return ObjectGuid(raw);
+    }
+
+    inline size_t MailGuidPresentByteCount(std::array<uint8, 8> const& bytes)
+    {
+        size_t count = 0;
+        for (uint8 value : bytes)
+            count += value != 0;
+        return count;
+    }
+
+    inline ObjectGuid MailGuidFromBytes(std::array<uint8, 8> const& bytes)
+    {
+        uint64 raw = 0;
+        for (uint8 index = 0; index < 8; ++index)
+            raw |= uint64(bytes[index]) << (8 * index);
+        return ObjectGuid(raw);
+    }
+
+    inline bool ReadCanonicalMailGuidByte(WorldPacket& in, uint8& value)
+    {
+        if (!value)
+            return true;
+        if (in.rpos() >= in.size() || in[in.rpos()] == 0x01)
+            return false;
+        in.ReadByteSeq(value);
+        return true;
+    }
+
+    struct MailAttachmentRequest
+    {
+        uint8 slot = 0;
+        ObjectGuid itemGuid;
+    };
+
+    struct SendMailRequest
+    {
+        uint32 stationeryId = 0;
+        uint32 packageId = 0;
+        uint64 COD = 0;
+        uint64 money = 0;
+        ObjectGuid mailboxGuid;
+        std::string receiver;
+        std::string subject;
+        std::string body;
+        std::vector<MailAttachmentRequest> attachments;
+    };
+
+    /// CMSG_SEND_MAIL (0x1DBA), client writer sub_66C61A. The reader first
+    /// proves the complete variable body size, then consumes it exactly.
+    inline bool ReadSendMail(WorldPacket& in, SendMailRequest& request)
+    {
+        request = SendMailRequest();
+        size_t const start = in.rpos();
+        if (in.size() - start < 30)
+        {
+            in.rfinish();
+            return false;
+        }
+
+        SendMailRequest parsed;
+        in >> parsed.stationeryId >> parsed.packageId >> parsed.COD >> parsed.money;
+        in.ResetBitReader();
+
+        std::array<uint8, 8> mailbox = {};
+        mailbox[0] = in.ReadBit();
+        mailbox[6] = in.ReadBit();
+        mailbox[4] = in.ReadBit();
+        mailbox[1] = in.ReadBit();
+        uint32 const bodyLength = in.ReadBits(11);
+        mailbox[3] = in.ReadBit();
+        uint32 const receiverLength = in.ReadBits(9);
+        mailbox[7] = in.ReadBit();
+        mailbox[5] = in.ReadBit();
+        uint32 const attachmentCount = in.ReadBits(5);
+        if (attachmentCount > 12 || in.size() - start < 30 + attachmentCount)
+        {
+            in.rfinish();
+            return false;
+        }
+
+        std::vector<std::array<uint8, 8>> itemBytes(attachmentCount);
+        for (uint32 item = 0; item < attachmentCount; ++item)
+        {
+            std::array<uint8, 8>& guid = itemBytes[item];
+            guid[1] = in.ReadBit();
+            guid[7] = in.ReadBit();
+            guid[2] = in.ReadBit();
+            guid[5] = in.ReadBit();
+            guid[0] = in.ReadBit();
+            guid[6] = in.ReadBit();
+            guid[3] = in.ReadBit();
+            guid[4] = in.ReadBit();
+        }
+        uint32 const subjectLength = in.ReadBits(9);
+        mailbox[2] = in.ReadBit();
+        in.ResetBitReader();
+
+        size_t required = bodyLength + subjectLength + receiverLength +
+            MailGuidPresentByteCount(mailbox);
+        for (std::array<uint8, 8> const& guid : itemBytes)
+            required += 1 + MailGuidPresentByteCount(guid);
+        if (in.size() - in.rpos() != required)
+        {
+            in.rfinish();
+            return false;
+        }
+
+        parsed.attachments.reserve(attachmentCount);
+        for (std::array<uint8, 8>& guid : itemBytes)
+        {
+            MailAttachmentRequest attachment;
+            in >> attachment.slot;
+            for (uint8 index : { uint8(3), uint8(0), uint8(2), uint8(1),
+                                 uint8(6), uint8(5), uint8(7), uint8(4) })
+            {
+                if (!ReadCanonicalMailGuidByte(in, guid[index]))
+                {
+                    in.rfinish();
+                    return false;
+                }
+            }
+            attachment.itemGuid = MailGuidFromBytes(guid);
+            parsed.attachments.push_back(attachment);
+        }
+
+        if (!ReadCanonicalMailGuidByte(in, mailbox[1]))
+        {
+            in.rfinish();
+            return false;
+        }
+        parsed.body = in.ReadString(bodyLength);
+        if (!ReadCanonicalMailGuidByte(in, mailbox[0]))
+        {
+            in.rfinish();
+            return false;
+        }
+        parsed.subject = in.ReadString(subjectLength);
+        for (uint8 index : { uint8(2), uint8(6), uint8(5), uint8(7),
+                             uint8(3), uint8(4) })
+        {
+            if (!ReadCanonicalMailGuidByte(in, mailbox[index]))
+            {
+                in.rfinish();
+                return false;
+            }
+        }
+        parsed.receiver = in.ReadString(receiverLength);
+        if (in.rpos() != in.size())
+        {
+            in.rfinish();
+            return false;
+        }
+
+        parsed.mailboxGuid = MailGuidFromBytes(mailbox);
+        request = parsed;
+        return true;
+    }
+
+    struct MailDeleteRequest
+    {
+        uint32 mailId = 0;
+        uint32 deleteMode = 0;
+    };
+
+    inline bool ReadMailDelete(WorldPacket& in, MailDeleteRequest& request)
+    {
+        request = MailDeleteRequest();
+        if (in.size() - in.rpos() != 8)
+        {
+            in.rfinish();
+            return false;
+        }
+        MailDeleteRequest parsed;
+        in >> parsed.mailId >> parsed.deleteMode;
+        request = parsed;
+        return true;
+    }
+
+    inline bool ReadStrictMailGuid(WorldPacket& in, uint8 const (&maskOrder)[8],
+        uint8 const (&byteOrder)[8], ObjectGuid& result)
+    {
+        std::array<uint8, 8> guid = {};
+        in.ResetBitReader();
+        for (uint8 index : maskOrder)
+            guid[index] = in.ReadBit();
+        in.ResetBitReader();
+        if (in.size() - in.rpos() != MailGuidPresentByteCount(guid))
+        {
+            in.rfinish();
+            return false;
+        }
+        for (uint8 index : byteOrder)
+        {
+            if (!ReadCanonicalMailGuidByte(in, guid[index]))
+            {
+                in.rfinish();
+                return false;
+            }
+        }
+        result = MailGuidFromBytes(guid);
+        return in.rpos() == in.size();
+    }
+
+    struct MailReturnRequest
+    {
+        uint32 mailId = 0;
+        ObjectGuid senderGuid;
+    };
+
+    inline bool ReadMailReturnToSender(WorldPacket& in, MailReturnRequest& request)
+    {
+        request = MailReturnRequest();
+        if (in.size() - in.rpos() < 5)
+        {
+            in.rfinish();
+            return false;
+        }
+        MailReturnRequest parsed;
+        in >> parsed.mailId;
+        uint8 const maskOrder[] = { 2, 0, 4, 6, 3, 1, 7, 5 };
+        uint8 const byteOrder[] = { 5, 6, 2, 0, 3, 1, 4, 7 };
+        if (!ReadStrictMailGuid(in, maskOrder, byteOrder, parsed.senderGuid))
+            return false;
+        request = parsed;
+        return true;
+    }
+
+    struct MailCreateTextItemRequest
+    {
+        uint32 mailId = 0;
+        ObjectGuid mailboxGuid;
+    };
+
+    inline bool ReadMailCreateTextItem(WorldPacket& in,
+        MailCreateTextItemRequest& request)
+    {
+        request = MailCreateTextItemRequest();
+        if (in.size() - in.rpos() < 5)
+        {
+            in.rfinish();
+            return false;
+        }
+        MailCreateTextItemRequest parsed;
+        in >> parsed.mailId;
+        uint8 const maskOrder[] = { 4, 1, 6, 2, 5, 3, 0, 7 };
+        uint8 const byteOrder[] = { 6, 5, 4, 3, 0, 7, 2, 1 };
+        if (!ReadStrictMailGuid(in, maskOrder, byteOrder, parsed.mailboxGuid))
+            return false;
+        request = parsed;
+        return true;
     }
 
     /// CMSG_GET_MAIL_LIST (0x077A): the mask, then the present bytes. Nothing else.
