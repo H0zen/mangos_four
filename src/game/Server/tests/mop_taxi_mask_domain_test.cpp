@@ -9,6 +9,7 @@
 #include "Database/DatabaseEnv.h"
 #include "DBCStores.h"
 
+#include <cstring>
 #include <cstdint>
 #include <cstdio>
 #include <sstream>

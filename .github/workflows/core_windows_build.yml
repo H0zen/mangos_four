@@ -136,8 +136,11 @@ jobs:
         run: cmake --build "$BUILD_DIR" --parallel
 
       - name: Test
-        shell: bash
-        run: ctest --test-dir "$BUILD_DIR" --output-on-failure
+        shell: powershell
+        run: |
+          $luaRuntime = (Resolve-Path (Join-Path $env:BUILD_DIR "dep\lualib\lua")).Path
+          $env:PATH = "$luaRuntime;$env:PATH"
+          ctest --test-dir $env:BUILD_DIR --output-on-failure
 
       - name: Verify the working tree is clean
         shell: bash
