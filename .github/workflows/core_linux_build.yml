@@ -2,9 +2,9 @@ name: Linux Build (GCC + Clang)
 
 on:
   push:
-    branches: [ master, devel ]
+    branches: [master]
   pull_request:
-    branches: [ master ]
+    branches: [master]
 
 permissions:
   contents: read

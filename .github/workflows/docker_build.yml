@@ -2,9 +2,9 @@ name: Docker Build
 
 on:
   push:
-      branches: [ master ]
+      branches: [master]
   pull_request:
-      branches: [ master ]
+      branches: [master]
 
 # Builds images and pushes nothing, so read is all the token ever needs -- at the
 # workflow level and again on the job, because a job may widen what the workflow grants

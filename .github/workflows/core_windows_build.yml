@@ -2,9 +2,9 @@ name: Windows Build (MSVC)
 
 on:
   push:
-    branches: [ master , devel ]
+    branches: [master]
   pull_request:
-    branches: [ master ]
+    branches: [master]
 
 permissions:
   contents: read
