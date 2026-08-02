@@ -87,16 +87,14 @@ void VisibleNotifier::Notify()
                 continue;
             }
 
-            // Players require reciprocal visibility. Creature passengers only
-            // need to remain visible to this player's transport-scoped camera.
+            // Players require reciprocal visibility. Other unit passengers are
+            // already known to the client and only need the transport exception
+            // below; re-running normal distance visibility can unsummon a pet
+            // whose world position is temporarily outside the active grid.
             if (Player* otherPlayer = passenger->ToPlayer())
             {
                 otherPlayer->UpdateVisibilityOf(otherPlayer, &player);
                 player.UpdateVisibilityOf(&player, otherPlayer, i_data, i_visibleNow);
-            }
-            else if (Creature* creature = passenger->ToCreature())
-            {
-                player.UpdateVisibilityOf(&player, creature, i_data, i_visibleNow);
             }
             i_clientGUIDs.erase(passenger->GetObjectGuid());
         }
