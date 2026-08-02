@@ -37,9 +37,19 @@
 
 namespace
 {
+    constexpr uint32 MopUnitFlagServerControlled = 0x00000001u;
+
     inline uint8 GuidByte(uint64 g, int i) { return uint8(g >> (i * 8)); }
 
     inline uint32 FloatBits(float f) { uint32 u; std::memcpy(&u, &f, 4); return u; }
+
+    uint32 ProjectSelfUnitFlags(uint32 flags)
+    {
+        // Four uses bit 0 internally for GM mode. The 18414 client treats it
+        // as server-controlled and refuses to attach that player to an
+        // MO_TRANSPORT, so keep the server state but omit the client flag.
+        return flags & ~MopUnitFlagServerControlled;
+    }
 
     // Classic pack-guid (mask byte + present bytes), as used in the CREATE preamble.
     void AppendPackedGuid(ByteBuffer& out, uint64 guid)
@@ -490,7 +500,7 @@ void MopUpdateObject::TranslateSelfPlayerFields(StaticField const* sourceFields,
             case 34: fields.push_back({ 39, value }); break;
             case 50: fields.push_back({ 55, value }); break;
             case 51: fields.push_back({ 57, value }); break;
-            case 55: fields.push_back({ 61, value }); break;
+            case 55: fields.push_back({ 61, ProjectSelfUnitFlags(value) }); break;
             case 61: fields.push_back({ 67, value }); break;
             case 62: fields.push_back({ 68, value }); break;
             case 63: fields.push_back({ 69, value }); break;
@@ -829,7 +839,7 @@ void MopUpdateObject::AppendSelfCreateBlock(ByteBuffer& out, const SelfPlayer& e
         { 44, e.maxPower[4] },                  // UNIT_FIELD_MAXPOWER5 (+0x24)
         { 55, uint32(e.level) },                // UNIT_FIELD_LEVEL (+0x2F)
         { 57, e.faction },                      // UNIT_FIELD_FACTION_TEMPLATE (+0x31)
-        { 61, e.unitFlags },                    // UNIT_FIELD_FLAGS (+0x35)
+        { 61, ProjectSelfUnitFlags(e.unitFlags) }, // UNIT_FIELD_FLAGS (+0x35)
         { 67, FloatBits(e.boundingRadius) },    // UNIT_FIELD_BOUNDING_RADIUS (+0x3B)
         { 68, FloatBits(e.combatReach) },       // UNIT_FIELD_COMBAT_REACH (+0x3C)
         { 69, e.displayId },                    // UNIT_FIELD_DISPLAY_ID (+0x3D)

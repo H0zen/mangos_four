@@ -85,7 +85,10 @@ namespace
         }
         player.level = 1;
         player.faction = 1;
-        player.unitFlags = 0x00000008u;
+        // Four keeps bit 0 internally while GM mode is enabled. The 18414
+        // client treats it as server-controlled and refuses to parent that
+        // player to an MO_TRANSPORT, so the self projection must omit it.
+        player.unitFlags = 0x00000009u;
         player.scale = 1.0f;
         player.boundingRadius = 0.388f;
         player.combatReach = 1.5f;
@@ -197,7 +200,7 @@ int main(int /*argc*/, char** /*argv*/)
     CHECK(fields[6] == player.health);
     CHECK(fields[12] == player.maxHealth);
     CHECK(fields[18] == player.level);
-    CHECK(fields[20] == player.unitFlags);
+    CHECK(fields[20] == 0x00000008u);
     CHECK(fields[23] == player.displayId);
     CHECK(fields[24] == player.nativeDisplayId);
 
@@ -205,6 +208,16 @@ int main(int /*argc*/, char** /*argv*/)
     packet >> dynamicFieldCount;
     CHECK(dynamicFieldCount == 0);
     CHECK(packet.rpos() == packet.size());
+
+    MopUpdateObject::StaticField const changedUnitFlags[] = {
+        { 55, 0x00000009u }
+    };
+    std::vector<MopUpdateObject::StaticField> projectedUnitFlags;
+    MopUpdateObject::TranslateSelfPlayerFields(changedUnitFlags, 1,
+        projectedUnitFlags);
+    CHECK(projectedUnitFlags.size() == 1);
+    CHECK(projectedUnitFlags[0].index == 61);
+    CHECK(projectedUnitFlags[0].value == 0x00000008u);
 
     if (g_failures)
     {
