@@ -1326,6 +1326,15 @@ void InitializeOpcodes()
     // the outcome. SMSG_SEND_MAIL_RESULT is now the real 18414 body and admitted.
     DefC(CMSG_MAIL_TAKE_ITEM, "CMSG_MAIL_TAKE_ITEM", STATUS_LOGGEDIN, PROCESS_THREADUNSAFE, &WorldSession::HandleMailTakeItem);
     DefC(CMSG_MAIL_TAKE_MONEY, "CMSG_MAIL_TAKE_MONEY", STATUS_LOGGEDIN, PROCESS_THREADUNSAFE, &WorldSession::HandleMailTakeMoney);
+    // The remaining mail UI actions use their client-writer-proven 18414
+    // bodies. SEND and RETURN publish no in-memory asset change or success
+    // before one direct database commit; DELETE revalidates the opened mailbox
+    // and refuses mail with value; CREATE_TEXT_ITEM persists its replay flag
+    // with the new inventory item.
+    DefC(CMSG_SEND_MAIL, "CMSG_SEND_MAIL", STATUS_LOGGEDIN, PROCESS_THREADUNSAFE, &WorldSession::HandleSendMail);
+    DefC(CMSG_MAIL_DELETE, "CMSG_MAIL_DELETE", STATUS_LOGGEDIN, PROCESS_THREADUNSAFE, &WorldSession::HandleMailDelete);
+    DefC(CMSG_MAIL_RETURN_TO_SENDER, "CMSG_MAIL_RETURN_TO_SENDER", STATUS_LOGGEDIN, PROCESS_THREADUNSAFE, &WorldSession::HandleMailReturnToSender);
+    DefC(CMSG_MAIL_CREATE_TEXT_ITEM, "CMSG_MAIL_CREATE_TEXT_ITEM", STATUS_LOGGEDIN, PROCESS_THREADUNSAFE, &WorldSession::HandleMailCreateTextItem);
     DefS(SMSG_SEND_MAIL_RESULT, "SMSG_SEND_MAIL_RESULT");
 
     // Both send no reply, so neither carries the unpaired-response hazard that

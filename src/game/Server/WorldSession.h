@@ -1661,6 +1661,7 @@ class WorldSession
         bool CheckBanker(ObjectGuid guid);
         void SendShowBank(ObjectGuid guid);
         bool CheckMailBox(ObjectGuid guid);
+        bool CheckOpenedMailBox();
         void SendShowMailBox(ObjectGuid guid);
         void SendTabardVendorActivate(ObjectGuid guid);
         void SendSpiritResurrect();
@@ -2344,6 +2345,7 @@ class WorldSession
         int m_sessionDbLocaleIndex;
         uint32 m_latency;
         uint32 m_clientTimeDelay;
+        ObjectGuid m_openMailboxGuid;
         AccountData m_accountData[NUM_ACCOUNT_DATA_TYPES];
         uint32 m_Tutorials[8];
         TutorialDataState m_tutorialState;

@@ -175,9 +175,9 @@
  *   TOTAL SMSG rows                   925
  *
  * SUBSYSTEM CONFIDENCE: high=365, low=221, medium=182, none=157
- * STATUS TOTALS: ACTIVE=546, DOC=434, DORMANT=540
+ * STATUS TOTALS: ACTIVE=550, DOC=434, DORMANT=536
  *   SMSG: ACTIVE=322, DOC=271, DORMANT=332
- *   CMSG: ACTIVE=224, DOC=163, DORMANT=208
+ *   CMSG: ACTIVE=228, DOC=163, DORMANT=204
  */
 
 // CAVEATS -- read before trusting any single row:
@@ -1725,7 +1725,7 @@ typedef uint16_t uint16;
  *   CMSG_SET_LOOT_SPECIALIZATION                   0x1260  DOC
  *   CMSG_TOTEM_DESTROYED                           0x1263  ACTIVE
  *   CMSG_SHOWING_HELM                              0x126B  ACTIVE
- *   CMSG_MAIL_CREATE_TEXT_ITEM                     0x1270  DORMANT
+ *   CMSG_MAIL_CREATE_TEXT_ITEM                     0x1270  ACTIVE
  *   CMSG_CANCEL_AUTO_REPEAT_SPELL                  0x1272  DORMANT
  *   CMSG_PETITION_DECLINE                          0x1279  DOC
  *   CMSG_BLACKMARKET_REQUEST_ITEMS                 0x127A  DOC
@@ -1777,7 +1777,7 @@ typedef uint16_t uint16;
  *   CMSG_UNKNOWN_0x14D1                            0x14D1  DOC
  *   CMSG_GUILD_BANK_MONEY_WITHDRAWN                0x14DB  ACTIVE
  *   CMSG_BUSY_TRADE                                0x14E0  DORMANT
- *   CMSG_MAIL_DELETE                               0x14E2  DORMANT
+ *   CMSG_MAIL_DELETE                               0x14E2  ACTIVE
  *   CMSG_SET_TRADE_GOLD                            0x14E3  ACTIVE
  *   CMSG_LF_GUILD_DECLINE_RECRUIT                  0x14F3  DOC
  *   CMSG_BATTLE_PET_LEARN                          0x1540  DOC
@@ -1881,7 +1881,7 @@ typedef uint16_t uint16;
  *   CMSG_LF_GUILD_SET_GUILD_POST                   0x1D9F  DOC
  *   CMSG_QUEST_NPC_QUERY                           0x1DAE  ACTIVE
  *   CMSG_UNKNOWN_0x1DB9                            0x1DB9  DOC
- *   CMSG_SEND_MAIL                                 0x1DBA  DORMANT
+ *   CMSG_SEND_MAIL                                 0x1DBA  ACTIVE
  *   CMSG_LOAD_SCREEN                               0x1DBD  ACTIVE
  *   CMSG_REQUEST_VEHICLE_EXIT                      0x1DC3  ACTIVE
  *   CMSG_CANCEL_MOD_SPEED_NO_CONTROL_AURAS         0x1DE0  DOC
@@ -1896,7 +1896,7 @@ typedef uint16_t uint16;
  *   CMSG_PETITION_RENAME                           0x1F9A  DOC
  *   CMSG_BATTLEFIELD_STATUS                        0x1F9E  ACTIVE
  *   CMSG_CALENDAR_GET_CALENDAR                     0x1F9F  ACTIVE
- *   CMSG_MAIL_RETURN_TO_SENDER                     0x1FA8  DORMANT
+ *   CMSG_MAIL_RETURN_TO_SENDER                     0x1FA8  ACTIVE
  *   CMSG_UNKNOWN_0x1FAD                            0x1FAD  ACTIVE   server-binding=MSG_MOVE_WORLDPORT_ACK
  *   CMSG_CALENDAR_EVENT_RSVP                       0x1FB8  DORMANT
  *   CMSG_UNKNOWN_0x1FB9                            0x1FB9  DOC

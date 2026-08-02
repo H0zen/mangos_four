@@ -46,6 +46,7 @@
 #include <map>
 
 struct AuctionEntry;
+struct Mail;
 class Item;
 class Object;
 class Player;
@@ -258,6 +259,11 @@ class MailDraft
 
         void CloneFrom(MailDraft const& draft);
     public:                                                 // finishers
+        // Queue delivery into the caller's active CharacterDatabase transaction.
+        // CompleteMailDelivery publishes the committed result to online state.
+        bool StageMailToDB(MailReceiver const& receiver, MailSender const& sender,
+            MailCheckMask checked, uint32 deliverDelay, Mail*& onlineMail);
+        void CompleteMailDelivery(MailReceiver const& receiver, Mail* onlineMail);
         void SendReturnToSender(uint32 sender_acc, ObjectGuid sender_guid, ObjectGuid receiver_guid);
         void SendMailTo(MailReceiver const& receiver, MailSender const& sender, MailCheckMask checked = MAIL_CHECK_MASK_NONE, uint32 deliver_delay = 0);
     private:

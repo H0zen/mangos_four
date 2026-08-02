@@ -160,6 +160,9 @@ void WorldSession::SendShowBank(ObjectGuid guid)
 
 void WorldSession::SendShowMailBox(ObjectGuid guid)
 {
+    if (!CheckMailBox(guid))
+        return;
+
     WorldPacket data(SMSG_SHOW_MAILBOX, 8);
     data << ObjectGuid(guid);
     SendPacket(&data);

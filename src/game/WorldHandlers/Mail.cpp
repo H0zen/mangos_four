@@ -262,6 +262,94 @@ void MailDraft::SendReturnToSender(uint32 sender_acc, ObjectGuid sender_guid, Ob
     // will delete item or place to receiver mail list
     SendMailTo(MailReceiver(receiver, receiver_guid), MailSender(MAIL_NORMAL, sender_guid.GetCounter()), MAIL_CHECK_MASK_RETURNED, deliver_delay);
 }
+
+bool MailDraft::StageMailToDB(MailReceiver const& receiver, MailSender const& sender,
+    MailCheckMask checked, uint32 deliverDelay, Mail*& onlineMail)
+{
+    onlineMail = NULL;
+    Player* pReceiver = receiver.GetPlayer();
+    if ((!pReceiver && !sObjectMgr.GetPlayerAccountIdByGUID(receiver.GetPlayerGuid())) ||
+        m_mailTemplateItemsNeed)
+    {
+        return false;
+    }
+
+    uint32 const mailId = sObjectMgr.GenerateMailID();
+    time_t const deliverTime = time(NULL) + deliverDelay;
+    uint32 const expireDelay = sender.GetMailMessageType() == MAIL_AUCTION &&
+        m_items.empty() && !m_money ? HOUR : (m_COD > 0 ? 3 * DAY : 30 * DAY);
+    time_t const expireTime = deliverTime + expireDelay;
+
+    std::string safeSubject = GetSubject();
+    CharacterDatabase.escape_string(safeSubject);
+    std::string safeBody = GetBody();
+    CharacterDatabase.escape_string(safeBody);
+
+    if (!CharacterDatabase.PExecute(
+            "INSERT INTO `mail` (`id`,`messageType`,`stationery`,`mailTemplateId`,`sender`,`receiver`,`subject`,`body`,`has_items`,`expire_time`,`deliver_time`,`money`,`cod`,`checked`) "
+            "VALUES ('%u', '%u', '%u', '%u', '%u', '%u', '%s', '%s', '%u', '" UI64FMTD "', '" UI64FMTD "', '" UI64FMTD "', '" UI64FMTD "', '%u')",
+            mailId, sender.GetMailMessageType(), sender.GetStationery(),
+            GetMailTemplateId(), sender.GetSenderId(),
+            receiver.GetPlayerGuid().GetCounter(), safeSubject.c_str(),
+            safeBody.c_str(), m_items.empty() ? 0 : 1, uint64(expireTime),
+            uint64(deliverTime), uint64(m_money), uint64(m_COD), checked))
+    {
+        return false;
+    }
+
+    for (MailItemMap::const_iterator itr = m_items.begin(); itr != m_items.end(); ++itr)
+    {
+        Item* item = itr->second;
+        if (!CharacterDatabase.PExecute(
+                "INSERT INTO `mail_items` (`mail_id`,`item_guid`,`item_template`,`receiver`) VALUES ('%u', '%u', '%u','%u')",
+                mailId, item->GetGUIDLow(), item->GetEntry(),
+                receiver.GetPlayerGuid().GetCounter()))
+        {
+            return false;
+        }
+    }
+
+    if (!pReceiver)
+        return true;
+
+    Mail* mail = new Mail;
+    mail->messageID = mailId;
+    mail->mailTemplateId = GetMailTemplateId();
+    mail->subject = GetSubject();
+    mail->body = GetBody();
+    mail->money = GetMoney();
+    mail->COD = GetCOD();
+    for (MailItemMap::const_iterator itr = m_items.begin(); itr != m_items.end(); ++itr)
+        mail->AddItem(itr->second->GetGUIDLow(), itr->second->GetEntry());
+    mail->messageType = sender.GetMailMessageType();
+    mail->stationery = sender.GetStationery();
+    mail->sender = sender.GetSenderId();
+    mail->receiverGuid = receiver.GetPlayerGuid();
+    mail->expire_time = expireTime;
+    mail->deliver_time = deliverTime;
+    mail->checked = checked;
+    mail->state = MAIL_STATE_UNCHANGED;
+    onlineMail = mail;
+    return true;
+}
+
+void MailDraft::CompleteMailDelivery(MailReceiver const& receiver, Mail* onlineMail)
+{
+    Player* pReceiver = receiver.GetPlayer();
+    if (!pReceiver)
+    {
+        deleteIncludedItems();
+        return;
+    }
+
+    MANGOS_ASSERT(onlineMail);
+    pReceiver->AddNewMailDeliverTime(onlineMail->deliver_time);
+    pReceiver->AddMail(onlineMail);
+    for (MailItemMap::iterator itr = m_items.begin(); itr != m_items.end(); ++itr)
+        pReceiver->AddMItem(itr->second);
+    m_items.clear();
+}
+
 /**
  * Sends a mail.
  *
