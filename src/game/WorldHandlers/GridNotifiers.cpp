@@ -79,15 +79,26 @@ void VisibleNotifier::Notify()
     // but exist one case when this possible and object not out of range: transports
     if (Transport* transport = player.GetTransport())
     {
-        for (Transport::PlayerSet::const_iterator itr = transport->GetPassengers().begin(); itr != transport->GetPassengers().end(); ++itr)
+        for (Transport::UnitSet::const_iterator itr = transport->GetPassengers().begin(); itr != transport->GetPassengers().end(); ++itr)
         {
-            if (i_clientGUIDs.find((*itr)->GetObjectGuid()) != i_clientGUIDs.end())
+            Unit* passenger = *itr;
+            if (!passenger || i_clientGUIDs.find(passenger->GetObjectGuid()) == i_clientGUIDs.end())
             {
-                // ignore far sight case
-                (*itr)->UpdateVisibilityOf(*itr, &player);
-                player.UpdateVisibilityOf(&player, *itr, i_data, i_visibleNow);
-                i_clientGUIDs.erase((*itr)->GetObjectGuid());
+                continue;
             }
+
+            // Players require reciprocal visibility. Creature passengers only
+            // need to remain visible to this player's transport-scoped camera.
+            if (Player* otherPlayer = passenger->ToPlayer())
+            {
+                otherPlayer->UpdateVisibilityOf(otherPlayer, &player);
+                player.UpdateVisibilityOf(&player, otherPlayer, i_data, i_visibleNow);
+            }
+            else if (Creature* creature = passenger->ToCreature())
+            {
+                player.UpdateVisibilityOf(&player, creature, i_data, i_visibleNow);
+            }
+            i_clientGUIDs.erase(passenger->GetObjectGuid());
         }
     }
 

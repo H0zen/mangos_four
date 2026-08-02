@@ -54,6 +54,9 @@ namespace Movement
              */
             explicit MoveSplineInit(Unit& m);
 
+            /// Allocates the next client-visible spline identifier.
+            static uint32 GenerateSplineId();
+
             /**
              * @brief Final pass of initialization that launches spline movement.
              * @return int32 duration - estimated travel time

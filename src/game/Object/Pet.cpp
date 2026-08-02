@@ -32,8 +32,13 @@
 #include "Formulas.h"
 #include "SpellAuras.h"
 #include "CreatureAI.h"
+#include "Player.h"
+#include "Transports.h"
 #include "Unit.h"
 #include "Util.h"
+#include "movement/MoveSpline.h"
+#include "movement/MoveSplineInit.h"
+#include "movement/packet_builder.h"
 
 /**
  * @brief Creates a pet instance of the specified type.
@@ -45,7 +50,7 @@ Pet::Pet(PetType type) :
     m_resetTalentsCost(0), m_resetTalentsTime(0), m_usedTalentCount(0),
     m_removed(false),  m_petType(type), m_duration(0),
     m_bonusdamage(0), m_petSlot(-1), m_auraUpdateMask(0), m_loading(false),
-    m_declinedname(NULL), m_petModeFlags(PET_MODE_DEFAULT), m_retreating(false),
+    m_declinedname(NULL), m_transport(NULL), m_petModeFlags(PET_MODE_DEFAULT), m_retreating(false),
     m_stayPosSet(false), m_stayPosX(0), m_stayPosY(0), m_stayPosZ(0), m_stayPosO(0),
     m_opener(0), m_openerMinRange(0), m_openerMaxRange(0)
 {
@@ -89,6 +94,13 @@ void Pet::AddToWorld()
  */
 void Pet::RemoveFromWorld()
 {
+    if (m_transport)
+    {
+        m_transport->RemovePassenger(this);
+        m_transport = NULL;
+        m_movementInfo.ClearTransportData();
+    }
+
     ///- Remove the pet from the accessor
     if (IsInWorld())
     {
@@ -178,6 +190,11 @@ void Pet::Update(uint32 update_diff, uint32 diff)
                 }
             }
 
+            if (Player* playerOwner = owner->ToPlayer())
+            {
+                UpdateTransport(playerOwner);
+            }
+
             if (m_duration > 0)
             {
                 if (m_duration > (int32)update_diff)
@@ -197,6 +214,69 @@ void Pet::Update(uint32 update_diff, uint32 diff)
     }
 
     Creature::Update(update_diff, diff);
+}
+
+void Pet::UpdateTransport(Player* owner)
+{
+    Transport* ownerTransport = owner ? owner->GetTransport() : NULL;
+
+    if (m_transport && m_transport != ownerTransport)
+    {
+        m_transport->RemovePassenger(this);
+        m_transport = NULL;
+        m_movementInfo.ClearTransportData();
+        DisableSpline();
+        GetMotionMaster()->Clear(false);
+        NearTeleportTo(owner->GetPositionX(), owner->GetPositionY(), owner->GetPositionZ(), owner->GetOrientation());
+        SendSplineAnchor(ObjectGuid(), owner->GetPositionX(), owner->GetPositionY(),
+            owner->GetPositionZ(), owner->GetOrientation());
+        return;
+    }
+
+    if (m_transport || !ownerTransport || !IsWithinDistInMap(owner, 8.0f))
+    {
+        return;
+    }
+
+    Position const* ownerLocal = owner->m_movementInfo.GetTransportPos();
+    float const localOrientation = ownerLocal->o;
+    float const localX = ownerLocal->x + std::cos(localOrientation + PET_FOLLOW_ANGLE) * PET_FOLLOW_DIST;
+    float const localY = ownerLocal->y + std::sin(localOrientation + PET_FOLLOW_ANGLE) * PET_FOLLOW_DIST;
+    DisableSpline();
+    GetMotionMaster()->Clear(false);
+    m_movementInfo.SetTransportData(ownerTransport->GetObjectGuid(), localX, localY,
+        ownerLocal->z, localOrientation, owner->m_movementInfo.GetTransportTime(), -1);
+    m_transport = ownerTransport;
+    ownerTransport->AddPassenger(this);
+
+    float const worldOrientation = owner->GetOrientation();
+    float const worldX = owner->GetPositionX() + std::cos(worldOrientation + PET_FOLLOW_ANGLE) * PET_FOLLOW_DIST;
+    float const worldY = owner->GetPositionY() + std::sin(worldOrientation + PET_FOLLOW_ANGLE) * PET_FOLLOW_DIST;
+    GetMap()->CreatureRelocation(this, worldX, worldY, owner->GetPositionZ(), worldOrientation);
+
+    // Replace the client's world-space follow spline with the same persistent
+    // transport-local facing anchor used by retail transported creatures. A
+    // zero-duration stop only cancels the old spline; its transport context is
+    // discarded immediately and the pet snaps back to the old world endpoint.
+    SendSplineAnchor(ownerTransport->GetObjectGuid(), localX, localY,
+        ownerLocal->z, localOrientation);
+}
+
+void Pet::SendSplineAnchor(ObjectGuid transportGuid, float x, float y, float z, float orientation)
+{
+    Movement::MonsterMoveData move;
+    move.position = G3D::Vector3(x, y, z);
+    move.splineId = Movement::MoveSplineInit::GenerateSplineId();
+    move.type = Movement::MonsterMoveFacingAngle;
+    move.moverGuid = GetObjectGuid();
+    move.transportGuid = transportGuid;
+    move.transportSeat = -1;
+    move.facingAngle = orientation;
+    move.uncompressedPath.push_back(move.position);
+
+    WorldPacket data(SMSG_MONSTER_MOVE, 64);
+    Movement::PacketBuilder::WriteMonsterMove(move, data);
+    SendMessageToSet(&data, true);
 }
 
 /**
@@ -371,6 +451,13 @@ void Pet::Unsummon(PetSaveMode mode, Unit* owner /*= NULL*/)
                 }
                 break;
         }
+    }
+
+    if (m_transport)
+    {
+        m_transport->RemovePassenger(this);
+        m_transport = NULL;
+        m_movementInfo.ClearTransportData();
     }
 
     SavePetToDB(mode);

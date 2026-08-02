@@ -200,9 +200,14 @@ namespace Movement
     /// generates per-spline ids; the client uses them to tell successive splines apart
     static std::atomic<uint32> splineIdGen(0);
 
+    uint32 MoveSplineInit::GenerateSplineId()
+    {
+        return ++splineIdGen;
+    }
+
     MoveSplineInit::MoveSplineInit(Unit& m) : unit(m)
     {
-        args.splineId = ++splineIdGen;
+        args.splineId = GenerateSplineId();
         // mix existing state into new
         args.walk = unit.m_movementInfo.HasMovementFlag(MOVEFLAG_WALK_MODE);
         args.flags.canSwim = unit.CanSwim(); ///< client refuses to swim a spline mover without this bit (TC 4.3.4)

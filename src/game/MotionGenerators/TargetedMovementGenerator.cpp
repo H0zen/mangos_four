@@ -29,6 +29,7 @@
 #include "PathFinder.h"
 #include "Unit.h"
 #include "Creature.h"
+#include "Pet.h"
 #include "Player.h"
 #include "World.h"
 #include "movement/MoveSplineInit.h"
@@ -107,6 +108,22 @@ void TargetedMovementGeneratorMedium<T, D>::_setTargetLocation(T& owner, bool up
     // allow pets following their master to cheat while generating paths
     bool forceDest = (owner.GetTypeId() == TYPEID_UNIT && ((Creature*)&owner)->IsPet()
                       && owner.hasUnitState(UNIT_STAT_FOLLOW));
+
+    // Legacy MO_TRANSPORT passengers use MovementInfo's transport-local
+    // position rather than the vehicle TransportInfo system. Do not generate a
+    // world-space follow spline while both pet and owner share that boat; the
+    // client carries the pet with the hull from its parented create snapshot.
+    if (forceDest)
+    {
+        Pet* pet = static_cast<Pet*>((Creature*)&owner);
+        Player* targetPlayer = i_target->ToPlayer();
+        if (pet->GetTransport() && targetPlayer && pet->GetTransport() == targetPlayer->GetTransport())
+        {
+            D::_clearUnitStateMove(owner);
+            return;
+        }
+    }
+
     i_path->calculate(x, y, z, forceDest);
     if (i_path->getPathType() & PATHFIND_NOPATH)
     {

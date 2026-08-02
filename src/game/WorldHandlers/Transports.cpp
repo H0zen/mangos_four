@@ -29,6 +29,8 @@
 #include "MapManager.h"
 #include "ObjectMgr.h"
 #include "ObjectGuid.h"
+#include "Creature.h"
+#include "Player.h"
 #include "Path.h"
 #include "GameTime.h"
 
@@ -511,18 +513,20 @@ void Transport::TeleportTransport(uint32 newMapid, float x, float y, float z)
     Map const* oldMap = GetMap();
     Relocate(x, y, z);
 
-    for (PlayerSet::iterator itr = m_passengers.begin(); itr != m_passengers.end();)
+    // Player::TeleportTo temporarily unsummons its pet, which removes that pet
+    // from this same passenger set. Snapshot players before starting the map
+    // transfer so that mutation cannot invalidate the traversal.
+    std::vector<Player*> playersToTeleport;
+    for (Unit* unit : m_passengers)
     {
-        PlayerSet::iterator it2 = itr;
-        ++itr;
-
-        Player* plr = *it2;
-        if (!plr)
+        if (Player* player = unit ? unit->ToPlayer() : NULL)
         {
-            m_passengers.erase(it2);
-            continue;
+            playersToTeleport.push_back(player);
         }
+    }
 
+    for (Player* plr : playersToTeleport)
+    {
         if (plr->IsDead() && !plr->HasFlag(PLAYER_FLAGS, PLAYER_FLAGS_GHOST))
         {
             plr->ResurrectPlayer(1.0);
@@ -547,23 +551,60 @@ void Transport::TeleportTransport(uint32 newMapid, float x, float y, float z)
     }
 }
 
-bool Transport::AddPassenger(Player* passenger)
+bool Transport::AddPassenger(Unit* passenger)
 {
+    if (!passenger)
+    {
+        return false;
+    }
+
     if (m_passengers.find(passenger) == m_passengers.end())
     {
-        DETAIL_LOG("Player %s boarded transport %s.", passenger->GetName(), GetName());
+        DETAIL_LOG("Unit %s boarded transport %s.", passenger->GetGuidStr().c_str(), GetName());
         m_passengers.insert(passenger);
     }
     return true;
 }
 
-bool Transport::RemovePassenger(Player* passenger)
+bool Transport::RemovePassenger(Unit* passenger)
 {
+    if (!passenger)
+    {
+        return false;
+    }
+
     if (m_passengers.erase(passenger))
     {
-        DETAIL_LOG("Player %s removed from transport %s.", passenger->GetName(), GetName());
+        DETAIL_LOG("Unit %s removed from transport %s.", passenger->GetGuidStr().c_str(), GetName());
     }
     return true;
+}
+
+void Transport::UpdateCreaturePassengerPositions()
+{
+    float const tx = GetPositionX();
+    float const ty = GetPositionY();
+    float const tz = GetPositionZ();
+    float const transportOrientation = GetOrientation();
+    float const cosOrientation = std::cos(transportOrientation);
+    float const sinOrientation = std::sin(transportOrientation);
+
+    for (Unit* unit : m_passengers)
+    {
+        Creature* creature = unit ? unit->ToCreature() : NULL;
+        if (!creature || !creature->IsInWorld() || creature->GetMap() != GetMap() ||
+            creature->m_movementInfo.GetTransportGuid() != GetObjectGuid())
+        {
+            continue;
+        }
+
+        Position const* local = creature->m_movementInfo.GetTransportPos();
+        float const worldX = tx + cosOrientation * local->x - sinOrientation * local->y;
+        float const worldY = ty + sinOrientation * local->x + cosOrientation * local->y;
+        float const worldZ = tz + local->z;
+        float const worldO = transportOrientation + local->o;
+        GetMap()->CreatureRelocation(creature, worldX, worldY, worldZ, worldO);
+    }
 }
 
 /**
@@ -596,12 +637,13 @@ void Transport::Update(uint32 update_diff, uint32 /*p_time*/)
         else
         {
             Relocate(m_curr->second.x, m_curr->second.y, m_curr->second.z);
+            UpdateCreaturePassengerPositions();
         }
 
         /*
-        for(PlayerSet::const_iterator itr = m_passengers.begin(); itr != m_passengers.end();)
+        for(UnitSet::const_iterator itr = m_passengers.begin(); itr != m_passengers.end();)
         {
-            PlayerSet::const_iterator it2 = itr;
+            UnitSet::const_iterator it2 = itr;
             ++itr;
             //(*it2)->SetPosition( m_curr->second.x + (*it2)->GetTransOffsetX(), m_curr->second.y + (*it2)->GetTransOffsetY(), m_curr->second.z + (*it2)->GetTransOffsetZ(), (*it2)->GetTransOffsetO() );
         }

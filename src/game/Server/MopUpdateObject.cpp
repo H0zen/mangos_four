@@ -186,9 +186,9 @@ bool MopUpdateObject::CanUseSimpleUnitMovement(SimpleUnitEligibility const& elig
     // combat when it entered view was never created client-side and stayed
     // invisible while still dealing damage.
     //
-    // Boarding and transport are still rejected: those change what the position
-    // means (transport-relative rather than world), so a stationary snapshot
-    // would place the unit somewhere wrong rather than merely stale.
+    // Vehicle boarding is still rejected because it requires TransportInfo's
+    // vehicle create state. A legacy MO_TRANSPORT parent is representable by
+    // this encoder's optional unit-transport block and is therefore accepted.
     //
     // Being a vehicle is not such a state. IsVehicle() is m_vehicleInfo != NULL,
     // so it means the unit CAN carry passengers, not that it is riding anything;
@@ -203,7 +203,7 @@ bool MopUpdateObject::CanUseSimpleUnitMovement(SimpleUnitEligibility const& elig
     // create stays well formed and the unit renders as an ordinary creature. The
     // cost is that it is not yet rideable, which needs a real vehicle create
     // block; being visible but not rideable beats being invisible.
-    return !eligibility.isBoarded && !eligibility.hasTransport;
+    return !eligibility.isBoarded;
 }
 
 bool MopUpdateObject::CanUseStationaryGameObjectMovement(StationaryGameObjectEligibility const& eligibility)

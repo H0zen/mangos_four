@@ -40,11 +40,11 @@ class Transport : public GameObject
         bool Create(uint32 guidlow, uint32 mapid, float x, float y, float z, float ang, uint8 animprogress, uint16 dynamicHighValue);
         bool GenerateWaypoints(uint32 pathid, std::set<uint32> &mapids);
         void Update(uint32 update_diff, uint32 p_time) override;
-        bool AddPassenger(Player* passenger);
-        bool RemovePassenger(Player* passenger);
+        bool AddPassenger(Unit* passenger);
+        bool RemovePassenger(Unit* passenger);
 
-        typedef std::set<Player*> PlayerSet;
-        PlayerSet const& GetPassengers() const { return m_passengers; }
+        typedef std::set<Unit*> UnitSet;
+        UnitSet const& GetPassengers() const { return m_passengers; }
 
     private:
         struct WayPoint
@@ -72,7 +72,7 @@ class Transport : public GameObject
         uint32 m_pathTime;
         uint32 m_timer;
 
-        PlayerSet m_passengers;
+        UnitSet m_passengers;
 
     public:
         WayPointMap m_WayPoints;
@@ -81,6 +81,7 @@ class Transport : public GameObject
 
     private:
         void TeleportTransport(uint32 newMapid, float x, float y, float z);
+        void UpdateCreaturePassengerPositions();
         void UpdateForMap(Map const* map);
         void DoEventIfAny(WayPointMap::value_type const& node, bool departure);
         void MoveToNextWayPoint();                          // move m_next/m_cur to next points

@@ -32,6 +32,8 @@
 #include "Formulas.h"
 #include "SpellAuras.h"
 #include "CreatureAI.h"
+#include "Player.h"
+#include "Transports.h"
 #include "Unit.h"
 #include "Util.h"
 
@@ -331,6 +333,20 @@ bool Pet::LoadPetFromDB(Player* owner, uint32 petentry, uint32 petnumber, bool c
     if (getPetType() == HUNTER_PET && savedhealth <= 0)
     {
         SetDeathState(JUST_DIED);
+    }
+
+    Transport* ownerTransport = owner->GetTransport();
+    if (ownerTransport)
+    {
+        Position const* ownerLocal = owner->m_movementInfo.GetTransportPos();
+        float const localOrientation = ownerLocal->o;
+        float const localX = ownerLocal->x + std::cos(localOrientation + PET_FOLLOW_ANGLE) * PET_FOLLOW_DIST;
+        float const localY = ownerLocal->y + std::sin(localOrientation + PET_FOLLOW_ANGLE) * PET_FOLLOW_DIST;
+        m_movementInfo.SetTransportData(ownerTransport->GetObjectGuid(), localX, localY,
+            ownerLocal->z, localOrientation, owner->m_movementInfo.GetTransportTime(), -1);
+        m_transport = ownerTransport;
+        ownerTransport->AddPassenger(this);
+        DisableSpline();
     }
 
     map->Add((Creature*)this);

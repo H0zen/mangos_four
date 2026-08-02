@@ -457,6 +457,23 @@ void Object::BuildCreateUpdateBlockForPlayer(UpdateData* data, Player* target) c
         movement.speedPitch = unit->GetSpeed(MOVE_PITCH_RATE);
         movement.self = false;
 
+        MovementInfo const& movementInfo = unit->m_movementInfo;
+        if (!movementInfo.GetTransportGuid().IsEmpty())
+        {
+            Position const* transportPosition = movementInfo.GetTransportPos();
+            movement.transportGuid = movementInfo.GetTransportGuid().GetRawValue();
+            movement.transportX = transportPosition->x;
+            movement.transportY = transportPosition->y;
+            movement.transportZ = transportPosition->z;
+            movement.transportO = transportPosition->o;
+            movement.transportTime = movementInfo.GetTransportTime();
+            movement.transportTime2 = movementInfo.GetTransportTime2();
+            movement.transportTime3 = movementInfo.GetTransportTime3();
+            movement.transportSeat = movementInfo.GetTransportSeat();
+            movement.hasTransportTime2 = movementInfo.GetStatusInfo().hasTransportTime2;
+            movement.hasTransportTime3 = movementInfo.GetStatusInfo().hasTransportTime3;
+        }
+
         if (GetTypeId() == TYPEID_PLAYER)
         {
             fields.reserve(53);
@@ -561,7 +578,9 @@ bool Object::CanBuildMopCreateUpdate() const
     // spline is re-sent on visibility gain, see Unit::SendCurrentSplineTo).
     // Gating on these states made every wandering, patrolling or fighting
     // creature invisible. Only genuinely unprojectable states (vehicles,
-    // transports, boarding, exotic movement extras) still block the create.
+    // vehicle boarding and exotic movement extras) still block the create.
+    // A legacy MO_TRANSPORT parent is representable by the optional unit-
+    // transport fields in AppendSimpleLivingMovement and is therefore allowed.
     eligibility.hasSpline = false;
     eligibility.movementFlags = 0;
     eligibility.hasAttackingTarget = false;
