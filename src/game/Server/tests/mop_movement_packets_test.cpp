@@ -600,8 +600,8 @@ static RefOp const kMoveWaterWalkAck[] = {
     RefOp::SplineElevation, RefOp::End };
 
 // CMSG_MOVE_CHNG_TRANSPORT. Independent transcription of the build-18414
-// client writer sub_67EE69. The opcode remains dormant; this sequence tests
-// only the codec selected by MovementInfo::Read.
+// client writer sub_67EE69. This sequence tests the codec selected by
+// MovementInfo::Read before the registered movement handler consumes it.
 static RefOp const kMoveChangeTransport[] = {
     RefOp::PositionX, RefOp::PositionY, RefOp::PositionZ,
     G(1), RefOp::HasPitch, RefOp::HasSplineElevation, G(4),

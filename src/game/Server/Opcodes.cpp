@@ -935,6 +935,9 @@ void InitializeOpcodes()
     DefC(CMSG_MOVE_START_TURN_LEFT, "CMSG_MOVE_START_TURN_LEFT", STATUS_LOGGEDIN, PROCESS_THREADUNSAFE, &WorldSession::HandleMovementOpcodes);
     DefC(CMSG_MOVE_START_TURN_RIGHT, "CMSG_MOVE_START_TURN_RIGHT", STATUS_LOGGEDIN, PROCESS_THREADUNSAFE, &WorldSession::HandleMovementOpcodes);
     DefC(CMSG_MOVE_STOP_TURN, "CMSG_MOVE_STOP_TURN", STATUS_LOGGEDIN, PROCESS_THREADUNSAFE, &WorldSession::HandleMovementOpcodes);
+    // Retail sends this as the initial transition from world movement to a
+    // transport GUID/local-offset movement block, before regular heartbeats.
+    DefC(CMSG_MOVE_CHNG_TRANSPORT, "CMSG_MOVE_CHNG_TRANSPORT", STATUS_LOGGEDIN, PROCESS_THREADUNSAFE, &WorldSession::HandleMovementOpcodes);
     // Flight-input snapshots use the same relocation path as ground movement,
     // but their 18414 writers have distinct 72-element layouts. Register the
     // four only with their matching MovementStructures.h readers.
