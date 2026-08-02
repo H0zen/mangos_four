@@ -59,6 +59,7 @@
 #include "AchievementMgr.h"
 #include "AuctionHouseMgr.h"
 #include "ObjectMgr.h"
+#include "ObjectAccessor.h"
 #include "CreatureEventAIMgr.h"
 #include "GuildMgr.h"
 #include "SpellMgr.h"
@@ -489,6 +490,8 @@ void World::SetInitialWorldSettings()
     // Load Conditions
     sLog.outString("Loading Conditions...");
     sObjectMgr.LoadConditions();
+    sLog.outString("Loading Phase Definitions...");
+    sObjectMgr.LoadPhaseDefinitions();
 
     sLog.outString("Creating map persistent states for non-instanceable maps...");     // must be after PackInstances(), LoadCreatures(), sPoolMgr.LoadFromDB(), sGameEventMgr.LoadFromDB();
     sMapPersistentStateMgr.InitWorldMaps();
@@ -2057,6 +2060,19 @@ void World::InvalidatePlayerDataToAllClient(ObjectGuid guid)
     WorldPacket data(SMSG_INVALIDATE_PLAYER, 8);
     data << guid;
     SendGlobalMessage(&data);
+}
+
+void World::UpdatePhaseDefinitions()
+{
+    sObjectAccessor.DoForAllPlayers([](Player* player)
+    {
+        if (!player->IsInWorld())
+        {
+            return;
+        }
+
+        player->RecalculatePhaseDefinitions(player->GetZoneId(), true, PlayerPhaseReason::DefinitionReload);
+    });
 }
 
 /**

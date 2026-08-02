@@ -263,8 +263,10 @@ void Player::UpdateZone(uint32 newZone, uint32 newArea)
         return;
     }
 
+    bool const zoneChanged = m_zoneUpdateId != newZone;
+
     /* If we're moving into a different zone */
-    if (m_zoneUpdateId != newZone)
+    if (zoneChanged)
     {
         // handle outdoor pvp zones
         sOutdoorPvPMgr.HandlePlayerLeaveZone(this, m_zoneUpdateId);
@@ -289,6 +291,9 @@ void Player::UpdateZone(uint32 newZone, uint32 newArea)
 
     m_zoneUpdateId    = newZone;
     m_zoneUpdateTimer = ZONE_UPDATE_INTERVAL;
+
+    if (zoneChanged)
+        RecalculatePhaseDefinitions(newZone, true, PlayerPhaseReason::ZoneChanged);
 
     // zone changed, so area changed as well, update it
     UpdateArea(newArea);

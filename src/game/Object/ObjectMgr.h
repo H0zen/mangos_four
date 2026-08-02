@@ -42,6 +42,7 @@
 #include "MapPersistentStateMgr.h"
 #include "ObjectAccessor.h"
 #include "ObjectGuid.h"
+#include "PhaseDefinition.h"
 #include "Policies/Singleton.h"
 
 #include <string>
@@ -51,10 +52,9 @@
 class Group;
 class Item;
 class SQLStorage;
-struct PhaseDefinition;
 struct SpellPhaseInfo;
 
-typedef std::list<PhaseDefinition*> PhaseDefinitionContainer;
+typedef std::vector<PhaseDefinition> PhaseDefinitionContainer;
 typedef std::unordered_map<uint32 /*zoneId*/, PhaseDefinitionContainer> PhaseDefinitionStore;
 
 typedef std::unordered_map<uint32 /*spellId*/, SpellPhaseInfo*> SpellPhaseStore;
@@ -1478,7 +1478,7 @@ class ObjectMgr
         void LoadPhaseDefinitions();
         void LoadSpellPhaseInfo();
 
-        PhaseDefinitionStore const* GetPhaseDefinitionStore() { return &_PhaseDefinitionStore; }
+        PhaseDefinitionContainer const* GetPhaseDefinitions(uint32 zoneId) const;
         SpellPhaseStore const* GetSpellPhaseStore() { return &_SpellPhaseStore; }
 
     protected:

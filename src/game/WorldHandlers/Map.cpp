@@ -719,6 +719,11 @@ bool Map::Add(Player* player)
     player->GetMapRef().link(this, player);
     player->SetMap(this);
 
+    uint32 zoneId = 0;
+    uint32 areaId = 0;
+    player->GetZoneAndAreaId(zoneId, areaId);
+    player->InitializePhaseForMapEntry(zoneId);
+
     // update player state for other player and visa-versa
     CellPair p = MaNGOS::ComputeCellPair(player->GetPositionX(), player->GetPositionY());
     Cell cell(p);

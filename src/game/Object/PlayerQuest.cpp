@@ -975,6 +975,8 @@ void Player::ClearQuestRewardStatus(uint32 questId)
     if (itr->second.uState != QUEST_NEW)
         itr->second.uState = QUEST_CHANGED;
 
+    RecalculateQuestPhase(true);
+
     uint32 const uniqueBit = GetCompletedQuestUniqueBit(questId);
     if (!uniqueBit)
         return;
@@ -1220,6 +1222,8 @@ void Player::RewardQuest(Quest const* pQuest, uint32 reward, Object* questGiver,
     {
         SendQuestReward(pQuest, xp);
     }
+
+    RecalculateQuestPhase(true);
 
     bool handled = false;
 
@@ -2060,9 +2064,16 @@ void Player::SetQuestStatus(uint32 quest_id, QuestStatus status)
         {
             q_status.uState = QUEST_CHANGED;
         }
+
+        RecalculateQuestPhase(true);
     }
 
     UpdateForQuestWorldObjects();
+}
+
+void Player::RecalculateQuestPhase(bool update)
+{
+    RecalculatePhaseDefinitions(m_zoneUpdateId, update, PlayerPhaseReason::QuestStateChanged);
 }
 
 // not used in MaNGOS, but used in scripting code

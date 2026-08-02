@@ -306,7 +306,7 @@ UpdateMask Player::updateVisualBits;
  *
  * @param session The owning world session.
  */
-Player::Player(WorldSession* session): Unit(), m_mover(this), m_camera(this), m_petMgr(this), m_achievementMgr(this), m_reputationMgr(this), m_glyphMgr(this), m_honorMgr(this), m_currencyMgr(this), m_runeMgr(this), m_spellCooldownMgr(this)
+Player::Player(WorldSession* session): Unit(), m_mover(this), m_camera(this), m_petMgr(this), m_achievementMgr(this), m_reputationMgr(this), m_glyphMgr(this), m_honorMgr(this), m_currencyMgr(this), m_runeMgr(this), m_spellCooldownMgr(this), m_phaseController(*this)
 {
     m_transport = 0;
 
@@ -2226,6 +2226,16 @@ struct SetGameMasterOffHelper
     uint32 faction;
 };
 
+void Player::SetPhaseMask(uint32 newPhaseMask, bool update)
+{
+    m_phaseController.SetAdministrativeOverride(newPhaseMask, update);
+}
+
+void Player::ApplyComposedPhaseMask(uint32 newPhaseMask, bool update)
+{
+    Unit::SetPhaseMask(newPhaseMask, update);
+}
+
 /**
  * @brief Enables or disables game master mode for the player.
  *
@@ -2254,7 +2264,7 @@ void Player::SetGameMaster(bool on)
             pet->GetHostileRefManager().setOnlineOfflineState(false);
         }
 
-        SetPhaseMask(PHASEMASK_ANYWHERE, false);            // see and visible in all phases
+        SetGameMasterPhaseOverride(true, false);             // see and visible in all phases
     }
     else
     {
@@ -2263,22 +2273,7 @@ void Player::SetGameMaster(bool on)
         RemoveFlag(UNIT_FIELD_FLAGS, UNIT_FLAG_UNK_0);
         RemoveFlag(PLAYER_FLAGS, PLAYER_FLAGS_GM);
 
-        // restore phase
-        AuraList const& phases = GetAurasByType(SPELL_AURA_PHASE);
-        AuraList const& phases2 = GetAurasByType(SPELL_AURA_PHASE_2);
-
-        if (!phases.empty())
-        {
-            SetPhaseMask(phases.front()->GetMiscValue(), false);
-        }
-        else if (!phases2.empty())
-        {
-            SetPhaseMask(phases2.front()->GetMiscValue(), false);
-        }
-        else
-        {
-            SetPhaseMask(PHASEMASK_NORMAL, false);
-        }
+        SetGameMasterPhaseOverride(false, false);
 
         if (Pet* pet = GetPet())
         {

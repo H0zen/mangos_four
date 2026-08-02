@@ -415,7 +415,19 @@ void Aura::HandlePhase(bool apply, bool Real)
         }
     }
 
-    target->SetPhaseMask(apply ? GetMiscValue() : uint32(PHASEMASK_NORMAL), true);
+    if (target->GetTypeId() == TYPEID_PLAYER)
+    {
+        Player* player = static_cast<Player*>(target);
+        if (apply)
+            player->SetPhaseAuraMask(GetMiscValue(), true);
+        else
+            player->ClearPhaseAuraMask(true);
+    }
+    else
+    {
+        target->SetPhaseMask(apply ? GetMiscValue() : uint32(PHASEMASK_NORMAL), true);
+    }
+
     // no-phase is also phase state so same code for apply and remove
     if (target->GetTypeId() == TYPEID_PLAYER)
     {

@@ -389,9 +389,11 @@ bool ChatHandler::HandleReloadCreatureQuestInvRelationsCommand(char* /*args*/)
  */
 bool ChatHandler::HandleReloadConditionsCommand(char* /*args*/)
 {
-    sLog.outString("Re-Loading `conditions`... ");
+    sLog.outString("Re-Loading `conditions` and `phase_definitions`... ");
     sObjectMgr.LoadConditions();
-    SendGlobalSysMessage("DB table `conditions` reloaded.", SEC_MODERATOR);
+    sObjectMgr.LoadPhaseDefinitions();
+    sWorld.UpdatePhaseDefinitions();
+    SendGlobalSysMessage("DB tables `conditions` and `phase_definitions` reloaded.", SEC_MODERATOR);
     return true;
 }
 

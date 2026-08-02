@@ -208,8 +208,6 @@ bool ChatHandler::HandleModifyPhaseCommand(char* args)
         return false;
     }
 
-    uint32 phasemask = (uint32)atoi(args);
-
     Unit* target = getSelectedUnit();
     if (!target)
     {
@@ -222,7 +220,26 @@ bool ChatHandler::HandleModifyPhaseCommand(char* args)
         return false;
     }
 
-    target->SetPhaseMask(phasemask, true);
+    char* phaseArg = ExtractLiteralArg(&args);
+    if (!phaseArg || *args)
+        return false;
+
+    if (target->GetTypeId() == TYPEID_PLAYER && stricmp(phaseArg, "reset") == 0)
+    {
+        static_cast<Player*>(target)->ClearAdministrativePhaseOverride(true);
+        return true;
+    }
+
+    char* numericArg = phaseArg;
+    uint64 rawPhaseMask = 0;
+    if (!ExtractUInt64(&numericArg, rawPhaseMask) || *numericArg || rawPhaseMask > UINT32_MAX)
+        return false;
+    uint32 phaseMask = static_cast<uint32>(rawPhaseMask);
+
+    if (target->GetTypeId() == TYPEID_PLAYER)
+        static_cast<Player*>(target)->SetAdministrativePhaseOverride(phaseMask, true);
+    else
+        target->SetPhaseMask(phaseMask, true);
 
     return true;
 }
@@ -678,4 +695,3 @@ void ChatHandler::HandleCharacterLevel(Player* player, ObjectGuid player_guid, u
         CharacterDatabase.PExecute("UPDATE `characters` SET `level` = '%u', `xp` = 0 WHERE `guid` = '%u'", newlevel, player_guid.GetCounter());
     }
 }
-
