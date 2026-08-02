@@ -173,8 +173,12 @@ void Pet::Update(uint32 update_diff, uint32 diff)
         {
             // unsummon pet that lost owner
             Unit* owner = GetOwner();
+            Player* playerOwner = owner ? owner->ToPlayer() : NULL;
+            bool const sharesOwnerTransport = m_transport && playerOwner &&
+                playerOwner->GetTransport() == m_transport;
             if (!owner ||
-                (!IsWithinDistInMap(owner, GetMap()->GetVisibilityDistance()) && (owner->GetCharmGuid() && (owner->GetCharmGuid() != GetObjectGuid()))) ||
+                (!sharesOwnerTransport && !IsWithinDistInMap(owner, GetMap()->GetVisibilityDistance()) &&
+                    (owner->GetCharmGuid() && (owner->GetCharmGuid() != GetObjectGuid()))) ||
                 (isControlled() && !owner->GetPetGuid()))
             {
                 Unsummon(PET_SAVE_REAGENTS);
@@ -190,7 +194,7 @@ void Pet::Update(uint32 update_diff, uint32 diff)
                 }
             }
 
-            if (Player* playerOwner = owner->ToPlayer())
+            if (playerOwner)
             {
                 UpdateTransport(playerOwner);
             }

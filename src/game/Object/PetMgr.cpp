@@ -67,7 +67,7 @@ void PetMgr::UnsummonTemporaryIfAny()
         return;
     }
 
-    if (!m_temporaryUnsummonedPetNumber && pet->isControlled() && !pet->isTemporarySummoned())
+    if (pet->isControlled() && !pet->isTemporarySummoned())
     {
         m_temporaryUnsummonedPetNumber = pet->GetCharmInfo()->GetPetNumber();
         DEBUG_LOG("PetMgr: temporarily unsummoning pet %u for player %s.",
@@ -117,7 +117,8 @@ void PetMgr::ResummonTemporaryUnsummonedIfAny()
     if (!NewPet->LoadPetFromDB(m_owner, 0, petNumber, true))
     {
         delete NewPet;
-        sLog.outError("PetMgr: failed to resummon temporary pet %u for player %s; keeping it pending.",
+        m_temporaryUnsummonedPetNumber = 0;
+        sLog.outError("PetMgr: failed to resummon temporary pet %u for player %s; clearing the pending restore.",
                       petNumber, m_owner->GetGuidStr().c_str());
         return;
     }

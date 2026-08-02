@@ -107,8 +107,9 @@ class PetMgr
 
         /// Counterpart to UnsummonTemporaryIfAny: if we stashed a pet
         /// number AND it's now appropriate to resummon (no pending
-        /// vehicle, mount, etc.), load that pet from DB. Clears the
-        /// stash either way (success or "not yet").
+        /// vehicle, mount, etc.), load that pet from DB. Eligibility
+        /// deferrals keep the stash for a later lifecycle boundary;
+        /// success or a terminal database-load failure clears it.
         void ResummonTemporaryUnsummonedIfAny();
 
     private:
