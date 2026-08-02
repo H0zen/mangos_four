@@ -1575,7 +1575,7 @@ class WorldSession
         void SendGuildInvite(Player* player, bool alreadyInGuild = false);
         void SendTransferAborted(uint32 mapid, uint8 reason, uint8 arg = 0);
         void SendTransferRoot(uint32 counter);
-        void SendSuspendToken(uint32 token);
+        void SendSuspendToken();
         void SendSetPhaseShift(uint32 phaseMask, uint16 mapId = 0);
         void SendQueryTimeResponse();
         void SendRedirectClient(std::string& ip, uint16 port);
@@ -2339,6 +2339,7 @@ class WorldSession
 
         time_t _logoutTime;
         uint32 m_pendingTransferRootCounter;
+        uint32 m_suspendTokenCounter;
         uint32 m_pendingSuspendToken;
         bool m_waitingForTransferRootAck;
         bool m_waitingForSuspendToken;

@@ -85,8 +85,17 @@ void WorldSession::SendTransferRoot(uint32 counter)
     SendPacket(&data);
 }
 
-void WorldSession::SendSuspendToken(uint32 token)
+void WorldSession::SendSuspendToken()
 {
+    // The suspend transaction is connection-scoped, not a movement-force
+    // counter. Retail 18414 uses independent values for the transfer root and
+    // suspend token (for example 77 and 17 in the same world-port sequence).
+    if (++m_suspendTokenCounter == 0)
+    {
+        ++m_suspendTokenCounter;
+    }
+
+    uint32 const token = m_suspendTokenCounter;
     m_pendingSuspendToken = token;
     m_waitingForSuspendToken = true;
 

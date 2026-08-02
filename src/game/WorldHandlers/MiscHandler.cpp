@@ -1308,7 +1308,9 @@ void WorldSession::HandleMoveRootAck(WorldPacket& recv_data)
         movementInfo.GetGuid().GetString().c_str(), movementInfo.GetMovementCounter());
 
     if (!m_waitingForTransferRootAck)
+    {
         return;
+    }
 
     if (!_player->IsBeingTeleportedFar() ||
         movementInfo.GetMovementCounter() != m_pendingTransferRootCounter)
@@ -1320,7 +1322,7 @@ void WorldSession::HandleMoveRootAck(WorldPacket& recv_data)
 
     m_waitingForTransferRootAck = false;
     m_pendingTransferRootCounter = 0;
-    SendSuspendToken(_player->NextMovementCounter());
+    SendSuspendToken();
 }
 
 /**
