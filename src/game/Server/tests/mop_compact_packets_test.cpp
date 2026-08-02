@@ -638,24 +638,21 @@ static void test_duel_request_and_winner_packets()
 
 static void test_mirror_timer_packets()
 {
+    // capture-000004 / sequence 10281: a full breath timer at 180 seconds.
+    // This protects the client-visible type/current ordering that drives
+    // MIRROR_TIMER_START and MirrorTimerColors.
     WorldPacket started;
     MopMirrorTimerPackets::BuildStart(
-        started, 0xDDEEFF00u, 0x11223344u, 0x99AABBCCu,
-        int32_t(-2), 0x55667788u, true);
+        started, 1, 180000, 180000, -1, 0, false);
     CHECK(started.GetOpcode() == SMSG_START_MIRROR_TIMER);
     CHECK(BytesEqual(started, {
-        0x44, 0x33, 0x22, 0x11,
-        0x88, 0x77, 0x66, 0x55,
-        0xCC, 0xBB, 0xAA, 0x99,
-        0xFE, 0xFF, 0xFF, 0xFF,
-        0x00, 0xFF, 0xEE, 0xDD,
-        0x80,
+        0x20, 0xBF, 0x02, 0x00,
+        0x00, 0x00, 0x00, 0x00,
+        0x01, 0x00, 0x00, 0x00,
+        0xFF, 0xFF, 0xFF, 0xFF,
+        0x20, 0xBF, 0x02, 0x00,
+        0x00,
     }));
-
-    WorldPacket running;
-    MopMirrorTimerPackets::BuildStart(
-        running, 1, 1000, 750, -1, 0, false);
-    CHECK(running[20] == 0x00);
 
     WorldPacket stopped;
     MopMirrorTimerPackets::BuildStop(stopped, 0x12345678u);

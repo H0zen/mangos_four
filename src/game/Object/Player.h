@@ -1489,9 +1489,10 @@ namespace MopMirrorTimerPackets
     {
         out.Initialize(SMSG_START_MIRROR_TIMER, 21);
 
-        // Wow.exe 18414 reader sub_6F16F9 consumes five uint32 values in
-        // max/spell/current/regen/type order, then one MSB-first pause bit.
-        out << maxValue << spellId << currentValue << uint32(regeneration) << type;
+        // Build-18414 retail packets carry max/spell/type/regen/current,
+        // followed by one MSB-first pause bit. The client maps the third word
+        // to MIRROR_TIMER_START's timer name and the fifth to its value.
+        out << maxValue << spellId << type << uint32(regeneration) << currentValue;
         out.WriteBit(paused);
         out.FlushBits();
     }
