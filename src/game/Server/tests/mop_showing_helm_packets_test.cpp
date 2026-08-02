@@ -37,8 +37,7 @@ static int g_fail = 0;
 static uint32 const HIDE_HELM = 0x00000400;                 // PLAYER_FLAGS_HIDE_HELM
 static uint32 const HIDE_CLOAK = 0x00000800;                // PLAYER_FLAGS_HIDE_CLOAK
 
-/// The production rule, stated once. The handler in CharacterHandler.cpp must
-/// agree with this; mop_showing_helm_source enforces that it does.
+/// The production rule, stated once.
 static uint32 ApplyShowing(uint32 flags, uint32 hideBit, bool showing)
 {
     if (!showing) { return flags | hideBit; }

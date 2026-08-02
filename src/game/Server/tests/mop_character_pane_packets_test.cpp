@@ -39,8 +39,7 @@ static void CheckBytes(WorldPacket const& packet,
 
 // These builders serialize packet bodies only. Opcode checks below prove that
 // they preserve the caller's selection and cannot silently regress to calling
-// Initialize themselves. Producer selection is pinned separately by the
-// *_opcode mutations in mop_character_pane_packets_source_test.cmake.
+// Initialize themselves.
 
 static void TestSetFactionStandingCapturedBodies()
 {
