@@ -355,6 +355,14 @@ void WorldSession::HandleMoveSplineDoneOpcode(WorldPacket& recv_data)
         return;
     }
 
+    // Continuous routes are finalized by the server movement update. The
+    // matching client acknowledgement can arrive immediately afterwards,
+    // when the completed taxi queue has already been cleared.
+    if (!GetPlayer()->m_taxi.GetTaxiDestination())
+    {
+        return;
+    }
+
     if (!GetPlayer()->movespline->Finalized())
     {
         DEBUG_LOG("WORLD: Rejected CMSG_MOVE_SPLINE_DONE: spline is not finalized");
