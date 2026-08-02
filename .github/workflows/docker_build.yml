@@ -36,7 +36,7 @@ jobs:
         uses: docker/build-push-action@v6
         with:
           context: .
-          file: extra/docker/DockerFile-mangosd
+          file: dockercontainer/DockerFile-mangosd
           tags: mangosd:latest
           push: false
           cache-from: type=gha,scope=mangosd
@@ -46,7 +46,7 @@ jobs:
         uses: docker/build-push-action@v6
         with:
           context: .
-          file: extra/docker/DockerFile-realmd
+          file: dockercontainer/DockerFile-realmd
           tags: realmd:latest
           push: false
           cache-from: type=gha,scope=realmd
