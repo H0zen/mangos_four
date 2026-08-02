@@ -1332,7 +1332,14 @@ void Player::Update(uint32 update_diff, uint32 p_time)
 
     // Handle pet unsummoning if out of range
     Pet* pet = GetPet();
-    if (pet && !pet->IsWithinDistInMap(this, GetMap()->GetVisibilityDistance()) && (GetCharmGuid() && (pet->GetObjectGuid() != GetCharmGuid())))
+    // A cross-map transport relocates the hull before the player's delayed
+    // teleport is executed at the end of this update.  Passenger-local pets
+    // are therefore briefly far away in world coordinates even though they
+    // still share the owner's transport.  Preserve them for TeleportTo's
+    // temporary-unsummon path instead of deleting them as ordinary strays.
+    if (pet && (!GetTransport() || pet->GetTransport() != GetTransport()) &&
+        !pet->IsWithinDistInMap(this, GetMap()->GetVisibilityDistance()) &&
+        (GetCharmGuid() && (pet->GetObjectGuid() != GetCharmGuid())))
     {
         pet->Unsummon(PET_SAVE_REAGENTS, this);
     }
