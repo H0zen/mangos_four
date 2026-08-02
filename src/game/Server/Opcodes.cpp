@@ -955,7 +955,7 @@ void InitializeOpcodes()
     DefC(CMSG_FORCE_SWIM_SPEED_CHANGE_ACK, "CMSG_FORCE_SWIM_SPEED_CHANGE_ACK", STATUS_LOGGEDIN, PROCESS_THREADUNSAFE, &WorldSession::HandleForceSpeedChangeAckOpcodes);
     // Forced-state acknowledgements are parsed and validated against the active
     // mover, but never author movement state or trigger an observer relay.
-    DefC(CMSG_FORCE_MOVE_ROOT_ACK, "CMSG_FORCE_MOVE_ROOT_ACK", STATUS_LOGGEDIN, PROCESS_THREADUNSAFE, &WorldSession::HandleMoveRootAck);
+    DefC(CMSG_FORCE_MOVE_ROOT_ACK, "CMSG_FORCE_MOVE_ROOT_ACK", STATUS_LOGGEDIN_OR_TRANSFER, PROCESS_THREADUNSAFE, &WorldSession::HandleMoveRootAck);
     DefC(CMSG_FORCE_MOVE_UNROOT_ACK, "CMSG_FORCE_MOVE_UNROOT_ACK", STATUS_LOGGEDIN, PROCESS_THREADUNSAFE, &WorldSession::HandleMoveUnRootAck);
     DefC(CMSG_MOVE_WATER_WALK_ACK, "CMSG_MOVE_WATER_WALK_ACK", STATUS_LOGGEDIN, PROCESS_THREADUNSAFE, &WorldSession::HandleMoveWaterWalkAck);
     DefS(SMSG_FORCE_MOVE_ROOT, "SMSG_FORCE_MOVE_ROOT");

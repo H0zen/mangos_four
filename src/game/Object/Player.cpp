@@ -1864,6 +1864,8 @@ bool Player::TeleportTo(uint32 mapid, float x, float y, float z, float orientati
 
             if (!GetSession()->PlayerLogout())
             {
+                GetSession()->SendTransferRoot(NextMovementCounter());
+
                 // send transfer packet to display load screen
                 WorldPacket data(SMSG_TRANSFER_PENDING, (4 + 4 + 4));
                 data.WriteBit(0);       // unknown
@@ -1912,9 +1914,6 @@ bool Player::TeleportTo(uint32 mapid, float x, float y, float z, float orientati
             // move packet sent by client always after far teleport
             // code for finish transfer to new map called in WorldSession::HandleMoveWorldportAckOpcode at client packet
             SetSemaphoreTeleportFar(true);
-
-            if (!GetSession()->PlayerLogout())
-                GetSession()->SendSuspendToken(NextMovementCounter());
         }
         else                                                // !map->CanEnter(this)
         {

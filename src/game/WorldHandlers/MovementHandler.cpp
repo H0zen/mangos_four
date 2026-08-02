@@ -73,6 +73,18 @@
 
 #define MOVEMENT_PACKET_TIME_DELAY 0
 
+void WorldSession::SendTransferRoot(uint32 counter)
+{
+    m_pendingTransferRootCounter = counter;
+    m_waitingForTransferRootAck = true;
+    m_pendingSuspendToken = 0;
+    m_waitingForSuspendToken = false;
+
+    WorldPacket data;
+    _player->BuildForceMoveRootPacket(&data, true, counter);
+    SendPacket(&data);
+}
+
 void WorldSession::SendSuspendToken(uint32 token)
 {
     m_pendingSuspendToken = token;
@@ -128,9 +140,9 @@ void WorldSession::HandleMoveWorldportAckOpcode(WorldPacket& /*recv_data*/)
 {
     DEBUG_LOG("WORLD: got MSG_MOVE_WORLDPORT_ACK.");
 
-    if (m_waitingForSuspendToken)
+    if (m_waitingForTransferRootAck || m_waitingForSuspendToken)
     {
-        DEBUG_LOG("WORLD: ignoring premature MSG_MOVE_WORLDPORT_ACK while waiting for the suspend token response.");
+        DEBUG_LOG("WORLD: ignoring premature MSG_MOVE_WORLDPORT_ACK while waiting for the transfer handshake.");
         return;
     }
 
@@ -142,6 +154,8 @@ void WorldSession::HandleMoveWorldportAckOpcode(WorldPacket& /*recv_data*/)
  */
 void WorldSession::HandleMoveWorldportAckOpcode()
 {
+    m_waitingForTransferRootAck = false;
+    m_pendingTransferRootCounter = 0;
     m_waitingForSuspendToken = false;
     m_pendingSuspendToken = 0;
 

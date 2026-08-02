@@ -1574,6 +1574,7 @@ class WorldSession
         void SendGroupInvite(Player* player, bool alreadyInGroup = false);
         void SendGuildInvite(Player* player, bool alreadyInGuild = false);
         void SendTransferAborted(uint32 mapid, uint8 reason, uint8 arg = 0);
+        void SendTransferRoot(uint32 counter);
         void SendSuspendToken(uint32 token);
         void SendSetPhaseShift(uint32 phaseMask, uint16 mapId = 0);
         void SendQueryTimeResponse();
@@ -2337,7 +2338,9 @@ class WorldSession
         uint16 _build;                                      // connected client build
 
         time_t _logoutTime;
+        uint32 m_pendingTransferRootCounter;
         uint32 m_pendingSuspendToken;
+        bool m_waitingForTransferRootAck;
         bool m_waitingForSuspendToken;
         bool m_inQueue;                                     // session wait in auth.queue
         bool m_playerLoading;                               // code processed in LoginPlayer

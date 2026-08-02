@@ -1306,6 +1306,21 @@ void WorldSession::HandleMoveRootAck(WorldPacket& recv_data)
 
     DEBUG_LOG("CMSG_FORCE_MOVE_ROOT_ACK: mover %s counter %u",
         movementInfo.GetGuid().GetString().c_str(), movementInfo.GetMovementCounter());
+
+    if (!m_waitingForTransferRootAck)
+        return;
+
+    if (!_player->IsBeingTeleportedFar() ||
+        movementInfo.GetMovementCounter() != m_pendingTransferRootCounter)
+    {
+        DEBUG_LOG("WORLD: ignoring mismatched transfer CMSG_FORCE_MOVE_ROOT_ACK counter %u (expected %u).",
+                  movementInfo.GetMovementCounter(), m_pendingTransferRootCounter);
+        return;
+    }
+
+    m_waitingForTransferRootAck = false;
+    m_pendingTransferRootCounter = 0;
+    SendSuspendToken(_player->NextMovementCounter());
 }
 
 /**

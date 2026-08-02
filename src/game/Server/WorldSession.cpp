@@ -172,7 +172,8 @@ WorldSession::WorldSession(uint32 id, std::shared_ptr<proto::IClientLink> link,
                            AccountTypes sec, uint8 expansion, time_t mute_time, LocaleConstant locale,
                            const uint8 (&sessionKey)[MopAuth::SESSION_KEY_LEN]) :
     m_muteTime(mute_time), _player(NULL), m_Socket(std::move(link)), _security(sec), _accountId(id), m_expansion(expansion), _logoutTime(0),
-    m_pendingSuspendToken(0), m_waitingForSuspendToken(false), m_inQueue(false), m_playerLoading(false), m_suppressWorldSends(false),
+    m_pendingTransferRootCounter(0), m_pendingSuspendToken(0), m_waitingForTransferRootAck(false), m_waitingForSuspendToken(false),
+    m_inQueue(false), m_playerLoading(false), m_suppressWorldSends(false),
     m_playerLogout(false), m_playerRecentlyLogout(false), m_playerSave(false),
     m_sessionDbcLocale(sWorld.GetAvailableDbcLocale(locale)), m_sessionDbLocaleIndex(sObjectMgr.GetIndexForLocale(locale)),
     m_latency(0), m_clientTimeDelay(0), m_tutorialState(TUTORIALDATA_UNCHANGED)
@@ -846,6 +847,16 @@ bool WorldSession::Update(PacketFilter& updater)
                     else if (_player->IsInWorld())
                     {
                         LogUnexpectedOpcode(packet, "the player is still in world");
+                    }
+                    else
+                    {
+                        ExecuteOpcode(opHandle, packet);
+                    }
+                    break;
+                case STATUS_LOGGEDIN_OR_TRANSFER:
+                    if (!_player)
+                    {
+                        LogUnexpectedOpcode(packet, "the player has not logged in yet");
                     }
                     else
                     {
