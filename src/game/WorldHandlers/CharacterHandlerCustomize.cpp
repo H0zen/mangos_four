@@ -600,5 +600,14 @@ void WorldSession::HandleLoadScreenOpcode(WorldPacket& recvPacket)
     DEBUG_LOG("CMSG_LOAD_SCREEN");
     MopClientRequestPackets::LoadScreenRequest const request =
         MopClientRequestPackets::ReadLoadScreenRequest(recvPacket);
-    (void)request;
+
+    // A far world port normally restores a temporarily unsummoned pet from
+    // HandleMoveWorldportAckOpcode.  MoP can finish admitting the player while
+    // that first restoration attempt is still ineligible, then reports the end
+    // of destination loading here.  Retry at that stable lifecycle boundary;
+    // the PetMgr guard makes this a no-op unless a pet is still pending.
+    if (!request.loading && GetPlayer())
+    {
+        GetPlayer()->ResummonPetTemporaryUnSummonedIfAny();
+    }
 }

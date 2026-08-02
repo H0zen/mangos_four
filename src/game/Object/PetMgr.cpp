@@ -70,6 +70,8 @@ void PetMgr::UnsummonTemporaryIfAny()
     if (!m_temporaryUnsummonedPetNumber && pet->isControlled() && !pet->isTemporarySummoned())
     {
         m_temporaryUnsummonedPetNumber = pet->GetCharmInfo()->GetPetNumber();
+        DEBUG_LOG("PetMgr: temporarily unsummoning pet %u for player %s.",
+                  m_temporaryUnsummonedPetNumber, m_owner->GetGuidStr().c_str());
     }
 
     pet->Unsummon(PET_SAVE_AS_CURRENT, m_owner);
@@ -96,19 +98,31 @@ void PetMgr::ResummonTemporaryUnsummonedIfAny()
     // not resummon in not appropriate state
     if (m_owner->IsPetNeedBeTemporaryUnsummoned())
     {
+        DEBUG_LOG("PetMgr: deferring pet %u resummon for player %s (inWorld=%u alive=%u mounted=%u).",
+                  m_temporaryUnsummonedPetNumber, m_owner->GetGuidStr().c_str(),
+                  uint32(m_owner->IsInWorld()), uint32(m_owner->IsAlive()), uint32(m_owner->IsMounted()));
         return;
     }
 
     if (m_owner->GetPetGuid())
     {
+        DEBUG_LOG("PetMgr: deferring pet %u resummon for player %s because pet %s is still assigned.",
+                  m_temporaryUnsummonedPetNumber, m_owner->GetGuidStr().c_str(),
+                  m_owner->GetPetGuid().GetString().c_str());
         return;
     }
 
+    uint32 const petNumber = m_temporaryUnsummonedPetNumber;
     Pet* NewPet = new Pet;
-    if (!NewPet->LoadPetFromDB(m_owner, 0, m_temporaryUnsummonedPetNumber, true))
+    if (!NewPet->LoadPetFromDB(m_owner, 0, petNumber, true))
     {
         delete NewPet;
+        sLog.outError("PetMgr: failed to resummon temporary pet %u for player %s; keeping it pending.",
+                      petNumber, m_owner->GetGuidStr().c_str());
+        return;
     }
 
     m_temporaryUnsummonedPetNumber = 0;
+    DEBUG_LOG("PetMgr: resummoned temporary pet %u for player %s.",
+              petNumber, m_owner->GetGuidStr().c_str());
 }
