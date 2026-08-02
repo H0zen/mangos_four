@@ -32,7 +32,7 @@ static void check_packet(WorldPacket const& packet, uint8 const* expected,
 static void test_dense_snapshot()
 {
     MopPetPackets::SpellSnapshot snapshot;
-    snapshot.guid = ObjectGuid(0x0807060504030201ULL);
+    snapshot.guid = ObjectGuid(uint64(0x0807060504030201ULL));
     snapshot.actionBar = {{
         0x01020304u, 0x11121314u, 0x21222324u, 0x31323334u,
         0x41424344u, 0x51525354u, 0x61626364u, 0x71727374u,

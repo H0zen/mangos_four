@@ -32,7 +32,7 @@ static void test_dense_default_mode()
 {
     WorldPacket packet;
     MopPetPackets::BuildMode(packet,
-        ObjectGuid(0x0807060504030201ULL), uint32(PET_MODE_DEFAULT));
+        ObjectGuid(uint64(0x0807060504030201ULL)), uint32(PET_MODE_DEFAULT));
 
     static uint8 const expected[] = {
         0xFF,
@@ -46,7 +46,7 @@ static void test_sparse_disabled_mode()
 {
     WorldPacket packet;
     MopPetPackets::BuildMode(packet,
-        ObjectGuid(0xAA000000000000BBULL), uint32(PET_MODE_DISABLE_ACTIONS));
+        ObjectGuid(uint64(0xAA000000000000BBULL)), uint32(PET_MODE_DISABLE_ACTIONS));
 
     static uint8 const expected[] = {
         0x48,

@@ -24,7 +24,7 @@ static void test_dense_hostile_reaction()
 {
     WorldPacket packet;
     MopCompactPackets::BuildAIReaction(
-        packet, ObjectGuid(0x0807060504030201ULL), AI_REACTION_HOSTILE);
+        packet, ObjectGuid(uint64(0x0807060504030201ULL)), AI_REACTION_HOSTILE);
 
     static uint8 const expected[] = {
         0xFF,
@@ -39,7 +39,7 @@ static void test_sparse_alert_reaction()
 {
     WorldPacket packet;
     MopCompactPackets::BuildAIReaction(
-        packet, ObjectGuid(0x0000AA00000000BBULL), AI_REACTION_ALERT);
+        packet, ObjectGuid(uint64(0x0000AA00000000BBULL)), AI_REACTION_ALERT);
 
     static uint8 const expected[] = {
         0xA0,

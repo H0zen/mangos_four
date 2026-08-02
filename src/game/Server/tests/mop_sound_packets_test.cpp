@@ -25,7 +25,7 @@ static void test_direct_sound_dense_guid()
 {
     WorldPacket packet;
     MopSoundPackets::BuildPlaySound(
-        packet, 0x11223344, ObjectGuid(0x0807060504030201ULL));
+        packet, 0x11223344, ObjectGuid(uint64(0x0807060504030201ULL)));
 
     static uint8 const expected[] = {
         0xFF,
@@ -48,8 +48,8 @@ static void test_object_sound_dense_guids()
 {
     WorldPacket packet;
     MopSoundPackets::BuildPlayObjectSound(
-        packet, 0x11223344, ObjectGuid(0x0807060504030201ULL),
-        ObjectGuid(0x1817161514131211ULL));
+        packet, 0x11223344, ObjectGuid(uint64(0x0807060504030201ULL)),
+        ObjectGuid(uint64(0x1817161514131211ULL)));
 
     static uint8 const expected[] = {
         0xFF, 0xFF,

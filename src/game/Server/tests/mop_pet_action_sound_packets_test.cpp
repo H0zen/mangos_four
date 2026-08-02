@@ -31,7 +31,7 @@ static void test_dense_attack_talk()
 {
     WorldPacket packet;
     MopCompactPackets::BuildPetActionSound(
-        packet, ObjectGuid(0x0807060504030201ULL), 1u); // PET_TALK_ATTACK
+        packet, ObjectGuid(uint64(0x0807060504030201ULL)), 1u); // PET_TALK_ATTACK
 
     static uint8 const expected[] = {
         0xFF,
@@ -46,7 +46,7 @@ static void test_sparse_special_talk()
 {
     WorldPacket packet;
     MopCompactPackets::BuildPetActionSound(
-        packet, ObjectGuid(0xAA000000000000BBULL), 0u); // PET_TALK_SPECIAL_SPELL
+        packet, ObjectGuid(uint64(0xAA000000000000BBULL)), 0u); // PET_TALK_SPECIAL_SPELL
 
     static uint8 const expected[] = {
         0x50, 0xAB,
