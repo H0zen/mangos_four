@@ -241,7 +241,8 @@ void Player::UpdateVisibilityOf(WorldObject const* viewPoint, WorldObject* targe
     }
     else
     {
-        if (target->IsVisibleForInState(this, viewPoint, false))
+        if (target->IsVisibleForInState(this, viewPoint, false) ||
+            SharesTransportWithPlayer(this, target))
         {
             if (!target->SendCreateUpdateToPlayer(this))
             {
@@ -297,7 +298,8 @@ void Player::UpdateVisibilityOf(WorldObject const* viewPoint, T* target, UpdateD
     }
     else
     {
-        if (target->IsVisibleForInState(this, viewPoint, false))
+        if (target->IsVisibleForInState(this, viewPoint, false) ||
+            SharesTransportWithPlayer(this, target))
         {
             if (!target->CanBuildMopCreateUpdate())
             {
