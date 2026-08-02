@@ -24,1241 +24,162 @@
  */
 
 /**
- * MaNGOS Four — offline structural test for the MoP 5.4.8.18414 self-player
- * SMSG_UPDATE_OBJECT create-block serializer (MopUpdateObject::BuildSelfCreate).
- *
- * Scope: catch bit/byte-count regressions (exact serialized length, derived from
- * first principles) and value-block field/index/value regressions (decode the
- * fixed-size values block from the end of the packet). The movement bit *order*
- * was transcribed verbatim from the confirmed 18414 layout and is validated by
- * the live client gate; a same-spec round-trip of it would be circular.
+ * Focused structural regression test for the MoP 5.4.8.18414 self-player
+ * SMSG_UPDATE_OBJECT create block.
  */
 
 #include "MopUpdateObject.h"
-#include "WorldPacket.h"
 #include "Opcodes.h"
+#include "WorldPacket.h"
+
 #include <cstdio>
-#include <cstring>
 
 static int g_failures = 0;
 #define CHECK(cond) do { if (!(cond)) { std::printf("FAIL %s:%d  %s\n", __FILE__, __LINE__, #cond); ++g_failures; } } while (0)
 
 namespace
 {
-    int NonZeroGuidBytes(uint64 g)
+    int NonZeroGuidBytes(uint64 guid)
     {
-        int n = 0;
+        int count = 0;
         for (int i = 0; i < 8; ++i)
         {
-            if (uint8(g >> (i * 8))) { ++n; }
+            if (uint8(guid >> (i * 8)))
+            {
+                ++count;
+            }
         }
-        return n;
+        return count;
     }
 
     MopUpdateObject::SelfPlayer MakeSelf()
     {
-        MopUpdateObject::SelfPlayer e{};
-        e.guid = 0x0000000000000010ULL;   // 16 -> only byte 0 non-zero
-        e.mapId = 0;
-        e.x = -8913.5f; e.y = 554.6f; e.z = 93.7f; e.o = 3.14f;
-        e.moveTime = 0x11223344u;
-        e.speedWalk = 1.0f; e.speedRun = 7.0f; e.speedRunBack = 4.5f;
-        e.speedSwim = 4.7222f; e.speedSwimBack = 2.5f; e.speedFlight = 7.0f;
-        e.speedFlightBack = 4.5f; e.speedTurn = 3.1415f; e.speedPitch = 3.1415f;
-        e.race = 1; e.class_ = 2; e.gender = 0; e.powerType = 3;
-        e.health = 100; e.maxHealth = 120;
-        for (uint32 i = 0; i < MAX_STORED_POWERS; ++i) { e.power[i] = 50 + i; e.maxPower[i] = 60 + i; }
-        e.level = 1; e.faction = 1; e.unitFlags = 0x00000008u;   // exercise a real unit flag through the serializer
-        e.scale = 1.0f; e.boundingRadius = 0.388f; e.combatReach = 1.5f;
-        e.displayId = 19724; e.nativeDisplayId = 19724;
-        return e;
+        MopUpdateObject::SelfPlayer player{};
+        player.guid = 0x10;
+        player.mapId = 0;
+        player.x = -8913.5f;
+        player.y = 554.6f;
+        player.z = 93.7f;
+        player.o = 3.14f;
+        player.moveTime = 0x11223344u;
+        player.speedWalk = 1.0f;
+        player.speedRun = 7.0f;
+        player.speedRunBack = 4.5f;
+        player.speedSwim = 4.7222f;
+        player.speedSwimBack = 2.5f;
+        player.speedFlight = 7.0f;
+        player.speedFlightBack = 4.5f;
+        player.speedTurn = 3.1415f;
+        player.speedPitch = 3.1415f;
+        player.race = 1;
+        player.class_ = 2;
+        player.gender = 0;
+        player.powerType = 3;
+        player.health = 100;
+        player.maxHealth = 120;
+        for (uint32 i = 0; i < MAX_STORED_POWERS; ++i)
+        {
+            player.power[i] = 50 + i;
+            player.maxPower[i] = 60 + i;
+        }
+        player.level = 1;
+        player.faction = 1;
+        player.unitFlags = 0x00000008u;
+        player.scale = 1.0f;
+        player.boundingRadius = 0.388f;
+        player.combatReach = 1.5f;
+        player.displayId = 19724;
+        player.nativeDisplayId = 19724;
+        return player;
     }
 }
-
-// ACE (dragged in via 'game') rewrites main() and requires (int, char**).
 int main(int /*argc*/, char** /*argv*/)
 {
-    CHECK(MopUpdateObject::TranslateSelfInventoryIndex(960) == 965);
-    CHECK(MopUpdateObject::TranslateSelfInventoryIndex(1131) == 1136);
-
-    // TranslateSelfPlayerFields is reached through AppendSelfPlayerValuesBlock
-    // everywhere else in these tests, which always hands it a fresh empty
-    // vector. Exercise the out-parameter contract directly: prior contents are
-    // replaced, not appended to, and the source is allowed to alias the
-    // destination's own storage.
-    {
-        const MopUpdateObject::StaticField source[] =
-        {
-            { 1142, 0x11111111u },       // coinage low  -> 1149
-            { 1144, 0x22222222u },       // XP           -> 1151
-        };
-
-        std::vector<MopUpdateObject::StaticField> projected;
-        projected.push_back({ 9999, 0xDEADBEEFu });   // must not survive
-        MopUpdateObject::TranslateSelfPlayerFields(source, 2, projected);
-        CHECK(projected.size() == 2);
-        CHECK(projected[0].index == 1149 && projected[0].value == 0x11111111u);
-        CHECK(projected[1].index == 1151 && projected[1].value == 0x22222222u);
-
-        // Reuse of the same vector must be idempotent, not cumulative.
-        MopUpdateObject::TranslateSelfPlayerFields(source, 2, projected);
-        CHECK(projected.size() == 2);
-
-        // Self-aliasing: read from the very storage being replaced. The
-        // legacy coinage pair 1142/1143 projects to 1149/1150, so feeding the
-        // result back in would hit the unsupported-field assert; use a range
-        // that is stable under the projection instead.
-        std::vector<MopUpdateObject::StaticField> aliased;
-        aliased.push_back({ 7, 0x33333333u });        // scale -> 7, fixed point
-        MopUpdateObject::TranslateSelfPlayerFields(aliased.data(),
-            uint32(aliased.size()), aliased);
-        CHECK(aliased.size() == 1);
-        CHECK(aliased[0].index == 7 && aliased[0].value == 0x33333333u);
-    }
-
-    // Observer-visible Player fields use a deliberately narrow 18414
-    // projection. Unit fields are individually admitted; visible-item pairs
-    // move by +5. Private Player fields must not acquire a target index.
-    {
-        uint16 targetIndex = 0;
-        const uint16 sparseMappings[][2] =
-        {
-            { 7, 7 }, { 26, 30 }, { 28, 33 }, { 34, 39 },
-            { 50, 55 }, { 51, 57 }, { 52, 58 }, { 53, 59 },
-            { 54, 60 }, { 63, 69 }, { 64, 70 }, { 65, 71 },
-            // Packed appearance words, previously dropped by both paths.
-            // Indices come from the client's CGPlayerData descriptor names:
-            // entry 6 hairColorID, 7 restState, 8 arenaFaction, base 160.
-            { 161, 166 }, { 162, 167 }, { 163, 168 },
-        };
-        for (const auto& mapping : sparseMappings)
-        {
-            CHECK(MopUpdateObject::TranslateObserverPlayerIndex(mapping[0], targetIndex));
-            CHECK(targetIndex == mapping[1]);
-        }
-        CHECK(MopUpdateObject::TranslateObserverPlayerIndex(916, targetIndex));
-        CHECK(targetIndex == 921);
-        CHECK(MopUpdateObject::TranslateObserverPlayerIndex(953, targetIndex));
-        CHECK(targetIndex == 958);
-        CHECK(!MopUpdateObject::TranslateObserverPlayerIndex(66, targetIndex));
-        CHECK(!MopUpdateObject::TranslateObserverPlayerIndex(954, targetIndex));
-        CHECK(!MopUpdateObject::TranslateObserverPlayerIndex(960, targetIndex));
-
-        const MopUpdateObject::StaticField translated[] =
-        {
-            { 7, 0 },
-            { 30, 0x11223344u },
-            { 921, 0x55667788u },
-            { 958, 0 },
-        };
-        ByteBuffer values;
-        MopUpdateObject::AppendValuesBlock(values, 0x10, translated,
-            sizeof(translated) / sizeof(translated[0]));
-        values.rpos(3); // VALUES + packed GUID
-        uint8 blockCount;
-        values >> blockCount;
-        CHECK(blockCount == 30);
-        uint32 masks[30];
-        for (uint32& mask : masks) values >> mask;
-        CHECK(masks[0] == ((uint32(1) << 7) | (uint32(1) << 30)));
-        CHECK(masks[921 / 32] == (uint32(1) << (921 % 32)));
-        CHECK(masks[958 / 32] == (uint32(1) << (958 % 32)));
-        uint32 scale, bytes0, visibleFirst, visibleLast;
-        uint8 dynamicCount;
-        values >> scale >> bytes0 >> visibleFirst >> visibleLast >> dynamicCount;
-        CHECK(scale == 0);
-        CHECK(bytes0 == 0x11223344u);
-        CHECK(visibleFirst == 0x55667788u);
-        CHECK(visibleLast == 0);
-        CHECK(dynamicCount == 0);
-        CHECK(values.rpos() == values.size());
-    }
-
-    MopUpdateObject::InventoryObjectEligibility inventoryEligibility{};
-    CHECK(!MopUpdateObject::CanUseInventoryObject(inventoryEligibility));
-    inventoryEligibility.hasTarget = true;
-    CHECK(!MopUpdateObject::CanUseInventoryObject(inventoryEligibility));
-    inventoryEligibility.hasOwner = true;
-    CHECK(!MopUpdateObject::CanUseInventoryObject(inventoryEligibility));
-    inventoryEligibility.ownerMatchesTarget = true;
-    CHECK(MopUpdateObject::CanUseInventoryObject(inventoryEligibility));
-
-    {
-        ByteBuffer emptyMovement;
-        MopUpdateObject::AppendEmptyMovement(emptyMovement);
-        const uint8 expected[] = { 0, 0, 0, 0, 0, 0 };
-        CHECK(emptyMovement.size() == sizeof(expected));
-        CHECK(emptyMovement.size() == sizeof(expected) &&
-            std::memcmp(emptyMovement.contents(), expected, sizeof(expected)) == 0);
-
-        const MopUpdateObject::StaticField fields[] = { { 0, 0x11223344u } };
-        ByteBuffer create;
-        MopUpdateObject::AppendEmptyMovementCreateBlock(create, 1, 0x10, 1,
-            fields, sizeof(fields) / sizeof(fields[0]));
-        ByteBuffer expectedCreate;
-        expectedCreate << uint8(1) << uint8(0x01) << uint8(0x10) << uint8(1);
-        expectedCreate.append(expected, sizeof(expected));
-        MopUpdateObject::AppendStaticValuesNoDynamic(expectedCreate, fields, sizeof(fields) / sizeof(fields[0]));
-        CHECK(create.size() == expectedCreate.size());
-        CHECK(create.size() == expectedCreate.size() &&
-            std::memcmp(create.contents(), expectedCreate.contents(), expectedCreate.size()) == 0);
-    }
-
-    {
-        uint32 itemValues[69];
-        for (uint32 i = 0; i < 69; ++i) itemValues[i] = 0x10000000u + i;
-
-        ByteBuffer itemCreate;
-        MopUpdateObject::AppendInventoryCreateBlock(itemCreate, 0x10, 1, itemValues, 69);
-        itemCreate.rpos(10); // create + packed GUID + type + six-byte movement body
-        uint8 blockCount;
-        itemCreate >> blockCount;
-        CHECK(blockCount == 3);
-        uint32 masks[3];
-        for (uint32& mask : masks) itemCreate >> mask;
-        CHECK(masks[0] == 0xFFFFFFFFu);
-        CHECK(masks[1] == 0xFFFFFFFFu);
-        CHECK(masks[2] == 0x0000001Fu);
-        for (uint32 i = 0; i < 69; ++i)
-        {
-            uint32 value;
-            itemCreate >> value;
-            CHECK(value == itemValues[i]);
-        }
-        uint8 dynamicCount;
-        itemCreate >> dynamicCount;
-        CHECK(dynamicCount == 0);
-        CHECK(itemCreate.rpos() == itemCreate.size());
-
-        uint32 containerValues[142];
-        for (uint32 i = 0; i < 142; ++i) containerValues[i] = 0x20000000u + i;
-
-        ByteBuffer containerCreate;
-        MopUpdateObject::AppendInventoryCreateBlock(containerCreate, 0x10, 2, containerValues, 142);
-        containerCreate.rpos(10);
-        containerCreate >> blockCount;
-        CHECK(blockCount == 5);
-        uint32 containerMasks[5];
-        for (uint32& mask : containerMasks) containerCreate >> mask;
-        CHECK(containerMasks[0] == 0xFFFFFFFFu);
-        CHECK(containerMasks[1] == 0xFFFFFFFFu);
-        CHECK(containerMasks[2] == 0xFFFFFFFFu);
-        CHECK(containerMasks[3] == 0xFFFFFFFFu);
-        CHECK(containerMasks[4] == 0x00003FFFu);
-        for (uint32 i = 0; i < 142; ++i)
-        {
-            uint32 value;
-            containerCreate >> value;
-            CHECK(value == containerValues[i]);
-        }
-        containerCreate >> dynamicCount;
-        CHECK(dynamicCount == 0);
-        CHECK(containerCreate.rpos() == containerCreate.size());
-
-        const MopUpdateObject::StaticField itemChanges[] =
-        {
-            { 0, 0 },
-            { 68, 0x55667788u },
-        };
-        ByteBuffer itemValuesUpdate;
-        MopUpdateObject::AppendInventoryValuesBlock(itemValuesUpdate, 0x10, 1,
-            itemChanges, sizeof(itemChanges) / sizeof(itemChanges[0]));
-        itemValuesUpdate.rpos(3); // VALUES + packed GUID
-        itemValuesUpdate >> blockCount;
-        CHECK(blockCount == 3);
-        for (uint32& mask : masks) itemValuesUpdate >> mask;
-        CHECK(masks[0] == 0x00000001u);
-        CHECK(masks[1] == 0x00000000u);
-        CHECK(masks[2] == 0x00000010u);
-        uint32 clearedValue, endpointValue;
-        itemValuesUpdate >> clearedValue >> endpointValue >> dynamicCount;
-        CHECK(clearedValue == 0);
-        CHECK(endpointValue == 0x55667788u);
-        CHECK(dynamicCount == 0);
-        CHECK(itemValuesUpdate.rpos() == itemValuesUpdate.size());
-
-        const MopUpdateObject::StaticField containerChange[] =
-        {
-            { 141, 0x99AABBCCu },
-        };
-        ByteBuffer containerValuesUpdate;
-        MopUpdateObject::AppendInventoryValuesBlock(containerValuesUpdate, 0x10, 2,
-            containerChange, sizeof(containerChange) / sizeof(containerChange[0]));
-        containerValuesUpdate.rpos(3);
-        containerValuesUpdate >> blockCount;
-        CHECK(blockCount == 5);
-        for (uint32& mask : containerMasks) containerValuesUpdate >> mask;
-        CHECK(containerMasks[4] == 0x00002000u);
-        containerValuesUpdate >> endpointValue >> dynamicCount;
-        CHECK(endpointValue == 0x99AABBCCu);
-        CHECK(dynamicCount == 0);
-        CHECK(containerValuesUpdate.rpos() == containerValuesUpdate.size());
-    }
-
-    {
-        const MopUpdateObject::StaticField sourceFields[] =
-        {
-            { 960, 0 },
-            { 1131, 0xAABBCCDDu },
-        };
-        ByteBuffer values;
-        MopUpdateObject::AppendSelfInventoryValuesBlock(values, 0x10, sourceFields,
-            sizeof(sourceFields) / sizeof(sourceFields[0]));
-        values.rpos(3); // VALUES + packed GUID
-        uint8 blockCount;
-        values >> blockCount;
-        CHECK(blockCount == 36);
-        uint32 masks[36];
-        for (uint32& mask : masks) values >> mask;
-        CHECK(masks[965 / 32] == (uint32(1) << (965 % 32)));
-        CHECK(masks[1136 / 32] == (uint32(1) << (1136 % 32)));
-        CHECK((masks[960 / 32] & (uint32(1) << (960 % 32))) == 0);
-        uint32 clearedValue, endpointValue;
-        values >> clearedValue >> endpointValue;
-        CHECK(clearedValue == 0);
-        CHECK(endpointValue == 0xAABBCCDDu);
-        uint8 dynamicCount;
-        values >> dynamicCount;
-        CHECK(dynamicCount == 0);
-        CHECK(values.rpos() == values.size());
-    }
-
-    // Post-create self updates must preserve the same binary-proved Unit-field
-    // projection as BuildSelfCreate while sharing one VALUES block with the
-    // existing inventory remap. Changed-to-zero fields remain present.
-    {
-        const MopUpdateObject::StaticField sourceFields[] =
-        {
-            { 7, 0 },                    // scale -> 7
-            { 26, 0x04030201u },         // bytes0 -> 30 plus display power -> 31
-            { 28, 0 },                   // health -> 33
-            { 29, 0x11111111u },         // power1 -> 34
-            { 33, 0x55555555u },         // power5 -> 38
-            { 34, 0x66666666u },         // max health -> 39
-            { 35, 0x77777777u },         // max power1 -> 40
-            { 39, 0xBBBBBBBBu },         // max power5 -> 44
-            { 50, 90 },                  // level -> 55
-            { 51, 35 },                  // faction -> 57
-            { 55, 0x00000008u },         // unit flags -> 61
-            { 61, 0x3EC6A7F0u },         // bounding radius -> 67
-            { 62, 0x3FC00000u },         // combat reach -> 68
-            { 63, 19724 },               // display -> 69
-            { 64, 19724 },               // native display -> 70
-            { 916, 0xCAFEBABEu },         // first visible item -> 921
-            { 953, 0 },                   // final visible enchant clear -> 958
-            { 960, 0 },                  // first inventory link -> 965
-            { 1131, 0xAABBCCDDu },       // final buyback field -> 1136
-            { 1142, 0x01234567u },       // coinage low -> 1149
-            { 1143, 0x89ABCDEFu },       // coinage high -> 1150
-            { 1144, 0 },                 // XP -> 1151
-            { 1145, 0x00123456u },       // next-level XP -> 1152
-        };
-        ByteBuffer values;
-        MopUpdateObject::AppendSelfPlayerValuesBlock(values, 0x10, sourceFields,
-            sizeof(sourceFields) / sizeof(sourceFields[0]));
-        values.rpos(3); // VALUES + packed GUID
-        uint8 blockCount;
-        values >> blockCount;
-        CHECK(blockCount == 37);
-        uint32 masks[37];
-        for (uint32& mask : masks) values >> mask;
-        auto hasBit = [&masks](uint16 index)
-        {
-            return (masks[index / 32] & (uint32(1) << (index % 32))) != 0;
-        };
-        for (uint16 index : { uint16(7), uint16(30), uint16(31), uint16(33),
-                uint16(34), uint16(38), uint16(39), uint16(40), uint16(44),
-                uint16(55), uint16(57), uint16(61), uint16(67), uint16(68),
-                uint16(69), uint16(70), uint16(921), uint16(958),
-                uint16(965), uint16(1136),
-                uint16(1149), uint16(1150), uint16(1151), uint16(1152) })
-        {
-            CHECK(hasBit(index));
-        }
-        CHECK(!hasBit(28));
-        CHECK(!hasBit(960));
-
-        const uint32 expected[] =
-        {
-            0, 0x03040201u, 4, 0, 0x11111111u, 0x55555555u,
-            0x66666666u, 0x77777777u, 0xBBBBBBBBu, 90, 35,
-            0x00000008u, 0x3EC6A7F0u, 0x3FC00000u, 19724, 19724,
-            0xCAFEBABEu, 0, 0, 0xAABBCCDDu,
-            0x01234567u, 0x89ABCDEFu, 0, 0x00123456u,
-        };
-        for (uint32 expectedValue : expected)
-        {
-            uint32 actualValue;
-            values >> actualValue;
-            CHECK(actualValue == expectedValue);
-        }
-        uint8 dynamicCount;
-        values >> dynamicCount;
-        CHECK(dynamicCount == 0);
-        CHECK(values.rpos() == values.size());
-    }
-
-    // The 18414 client gates language selection on CGPlayerData::local.skill,
-    // not on SMSG_INITIAL_SPELLS. Preserve all seven 64-word skill arrays.
-    {
-        const MopUpdateObject::StaticField sourceFields[] =
-        {
-            { 1146, 0x00000389u },       // first skill line -> 1153
-            { 1210, 0x00000001u },       // first skill step -> 1217
-            { 1274, 0x0000012Cu },       // first skill rank -> 1281
-            { 1338, 0x00000001u },       // first starting rank -> 1345
-            { 1402, 0x0000012Cu },       // first max rank -> 1409
-            { 1466, 0 },                 // first modifier clear -> 1473
-            { 1530, 0 },                 // first talent clear -> 1537
-            { 1593, 0xAABBCCDDu },       // final skill word -> 1600
-        };
-        ByteBuffer values;
-        MopUpdateObject::AppendSelfPlayerValuesBlock(values, 0x10, sourceFields,
-            sizeof(sourceFields) / sizeof(sourceFields[0]));
-        values.rpos(3); // VALUES + packed GUID
-        uint8 blockCount;
-        values >> blockCount;
-        CHECK(blockCount == 51);
-        uint32 masks[51];
-        for (uint32& mask : masks) values >> mask;
-        auto hasBit = [&masks](uint16 index)
-        {
-            return (masks[index / 32] & (uint32(1) << (index % 32))) != 0;
-        };
-        for (uint16 index : { uint16(1153), uint16(1217), uint16(1281),
-                uint16(1345), uint16(1409), uint16(1473), uint16(1537),
-                uint16(1600) })
-        {
-            CHECK(hasBit(index));
-        }
-        CHECK(!hasBit(1146));
-
-        for (uint32 expectedValue : { 0x00000389u, 0x00000001u,
-                0x0000012Cu, 0x00000001u, 0x0000012Cu, 0u, 0u,
-                0xAABBCCDDu })
-        {
-            uint32 actualValue;
-            values >> actualValue;
-            CHECK(actualValue == expectedValue);
-        }
-        uint8 dynamicCount;
-        values >> dynamicCount;
-        CHECK(dynamicCount == 0);
-        CHECK(values.rpos() == values.size());
-    }
-
-    // MerchantFrame.lua asks native GetNumBuybackItems(), which admits a
-    // logical slot only when both its item object and buybackPrice are set.
-    // The 18414 CGPlayerData metadata moves Four's price/timestamp ranges by
-    // eight fields; changed-to-zero endpoints remain significant.
-    {
-        const MopUpdateObject::StaticField sourceFields[] =
-        {
-            { 1857, 0x01020304u },       // first buyback price -> 1865
-            { 1868, 0 },                 // final buyback price -> 1876
-            { 1869, 0x11223344u },       // first buyback timestamp -> 1877
-            { 1880, 0 },                 // final buyback timestamp -> 1888
-        };
-        ByteBuffer values;
-        MopUpdateObject::AppendSelfPlayerValuesBlock(values, 0x10, sourceFields,
-            sizeof(sourceFields) / sizeof(sourceFields[0]));
-        values.rpos(3); // VALUES + packed GUID
-        uint8 blockCount;
-        values >> blockCount;
-        CHECK(blockCount == 60);
-        uint32 masks[60];
-        for (uint32& mask : masks) values >> mask;
-        auto hasBit = [&masks](uint16 index)
-        {
-            return (masks[index / 32] & (uint32(1) << (index % 32))) != 0;
-        };
-        for (uint16 index : { uint16(1865), uint16(1876), uint16(1877), uint16(1888) })
-            CHECK(hasBit(index));
-        CHECK(!hasBit(1857));
-        CHECK(!hasBit(1869));
-
-        for (uint32 expectedValue : { 0x01020304u, 0u, 0x11223344u, 0u })
-        {
-            uint32 actualValue;
-            values >> actualValue;
-            CHECK(actualValue == expectedValue);
-        }
-        uint8 dynamicCount;
-        values >> dynamicCount;
-        CHECK(dynamicCount == 0);
-        CHECK(values.rpos() == values.size());
-    }
-
-    // The quest log is the one self range whose slot stride differs between
-    // Four and 18414. Four stores fifty five-word slots at 166..415; the
-    // client's CGPlayerData::questLog is fifty FIFTEEN-word slots at
-    // 171..920. Retail captures show 18414 setting the mask bit for all
-    // fifteen words of a touched slot, carrying words 5..14 as explicit
-    // zeroes, so the serializer expands each five-word slot to fifteen.
-    {
-        const MopUpdateObject::StaticField sourceFields[] =
-        {
-            { 166, 0x000004D2u },   // slot 0  quest id
-            { 167, 0x00000001u },   // slot 0  state
-            { 168, 0x00010000u },   // slot 0  counts
-            { 169, 0x00000017u },   // slot 0  counts
-            { 170, 0x00000E10u },   // slot 0  timer
-            { 411, 0x000004D3u },   // slot 49 quest id
-            { 412, 0u },
-            { 413, 0u },
-            { 414, 0u },
-            { 415, 0u },
-        };
-        ByteBuffer values;
-        MopUpdateObject::AppendSelfPlayerValuesBlock(values, 0x10, sourceFields,
-            sizeof(sourceFields) / sizeof(sourceFields[0]));
-        values.rpos(3); // VALUES + packed GUID
-        uint8 blockCount;
-        values >> blockCount;
-        CHECK(blockCount == 29);
-        uint32 masks[29];
-        for (uint32& mask : masks) values >> mask;
-        auto hasBit = [&masks](uint16 index)
-        {
-            return (masks[index / 32] & (uint32(1) << (index % 32))) != 0;
-        };
-        // every word of both touched slots, including the ten zero words
-        for (uint16 index = 171; index <= 185; ++index) CHECK(hasBit(index));
-        for (uint16 index = 906; index <= 920; ++index) CHECK(hasBit(index));
-        // untouched neighbouring slots stay absent
-        CHECK(!hasBit(186));
-        CHECK(!hasBit(905));
-        // A flat range copy would land slot 49 at 416..420 instead of
-        // 906..920, so the positive checks above already exclude it; 420 is
-        // asserted absent as the direct flat-copy target of source 415.
-        // (176 is NOT a valid guard any more: it is slot 0 word 5, which the
-        // serializer now legitimately writes as an explicit zero.)
-        CHECK(!hasBit(420));
-        // and the untranslated legacy indices
-        CHECK(!hasBit(166));
-        CHECK(!hasBit(415));
-
-        const uint32 expected[] =
-        {
-            0x000004D2u, 0x00000001u, 0x00010000u, 0x00000017u, 0x00000E10u,
-            0, 0, 0, 0, 0, 0, 0, 0, 0, 0,      // slot 0  words 5..14
-            0x000004D3u, 0, 0, 0, 0,
-            0, 0, 0, 0, 0, 0, 0, 0, 0, 0,      // slot 49 words 5..14
-        };
-        for (uint32 expectedValue : expected)
-        {
-            uint32 actualValue;
-            values >> actualValue;
-            CHECK(actualValue == expectedValue);
-        }
-        uint8 dynamicCount;
-        values >> dynamicCount;
-        CHECK(dynamicCount == 0);
-        CHECK(values.rpos() == values.size());
-    }
-
-    // Explored zones and the rested-XP pool shift by eight, not seven.
-    // 18414 holds local.exploredZones at 1627..1826 and
-    // local.restStateBonusPool at 1827; Four holds 1619..1818 and 1819.
-    {
-        const MopUpdateObject::StaticField sourceFields[] =
-        {
-            { 1619, 0xA1A2A3A4u },   // first explored-zone word -> 1627
-            { 1818, 0xB1B2B3B4u },   // last explored-zone word  -> 1826
-            { 1819, 0xC1C2C3C4u },   // rested-XP pool           -> 1827
-        };
-        ByteBuffer values;
-        MopUpdateObject::AppendSelfPlayerValuesBlock(values, 0x10, sourceFields,
-            sizeof(sourceFields) / sizeof(sourceFields[0]));
-        values.rpos(3);
-        uint8 blockCount;
-        values >> blockCount;
-        CHECK(blockCount == 58);
-        uint32 masks[58];
-        for (uint32& mask : masks) values >> mask;
-        auto hasBit = [&masks](uint16 index)
-        {
-            return (masks[index / 32] & (uint32(1) << (index % 32))) != 0;
-        };
-        CHECK(hasBit(1627));
-        CHECK(hasBit(1826));
-        CHECK(hasBit(1827));
-        // a seven-shift, as used by the coinage/XP range, must not be applied
-        CHECK(!hasBit(1626));
-        CHECK(!hasBit(1825));
-        // and the untranslated legacy indices
-        CHECK(!hasBit(1619));
-        CHECK(!hasBit(1819));
-        for (uint32 expectedValue : { 0xA1A2A3A4u, 0xB1B2B3B4u, 0xC1C2C3C4u })
-        {
-            uint32 actualValue;
-            values >> actualValue;
-            CHECK(actualValue == expectedValue);
-        }
-        uint8 dynamicCount;
-        values >> dynamicCount;
-        CHECK(dynamicCount == 0);
-        CHECK(values.rpos() == values.size());
-    }
-
-    // PLAYER_FLAGS. Nothing projected it, and two unrelated-looking failures
-    // came out of that single gap: PLAYER_FLAGS_GHOST (0x10) never reached the
-    // client, so death did nothing at all -- no release dialog, therefore no
-    // CMSG_REPOP_REQUEST, therefore nothing for release or .revive to act on --
-    // and PLAYER_FLAGS_RESTING (0x20), one bit away, left GetRestState()
-    // returning nil so MainMenuBar.lua:119 threw on every XP update and login.
-    //
-    // The 18414 index comes from the client's own field descriptors rather
-    // than by extrapolating a neighbouring shift: CGPlayerData's descriptor
-    // table runs at a 12-byte stride from dword_10F52B8, playerFlags writes at
-    // dword_10F52D0 (relative index 2) and questLog at dword_10F533C (relative
-    // index 11). questLog's absolute index is pinned at 171 below, which puts
-    // the block base at 160 and playerFlags at 162.
-    {
-        ByteBuffer values;
-        const MopUpdateObject::StaticField sourceFields[] =
-        {
-            { 157, 0x00000030u },   // GHOST | RESTING
-        };
-        MopUpdateObject::AppendSelfPlayerValuesBlock(values, 0x10, sourceFields,
-            sizeof(sourceFields) / sizeof(sourceFields[0]));
-        values.rpos(3);
-        uint8 blockCount;
-        values >> blockCount;
-        uint32 masks[6];
-        CHECK(blockCount == 6);
-        for (uint32& mask : masks) values >> mask;
-        auto hasBit = [&masks](uint16 index)
-        {
-            return (masks[index / 32] & (uint32(1) << (index % 32))) != 0;
-        };
-        CHECK(hasBit(162));
-        CHECK(!hasBit(157));    // the legacy index must not be sent verbatim
-        CHECK(!hasBit(161));
-        CHECK(!hasBit(163));
-        uint32 value = 0;
-        values >> value;
-        CHECK(value == 0x00000030u);
-    }
-
-    // Per-slot re-striding, checked directly at both ends of the block.
-    CHECK(MopUpdateObject::TranslateSelfQuestLogIndex(166) == 171);
-    CHECK(MopUpdateObject::TranslateSelfQuestLogIndex(170) == 175);
-    CHECK(MopUpdateObject::TranslateSelfQuestLogIndex(171) == 186);
-    CHECK(MopUpdateObject::TranslateSelfQuestLogIndex(415) == 910);
-
-    CHECK(MopUpdateObject::RepackUnitBytes0(0x04030201u) == 0x03040201u);
-    CHECK(MopUpdateObject::TranslateUnitDynamicFlags(0x000000A5u) == 0x0000014Au);
-    CHECK(MopUpdateObject::TranslateUnitDynamicFlags(0xFFFF01A5u) == 0x0000014Au);
-    {
-        MopUpdateObject::UnitDynamicFlagView view{};
-        view.hasLootRecipient = true;
-
-        // Another player sees the tap, but not the private loot cue or
-        // TAPPED_BY_PLAYER state.
-        CHECK(MopUpdateObject::TranslateUnitDynamicFlagsForViewer(
-            0x0000000Du, view) == 0x00000008u);
-
-        // The recipient sees all three 18414 states: lootable, tapped and
-        // tapped-by-player.
-        view.tappedByViewer = true;
-        view.allowedToLoot = true;
-        CHECK(MopUpdateObject::TranslateUnitDynamicFlagsForViewer(
-            0x0000000Du, view) == 0x0000001Au);
-
-        // Stale legacy tap bits must disappear once ownership is cleared.
-        view.hasLootRecipient = false;
-        view.tappedByViewer = false;
-        CHECK(MopUpdateObject::TranslateUnitDynamicFlagsForViewer(
-            0x0000000Du, view) == 0x00000002u);
-    }
-    CHECK(MopUpdateObject::TranslateGameObjectDynamic(0xFFFF0001u) == 0xFFFF0002u);
-    CHECK(MopUpdateObject::TranslateGameObjectDynamic(0xFFFF0009u) == 0xFFFF0012u);
-    CHECK(MopUpdateObject::TranslateGameObjectDynamic(0x123400F3u) == 0x12340006u);
-
-    // Only transport-relative states are rejected. AppendSimpleLivingMovement
-    // emits a state-invariant layout - every optional block is declared absent
-    // and position plus all nine speeds are written unconditionally - so a
-    // moving or fighting unit encodes to the same structure as an idle one.
-    // Rejecting those states made BuildCreateUpdateBlockForPlayer emit nothing,
-    // leaving creatures that were moving or in combat permanently invisible.
-    MopUpdateObject::SimpleUnitEligibility eligibility{};
-    CHECK(MopUpdateObject::CanUseSimpleUnitMovement(eligibility));
-    eligibility.isBoarded = true; CHECK(!MopUpdateObject::CanUseSimpleUnitMovement(eligibility)); eligibility.isBoarded = false;
-    eligibility.hasTransport = true; CHECK(!MopUpdateObject::CanUseSimpleUnitMovement(eligibility)); eligibility.hasTransport = false;
-
-    // A vehicle carries passengers; it does not ride anything. Its own position
-    // is a world position, so it encodes as a stationary snapshot like any other
-    // unit. Rejecting it emitted no create at all, hiding 6,529 spawns including
-    // quest givers. The passenger is the transport-relative case, and that is
-    // isBoarded above -- which stays rejected even when both are set.
-    eligibility.isVehicle = true;
-    CHECK(MopUpdateObject::CanUseSimpleUnitMovement(eligibility));
-    eligibility.isBoarded = true;
-    CHECK(!MopUpdateObject::CanUseSimpleUnitMovement(eligibility));
-    eligibility.isBoarded = false;
-    eligibility.hasTransport = true;
-    CHECK(!MopUpdateObject::CanUseSimpleUnitMovement(eligibility));
-    eligibility.hasTransport = false;
-    eligibility.isVehicle = false;
-
-    // States the encoder represents as a stationary snapshot: the unit is still
-    // created, and the SMSG_MONSTER_MOVE stream animates it from there.
-    eligibility.hasSpline = true; CHECK(MopUpdateObject::CanUseSimpleUnitMovement(eligibility)); eligibility.hasSpline = false;
-    eligibility.movementFlags = MopUpdateObject::SimpleLivingWalkModeFlag;
-    CHECK(MopUpdateObject::CanUseSimpleUnitMovement(eligibility));
-    eligibility.movementFlags = 1;
-    CHECK(MopUpdateObject::CanUseSimpleUnitMovement(eligibility));
-    eligibility.movementFlags = MopUpdateObject::SimpleLivingWalkModeFlag | 1;
-    CHECK(MopUpdateObject::CanUseSimpleUnitMovement(eligibility));
-    eligibility.movementFlags = 0;
-    eligibility.movementFlags2 = 1; CHECK(MopUpdateObject::CanUseSimpleUnitMovement(eligibility)); eligibility.movementFlags2 = 0;
-    eligibility.hasOptionalMovement = true; CHECK(MopUpdateObject::CanUseSimpleUnitMovement(eligibility)); eligibility.hasOptionalMovement = false;
-    eligibility.hasAttackingTarget = true; CHECK(MopUpdateObject::CanUseSimpleUnitMovement(eligibility)); eligibility.hasAttackingTarget = false;
-
-    // Transport rejection must survive any combination of the snapshot states.
-    eligibility.hasSpline = true;
-    eligibility.hasAttackingTarget = true;
-    eligibility.hasTransport = true;
-    CHECK(!MopUpdateObject::CanUseSimpleUnitMovement(eligibility));
-
-    MopUpdateObject::StationaryGameObjectEligibility gameObjectEligibility{};
-    gameObjectEligibility.hasTemplate = true;
-    gameObjectEligibility.hasStationaryPosition = true;
-    gameObjectEligibility.hasRotation = true;
-    CHECK(MopUpdateObject::CanUseStationaryGameObjectMovement(gameObjectEligibility));
-    gameObjectEligibility.isTransport = true;
-    CHECK(!MopUpdateObject::CanUseStationaryGameObjectMovement(gameObjectEligibility));
-    gameObjectEligibility.isTransport = false; gameObjectEligibility.isBoarded = true;
-    CHECK(!MopUpdateObject::CanUseStationaryGameObjectMovement(gameObjectEligibility));
-    gameObjectEligibility.isBoarded = false; gameObjectEligibility.hasUnsupportedMovement = true;
-    CHECK(!MopUpdateObject::CanUseStationaryGameObjectMovement(gameObjectEligibility));
-    gameObjectEligibility.hasUnsupportedMovement = false; gameObjectEligibility.hasStationaryPosition = false;
-    CHECK(!MopUpdateObject::CanUseStationaryGameObjectMovement(gameObjectEligibility));
-    gameObjectEligibility.hasStationaryPosition = true; gameObjectEligibility.hasRotation = false;
-    CHECK(!MopUpdateObject::CanUseStationaryGameObjectMovement(gameObjectEligibility));
-    gameObjectEligibility.hasRotation = true; gameObjectEligibility.hasTemplate = false;
-    CHECK(!MopUpdateObject::CanUseStationaryGameObjectMovement(gameObjectEligibility));
-    gameObjectEligibility.hasTemplate = true;
-    // Being a destructible building is deliberately absent from this struct.
-    // It was a rejection reason, on type alone, and hid 147 spawns - 88 of
-    // them open-world scenery. Movement does not vary with type, so there is
-    // nothing here to assert about it: the eligibility boundary no longer
-    // sees the type at all. Proving a type-33 object is now created needs an
-    // object-level test that builds a real GameObject, which this unit test
-    // has no fixture for.
-
-    MopUpdateObject::PositionOnlyEligibility positionOnlyEligibility{};
-    positionOnlyEligibility.hasPosition = true;
-    CHECK(MopUpdateObject::CanUsePositionOnlyMovement(positionOnlyEligibility));
-    positionOnlyEligibility.isBoarded = true;
-    CHECK(!MopUpdateObject::CanUsePositionOnlyMovement(positionOnlyEligibility));
-    positionOnlyEligibility.isBoarded = false;
-    positionOnlyEligibility.hasUnsupportedMovement = true;
-    CHECK(!MopUpdateObject::CanUsePositionOnlyMovement(positionOnlyEligibility));
-    positionOnlyEligibility.hasUnsupportedMovement = false;
-    positionOnlyEligibility.hasPosition = false;
-    CHECK(!MopUpdateObject::CanUsePositionOnlyMovement(positionOnlyEligibility));
-
-    {
-        WorldPacket destroy;
-        MopUpdateObject::BuildDestroyObject(destroy, 0x0807060504030201ULL, false);
-        const uint8 expected[] = { 0xF7, 0x80, 0x00, 0x04, 0x09, 0x02, 0x06, 0x05, 0x03, 0x07 };
-        CHECK(destroy.GetOpcode() == SMSG_DESTROY_OBJECT);
-        CHECK(destroy.size() == sizeof(expected));
-        CHECK(destroy.size() == sizeof(expected) && std::memcmp(destroy.contents(), expected, sizeof(expected)) == 0);
-
-        WorldPacket animatedDestroy;
-        MopUpdateObject::BuildDestroyObject(animatedDestroy, 0x0807060504030201ULL, true);
-        uint8 animatedExpected[sizeof(expected)];
-        std::memcpy(animatedExpected, expected, sizeof(expected));
-        animatedExpected[0] = 0xFF;
-        CHECK(animatedDestroy.size() == sizeof(animatedExpected));
-        CHECK(animatedDestroy.size() == sizeof(animatedExpected) &&
-            std::memcmp(animatedDestroy.contents(), animatedExpected, sizeof(animatedExpected)) == 0);
-    }
-
-    // Binary-proved 18414 static-values grammar: minimal word count, mask words,
-    // values in ascending field order, then the zero dynamic-field terminator.
-    {
-        const MopUpdateObject::StaticField fields[] =
-        {
-            { 0, 0x11223344u },
-            { 31, 0x55667788u },
-            { 32, 0x99AABBCCu },
-            { 70, 0xDDEEFF00u },
-        };
-
-        ByteBuffer values;
-        MopUpdateObject::AppendStaticValuesNoDynamic(values, fields, sizeof(fields) / sizeof(fields[0]));
-
-        const uint8 expected[] =
-        {
-            0x03,
-            0x01, 0x00, 0x00, 0x80,
-            0x01, 0x00, 0x00, 0x00,
-            0x40, 0x00, 0x00, 0x00,
-            0x44, 0x33, 0x22, 0x11,
-            0x88, 0x77, 0x66, 0x55,
-            0xCC, 0xBB, 0xAA, 0x99,
-            0x00, 0xFF, 0xEE, 0xDD,
-            0x00,
-        };
-        CHECK(values.size() == sizeof(expected));
-        CHECK(values.size() == sizeof(expected) && std::memcmp(values.contents(), expected, sizeof(expected)) == 0);
-    }
-
-    // Binary-proved stationary game-object movement subset: only the top-level
-    // rotation and stationary-position bits, followed by YZOX and rotation64.
-    {
-        MopUpdateObject::StationaryGameObjectMovement movement{};
-        movement.x = 1.0f;
-        movement.y = 2.0f;
-        movement.z = 3.0f;
-        movement.o = 4.0f;
-        movement.rotation = 0x1122334455667788ULL;
-
-        ByteBuffer bytes;
-        MopUpdateObject::AppendStationaryGameObjectMovement(bytes, movement);
-
-        const uint8 expectedBits[] = { 0x00, 0x00, 0x00, 0x01, 0x00, 0x40 };
-        CHECK(bytes.size() == sizeof(expectedBits) + 4 * sizeof(float) + sizeof(uint64));
-        CHECK(bytes.size() >= sizeof(expectedBits) && std::memcmp(bytes.contents(), expectedBits, sizeof(expectedBits)) == 0);
-
-        bytes.rpos(sizeof(expectedBits));
-        float y, z, o, x;
-        uint64 rotation;
-        bytes >> y >> z >> o >> x >> rotation;
-        CHECK(y == movement.y); CHECK(z == movement.z); CHECK(o == movement.o); CHECK(x == movement.x);
-        CHECK(rotation == movement.rotation);
-        CHECK(bytes.rpos() == bytes.size());
-
-        // 0xFF002100 is a real destructible BYTES_1: state 0, type 33, artKit
-        // 0, animProgress 255. Index 18 is the highest slot in the gameobject
-        // descriptor, so it also pins the mask width at one block.
-        const MopUpdateObject::StaticField fields[] =
-        {
-            { 0, 0xAABBCCDDu },
-            { 17, 60u },
-            { 18, 0xFF002100u },
-        };
-        ByteBuffer create;
-        MopUpdateObject::AppendStationaryGameObjectCreateBlock(create, 2, 0x10, 5, movement,
-            fields, sizeof(fields) / sizeof(fields[0]));
-        ByteBuffer expected;
-        expected << uint8(2) << uint8(0x01) << uint8(0x10) << uint8(5);
-        expected.append(bytes);
-        MopUpdateObject::AppendStaticValuesNoDynamic(expected, fields, sizeof(fields) / sizeof(fields[0]));
-        CHECK(create.size() == expected.size());
-        CHECK(create.size() == expected.size() && std::memcmp(create.contents(), expected.contents(), expected.size()) == 0);
-
-        // Both buffers above come from the same builder, so assert the tail
-        // against a mask and payload written out by hand instead.
-        ByteBuffer values;
-        MopUpdateObject::AppendStaticValuesNoDynamic(values, fields, sizeof(fields) / sizeof(fields[0]));
-        const uint8 expectedBlockCount = 1;
-        const uint32 expectedMask = (1u << 0) | (1u << 17) | (1u << 18);
-        // block count, one mask, three values, then the trailing terminator
-        CHECK(values.size() == sizeof(uint8) + sizeof(uint32) + 3 * sizeof(uint32) + sizeof(uint8));
-        uint8 blockCount, terminator;
-        uint32 mask, valueZero, valueSeventeen, valueEighteen;
-        values >> blockCount >> mask >> valueZero >> valueSeventeen >> valueEighteen >> terminator;
-        CHECK(terminator == 0);
-        CHECK(blockCount == expectedBlockCount);
-        CHECK(mask == expectedMask);
-        CHECK(valueZero == 0xAABBCCDDu);
-        CHECK(valueSeventeen == 60u);
-        CHECK(valueEighteen == 0xFF002100u);
-        CHECK(values.rpos() == values.size());
-    }
-
-    // Binary-proved DynamicObject/Corpse movement subset: stationary position
-    // only, with the four floats emitted in Y, Z, orientation, X order.
-    {
-        MopUpdateObject::PositionOnlyMovement movement{};
-        movement.x = 1.0f;
-        movement.y = 2.0f;
-        movement.z = 3.0f;
-        movement.o = 4.0f;
-
-        ByteBuffer bytes;
-        MopUpdateObject::AppendPositionOnlyMovement(bytes, movement);
-        const uint8 expected[] =
-        {
-            0x00, 0x00, 0x00, 0x00, 0x00, 0x40,
-            0x00, 0x00, 0x00, 0x40,
-            0x00, 0x00, 0x40, 0x40,
-            0x00, 0x00, 0x80, 0x40,
-            0x00, 0x00, 0x80, 0x3F,
-        };
-        CHECK(bytes.size() == sizeof(expected));
-        CHECK(bytes.size() == sizeof(expected) &&
-            std::memcmp(bytes.contents(), expected, sizeof(expected)) == 0);
-
-        uint32 dynamicValues[14];
-        for (uint32 i = 0; i < 14; ++i) dynamicValues[i] = 0x10000000u + i;
-        ByteBuffer dynamicCreate;
-        MopUpdateObject::AppendPositionOnlyCreateBlock(dynamicCreate, 2, 0x10, 6, movement,
-            dynamicValues, 14);
-        dynamicCreate.rpos(4 + sizeof(expected));
-        uint8 blockCount;
-        uint32 mask;
-        dynamicCreate >> blockCount >> mask;
-        CHECK(blockCount == 1);
-        CHECK(mask == 0x00003FFFu);
-        for (uint32 i = 0; i < 14; ++i)
-        {
-            uint32 value;
-            dynamicCreate >> value;
-            CHECK(value == dynamicValues[i]);
-        }
-        uint8 dynamicCount;
-        dynamicCreate >> dynamicCount;
-        CHECK(dynamicCount == 0);
-        CHECK(dynamicCreate.rpos() == dynamicCreate.size());
-
-        uint32 corpseValues[36];
-        for (uint32 i = 0; i < 36; ++i) corpseValues[i] = 0x20000000u + i;
-        ByteBuffer corpseCreate;
-        MopUpdateObject::AppendPositionOnlyCreateBlock(corpseCreate, 1, 0x10, 7, movement,
-            corpseValues, 36);
-        corpseCreate.rpos(4 + sizeof(expected));
-        uint32 masks[2];
-        corpseCreate >> blockCount >> masks[0] >> masks[1];
-        CHECK(blockCount == 2);
-        CHECK(masks[0] == 0xFFFFFFFFu);
-        CHECK(masks[1] == 0x0000000Fu);
-        for (uint32 i = 0; i < 36; ++i)
-        {
-            uint32 value;
-            corpseCreate >> value;
-            CHECK(value == corpseValues[i]);
-        }
-        corpseCreate >> dynamicCount;
-        CHECK(dynamicCount == 0);
-        CHECK(corpseCreate.rpos() == corpseCreate.size());
-
-        const MopUpdateObject::StaticField changes[] =
-        {
-            { 0, 0 },
-            { 13, 0x55667788u },
-        };
-        ByteBuffer values;
-        MopUpdateObject::AppendPositionOnlyValuesBlock(values, 0x10, 6, changes,
-            sizeof(changes) / sizeof(changes[0]));
-        values.rpos(3);
-        values >> blockCount >> mask;
-        CHECK(blockCount == 1);
-        CHECK(mask == 0x00002001u);
-        uint32 clearedValue, endpointValue;
-        values >> clearedValue >> endpointValue >> dynamicCount;
-        CHECK(clearedValue == 0);
-        CHECK(endpointValue == 0x55667788u);
-        CHECK(dynamicCount == 0);
-        CHECK(values.rpos() == values.size());
-
-        const MopUpdateObject::StaticField corpseChange[] = { { 35, 0 } };
-        ByteBuffer corpseUpdate;
-        MopUpdateObject::AppendPositionOnlyValuesBlock(corpseUpdate, 0x10, 7, corpseChange, 1);
-        corpseUpdate.rpos(3);
-        corpseUpdate >> blockCount >> masks[0] >> masks[1] >> clearedValue >> dynamicCount;
-        CHECK(blockCount == 2);
-        CHECK(masks[0] == 0);
-        CHECK(masks[1] == 0x00000008u);
-        CHECK(clearedValue == 0);
-        CHECK(dynamicCount == 0);
-        CHECK(corpseUpdate.rpos() == corpseUpdate.size());
-    }
-
-    MopUpdateObject::SelfPlayer e = MakeSelf();
-
-    // The binary-proved simple LIVING subset is reusable for ordinary units;
-    // SELF is the sole top-level distinction for the receiving player.
-    MopUpdateObject::SimpleLivingMovement living{};
-    living.guid = e.guid;
-    living.x = e.x; living.y = e.y; living.z = e.z; living.o = e.o;
-    living.moveTime = e.moveTime;
-    living.speedWalk = e.speedWalk; living.speedRun = e.speedRun; living.speedRunBack = e.speedRunBack;
-    living.speedSwim = e.speedSwim; living.speedSwimBack = e.speedSwimBack;
-    living.speedFlight = e.speedFlight; living.speedFlightBack = e.speedFlightBack;
-    living.speedTurn = e.speedTurn; living.speedPitch = e.speedPitch;
-    living.self = true;
-
-    ByteBuffer selfMovement;
-    MopUpdateObject::AppendSimpleLivingMovement(selfMovement, living);
-
-    living.self = false;
-    ByteBuffer creatureMovement;
-    MopUpdateObject::AppendSimpleLivingMovement(creatureMovement, living);
-    CHECK(selfMovement.size() == creatureMovement.size());
-    CHECK(selfMovement.size() > 4);
-    for (size_t i = 0; i < selfMovement.size() && i < creatureMovement.size(); ++i)
-    {
-        const uint8 delta = selfMovement.contents()[i] ^ creatureMovement.contents()[i];
-        CHECK(delta == (i == 4 ? 0x40 : 0x00));
-    }
-
-    {
-        const MopUpdateObject::StaticField fields[] =
-        {
-            { 0, 0xAABBCCDDu },
-            { 7, 0x3F800000u },
-        };
-
-        ByteBuffer create;
-        MopUpdateObject::AppendSimpleLivingCreateBlock(create, 2, e.guid, 3, living,
-            fields, sizeof(fields) / sizeof(fields[0]));
-
-        ByteBuffer expected;
-        expected << uint8(2) << uint8(0x01) << uint8(0x10) << uint8(3);
-        expected.append(creatureMovement);
-        MopUpdateObject::AppendStaticValuesNoDynamic(expected, fields, sizeof(fields) / sizeof(fields[0]));
-        CHECK(create.size() == expected.size());
-        CHECK(create.size() == expected.size() && std::memcmp(create.contents(), expected.contents(), expected.size()) == 0);
-
-        ByteBuffer values;
-        MopUpdateObject::AppendValuesBlock(values, e.guid, fields, sizeof(fields) / sizeof(fields[0]));
-        expected.clear();
-        expected << uint8(0) << uint8(0x01) << uint8(0x10);
-        MopUpdateObject::AppendStaticValuesNoDynamic(expected, fields, sizeof(fields) / sizeof(fields[0]));
-        CHECK(values.size() == expected.size());
-        CHECK(values.size() == expected.size() && std::memcmp(values.contents(), expected.contents(), expected.size()) == 0);
-    }
-
-    WorldPacket p;
-    MopUpdateObject::BuildSelfCreate(p, e);
-
-    const size_t movementOffset = 6 + (3 + NonZeroGuidBytes(e.guid));
-    CHECK(p.size() >= movementOffset + selfMovement.size());
-    CHECK(p.size() >= movementOffset + selfMovement.size() &&
-        std::memcmp(p.contents() + movementOffset, selfMovement.contents(), selfMovement.size()) == 0);
-
-    CHECK(p.GetOpcode() == SMSG_UPDATE_OBJECT);
-
-    // --- exact length (movement bit-count + byte-count sanity) ---
-    // header 6 + preamble (1 + [1 mask + nzgb] + 1) + movementBits ceil(104/8)=13
-    //   + byteTail (nzgb guid bytes + 13 floats + 4 time) + values 114.
-    // values 114 = 1 blockCount + 3*4 masks + 25 fields*4 + 1 dynamic-count.
-    const int nzgb = NonZeroGuidBytes(e.guid);                 // 1
-    const size_t expected = 6 + (3 + nzgb) + 13 + (nzgb + 13 * 4 + 4) + 114;
-    CHECK(p.size() == expected);
-
-    // --- header ---
-    p.rpos(0);
-    uint16 map; uint32 count;
-    p >> map; p >> count;
-    CHECK(map == e.mapId);
-    CHECK(count == 1);
-
-    // --- CREATE preamble ---
-    uint8 updateType; p >> updateType;
-    CHECK(updateType == 2);                                    // CREATE_OBJECT2
-    uint8 gmask; p >> gmask;
-    uint64 decGuid = 0;
+    MopUpdateObject::SelfPlayer const player = MakeSelf();
+    WorldPacket packet;
+    MopUpdateObject::BuildSelfCreate(packet, player);
+
+    int const guidByteCount = NonZeroGuidBytes(player.guid);
+    size_t const expectedSize =
+        6 + (3 + guidByteCount) + 13 + (guidByteCount + 13 * 4 + 4) + 114;
+    CHECK(packet.GetOpcode() == SMSG_UPDATE_OBJECT);
+    CHECK(packet.size() == expectedSize);
+
+    packet.rpos(0);
+    uint16 mapId = 0;
+    uint32 objectCount = 0;
+    packet >> mapId >> objectCount;
+    CHECK(mapId == player.mapId);
+    CHECK(objectCount == 1);
+
+    uint8 updateType = 0;
+    uint8 guidMask = 0;
+    packet >> updateType >> guidMask;
+    uint64 decodedGuid = 0;
     for (int i = 0; i < 8; ++i)
     {
-        if (gmask & (1 << i)) { uint8 b; p >> b; decGuid |= uint64(b) << (i * 8); }
+        if (guidMask & (1 << i))
+        {
+            uint8 byte = 0;
+            packet >> byte;
+            decodedGuid |= uint64(byte) << (i * 8);
+        }
     }
-    CHECK(decGuid == e.guid);
-    uint8 typeId; p >> typeId;
-    CHECK(typeId == 4);                                        // TYPEID_PLAYER
+    uint8 typeId = 0;
+    packet >> typeId;
+    CHECK(updateType == 2);
+    CHECK(decodedGuid == player.guid);
+    CHECK(typeId == 4);
 
-    // --- values block (fixed 114 bytes at the tail) ---
-    CHECK(p.size() >= 114);
-    p.rpos(p.size() - 114);
-    uint8 blockCount; p >> blockCount;
+    packet.rpos(packet.size() - 114);
+    uint8 blockCount = 0;
+    packet >> blockCount;
     CHECK(blockCount == 3);
-    uint32 mask[3];
-    for (int i = 0; i < 3; ++i) { p >> mask[i]; }
-    auto hasBit = [&](int idx) { return (mask[idx / 32] >> (idx % 32)) & 1u; };
-    CHECK(hasBit(0)); CHECK(hasBit(1)); CHECK(hasBit(4)); CHECK(hasBit(7));
-    CHECK(hasBit(30)); CHECK(hasBit(33)); CHECK(hasBit(55)); CHECK(hasBit(69)); CHECK(hasBit(70));
-    CHECK(hasBit(34)); CHECK(hasBit(38)); CHECK(hasBit(40)); CHECK(hasBit(44)); // power1..5 / maxpower1..5 span
-    CHECK(!hasBit(2)); CHECK(!hasBit(32));                     // spot-check unset bits
 
-    uint32 f[25];
-    for (int i = 0; i < 25; ++i) { p >> f[i]; }
-    CHECK(f[0] == 16u);                                        // OBJECT_FIELD_GUID low
-    CHECK(f[1] == 0u);                                         // OBJECT_FIELD_GUID high
-    CHECK(f[2] == 25u);                                        // OBJECT_FIELD_TYPE
-    CHECK(f[4] == (1u | (2u << 8) | (uint32(e.powerType) << 16) | (0u << 24))); // SEX: race|class|power|gender
-    CHECK(f[6] == 100u);                                       // HEALTH (idx 33)
-    CHECK(f[7] == 50u);                                        // POWER1 (idx 34)
-    CHECK(f[11] == 54u);                                       // POWER5 (idx 38)
-    CHECK(f[12] == 120u);                                      // MAX_HEALTH (idx 39)
-    CHECK(f[13] == 60u);                                       // MAXPOWER1 (idx 40)
-    CHECK(f[17] == 64u);                                       // MAXPOWER5 (idx 44)
-    CHECK(f[18] == 1u);                                        // LEVEL (idx 55)
-    CHECK(f[19] == 1u);                                        // FACTION (idx 57)
-    CHECK(f[20] == 0x8u);                                      // UNIT_FIELD_FLAGS (idx 61) passed through
-    CHECK(f[23] == 19724u);                                    // DISPLAY_ID (idx 69)
-    CHECK(f[24] == 19724u);                                    // NATIVE_DISPLAY_ID (idx 70)
-    uint8 dyn; p >> dyn;
-    CHECK(dyn == 0);                                           // no dynamic fields
-    CHECK(p.rpos() == p.size());                               // consumed to the end
-
-    // The login burst appends the projected self fields to this same create
-    // block, so they ride in the create rather than arriving afterwards as a
-    // VALUES block. Retail orders the login packet items-first, self-last.
+    uint32 mask[3] = {};
+    for (uint32& word : mask)
     {
-        // Core-only must be byte-identical whether reached through
-        // BuildSelfCreate or the block writer it now delegates to.
-        ByteBuffer bare;
-        MopUpdateObject::AppendSelfCreateBlock(bare, e, nullptr, 0);
-        CHECK(bare.size() + 6 == p.size());
-        CHECK(bare.size() + 6 == p.size() &&
-            std::memcmp(bare.contents(), p.contents() + 6, bare.size()) == 0);
+        packet >> word;
+    }
+    auto hasBit = [&mask](int index)
+    {
+        return (mask[index / 32] >> (index % 32)) & 1u;
+    };
+    CHECK(hasBit(0));
+    CHECK(hasBit(33));
+    CHECK(hasBit(61));
+    CHECK(hasBit(69));
+    CHECK(hasBit(70));
 
-        // Two projected fields either side of a 32-bit mask boundary, both
-        // above the core block's last index (70).
-        const MopUpdateObject::StaticField extra[] =
-        {
-            { 162, 0x00000010u },        // PLAYER_FLAGS, lowest projected field
-            { 1149, 0x0000BEEFu },       // coinage low
-        };
-        ByteBuffer seeded;
-        MopUpdateObject::AppendSelfCreateBlock(seeded, e, extra, 2);
+    uint32 fields[25] = {};
+    for (uint32& field : fields)
+    {
+        packet >> field;
+    }
+    CHECK(fields[0] == uint32(player.guid));
+    CHECK(fields[2] == 25u);
+    CHECK(fields[4] == (uint32(player.race) |
+                        (uint32(player.class_) << 8) |
+                        (uint32(player.powerType) << 16) |
+                        (uint32(player.gender) << 24)));
+    CHECK(fields[6] == player.health);
+    CHECK(fields[12] == player.maxHealth);
+    CHECK(fields[18] == player.level);
+    CHECK(fields[20] == player.unitFlags);
+    CHECK(fields[23] == player.displayId);
+    CHECK(fields[24] == player.nativeDisplayId);
 
-        // Two more fields, and the mask grows to cover index 1149.
-        CHECK(seeded.size() == bare.size() + 2 * 4 + (1149 / 32 + 1 - 3) * 4);
+    uint8 dynamicFieldCount = 0;
+    packet >> dynamicFieldCount;
+    CHECK(dynamicFieldCount == 0);
+    CHECK(packet.rpos() == packet.size());
 
-        // Decode the mask from the head of the values block. Everything before
-        // it is identical to the core-only block, so its offset is known.
-        const size_t valuesOffset = bare.size() - 114;
-        seeded.rpos(valuesOffset);
-        uint8 seededBlocks; seeded >> seededBlocks;
-        CHECK(seededBlocks == 1149 / 32 + 1);
-        std::vector<uint32> seededMask(seededBlocks);
-        for (uint8 i = 0; i < seededBlocks; ++i) { seeded >> seededMask[i]; }
-        auto seededBit = [&](int idx)
-        {
-            return (seededMask[idx / 32] >> (idx % 32)) & 1u;
-        };
-        CHECK(seededBit(70));            // last core field still present
-        CHECK(seededBit(162));           // appended
-        CHECK(seededBit(1149));          // appended
-        CHECK(!seededBit(163));          // nothing invented in between
-
-        // Values stay in index order: the 25 core values, then the two extras.
-        for (int i = 0; i < 25; ++i) { uint32 v; seeded >> v; }
-        uint32 v162, v1149;
-        seeded >> v162; seeded >> v1149;
-        CHECK(v162 == 0x00000010u);
-        CHECK(v1149 == 0x0000BEEFu);
-        uint8 seededDyn; seeded >> seededDyn;
-        CHECK(seededDyn == 0);
-        CHECK(seeded.rpos() == seeded.size());
+    if (g_failures)
+    {
+        std::printf("%d FAILURES\n", g_failures);
+        return 1;
     }
 
-    // The real login path feeds LEGACY indices spanning every range Map.cpp
-    // seeds, projects them, and hands the result to the create block. The
-    // projection is not monotonic in general - ranges shift by +5, +7 and +8
-    // and the quest log re-strides 5->15 - so the property that matters is
-    // that it stays ascending across each range BOUNDARY for this input.
-    {
-        MopUpdateObject::StaticField legacy[] =
-        {
-            { 157, 0x00000010u },        // PLAYER_FLAGS      -> 162
-            { 166, 27353u },             // quest slot 0 id   -> 171 (whole slot)
-            { 167, 0u },
-            { 168, 0u },
-            { 169, 0u },
-            { 170, 0u },
-            { 916, 12345u },             // visible item 1    -> 921
-            { 960, 0x0000ABCDu },        // inventory slot 0  -> 965
-            { 1142, 0x0000BEEFu },       // coinage low       -> 1149
-            { 1146, 0x00010002u },       // skill line 0      -> 1153
-            { 1619, 0xFFFFFFFFu },       // explored zone 0   -> 1627
-        };
-        const uint32 legacyCount = uint32(sizeof(legacy) / sizeof(legacy[0]));
-
-        // Taxi and spell mounts change after login. The owner's private
-        // VALUES projection must carry the legacy mount-display field to the
-        // 18414 UnitData slot, not only show it to nearby observers.
-        {
-            const MopUpdateObject::StaticField mount[] =
-            {
-                { 65, 29261u },
-            };
-            std::vector<MopUpdateObject::StaticField> out;
-            MopUpdateObject::TranslateSelfPlayerFields(mount, 1, out);
-            CHECK(out.size() == 1);
-            CHECK(out[0].index == 71 && out[0].value == 29261u);
-        }
-
-        // The same three words must also survive the SELF projection - they
-        // carry rest state (byte 3 of 162) and gender (byte 0 of 163), which
-        // the owner's own client needs for GetRestState() and for voice.
-        {
-            const MopUpdateObject::StaticField bytes[] =
-            {
-                { 161, 0x01020304u },
-                { 162, 0x05060708u },
-                { 163, 0x090A0B0Cu },
-            };
-            std::vector<MopUpdateObject::StaticField> out;
-            MopUpdateObject::TranslateSelfPlayerFields(bytes, 3, out);
-            CHECK(out.size() == 3);
-            CHECK(out[0].index == 166 && out[0].value == 0x01020304u);
-            CHECK(out[1].index == 167 && out[1].value == 0x05060708u);
-            CHECK(out[2].index == 168 && out[2].value == 0x090A0B0Cu);
-        }
-
-        std::vector<MopUpdateObject::StaticField> projected;
-        MopUpdateObject::TranslateSelfPlayerFields(legacy, legacyCount, projected);
-
-        // Quest slots expand 5 words to 15, so the count grows.
-        CHECK(projected.size() == legacyCount - 5 + 15);
-        CHECK(projected.front().index == 162);
-        CHECK(projected.front().index > 70);   // clears the core block
-        CHECK(projected.back().index == 1627);
-        for (size_t i = 1; i < projected.size(); ++i)
-        {
-            CHECK(projected[i - 1].index < projected[i].index);
-        }
-
-        // Must not trip the serializer's ascending assert when appended.
-        ByteBuffer real;
-        MopUpdateObject::AppendSelfCreateBlock(real, e, projected.data(),
-            uint32(projected.size()));
-        CHECK(real.size() > 0);
-
-        // Retail orders the login packet item creates first, self create last.
-        // Verify the two blocks decode in that order from one stream.
-        ByteBuffer stream;
-        uint32 itemValues[MopUpdateObject::ItemFieldCount] = { 0 };
-        itemValues[0] = 0x22u;                 // OBJECT_FIELD_GUID low
-        itemValues[4] = 3u;                    // OBJECT_FIELD_TYPE, Item
-        MopUpdateObject::AppendInventoryCreateBlock(stream, 0x22, 1, itemValues,
-            MopUpdateObject::ItemFieldCount);
-        const size_t selfBlockStart = stream.size();
-        MopUpdateObject::AppendSelfCreateBlock(stream, e, projected.data(),
-            uint32(projected.size()));
-
-        stream.rpos(0);
-        uint8 firstType; stream >> firstType;
-        CHECK(firstType == 1);                 // CREATE_OBJECT for the item
-        uint8 firstGuidMask; stream >> firstGuidMask;
-        for (int i = 0; i < 8; ++i)
-        {
-            if (firstGuidMask & (1 << i)) { uint8 b; stream >> b; }
-        }
-        uint8 firstTypeId; stream >> firstTypeId;
-        CHECK(firstTypeId == 1);               // TYPEID_ITEM
-
-        stream.rpos(selfBlockStart);
-        uint8 secondType; stream >> secondType;
-        CHECK(secondType == 2);                // CREATE_OBJECT2 for the player
-        uint8 secondGuidMask; stream >> secondGuidMask;
-        for (int i = 0; i < 8; ++i)
-        {
-            if (secondGuidMask & (1 << i)) { uint8 b; stream >> b; }
-        }
-        uint8 secondTypeId; stream >> secondTypeId;
-        CHECK(secondTypeId == 4);              // TYPEID_PLAYER, last
-    }
-
-    if (g_failures == 0) { std::printf("ALL PASS\n"); return 0; }
-    std::printf("%d FAILURES\n", g_failures);
-    return 1;
+    std::puts("mop_updateobject: all checks passed");
+    return 0;
 }

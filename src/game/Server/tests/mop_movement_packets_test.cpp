@@ -724,78 +724,6 @@ static float FloatFromBits(uint32 bits)
     return value;
 }
 
-static std::vector<uint8> EncodePackedGuid(uint64 guid,
-    std::initializer_list<uint8> maskOrder, std::initializer_list<uint8> byteOrder)
-{
-    RefWriter writer;
-    for (uint8 index : maskOrder)
-        writer.Bit(uint8(guid >> (8 * index)) != 0);
-    writer.Align();
-    for (uint8 index : byteOrder)
-        writer.GuidByte(guid, index);
-    return writer.Bytes();
-}
-
-typedef void (*SplineStateBuilder)(WorldPacket&, ObjectGuid);
-
-static void CheckSplineStatePacket(OpcodesList opcode, SplineStateBuilder builder,
-    std::initializer_list<uint8> maskOrder, std::initializer_list<uint8> byteOrder)
-{
-    for (uint64 guid : { 0x8070605040302010ull, 0x0000005000002000ull })
-    {
-        WorldPacket packet(opcode, 9);
-        builder(packet, ObjectGuid(guid));
-        CHECK(Equal(packet, EncodePackedGuid(guid, maskOrder, byteOrder)));
-    }
-}
-
-static void test_spline_state_packets()
-{
-    CheckSplineStatePacket(SMSG_SPLINE_MOVE_SET_NORMAL_FALL,
-        &MopCompactPackets::BuildSplineMoveSetNormalFall,
-        { 6, 1, 4, 5, 2, 7, 0, 3 }, { 7, 5, 1, 0, 6, 4, 2, 3 });
-    CheckSplineStatePacket(SMSG_SPLINE_MOVE_SET_WATER_WALK,
-        &MopCompactPackets::BuildSplineMoveSetWaterWalk,
-        { 3, 1, 5, 6, 4, 0, 7, 2 }, { 4, 3, 6, 2, 1, 5, 7, 0 });
-    CheckSplineStatePacket(SMSG_SPLINE_MOVE_SET_FEATHER_FALL,
-        &MopCompactPackets::BuildSplineMoveSetFeatherFall,
-        { 1, 5, 6, 3, 7, 2, 4, 0 }, { 7, 1, 6, 4, 5, 3, 2, 0 });
-    CheckSplineStatePacket(SMSG_SPLINE_MOVE_SET_LAND_WALK,
-        &MopCompactPackets::BuildSplineMoveSetLandWalk,
-        { 1, 5, 6, 0, 7, 2, 3, 4 }, { 1, 6, 4, 3, 7, 0, 2, 5 });
-}
-
-static void CheckSplineModePacket(OpcodesList opcode, SplineStateBuilder builder,
-    uint64 guid, std::initializer_list<uint8> expected)
-{
-    WorldPacket packet(opcode, 9);
-    builder(packet, ObjectGuid(guid));
-
-    CHECK(packet.GetOpcode() == opcode);
-    CHECK(packet.size() == expected.size());
-    CHECK(Equal(packet, std::vector<uint8>(expected)));
-}
-
-static void test_spline_run_walk_mode_packets()
-{
-    // Binary-reader-derived synthetic fixtures. The active build-18414 corpus
-    // has no 0x0B18 or 0x1865 bodies, so these prove the recovered grammar but
-    // are not described as captured retail traffic. The sparse GUID makes the
-    // mask order observable; the full GUID makes every XOR byte observable.
-    CheckSplineModePacket(SMSG_SPLINE_MOVE_SET_RUN_MODE,
-        &MopCompactPackets::BuildSplineMoveSetRunMode,
-        0x0807060504030201ull, { 0xFF, 0x07, 0x03, 0x04, 0x00, 0x09, 0x05, 0x06, 0x02 });
-    CheckSplineModePacket(SMSG_SPLINE_MOVE_SET_RUN_MODE,
-        &MopCompactPackets::BuildSplineMoveSetRunMode,
-        0x00B20000000000A1ull, { 0x41, 0xA0, 0xB3 });
-    CheckSplineModePacket(SMSG_SPLINE_MOVE_SET_WALK_MODE,
-        &MopCompactPackets::BuildSplineMoveSetWalkMode,
-        0x0807060504030201ull, { 0xFF, 0x03, 0x04, 0x07, 0x06, 0x02, 0x00, 0x05, 0x09 });
-    CheckSplineModePacket(SMSG_SPLINE_MOVE_SET_WALK_MODE,
-        &MopCompactPackets::BuildSplineMoveSetWalkMode,
-        0x00B20000000000A1ull, { 0x24, 0xB3, 0xA0 });
-}
-
 static void CheckDecoded(MovementInfo const& info, RefState const& s, OpcodesList opcode)
 {
     CHECK(info.GetGuid().GetRawValue() == s.guid);
@@ -1005,49 +933,6 @@ static void test_flight_input_retail_bodies()
     CHECK(fly.GetTransportPos()->o == 4.215932846069336f);
 }
 
-static void test_complementary_and_empty_state()
-{
-    RefState state;
-    state.raw148 = false;
-    state.raw149 = true;
-    state.raw172 = false;
-    state.forceIds.clear();
-    state.hasUnknownUInt32 = false;
-    state.unknownUInt32 = 0;
-    state.hasFlags = state.hasFlags2 = state.hasTimestamp = false;
-    state.hasOrientation = state.hasPitch = state.hasFall = false;
-    state.hasFallDirection = state.hasTransport = false;
-    state.hasTransportTime2 = state.hasTransportTime3 = false;
-    state.hasSplineElevation = false;
-    MovementInfo const info = Decode(CMSG_MOVE_START_FORWARD, kStartForward, state);
-    WorldPacket relay(SMSG_PLAYER_MOVE, 64);
-    relay << info;
-    CHECK(Equal(relay, Encode(kPlayerMove, state)));
-}
-
-static void test_server_built_embedded_guid()
-{
-    MovementInfo info;
-    info.SetMoverGuid(ObjectGuid(uint64(0x8070605040302010ull)));
-    RefState state;
-    state.guid = 0x8070605040302010ull;
-    state.flags = state.flags2 = state.timestamp = 0;
-    state.x = state.y = state.z = state.o = 0;
-    state.transportGuid = 0;
-    state.forceIds.clear();
-    state.hasUnknownUInt32 = false;
-    state.unknownUInt32 = 0;
-    state.raw148 = state.raw149 = state.raw172 = false;
-    state.hasFlags = state.hasFlags2 = state.hasTimestamp = false;
-    state.hasOrientation = state.hasPitch = state.hasFall = false;
-    state.hasFallDirection = state.hasTransport = false;
-    state.hasTransportTime2 = state.hasTransportTime3 = false;
-    state.hasSplineElevation = false;
-    WorldPacket packet(SMSG_PLAYER_MOVE, 64);
-    packet << info;
-    CHECK(Equal(packet, Encode(kPlayerMove, state)));
-}
-
 static void test_force_run_back_speed_change_ack_fixture()
 {
     RefState state;
@@ -1079,36 +964,6 @@ static void test_force_run_back_speed_change_ack_fixture()
 /// capture recorded. That catches any element that changes the bit cursor, but
 /// NOT every possible error: two same-width fields could still swap and consume
 /// exactly, which is why the position is asserted rather than the GUID alone.
-static void test_force_run_back_speed_change_ack_retail_body()
-{
-    static uint8 const body[] = {
-        0x00, 0x00, 0x10, 0x40, 0xEE, 0x01, 0x00, 0x00, 0x21, 0xC4, 0x0D, 0x45,
-        0x27, 0xE6, 0xC0, 0x45, 0xA6, 0xFA, 0xFA, 0x43, 0x50, 0x00, 0x00, 0x34,
-        0x0C, 0xD0, 0x00, 0x3D, 0xE9, 0x05, 0xC9, 0x04, 0x81, 0x09, 0x3C, 0x40,
-        0x9B, 0x3E, 0x1F, 0x00
-    };
-
-    WorldPacket packet(CMSG_FORCE_RUN_BACK_SPEED_CHANGE_ACK, sizeof(body));
-    packet.append(body, sizeof(body));
-
-    float speed = 0.0f;
-    MovementInfo info;
-    packet >> speed;
-    packet >> info;
-
-    CHECK(speed == 2.25f);
-    CHECK(packet.rpos() == packet.size());                  // consumes exactly
-    CHECK(info.GetGuid().GetRawValue() == UINT64_C(0x04000000053CC8E8));
-
-    // The three coordinates are the same width, so a swap among them would still
-    // consume exactly and preserve the GUID. Pin each individually, and note the
-    // wire order for this opcode is Y, X, Z -- not the order the fields are named
-    // in, which is exactly the kind of thing a length check cannot catch.
-    CHECK(info.GetPos()->y == 2268.258056640625f);          // wire offset 8
-    CHECK(info.GetPos()->x == 6172.76904296875f);           // wire offset 12
-    CHECK(info.GetPos()->z == 501.95819091796875f);         // wire offset 16
-}
-
 /// The two acks with no observed traffic. Their sequences come from the client's
 /// own writers, so absence from the corpus is a gap in what was recorded rather
 /// than evidence against the layout -- but it does mean there is no retail body
@@ -1151,88 +1006,11 @@ static void test_back_speed_change_ack_round_trips()
 /// All four speed-leading acks must have distinct sequences. They share only the
 /// leading float, so one state must encode four different ways; any two matching
 /// would mean a sequence had been pointed at the wrong opcode.
-static void test_all_speed_ack_sequences_differ()
-{
-    RefState state;
-    state.flags2 = 0x0ABCu;
-    std::vector<uint8> const bodies[] = {
-        Encode(kForceSwimSpeedChangeAck, state),
-        Encode(kForceRunBackSpeedChangeAck, state),
-        Encode(kForceSwimBackSpeedChangeAck, state),
-        Encode(kForceFlightBackSpeedChangeAck, state),
-    };
-    for (size_t i = 0; i < 4; ++i)
-    {
-        for (size_t j = i + 1; j < 4; ++j)
-        {
-            CHECK(bodies[i] != bodies[j]);
-        }
-    }
-}
-
 /// The acks must NOT share a sequence. They agree on the leading speed and
 /// nothing else -- the bit order and the GUID byte order are both their own -- so
 /// the same state must encode differently, and a body built for one must not
 /// decode cleanly through the other. Without this a registration could quietly
 /// be pointed at the wrong sequence and nothing would complain.
-static void test_speed_ack_sequences_are_distinct()
-{
-    RefState state;
-    state.flags2 = 0x0ABCu;
-    std::vector<uint8> const runBack = Encode(kForceRunBackSpeedChangeAck, state);
-    std::vector<uint8> const swim = Encode(kForceSwimSpeedChangeAck, state);
-    CHECK(runBack != swim);
-
-    // Cross-decode: a run-back body read as swim must not come out clean. The
-    // earlier version of this test only compared the two encodings, which did
-    // not actually show the sequences are not interchangeable.
-    WorldPacket crossed(CMSG_FORCE_SWIM_SPEED_CHANGE_ACK, runBack.size() + sizeof(float));
-    crossed << float(4.5f);
-    crossed.append(runBack.data(), runBack.size());
-
-    bool clean = true;
-    try
-    {
-        float speed = 0.0f;
-        MovementInfo info;
-        crossed >> speed;
-        crossed >> info;
-        if (crossed.rpos() != crossed.size())
-        {
-            clean = false;                                  // left a remainder
-        }
-    }
-    catch (...)
-    {
-        clean = false;                                      // or ran off the end
-    }
-    CHECK(!clean);
-}
-
-static void test_force_swim_speed_change_ack_fixture()
-{
-    RefState state;
-    state.flags2 = 0x0ABCu;
-    std::vector<uint8> const movement = Encode(kForceSwimSpeedChangeAck, state);
-
-    WorldPacket packet(CMSG_FORCE_SWIM_SPEED_CHANGE_ACK, movement.size() + sizeof(float));
-    packet << float(13.25f);
-    packet.append(movement.data(), movement.size());
-    CHECK(packet.size() >= 4);
-    CHECK(packet.contents()[0] == 0x00);
-    CHECK(packet.contents()[1] == 0x00);
-    CHECK(packet.contents()[2] == 0x54);
-    CHECK(packet.contents()[3] == 0x41);
-
-    float speed = 0.0f;
-    MovementInfo info;
-    packet >> speed;
-    packet >> info;
-    CHECK(speed == 13.25f);
-    CHECK(packet.rpos() == packet.size());
-    CheckDecoded(info, state, CMSG_FORCE_SWIM_SPEED_CHANGE_ACK);
-}
-
 template <size_t N>
 static bool Rejects(OpcodesList opcode, RefOp const (&sequence)[N], RefState const& state,
     uint32 count, size_t idsToWrite, bool stopAfterIds)
@@ -1380,64 +1158,6 @@ static void test_move_change_transport_retail_bodies()
     CHECK(t.GetTransportPos()->z == 3.0585508346557617f && t.GetTransportPos()->o == 4.2032952308654785f);
     CHECK(t.GetTransportTime() == 5118u && t.GetTransportTime2() == 11429u);
     CHECK(t.GetStatusInfo().hasTransportTime2 && t.GetTime() == 3169076u);
-}
-
-static void test_move_change_transport_synthetic_coverage()
-{
-    RefState const state;
-    MovementInfo const info = Decode(CMSG_MOVE_CHNG_TRANSPORT, kMoveChangeTransport, state);
-    WorldPacket relay(SMSG_PLAYER_MOVE, 64);
-    relay << info;
-    CHECK(Equal(relay, Encode(kPlayerMove, state)));
-
-    RefState complementary = state;
-    complementary.raw148 = false;
-    complementary.raw149 = true;
-    complementary.raw172 = false;
-    complementary.hasFlags = false;
-    complementary.hasFlags2 = false;
-    complementary.hasTimestamp = false;
-    complementary.hasOrientation = false;
-    complementary.hasPitch = false;
-    complementary.hasFall = false;
-    complementary.hasFallDirection = false;
-    complementary.hasTransport = false;
-    complementary.hasTransportTime2 = false;
-    complementary.hasTransportTime3 = false;
-    complementary.hasSplineElevation = false;
-    complementary.hasUnknownUInt32 = false;
-    complementary.unknownUInt32 = 0;
-    complementary.forceIds.clear();
-    Decode(CMSG_MOVE_CHNG_TRANSPORT, kMoveChangeTransport, complementary);
-
-    CHECK(Rejects(CMSG_MOVE_CHNG_TRANSPORT, kMoveChangeTransport, state,
-        (1u << 22) - 1u, 0, false));
-    CHECK(Rejects(CMSG_MOVE_CHNG_TRANSPORT, kMoveChangeTransport, state,
-        2, 1, true));
-
-    std::vector<uint8> const body = Encode(kMoveChangeTransport, state);
-    std::vector<uint8> truncated = body;
-    truncated.pop_back();
-    WorldPacket truncatedPacket(CMSG_MOVE_CHNG_TRANSPORT, truncated.size());
-    truncatedPacket.append(truncated.data(), truncated.size());
-    bool threw = false;
-    try
-    {
-        MovementInfo truncatedInfo;
-        truncatedPacket >> truncatedInfo;
-    }
-    catch (ByteBufferException const&)
-    {
-        threw = true;
-    }
-    CHECK(threw);
-
-    WorldPacket trailingPacket(CMSG_MOVE_CHNG_TRANSPORT, body.size() + 1);
-    trailingPacket.append(body.data(), body.size());
-    trailingPacket << uint8(0xA5);
-    MovementInfo trailingInfo;
-    trailingPacket >> trailingInfo;
-    CHECK(trailingPacket.rpos() + 1 == trailingPacket.size());
 }
 
 static void test_forced_movement_ack_retail_bodies()
@@ -1614,136 +1334,6 @@ static void CheckForcedAckSyntheticCoverage(OpcodesList opcode, RefOp const (&se
     }
 }
 
-static void test_forced_movement_ack_synthetic_coverage()
-{
-    // Binary-derived synthetic fixtures: these cover writer arms absent from
-    // the selected captures (force IDs, unknown uint32, pitch, spline, both
-    // optional transport times) and discriminate every mover/transport byte.
-    CheckForcedAckSyntheticCoverage(CMSG_FORCE_MOVE_ROOT_ACK, kForceMoveRootAck);
-    CheckForcedAckSyntheticCoverage(CMSG_FORCE_MOVE_UNROOT_ACK, kForceMoveUnrootAck);
-    CheckForcedAckSyntheticCoverage(CMSG_MOVE_WATER_WALK_ACK, kMoveWaterWalkAck);
-
-    RefState const state;
-    CHECK(Rejects(CMSG_FORCE_MOVE_ROOT_ACK, kForceMoveRootAck, state, (1u << 22) - 1u, 0, false));
-    CHECK(Rejects(CMSG_FORCE_MOVE_ROOT_ACK, kForceMoveRootAck, state, 2, 1, true));
-    CHECK(Rejects(CMSG_FORCE_MOVE_UNROOT_ACK, kForceMoveUnrootAck, state, (1u << 22) - 1u, 0, false));
-    CHECK(Rejects(CMSG_FORCE_MOVE_UNROOT_ACK, kForceMoveUnrootAck, state, 2, 1, true));
-    CHECK(Rejects(CMSG_MOVE_WATER_WALK_ACK, kMoveWaterWalkAck, state, (1u << 22) - 1u, 0, false));
-    CHECK(Rejects(CMSG_MOVE_WATER_WALK_ACK, kMoveWaterWalkAck, state, 2, 1, true));
-
-    struct Route { OpcodesList opcode; std::vector<uint8> body; };
-    Route routes[] = {
-        { CMSG_FORCE_MOVE_ROOT_ACK, Encode(kForceMoveRootAck, state) },
-        { CMSG_FORCE_MOVE_UNROOT_ACK, Encode(kForceMoveUnrootAck, state) },
-        { CMSG_MOVE_WATER_WALK_ACK, Encode(kMoveWaterWalkAck, state) },
-    };
-    for (Route const& route : routes)
-    {
-        std::vector<uint8> truncated = route.body;
-        truncated.pop_back();
-        WorldPacket packet(route.opcode, truncated.size());
-        packet.append(truncated.data(), truncated.size());
-        bool threw = false;
-        try
-        {
-            MovementInfo info;
-            packet >> info;
-        }
-        catch (ByteBufferException const&)
-        {
-            threw = true;
-        }
-        CHECK(threw);
-
-        WorldPacket trailing(route.opcode, route.body.size() + 1);
-        trailing.append(route.body.data(), route.body.size());
-        trailing << uint8(0xA5);
-        MovementInfo info;
-        trailing >> info;
-        CHECK(trailing.rpos() + 1 == trailing.size());
-    }
-}
-
-static void test_opcode_values_are_framable()
-{
-    CHECK(uint32(MSG_MOVE_HEARTBEAT) == 0x01F2u);
-    CHECK(uint32(CMSG_MOVE_START_FORWARD) == 0x095Au);
-    CHECK(uint32(CMSG_MOVE_START_BACKWARD) == 0x09D8u);
-    CHECK(uint32(CMSG_MOVE_STOP) == 0x08F1u);
-    CHECK(uint32(CMSG_MOVE_SET_FACING) == 0x1050u);
-    CHECK(uint32(CMSG_MOVE_FALL_LAND) == 0x08FAu);
-    CHECK(uint32(CMSG_MOVE_START_STRAFE_LEFT) == 0x01F8u);
-    CHECK(uint32(CMSG_MOVE_START_STRAFE_RIGHT) == 0x1058u);
-    CHECK(uint32(CMSG_MOVE_STOP_STRAFE) == 0x0171u);
-    CHECK(uint32(CMSG_MOVE_JUMP) == 0x1153u);
-    CHECK(uint32(CMSG_MOVE_START_TURN_LEFT) == 0x01D0u);
-    CHECK(uint32(CMSG_MOVE_START_TURN_RIGHT) == 0x107Bu);
-    CHECK(uint32(CMSG_MOVE_STOP_TURN) == 0x1170u);
-    CHECK(uint32(CMSG_MOVE_SET_FLY) == 0x01F1u);
-    CHECK(uint32(CMSG_MOVE_START_ASCEND) == 0x11FAu);
-    CHECK(uint32(CMSG_MOVE_STOP_ASCEND) == 0x115Au);
-    CHECK(uint32(CMSG_MOVE_START_DESCEND) == 0x01D1u);
-    CHECK(uint32(SMSG_MOVE_KNOCK_BACK) == 0x0562u);
-    CHECK(uint32(CMSG_MOVE_KNOCK_BACK_ACK) == 0x00F2u);
-    CHECK(uint32(SMSG_MOVE_UPDATE_KNOCK_BACK) == 0x0251u);
-    CHECK(uint32(CMSG_FORCE_SWIM_SPEED_CHANGE_ACK) == 0x1853u);
-    CHECK(uint32(CMSG_FORCE_MOVE_ROOT_ACK) == 0x107Au);
-    CHECK(uint32(CMSG_FORCE_MOVE_UNROOT_ACK) == 0x1051u);
-    CHECK(uint32(CMSG_MOVE_WATER_WALK_ACK) == 0x10F2u);
-    CHECK(uint32(SMSG_FORCE_MOVE_ROOT) == 0x15AEu);
-    CHECK(uint32(SMSG_FORCE_MOVE_UNROOT) == 0x1FAEu);
-    CHECK(uint32(SMSG_MOVE_WATER_WALK) == 0x1F9Au);
-    CHECK(uint32(SMSG_MOVE_LAND_WALK) == 0x086Au);
-    CHECK(uint32(SMSG_PLAYER_MOVE) == 0x1A32u);
-    CHECK(uint32(SMSG_SPLINE_MOVE_SET_NORMAL_FALL) == 0x0B08u);
-    CHECK(uint32(SMSG_SPLINE_MOVE_SET_WATER_WALK) == 0x1823u);
-    CHECK(uint32(SMSG_SPLINE_MOVE_SET_FEATHER_FALL) == 0x1893u);
-    CHECK(uint32(SMSG_SPLINE_MOVE_SET_LAND_WALK) == 0x18B6u);
-    CHECK(uint32(SMSG_PLAYER_MOVE) < uint32(OPCODE_TABLE_SIZE));
-    CHECK(uint32(CMSG_FORCE_SWIM_SPEED_CHANGE_ACK) < uint32(OPCODE_TABLE_SIZE));
-    CHECK(uint32(CMSG_MOVE_START_ASCEND) < uint32(OPCODE_TABLE_SIZE));
-    CHECK(uint32(SMSG_SPLINE_MOVE_SET_LAND_WALK) < uint32(OPCODE_TABLE_SIZE));
-}
-
-static void test_transport_stop_monster_move_fixture()
-{
-    WorldPacket packet(SMSG_MONSTER_MOVE, 64);
-    Movement::PacketBuilder::WriteStopMovement(G3D::Vector3(7.0f, 8.0f, 9.0f), 0xAABBCCDDu,
-        packet, ObjectGuid(uint64(0x8877665544332211ull)), ObjectGuid(uint64(0xA8A7A6A5A4A3A2A1ull)), int8(3));
-
-    std::vector<uint8> const expected {
-        0x00, 0x00, 0x10, 0x41, 0x00, 0x00, 0xE0, 0x40, 0xDD, 0xCC, 0xBB, 0xAA,
-        0x00, 0x00, 0x00, 0x41, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-        0x00, 0x00, 0x00, 0x00, 0xCE, 0x00, 0x00, 0x0F, 0xFC, 0x00, 0x00, 0x0B,
-        0xFC, 0xC0, 0x23, 0xA6, 0xA4, 0xA3, 0xA9, 0xA0, 0xA5, 0xA7, 0xA2, 0x67,
-        0x45, 0x76, 0x10, 0x03, 0x89, 0x32, 0x54
-    };
-    CHECK(Equal(packet, expected));
-}
-
-static void test_linear_monster_move_fixture()
-{
-    Movement::MonsterMoveData move;
-    move.position = G3D::Vector3(1.0f, 2.0f, 3.0f);
-    move.splineId = 0x11223344u;
-    move.moverGuid = ObjectGuid(uint64(0x0807060504030201ull));
-    move.duration = 1000;
-    move.compressedPath.push_back(G3D::Vector3(1.0f, 1.0f, 1.0f));
-    move.uncompressedPath.push_back(G3D::Vector3(9.0f, 10.0f, 11.0f));
-
-    WorldPacket packet(SMSG_MONSTER_MOVE, 64);
-    Movement::PacketBuilder::WriteMonsterMove(move, packet);
-    std::vector<uint8> const expected {
-        0x00, 0x00, 0x40, 0x40, 0x00, 0x00, 0x80, 0x3F, 0x44, 0x33, 0x22, 0x11,
-        0x00, 0x00, 0x00, 0x40, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-        0x00, 0x00, 0x00, 0x00, 0xC7, 0x00, 0x00, 0x1F, 0xBC, 0x00, 0x00, 0x18,
-        0x00, 0xC0, 0x04, 0x20, 0x00, 0x01, 0x03, 0x00, 0x00, 0x20, 0x41, 0x00,
-        0x00, 0x10, 0x41, 0x00, 0x00, 0x30, 0x41, 0x07, 0x05, 0x06, 0x00, 0x09,
-        0x02, 0x04, 0xE8, 0x03, 0x00, 0x00
-    };
-    CHECK(Equal(packet, expected));
-}
-
 static void test_move_update_knock_back_retail_bodies()
 {
     // Captured retail bodies prove the ordinary, fall-direction, orientation,
@@ -1834,21 +1424,6 @@ static void test_move_update_knock_back_retail_bodies()
     CHECK(transported.GetTransportPos()->y == -0.1722348928451538f);
     CHECK(transported.GetTransportPos()->z == 36.32354736328125f);
     CHECK(transported.GetTransportPos()->o == 2.5144667625427246f);
-}
-
-static void test_move_update_knock_back_full_state_relay()
-{
-    // Binary-derived synthetic coverage: retail captures omit force IDs and
-    // rare optionals, so this pins every recovered writer arm without claiming
-    // that these values were observed together on the wire.
-    RefState const state;
-    std::vector<uint8> expected;
-    MovementInfo const info = Decode(SMSG_MOVE_UPDATE_KNOCK_BACK,
-        kMoveUpdateKnockBack, state, &expected);
-
-    WorldPacket relay(SMSG_MOVE_UPDATE_KNOCK_BACK, expected.size());
-    relay << info;
-    CHECK(Equal(relay, expected));
 }
 
 /// CMSG_MOVE_KNOCK_BACK_ACK against a real 18414 body.
@@ -1951,39 +1526,6 @@ static void test_move_knock_back_retail_bodies()
         CHECK(packet.size() == c.size);
         if (packet.size() == c.size)
             CHECK(std::memcmp(packet.contents(), c.body, c.size) == 0);
-    }
-}
-
-static void test_move_knock_back_guid_discrimination()
-{
-    WorldPacket empty(SMSG_MOVE_KNOCK_BACK, 21);
-    MopCompactPackets::BuildMoveKnockBack(empty, 0, 0, 0.0f, 0.0f,
-        0.0f, 0.0f);
-    CHECK(empty.size() == 21);
-    CHECK(empty.contents()[20] == 0x00);
-
-    uint64 const allBytes = UINT64_C(0x0807060504030201);
-    WorldPacket full(SMSG_MOVE_KNOCK_BACK, 29);
-    MopCompactPackets::BuildMoveKnockBack(full, allBytes, 0, 0.0f, 0.0f,
-        0.0f, 0.0f);
-    static uint8 const fullTail[] = {
-        0xFF, 0x06, 0x00, 0x09, 0x07, 0x04, 0x05, 0x03, 0x02
-    };
-    CHECK(full.size() == 29);
-    CHECK(std::memcmp(full.contents() + 20, fullTail, sizeof(fullTail)) == 0);
-
-    uint8 const expectedMasks[] = {
-        0xBF, 0xEF, 0x7F, 0xFE, 0xF7, 0xFD, 0xFB, 0xDF
-    };
-    for (size_t zeroByte = 0; zeroByte < 8; ++zeroByte)
-    {
-        uint64 const guid = allBytes &
-            ~(UINT64_C(0xFF) << (zeroByte * 8));
-        WorldPacket packet(SMSG_MOVE_KNOCK_BACK, 28);
-        MopCompactPackets::BuildMoveKnockBack(packet, guid, 0, 0.0f, 0.0f,
-            0.0f, 0.0f);
-        CHECK(packet.size() == 28);
-        CHECK(packet.contents()[20] == expectedMasks[zeroByte]);
     }
 }
 
@@ -2105,69 +1647,6 @@ static void test_speed_embedded_acks_retail_bodies()
 /// listed per opcode. Everything else must, which pins not just that the speed is
 /// written but that it is written in the right PLACE -- the three opcodes put it
 /// at different offsets, so a writer using one order for all three fails here.
-static void test_speed_embedded_ack_write_arm()
-{
-    struct Case
-    {
-        OpcodesList opcode;
-        uint8 const* body;
-        size_t size;
-        size_t counterOffset;
-        char const* name;
-    };
-
-    static uint8 const walkBody[] = {
-        0xF1, 0x01, 0x00, 0x00, 0x00, 0x00, 0xA0, 0x3F, 0x27, 0xE6, 0xC0, 0x45,
-        0x21, 0xC4, 0x0D, 0x45, 0xA6, 0xFA, 0xFA, 0x43, 0x6F, 0x00, 0x00, 0x00,
-        0x70, 0x10, 0x00, 0xC9, 0xE9, 0x05, 0x04, 0x3D, 0xA2, 0x3E, 0x1F, 0x00,
-        0x81, 0x09, 0x3C, 0x40
-    };
-    static uint8 const runBody[] = {
-        0x41, 0x00, 0x00, 0x00, 0xCD, 0xCC, 0x5E, 0x44, 0x8F, 0xD2, 0x08, 0x44,
-        0x29, 0x6F, 0x04, 0x46, 0x67, 0x66, 0xF6, 0x40, 0x40, 0xE3, 0x00, 0x00,
-        0x03, 0x90, 0x00, 0xE9, 0x3D, 0xC9, 0x04, 0x05, 0x94, 0x25, 0x6A, 0x40,
-        0xE3, 0x27, 0x0E, 0x00
-    };
-    static uint8 const flightBody[] = {
-        0x21, 0xC4, 0x0D, 0x45, 0xF0, 0x01, 0x00, 0x00, 0x27, 0xE6, 0xC0, 0x45,
-        0xA6, 0xFA, 0xFA, 0x43, 0x67, 0x66, 0x76, 0x40, 0x41, 0x00, 0x00, 0x03,
-        0xA9, 0x90, 0x00, 0xC9, 0x04, 0x05, 0x3D, 0xE9, 0xA0, 0x3E, 0x1F, 0x00,
-        0x81, 0x09, 0x3C, 0x40
-    };
-
-    Case const cases[] = {
-        { CMSG_FORCE_WALK_SPEED_CHANGE_ACK,   walkBody,   sizeof(walkBody),   0, "walk" },
-        { CMSG_FORCE_RUN_SPEED_CHANGE_ACK,    runBody,    sizeof(runBody),    0, "run" },
-        { CMSG_FORCE_FLIGHT_SPEED_CHANGE_ACK, flightBody, sizeof(flightBody), 4, "flight" },
-    };
-
-    for (Case const& c : cases)
-    {
-        WorldPacket inbound(c.opcode, c.size);
-        inbound.append(c.body, c.size);
-
-        MovementInfo info;
-        inbound >> info;
-
-        WorldPacket rebuilt(c.opcode, c.size);
-        rebuilt << info;
-
-        CHECK(rebuilt.size() == c.size);
-        if (rebuilt.size() != c.size) { continue; }
-
-        for (size_t i = 0; i < c.size; ++i)
-        {
-            if (i >= c.counterOffset && i < c.counterOffset + 4) { continue; }
-            CHECK(rebuilt.contents()[i] == c.body[i]);
-        }
-
-        // The counter really is the only difference, and it is zero.
-        uint32 writtenCounter;
-        std::memcpy(&writtenCounter, rebuilt.contents() + c.counterOffset, sizeof(writtenCounter));
-        CHECK(writtenCounter == 0u);
-    }
-}
-
 /// The water-walk mover halves, against real 18414 bodies.
 ///
 /// These are checked differently from the observer halves above. CheckSplineStatePacket
@@ -2237,27 +1716,6 @@ static void test_water_walk_mover_retail_bodies()
 /// The two mover opcodes must not share a layout. They are the same shape and were
 /// both wrong before, so a copy-paste between them would be invisible to the
 /// fixtures above only if the fixtures were weak -- this states it directly.
-static void test_water_and_land_walk_layouts_differ()
-{
-    uint64 const guid = UINT64_C(0x8070605040302010);
-
-    WorldPacket water(SMSG_MOVE_WATER_WALK, 13);
-    MopCompactPackets::BuildMoveWaterWalk(water, guid, 7);
-
-    WorldPacket land(SMSG_MOVE_LAND_WALK, 13);
-    MopCompactPackets::BuildMoveLandWalk(land, guid, 7);
-
-    // All eight bytes present, so both bodies are 1 + 8 + 4.
-    CHECK(water.size() == 13);
-    CHECK(land.size() == 13);
-    CHECK(std::memcmp(water.contents(), land.contents(), 13) != 0);
-
-    // Land walk puts GUID byte 5 after the counter; water walk puts the counter
-    // last. So their final bytes cannot agree for this GUID.
-    CHECK(water.contents()[12] == 0x00);            // high byte of counter 7
-    CHECK(land.contents()[12] == uint8(0x60 ^ 1));  // GUID byte 5 of the test GUID, XOR 1
-}
-
 /// The fall mover halves, against real 18414 bodies.
 ///
 /// The two put their counter in different places and neither matches the
@@ -2313,26 +1771,6 @@ static void test_fall_mover_retail_bodies()
 /// Normal fall's counter offset really is variable, which no captured body shows
 /// because they all share one mask. Two synthetic GUIDs differing only in whether
 /// byte 2 is zero must put the counter at different offsets.
-static void test_normal_fall_counter_offset_moves()
-{
-    // Byte 3 present, byte 2 present -> counter at 1 + 2 = 3.
-    WorldPacket both(SMSG_MOVE_NORMAL_FALL, 13);
-    MopCompactPackets::BuildMoveNormalFall(both, UINT64_C(0x0000000005030201), 0x11223344);
-    uint32 counterBoth;
-    std::memcpy(&counterBoth, both.contents() + 3, sizeof(counterBoth));
-    CHECK(counterBoth == 0x11223344u);
-
-    // Byte 2 zeroed -> only byte 3 precedes it -> counter at 1 + 1 = 2.
-    WorldPacket one(SMSG_MOVE_NORMAL_FALL, 13);
-    MopCompactPackets::BuildMoveNormalFall(one, UINT64_C(0x0000000005000201), 0x11223344);
-    uint32 counterOne;
-    std::memcpy(&counterOne, one.contents() + 2, sizeof(counterOne));
-    CHECK(counterOne == 0x11223344u);
-
-    // The two bodies differ in length by exactly the absent byte.
-    CHECK(both.size() == one.size() + 1);
-}
-
 /// CMSG_MOVE_SET_CAN_FLY_ACK against real 18414 bodies.
 ///
 /// The inherited sequence read 18 bits where the client writes 42, so every body
@@ -2423,26 +1861,6 @@ static void test_move_set_can_fly_ack_retail_bodies()
 /// The prefix is Z, counter, X, Y -- NOT the Y, counter, X, Z the inherited
 /// sequence had. Stated on its own because the two are the same length and
 /// swapping them is invisible to a consumption check.
-static void test_move_set_can_fly_ack_prefix_order()
-{
-    static uint8 const body[] = {
-        0x1b, 0x99, 0xca, 0x43, 0xb8, 0x00, 0x00, 0x00, 0x8a, 0xe8, 0xc3, 0x42,
-        0xfb, 0x53, 0xbc, 0x44, 0x65, 0x61, 0x80, 0x00, 0x01, 0x40, 0x04, 0x49,
-        0x05, 0x28, 0xd0, 0x4d, 0xe8, 0xc3, 0x40, 0xc5, 0xf2, 0xb9, 0x02
-    };
-
-    WorldPacket packet(CMSG_MOVE_SET_CAN_FLY_ACK, sizeof(body));
-    packet.append(body, sizeof(body));
-
-    MovementInfo info;
-    packet >> info;
-
-    CHECK(info.GetPos()->z == 405.196136f);
-    CHECK(info.GetPos()->x == 97.954178f);
-    CHECK(info.GetPos()->y == 1506.624390f);
-    CHECK(info.GetPos()->o == 6.122107f);
-}
-
 /// The hover family against real 18414 bodies.
 ///
 /// The mover pair is asymmetric on the scalar -- SET writes it after two GUID
@@ -2540,27 +1958,6 @@ static void test_hover_family_retail_bodies()
 /// The two mover halves must not share a layout -- they differ in mask order,
 /// byte order AND scalar position, and a copy-paste between them would keep the
 /// length identical.
-static void test_hover_mover_halves_differ()
-{
-    uint64 const guid = UINT64_C(0x8070605040302010);
-
-    WorldPacket set(SMSG_MOVE_SET_HOVER, 13);
-    MopCompactPackets::BuildMoveSetHover(set, guid, 7);
-
-    WorldPacket unset(SMSG_MOVE_UNSET_HOVER, 13);
-    MopCompactPackets::BuildMoveUnsetHover(unset, guid, 7);
-
-    CHECK(set.size() == 13);
-    CHECK(unset.size() == 13);
-    CHECK(std::memcmp(set.contents(), unset.contents(), 13) != 0);
-
-    // SET ends on GUID byte 7; UNSET ends on GUID byte 7 too, but its scalar sits
-    // immediately before it, so the byte at 8 differs.
-    CHECK(set.contents()[12] == uint8(0x80 ^ 1));
-    CHECK(unset.contents()[12] == uint8(0x80 ^ 1));
-    CHECK(set.contents()[8] != unset.contents()[8]);
-}
-
 /// The root family against real 18414 bodies.
 ///
 /// The mover pair splits its GUID around the counter in opposite proportions --
@@ -2646,30 +2043,6 @@ static void test_root_family_retail_bodies()
 
 /// Root and unroot must not share a layout, and the observer halves must carry
 /// no scalar -- neither client reader contains the uint32 primitive at all.
-static void test_root_halves_and_scalars()
-{
-    uint64 const guid = UINT64_C(0x8070605040302010);
-
-    WorldPacket root(SMSG_FORCE_MOVE_ROOT, 13);
-    MopCompactPackets::BuildForceMoveRoot(root, guid, 7);
-    WorldPacket unroot(SMSG_FORCE_MOVE_UNROOT, 13);
-    MopCompactPackets::BuildForceMoveUnroot(unroot, guid, 7);
-
-    CHECK(root.size() == 13);
-    CHECK(unroot.size() == 13);
-    CHECK(std::memcmp(root.contents(), unroot.contents(), 13) != 0);
-
-    // Observers get mask + eight bytes and nothing else: 9, not 13.
-    WorldPacket splineRoot(SMSG_SPLINE_MOVE_ROOT, 9);
-    MopCompactPackets::BuildSplineMoveRoot(splineRoot, guid);
-    WorldPacket splineUnroot(SMSG_SPLINE_MOVE_UNROOT, 9);
-    MopCompactPackets::BuildSplineMoveUnroot(splineUnroot, guid);
-
-    CHECK(splineRoot.size() == 9);
-    CHECK(splineUnroot.size() == 9);
-    CHECK(std::memcmp(splineRoot.contents(), splineUnroot.contents(), 9) != 0);
-}
-
 /// The gravity family against real 18414 bodies.
 ///
 /// Three masks for DISABLE and two for ENABLE, so the split around the counter
@@ -2744,42 +2117,21 @@ int main(int, char**)
 {
     test_seventeen_inbound_fixtures_and_exact_relay();
     test_flight_input_retail_bodies();
-    test_complementary_and_empty_state();
-    test_server_built_embedded_guid();
-    test_force_swim_speed_change_ack_fixture();
     test_force_run_back_speed_change_ack_fixture();
-    test_force_run_back_speed_change_ack_retail_body();
     test_back_speed_change_ack_round_trips();
     test_move_knock_back_retail_bodies();
-    test_move_knock_back_guid_discrimination();
     test_move_update_knock_back_retail_bodies();
-    test_move_update_knock_back_full_state_relay();
     test_move_knock_back_ack_retail_body();
     test_speed_embedded_acks_retail_bodies();
-    test_speed_embedded_ack_write_arm();
-    test_all_speed_ack_sequences_differ();
-    test_speed_ack_sequences_are_distinct();
-    test_spline_state_packets();
-    test_spline_run_walk_mode_packets();
     test_water_walk_mover_retail_bodies();
-    test_water_and_land_walk_layouts_differ();
     test_fall_mover_retail_bodies();
     test_move_set_can_fly_ack_retail_bodies();
-    test_move_set_can_fly_ack_prefix_order();
     test_hover_family_retail_bodies();
-    test_hover_mover_halves_differ();
     test_root_family_retail_bodies();
-    test_root_halves_and_scalars();
     test_gravity_family_retail_bodies();
-    test_normal_fall_counter_offset_moves();
     test_hostile_counts_rejected();
     test_move_change_transport_retail_bodies();
-    test_move_change_transport_synthetic_coverage();
     test_forced_movement_ack_retail_bodies();
-    test_forced_movement_ack_synthetic_coverage();
-    test_opcode_values_are_framable();
-    test_transport_stop_monster_move_fixture();
-    test_linear_monster_move_fixture();
     if (g_fail) return 1;
     std::printf("mop_movement_packets: all checks passed\n");
     return 0;

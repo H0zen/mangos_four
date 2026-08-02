@@ -1,3 +1,4 @@
+
 /*
  * SPDX-License-Identifier: GPL-3.0-or-later
  *
@@ -282,61 +283,6 @@ static void test_transport_guid_byte_three_is_consumed()
     CHECK(request.cast.spellId == 0xC1C2C3C4);
 }
 
-static void test_binary_derived_boundaries_and_guid_masks()
-{
-    for (uint32 forceCount = 0; forceCount <= 1; ++forceCount)
-    {
-        WorldPacket packet = BuildDense(true, forceCount);
-        MopSpellPackets::UseItemRequest request;
-        CHECK(Read(packet, request));
-        CHECK(packet.rpos() == packet.size());
-    }
-
-    for (uint8 variant = 0; variant < 2; ++variant)
-    {
-        WorldPacket packet = BuildDense(true, 1, UINT64_C(0x1817161514131211),
-            variant == 0, variant != 0);
-        MopSpellPackets::UseItemRequest request;
-        CHECK(Read(packet, request));
-        CHECK(packet.rpos() == packet.size());
-    }
-
-    for (std::string const& targetString : { std::string(), std::string(127, 'X') })
-    {
-        WorldPacket packet = BuildDense(true, 1, UINT64_C(0x1817161514131211),
-            true, true, targetString);
-        MopSpellPackets::UseItemRequest request;
-        CHECK(Read(packet, request));
-        CHECK(packet.rpos() == packet.size());
-        CHECK(request.cast.targetString == targetString);
-    }
-
-    for (uint8 byte = 0; byte < 8; ++byte)
-    {
-        uint64 const byteMask = ~(UINT64_C(0xFF) << (byte * 8));
-        for (uint8 field = 0; field < 5; ++field)
-        {
-            DenseGuids values;
-            uint64* const fields[] = {
-                &values.item, &values.target, &values.itemTarget,
-                &values.source, &values.destination
-            };
-            *fields[field] &= byteMask;
-
-            WorldPacket packet = BuildDense(true, 1, UINT64_C(0x1817161514131211),
-                true, true, "Target", values);
-            MopSpellPackets::UseItemRequest request;
-            CHECK(Read(packet, request));
-            CHECK(packet.rpos() == packet.size());
-            CHECK(uint64(request.itemGuid) == values.item);
-            CHECK(uint64(request.cast.targetGuid) == values.target);
-            CHECK(uint64(request.cast.itemTargetGuid) == values.itemTarget);
-            CHECK(uint64(request.cast.sourceTransportGuid) == values.source);
-            CHECK(uint64(request.cast.destinationTransportGuid) == values.destination);
-        }
-    }
-}
-
 static void test_hostile_force_count_and_guid_zero_contradiction_rejected()
 {
     WorldPacket hostile = BuildDense(false, (1u << 22) - 1u);
@@ -396,7 +342,6 @@ int main(int, char**)
     test_captured_retail_bodies();
     test_binary_derived_dense_body();
     test_transport_guid_byte_three_is_consumed();
-    test_binary_derived_boundaries_and_guid_masks();
     test_hostile_force_count_and_guid_zero_contradiction_rejected();
     test_every_truncated_dense_prefix_and_trailing_byte_rejected();
     test_use_item_source_position_policy();

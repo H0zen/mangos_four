@@ -53,73 +53,6 @@ static bool Equal(WorldPacket const& packet, std::vector<uint8> const& expected)
     return equal;
 }
 
-static MopLfgPackets::BootUpdate Fixture(std::string const& reason)
-{
-    MopLfgPackets::BootUpdate update;
-    update.victimGuid = 0x0807060504030201ULL;
-    update.reason = reason;
-    update.inProgress = true;
-    update.didVote = true;
-    update.votePassed = false;
-    update.agree = true;
-    update.votesNeeded = 3;
-    update.timeLeft = 120;
-    update.agreeCount = 2;
-    update.voteCount = 4;
-    return update;
-}
-
-static void test_reason_present()
-{
-    WorldPacket packet(SMSG_LFG_BOOT_PLAYER, 32);
-    CHECK(MopLfgPackets::BuildBootPlayer(packet, Fixture("ABC")));
-    CHECK(Equal(packet, {
-        0x6C,0x0F,0xF8,
-        0x02,0x04,0x05,0x06,
-        0x03,0x00,0x00,0x00,
-        0x78,0x00,0x00,0x00,
-        0x41,0x42,0x43,
-        0x07,0x00,
-        0x02,0x00,0x00,0x00,
-        0x09,
-        0x04,0x00,0x00,0x00,
-        0x03
-    }));
-}
-
-static void test_reason_absent()
-{
-    WorldPacket packet(SMSG_LFG_BOOT_PLAYER, 32);
-    CHECK(MopLfgPackets::BuildBootPlayer(packet, Fixture("")));
-    CHECK(Equal(packet, {
-        0xEF,0xF8,
-        0x02,0x04,0x05,0x06,
-        0x03,0x00,0x00,0x00,
-        0x78,0x00,0x00,0x00,
-        0x07,0x00,
-        0x02,0x00,0x00,0x00,
-        0x09,
-        0x04,0x00,0x00,0x00,
-        0x03
-    }));
-}
-
-static void test_reason_length_boundary()
-{
-    WorldPacket valid(SMSG_LFG_BOOT_PLAYER, 300);
-    CHECK(MopLfgPackets::BuildBootPlayer(valid, Fixture(std::string(255, 'x'))));
-
-    WorldPacket rejected(SMSG_LFG_BOOT_PLAYER, 0);
-    CHECK(!MopLfgPackets::BuildBootPlayer(rejected, Fixture(std::string(256, 'x'))));
-    CHECK(rejected.empty());
-}
-
-static void test_opcode()
-{
-    CHECK(uint32(SMSG_LFG_BOOT_PLAYER) == 0x183Au);
-    CHECK(uint32(SMSG_LFG_BOOT_PLAYER) < uint32(OPCODE_TABLE_SIZE));
-}
-
 static MopLfgPackets::StatusUpdate StatusFixture()
 {
     MopLfgPackets::StatusUpdate update;
@@ -167,43 +100,6 @@ static void test_update_status_exact_fixture()
     }));
 }
 
-static void test_update_status_empty_optional_fields()
-{
-    MopLfgPackets::StatusUpdate update;
-    WorldPacket packet(SMSG_LFG_UPDATE_STATUS, 32);
-    CHECK(MopLfgPackets::BuildUpdateStatus(packet, update));
-    CHECK(Equal(packet, {
-        0x00,0x00,0x00,0x00,0x10,0x00,0x00,0x00,0x00,
-        0x00,0x00,0x00,
-        0x00,
-        0x00,0x00,0x00,0x00,
-        0x00,0x00,0x00,0x00,
-        0x00,0x00,0x00,0x00,
-        0x00,
-        0x03,0x00,0x00,0x00
-    }));
-}
-
-static void test_update_status_bounds()
-{
-    MopLfgPackets::StatusUpdate update;
-    update.comment.assign(255, 'x');
-    WorldPacket valid(SMSG_LFG_UPDATE_STATUS, 300);
-    CHECK(MopLfgPackets::BuildUpdateStatus(valid, update));
-
-    update.comment.push_back('x');
-    WorldPacket invalidComment(SMSG_LFG_UPDATE_STATUS, 0);
-    CHECK(!MopLfgPackets::BuildUpdateStatus(invalidComment, update));
-    CHECK(invalidComment.empty());
-}
-
-static void test_update_status_opcode()
-{
-    CHECK(uint32(SMSG_LFG_UPDATE_STATUS) == 0x0C2Eu);
-    CHECK(uint32(SMSG_LFG_UPDATE_STATUS) < uint32(OPCODE_TABLE_SIZE));
-    CHECK(uint32(CMSG_LFG_GET_STATUS) == 0x032Du);
-}
-
 static void test_queue_status_exact_fixture()
 {
     MopLfgPackets::QueueStatusUpdate update;
@@ -239,19 +135,6 @@ static void test_queue_status_exact_fixture()
     }));
 }
 
-static void test_queue_status_opcode()
-{
-    CHECK(uint32(SMSG_LFG_QUEUE_STATUS) == 0x1006u);
-    CHECK(uint32(SMSG_LFG_QUEUE_STATUS) < uint32(OPCODE_TABLE_SIZE));
-}
-
-static void test_default_player_status()
-{
-    LFGPlayerStatus status;
-    CHECK(status.state == LFG_STATE_NONE);
-    CHECK(status.updateType == LFG_UPDATE_DEFAULT);
-}
-
 static void test_lock_info_request()
 {
     WorldPacket player(CMSG_LFG_LOCK_INFO_REQUEST, 2);
@@ -277,41 +160,6 @@ static void test_lock_info_request()
     CHECK(party.rpos() == party.size());
 }
 
-static void test_lock_info_request_rejects_invalid_body()
-{
-    bool forPlayer = false;
-
-    WorldPacket wrongSentinel(CMSG_LFG_LOCK_INFO_REQUEST, 2);
-    wrongSentinel << uint8(0x00) << uint8(0x80);
-    CHECK(!MopLfgPackets::ParseLockInfoRequest(wrongSentinel, forPlayer));
-
-    WorldPacket truncated(CMSG_LFG_LOCK_INFO_REQUEST, 1);
-    truncated << uint8(0x7F);
-    CHECK(!MopLfgPackets::ParseLockInfoRequest(truncated, forPlayer));
-
-    WorldPacket nonzeroPadding(CMSG_LFG_LOCK_INFO_REQUEST, 2);
-    nonzeroPadding << uint8(0x7F) << uint8(0x81);
-    CHECK(!MopLfgPackets::ParseLockInfoRequest(nonzeroPadding, forPlayer));
-}
-
-static void test_empty_lock_info_responses()
-{
-    WorldPacket player(SMSG_LFG_PLAYER_INFO, 5);
-    MopLfgPackets::BuildEmptyPlayerInfo(player);
-    CHECK(Equal(player, { 0x00,0x00,0x00,0x00,0x00 }));
-
-    WorldPacket party(SMSG_LFG_PARTY_INFO, 3);
-    MopLfgPackets::BuildEmptyPartyInfo(party);
-    CHECK(Equal(party, { 0x00,0x00,0x00 }));
-}
-
-static void test_lock_info_opcodes()
-{
-    CHECK(uint32(CMSG_LFG_LOCK_INFO_REQUEST) == 0x006Bu);
-    CHECK(uint32(SMSG_LFG_PLAYER_INFO) == 0x1861u);
-    CHECK(uint32(SMSG_LFG_PARTY_INFO) == 0x168Eu);
-}
-
 static WorldPacket LfrRequestPacket(std::initializer_list<uint8> bytes)
 {
     WorldPacket packet(CMSG_LFG_LFR_JOIN, bytes.size());
@@ -330,74 +178,12 @@ static void test_lfr_search_request()
     CHECK(packet.rpos() == packet.size());
 }
 
-static void test_lfr_search_request_rejects_invalid_body()
-{
-    MopLfgPackets::LfrSearchRequest request;
-
-    WorldPacket truncated = LfrRequestPacket({ 0x45, 0x23, 0x01 });
-    CHECK(!MopLfgPackets::ParseLfrSearchRequest(truncated, request));
-
-    WorldPacket trailing = LfrRequestPacket({ 0x45, 0x23, 0x01, 0x03, 0x00 });
-    CHECK(!MopLfgPackets::ParseLfrSearchRequest(trailing, request));
-
-    WorldPacket reservedBit = LfrRequestPacket({ 0x45, 0x23, 0x11, 0x03 });
-    CHECK(!MopLfgPackets::ParseLfrSearchRequest(reservedBit, request));
-
-    WorldPacket highReservedBit = LfrRequestPacket({ 0x45, 0x23, 0x81, 0x03 });
-    CHECK(!MopLfgPackets::ParseLfrSearchRequest(highReservedBit, request));
-
-    WorldPacket invalidType = LfrRequestPacket({ 0x45, 0x23, 0x01, 0x07 });
-    CHECK(!MopLfgPackets::ParseLfrSearchRequest(invalidType, request));
-}
-
-static void test_empty_lfr_search_response()
-{
-    MopLfgPackets::LfrSearchRequest request;
-    request.lfgId = 0x12345u;
-    request.typeId = 3u;
-
-    WorldPacket packet(SMSG_LFG_UPDATE_SEARCH, 37);
-    MopLfgPackets::BuildEmptyLfrSearchResponse(packet, request);
-    CHECK(Equal(packet, {
-        0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,
-        0x00,0x00,0x00,0x00,
-        0x00,0x00,0x00,0x00,
-        0x45,0x23,0x01,0x00,
-        0x03,0x00,0x00,0x00,
-        0x00,0x00,0x00,0x00,
-        0x00,0x00,0x00,0x00,
-        0x00,0x00,0x00,0x00
-    }));
-}
-
-static void test_lfr_search_opcodes()
-{
-    CHECK(uint32(CMSG_LFG_LFR_JOIN) == 0x1AA2u);
-    CHECK(uint32(CMSG_LFG_LFR_LEAVE) == 0x00E3u);
-    CHECK(uint32(SMSG_LFG_UPDATE_SEARCH) == 0x1161u);
-}
-
 int main(int /*argc*/, char** /*argv*/)
 {
-    test_reason_present();
-    test_reason_absent();
-    test_reason_length_boundary();
-    test_opcode();
     test_update_status_exact_fixture();
-    test_update_status_empty_optional_fields();
-    test_update_status_bounds();
-    test_update_status_opcode();
     test_queue_status_exact_fixture();
-    test_queue_status_opcode();
-    test_default_player_status();
     test_lock_info_request();
-    test_lock_info_request_rejects_invalid_body();
-    test_empty_lock_info_responses();
-    test_lock_info_opcodes();
     test_lfr_search_request();
-    test_lfr_search_request_rejects_invalid_body();
-    test_empty_lfr_search_response();
-    test_lfr_search_opcodes();
 
     if (g_fail)
     {

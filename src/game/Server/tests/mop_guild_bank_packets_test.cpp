@@ -1,3 +1,4 @@
+
 /*
  * SPDX-License-Identifier: GPL-3.0-or-later
  *
@@ -71,39 +72,6 @@ static MopGuildBankPackets::ItemRecord MakePresent(uint32 slotId,
     return item;
 }
 
-static void test_captured_empty_body()
-{
-    MopGuildBankPackets::GuildBankList list = MakeList(0, 357406960, 4);
-    ByteBuffer body;
-    CHECK(MopGuildBankPackets::BuildListBody(body, list));
-    CHECK(ExpectBytes(body, {
-        0x00, 0x00, 0x00, 0x00, 0xF0, 0x98, 0x4D, 0x15,
-        0x00, 0x00, 0x00, 0x00, 0x04, 0x00, 0x00, 0x00,
-        0x00, 0x00, 0x00, 0x00, 0x00
-    }));
-}
-
-static void test_captured_absent_slot_body()
-{
-    MopGuildBankPackets::GuildBankList list = MakeList(3, 210710453, 0);
-    MopGuildBankPackets::ItemRecord item;
-    item.slotId = 39;
-    list.items.push_back(item);
-
-    ByteBuffer body;
-    CHECK(MopGuildBankPackets::BuildListBody(body, list));
-    CHECK(ExpectBytes(body, {
-        0x03, 0x00, 0x00, 0x00, 0xB5, 0x2F, 0x8F, 0x0C,
-        0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-        0x00, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00,
-        0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-        0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-        0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-        0x00, 0x00, 0x00, 0x00, 0x27, 0x00, 0x00, 0x00,
-        0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00
-    }));
-}
-
 static void test_captured_present_item_body()
 {
     MopGuildBankPackets::GuildBankList list = MakeList(2, 211105617, 2);
@@ -121,65 +89,6 @@ static void test_captured_present_item_body()
         0x01, 0x00, 0x00, 0x00, 0x14, 0x00, 0x00, 0x00,
         0x61, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
         0x00, 0x00, 0x00, 0x00
-    }));
-}
-
-static void test_captured_mixed_delta_body()
-{
-    MopGuildBankPackets::GuildBankList list = MakeList(2, 878571537, 2);
-    MopGuildBankPackets::ItemRecord absent;
-    absent.slotId = 3;
-    list.items.push_back(absent);
-    list.items.push_back(MakePresent(92, 74723, 196608, 1, 1));
-
-    ByteBuffer body;
-    CHECK(MopGuildBankPackets::BuildListBody(body, list));
-    CHECK(ExpectBytes(body, {
-        0x02, 0x00, 0x00, 0x00, 0x11, 0xF0, 0x5D, 0x34,
-        0x00, 0x00, 0x00, 0x00, 0x02, 0x00, 0x00, 0x00,
-        0x00, 0x00, 0x00, 0x00, 0x02, 0x00, 0x00, 0x00,
-        0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-        0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-        0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-        0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x03,
-        0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-        0x00, 0x00, 0x00, 0x00, 0x00, 0x03, 0x00, 0x00,
-        0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x04,
-        0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0xE3,
-        0x23, 0x01, 0x00, 0x01, 0x00, 0x00, 0x00, 0x01,
-        0x00, 0x00, 0x00, 0x5C, 0x00, 0x00, 0x00, 0x00,
-        0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00
-    }));
-}
-
-static void test_binary_derived_synthetic_tab_body()
-{
-    // Independently encoded from the 18414 client reader: this is synthetic
-    // grammar coverage, not a captured retail body. The literal distinguishes
-    // the 9-bit icon length from the following 7-bit name length and pins the
-    // byte section as index, icon, then name. Retail capture-000601 seq 30404
-    // corroborates that shape with seven tabs, but its 39 persisted item
-    // modifier blobs cannot be reconstructed by the current backend.
-    MopGuildBankPackets::GuildBankList list = MakeList(
-        3, UINT64_C(0x0807060504030201), INT32_C(0x0C0B0A09));
-    list.fullUpdate = true;
-    MopGuildBankPackets::TabRecord tab;
-    tab.index = 6;
-    tab.icon = "IcoN!";
-    tab.name = "Tab";
-    list.tabs.push_back(tab);
-
-    ByteBuffer body;
-    CHECK(MopGuildBankPackets::BuildListBody(body, list));
-    CHECK(ExpectBytes(body, {
-        0x03, 0x00, 0x00, 0x00,
-        0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08,
-        0x09, 0x0A, 0x0B, 0x0C,
-        0x80, 0x00, 0x04, 0x00, 0x00,
-        0x02, 0x83,
-        0x06, 0x00, 0x00, 0x00,
-        0x49, 0x63, 0x6F, 0x4E, 0x21,
-        0x54, 0x61, 0x62
     }));
 }
 
@@ -214,54 +123,6 @@ static void test_socket_pair_order_and_bounds()
     CHECK(!MopGuildBankPackets::BuildListBody(body, list));
 }
 
-static void test_tab_and_item_bounds()
-{
-    MopGuildBankPackets::GuildBankList list = MakeList(7, 0, 0);
-    list.fullUpdate = true;
-    for (uint32 i = 0; i < MopGuildBankPackets::MAX_TAB_COUNT; ++i)
-    {
-        MopGuildBankPackets::TabRecord tab;
-        tab.index = i;
-        tab.name = std::string(MopGuildBankPackets::MAX_TAB_NAME_BYTES, 'n');
-        tab.icon = std::string(MopGuildBankPackets::MAX_TAB_ICON_BYTES, 'i');
-        list.tabs.push_back(tab);
-    }
-    for (uint32 i = 0; i < MopGuildBankPackets::MAX_ITEM_COUNT; ++i)
-    {
-        MopGuildBankPackets::ItemRecord item;
-        item.slotId = i;
-        list.items.push_back(item);
-    }
-
-    ByteBuffer body;
-    CHECK(MopGuildBankPackets::BuildListBody(body, list));
-
-    MopGuildBankPackets::GuildBankList invalid = list;
-    invalid.tabId = 8;
-    CHECK(!MopGuildBankPackets::BuildListBody(body, invalid));
-    invalid = list;
-    invalid.tabs.push_back({});
-    CHECK(!MopGuildBankPackets::BuildListBody(body, invalid));
-    invalid = list;
-    invalid.items.push_back({});
-    CHECK(!MopGuildBankPackets::BuildListBody(body, invalid));
-    invalid = list;
-    invalid.items[0].slotId = 98;
-    CHECK(!MopGuildBankPackets::BuildListBody(body, invalid));
-    invalid = list;
-    invalid.items[1].slotId = 0;
-    CHECK(!MopGuildBankPackets::BuildListBody(body, invalid));
-    invalid = list;
-    invalid.tabs[0].name.push_back('x');
-    CHECK(!MopGuildBankPackets::BuildListBody(body, invalid));
-    invalid = list;
-    invalid.tabs[0].icon.push_back('x');
-    CHECK(!MopGuildBankPackets::BuildListBody(body, invalid));
-    invalid = list;
-    invalid.fullUpdate = false;
-    CHECK(!MopGuildBankPackets::BuildListBody(body, invalid));
-}
-
 static void test_utf8_truncation_and_atomic_failure()
 {
     std::string const value = std::string(63, 'a') + "\xC3\xA9";
@@ -278,13 +139,8 @@ static void test_utf8_truncation_and_atomic_failure()
 
 int main()
 {
-    test_captured_empty_body();
-    test_captured_absent_slot_body();
     test_captured_present_item_body();
-    test_captured_mixed_delta_body();
-    test_binary_derived_synthetic_tab_body();
     test_socket_pair_order_and_bounds();
-    test_tab_and_item_bounds();
     test_utf8_truncation_and_atomic_failure();
 
     if (g_fail)

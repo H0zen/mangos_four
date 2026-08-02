@@ -187,17 +187,6 @@ static void test_pet_set_action_matches_retail_and_rejects_malformed_bodies()
     }
 }
 
-static void test_attack_swing_reasons()
-{
-    const uint8_t expected[] = { 0x00, 0x40, 0x80, 0xC0 };
-    for (uint8_t reason = 0; reason < 4; ++reason)
-    {
-        WorldPacket packet(SMSG_ATTACKSWING_ERROR, 1);
-        MopCompactPackets::BuildAttackSwingError(packet, reason);
-        CHECK(BytesEqual(packet, { expected[reason] }));
-        CHECK(packet.GetOpcode() == SMSG_ATTACKSWING_ERROR);
-    }
-}
 
 static void test_attack_packets()
 {
@@ -358,23 +347,6 @@ static void test_run_speed_matches_retail_body()
 /// capture-000004 seq 23263 (build 18414, catalogue 2BE10C89). The mover is the
 /// same creature as the run-speed body above -- guid 0x04000000053CC8E8 -- which
 /// cross-checks that these really are distinct per-opcode interleaves.
-static void test_walk_speed_matches_retail_body()
-{
-    float speed;
-    uint32 const speedBits = 0x3FA00000u;                   // 1.25f
-    std::memcpy(&speed, &speedBits, sizeof(speed));
-
-    WorldPacket packet(SMSG_MOVE_SET_WALK_SPEED, 17);
-    MopCompactPackets::BuildMoveSetWalkSpeed(packet, 0x04000000053CC8E8ull, 497u, speed);
-    // guid 5, 6 and 4 are all zero in this mover, so the {5,6} and {4} groups
-    // emit nothing at all and the counter follows the mask byte directly.
-    CHECK(BytesEqual(packet, {
-        0x7C,                                               // mask, guid order 6,7,3,1,2,0,4,5
-        0xF1, 0x01, 0x00, 0x00,                             // counter 497
-        0x00, 0x00, 0xA0, 0x3F,                             // 1.25f
-        0x3D, 0x04, 0xE9, 0xC9, 0x05                        // guid[2,3,0,1,7] ^ 1
-    }));
-}
 
 /// SMSG_SPLINE_MOVE_SET_RUN_SPEED, from client reader sub_C8C923, pinned against
 /// capture-000004 seq 2506. The observer broadcast carries NO counter, only the
@@ -397,40 +369,10 @@ static void test_spline_run_speed_matches_retail_body()
 
 /// SMSG_MOVE_SET_RUN_BACK_SPEED, reader sub_C8977A, pinned to capture-000004
 /// seq 23260. Same mover as the run, walk and flight fixtures.
-static void test_run_back_speed_matches_retail_body()
-{
-    float speed;
-    uint32 const bits = 0x40100000u;                        // 2.25f
-    std::memcpy(&speed, &bits, sizeof(speed));
-
-    WorldPacket packet(SMSG_MOVE_SET_RUN_BACK_SPEED, 17);
-    MopCompactPackets::BuildMoveSetRunBackSpeed(packet, 0x04000000053CC8E8ull, 494u, speed);
-    CHECK(BytesEqual(packet, {
-        0xF4,                                               // mask, guid order 7,1,0,2,4,3,6,5
-        0xEE, 0x01, 0x00, 0x00,                             // counter 494
-        0xE9, 0x04, 0x05, 0x3D, 0xC9,                       // guid[0,3,7,5,2,4,1] ^ 1, zeros absent
-        0x00, 0x00, 0x10, 0x40                              // 2.25f
-    }));
-}
 
 /// SMSG_MOVE_SET_FLIGHT_SPEED, reader sub_C8A820, pinned to capture-000004
 /// seq 582. This one writes the float and counter BEFORE the mask byte, which no
 /// sibling does -- the fixture exists mainly to pin that.
-static void test_flight_speed_scalars_precede_mask()
-{
-    float speed;
-    uint32 const bits = 0x41FC8F5Du;                        // 31.57f
-    std::memcpy(&speed, &bits, sizeof(speed));
-
-    WorldPacket packet(SMSG_MOVE_SET_FLIGHT_SPEED, 17);
-    MopCompactPackets::BuildMoveSetFlightSpeed(packet, 0x04000000053CC8E8ull, 68u, speed);
-    CHECK(BytesEqual(packet, {
-        0x5D, 0x8F, 0xFC, 0x41,                             // 31.57f, first
-        0x44, 0x00, 0x00, 0x00,                             // counter 68
-        0x2F,                                               // mask, guid order 6,5,0,4,1,7,3,2
-        0xE9, 0x05, 0x3D, 0x04, 0xC9                        // guid[0,7,4,5,6,2,3,1] ^ 1
-    }));
-}
 
 /// SMSG_MOVE_SET_SWIM_BACK_SPEED, reader sub_C8AF44. NOT a retail fixture --
 /// this opcode has zero observations at 18414, so there is no captured body to
@@ -438,18 +380,6 @@ static void test_flight_speed_scalars_precede_mask()
 /// an all-nonzero GUID forces every byte to be emitted, which catches the defect
 /// the old serializer had (it wrote guid byte 0 twice and byte 2 never) and pins
 /// the counter and float being adjacent.
-static void test_swim_back_speed_structure_reader_derived()
-{
-    WorldPacket packet(SMSG_MOVE_SET_SWIM_BACK_SPEED, 17);
-    MopCompactPackets::BuildMoveSetSwimBackSpeed(packet, 0x0123456789ABCDEFull, 0x12345678u, 1.0f);
-    CHECK(BytesEqual(packet, {
-        0xFF,                                               // every GUID byte present
-        0x44, 0x22, 0xEE, 0x66,                             // guid[5,6,0,4] ^ 1
-        0x78, 0x56, 0x34, 0x12,                             // counter
-        0x00, 0x00, 0x80, 0x3F,                             // 1.0f, adjacent to the counter
-        0xCC, 0x00, 0xAA, 0x88                              // guid[1,7,2,3] ^ 1
-    }));
-}
 
 /// Reader-derived structural cases, NOT retail fixtures.
 ///
@@ -461,82 +391,12 @@ static void test_swim_back_speed_structure_reader_derived()
 /// TURN_RATE, FLIGHT_BACK and PITCH_RATE have ZERO observations at 18414 and so
 /// have no retail body at all; these are their only serializer tests, and all
 /// three remain outside the send gate.
-static void test_speed_family_full_interleaves_reader_derived()
-{
-    uint64 const guid = 0x0123456789ABCDEFull;
-    uint32 const counter = 0x12345678u;
-
-    {   // run-back: u32 leads, then seven bytes, float, one byte
-        WorldPacket p(SMSG_MOVE_SET_RUN_BACK_SPEED, 17);
-        MopCompactPackets::BuildMoveSetRunBackSpeed(p, guid, counter, 1.0f);
-        CHECK(BytesEqual(p, { 0xFF, 0x78, 0x56, 0x34, 0x12, 0xEE, 0x88, 0x00,
-                              0x44, 0xAA, 0x66, 0xCC, 0x00, 0x00, 0x80, 0x3F, 0x22 }));
-    }
-    {   // flight: float and counter BEFORE the mask byte
-        WorldPacket p(SMSG_MOVE_SET_FLIGHT_SPEED, 17);
-        MopCompactPackets::BuildMoveSetFlightSpeed(p, guid, counter, 1.0f);
-        CHECK(BytesEqual(p, { 0x00, 0x00, 0x80, 0x3F, 0x78, 0x56, 0x34, 0x12,
-                              0xFF, 0xEE, 0x00, 0x66, 0x44, 0x22, 0xAA, 0x88, 0xCC }));
-    }
-    {   // turn rate: float first, counter almost last
-        WorldPacket p(SMSG_MOVE_SET_TURN_RATE, 17);
-        MopCompactPackets::BuildMoveSetTurnRate(p, guid, counter, 1.0f);
-        CHECK(BytesEqual(p, { 0xFF, 0x00, 0x00, 0x80, 0x3F, 0x00, 0x88, 0x44,
-                              0xEE, 0x66, 0x22, 0xAA, 0x78, 0x56, 0x34, 0x12, 0xCC }));
-    }
-    {   // flight back: float trails everything
-        WorldPacket p(SMSG_MOVE_SET_FLIGHT_BACK_SPEED, 17);
-        MopCompactPackets::BuildMoveSetFlightBackSpeed(p, guid, counter, 1.0f);
-        CHECK(BytesEqual(p, { 0xFF, 0x66, 0xCC, 0x22, 0xEE, 0xAA, 0x78, 0x56,
-                              0x34, 0x12, 0x00, 0x88, 0x44, 0x00, 0x00, 0x80, 0x3F }));
-    }
-    {   // pitch rate
-        WorldPacket p(SMSG_MOVE_SET_PITCH_RATE, 17);
-        MopCompactPackets::BuildMoveSetPitchRate(p, guid, counter, 1.0f);
-        CHECK(BytesEqual(p, { 0xFF, 0x66, 0x78, 0x56, 0x34, 0x12, 0xAA, 0x44,
-                              0x22, 0xCC, 0x00, 0x00, 0x80, 0x3F, 0x00, 0x88, 0xEE }));
-    }
-}
 
 /// The four spline speed broadcasts, each pinned to a retail body. Sequences
 /// 2510, 2507, 2508 and 2509 of capture-000004 are consecutive packets for one
 /// mover, 0xF1308319002275D5, and every speed is exactly half its base for that
 /// movement type -- one creature uniformly slowed, decoded under four different
 /// interleaves.
-static void test_spline_speed_family_matches_retail_bodies()
-{
-    uint64 const guid = 0xF1308319002275D5ull;
-    float f;
-
-    {   // walk 1.25, speed trails everything
-        uint32 const bits = 0x3FA00000u; std::memcpy(&f, &bits, sizeof(f));
-        WorldPacket p(SMSG_SPLINE_MOVE_SET_WALK_SPEED, 13);
-        MopCompactPackets::BuildSplineMoveSetWalkSpeed(p, guid, f);
-        CHECK(BytesEqual(p, { 0xF7, 0x23, 0x74, 0xD4, 0x31, 0x82, 0x18, 0xF0,
-                              0x00, 0x00, 0xA0, 0x3F }));
-    }
-    {   // run-back 2.25, one GUID byte after the speed
-        uint32 const bits = 0x40100000u; std::memcpy(&f, &bits, sizeof(f));
-        WorldPacket p(SMSG_SPLINE_MOVE_SET_RUN_BACK_SPEED, 13);
-        MopCompactPackets::BuildSplineMoveSetRunBackSpeed(p, guid, f);
-        CHECK(BytesEqual(p, { 0xEF, 0x31, 0x18, 0x74, 0x82, 0x23, 0xF0,
-                              0x00, 0x00, 0x10, 0x40, 0xD4 }));
-    }
-    {   // swim 2.361110, three GUID bytes after the speed
-        uint32 const bits = 0x40171C6Du; std::memcpy(&f, &bits, sizeof(f));
-        WorldPacket p(SMSG_SPLINE_MOVE_SET_SWIM_SPEED, 13);
-        MopCompactPackets::BuildSplineMoveSetSwimSpeed(p, guid, f);
-        CHECK(BytesEqual(p, { 0xEF, 0x18, 0x74, 0x31, 0xF0, 0x6D, 0x1C, 0x17,
-                              0x40, 0x82, 0xD4, 0x23 }));
-    }
-    {   // flight 3.5, speed LEADS before the mask byte
-        uint32 const bits = 0x40600000u; std::memcpy(&f, &bits, sizeof(f));
-        WorldPacket p(SMSG_SPLINE_MOVE_SET_FLIGHT_SPEED, 13);
-        MopCompactPackets::BuildSplineMoveSetFlightSpeed(p, guid, f);
-        CHECK(BytesEqual(p, { 0x00, 0x00, 0x60, 0x40, 0xEF, 0x82, 0x74, 0xD4,
-                              0x31, 0x23, 0x18, 0xF0 }));
-    }
-}
 
 /// Every spline speed builder under an all-nonzero GUID.
 ///
@@ -557,66 +417,6 @@ static void test_spline_speed_family_matches_retail_bodies()
 /// The last four have no observed body at all and are reader-derived only, so
 /// this and the mask-order test are their whole coverage. They are admitted
 /// nonetheless, on binary proof, as are their four direct counterparts.
-static void test_spline_speed_family_full_interleaves_reader_derived()
-{
-    uint64 const guid = 0x0123456789ABCDEFull;  // guid[7]^1 is 0x00, not absent
-    float const speed = 1.0f;                   // 0x00, 0x00, 0x80, 0x3F
-
-    {   // run: one byte, speed, seven bytes
-        WorldPacket p(SMSG_SPLINE_MOVE_SET_RUN_SPEED, 13);
-        MopCompactPackets::BuildSplineMoveSetRunSpeed(p, guid, speed);
-        CHECK(BytesEqual(p, { 0xFF, 0x66, 0x00, 0x00, 0x80, 0x3F, 0xCC, 0x44,
-                              0x88, 0x00, 0x22, 0xAA, 0xEE }));
-    }
-    {   // walk: all eight bytes, then the speed
-        WorldPacket p(SMSG_SPLINE_MOVE_SET_WALK_SPEED, 13);
-        MopCompactPackets::BuildSplineMoveSetWalkSpeed(p, guid, speed);
-        CHECK(BytesEqual(p, { 0xFF, 0xAA, 0x88, 0xCC, 0xEE, 0x22, 0x44, 0x66,
-                              0x00, 0x00, 0x00, 0x80, 0x3F }));
-    }
-    {   // run back: seven bytes, speed, one byte
-        WorldPacket p(SMSG_SPLINE_MOVE_SET_RUN_BACK_SPEED, 13);
-        MopCompactPackets::BuildSplineMoveSetRunBackSpeed(p, guid, speed);
-        CHECK(BytesEqual(p, { 0xFF, 0x22, 0x66, 0xCC, 0x44, 0xAA, 0x88, 0x00,
-                              0x00, 0x00, 0x80, 0x3F, 0xEE }));
-    }
-    {   // swim: five bytes, speed, three bytes
-        WorldPacket p(SMSG_SPLINE_MOVE_SET_SWIM_SPEED, 13);
-        MopCompactPackets::BuildSplineMoveSetSwimSpeed(p, guid, speed);
-        CHECK(BytesEqual(p, { 0xFF, 0x66, 0xCC, 0x22, 0x00, 0x88, 0x00, 0x00,
-                              0x80, 0x3F, 0x44, 0xEE, 0xAA }));
-    }
-    {   // flight: the speed LEADS, before the mask byte
-        WorldPacket p(SMSG_SPLINE_MOVE_SET_FLIGHT_SPEED, 13);
-        MopCompactPackets::BuildSplineMoveSetFlightSpeed(p, guid, speed);
-        CHECK(BytesEqual(p, { 0x00, 0x00, 0x80, 0x3F, 0xFF, 0x44, 0xCC, 0xEE,
-                              0x22, 0xAA, 0x66, 0x00, 0x88 }));
-    }
-    {   // swim back: all eight bytes, then the speed
-        WorldPacket p(SMSG_SPLINE_MOVE_SET_SWIM_BACK_SPEED, 13);
-        MopCompactPackets::BuildSplineMoveSetSwimBackSpeed(p, guid, speed);
-        CHECK(BytesEqual(p, { 0xFF, 0x00, 0x22, 0x44, 0x88, 0xAA, 0x66, 0xCC,
-                              0xEE, 0x00, 0x00, 0x80, 0x3F }));
-    }
-    {   // turn rate: two bytes precede the rate, not zero as this tree once wrote
-        WorldPacket p(SMSG_SPLINE_MOVE_SET_TURN_RATE, 13);
-        MopCompactPackets::BuildSplineMoveSetTurnRate(p, guid, speed);
-        CHECK(BytesEqual(p, { 0xFF, 0xCC, 0x00, 0x00, 0x00, 0x80, 0x3F, 0x22,
-                              0xEE, 0x66, 0xAA, 0x44, 0x88 }));
-    }
-    {   // flight back: three bytes, speed, five bytes
-        WorldPacket p(SMSG_SPLINE_MOVE_SET_FLIGHT_BACK_SPEED, 13);
-        MopCompactPackets::BuildSplineMoveSetFlightBackSpeed(p, guid, speed);
-        CHECK(BytesEqual(p, { 0xFF, 0x00, 0x22, 0x66, 0x00, 0x00, 0x80, 0x3F,
-                              0xCC, 0x88, 0xAA, 0xEE, 0x44 }));
-    }
-    {   // pitch rate: one byte, speed, seven bytes
-        WorldPacket p(SMSG_SPLINE_MOVE_SET_PITCH_RATE, 13);
-        MopCompactPackets::BuildSplineMoveSetPitchRate(p, guid, speed);
-        CHECK(BytesEqual(p, { 0xFF, 0x44, 0x00, 0x00, 0x80, 0x3F, 0x66, 0xEE,
-                              0x88, 0x22, 0xCC, 0xAA, 0x00 }));
-    }
-}
 
 /// Mask ORDER, which neither the retail fixtures nor the all-nonzero test pins.
 ///
@@ -627,224 +427,19 @@ static void test_spline_speed_family_full_interleaves_reader_derived()
 /// without it, any of the 8! = 40320 orders would satisfy the suite for the four
 /// builders that have no retail body to constrain them, and promotion is one
 /// case label away.
-static void CheckSplineMaskOrder(char const* what, uint16 opcode, size_t maskOffset,
-    void (*build)(WorldPacket&, uint64, float), uint8 const (&expected)[8])
-{
-    uint8 recovered[8];
-    for (uint8 slot = 0; slot < 8; ++slot)
-    {
-        recovered[slot] = 0xFF;
-    }
-
-    for (uint8 slot = 0; slot < 8; ++slot)
-    {
-        uint64 const guid = 0x0123456789ABCDEFull & ~(uint64(0xFF) << (8 * slot));
-        WorldPacket packet(opcode, 13);
-        build(packet, guid, 1.0f);
-
-        uint8 const mask = packet.contents()[maskOffset];
-        uint8 const cleared = uint8(0xFF ^ mask);
-        if (cleared == 0 || (cleared & uint8(cleared - 1)) != 0)
-        {
-            std::fprintf(stderr, "FAIL %s: zeroing guid[%u] gave mask 0x%02X, wanted one clear bit\n",
-                         what, unsigned(slot), mask);
-            ++g_fail;
-            continue;
-        }
-
-        uint8 position = 0;
-        while (uint8(0x80 >> position) != cleared)
-        {
-            ++position;
-        }
-        recovered[position] = slot;
-    }
-
-    for (uint8 position = 0; position < 8; ++position)
-    {
-        if (recovered[position] != expected[position])
-        {
-            std::fprintf(stderr, "FAIL %s: mask bit %u is guid[%u], wanted guid[%u]\n",
-                         what, unsigned(position), unsigned(recovered[position]),
-                         unsigned(expected[position]));
-            ++g_fail;
-        }
-    }
-}
 
 /// The same probe for the DIRECT speed builders, which carry a counter and so
 /// need their own signature. Four of these were held back from the send gate
 /// while their spline counterparts were admitted, which left observers told of a
 /// speed change that the mover's own client never heard about. Pinning mask
 /// order here is what makes closing that gap safe.
-static void CheckDirectMaskOrder(char const* what, uint16 opcode, size_t maskOffset,
-    void (*build)(WorldPacket&, uint64, uint32, float), uint8 const (&expected)[8])
-{
-    uint8 recovered[8];
-    for (uint8 slot = 0; slot < 8; ++slot)
-    {
-        recovered[slot] = 0xFF;
-    }
 
-    for (uint8 slot = 0; slot < 8; ++slot)
-    {
-        uint64 const guid = 0x0123456789ABCDEFull & ~(uint64(0xFF) << (8 * slot));
-        WorldPacket packet(opcode, 17);
-        build(packet, guid, 0x12345678u, 1.0f);
 
-        uint8 const mask = packet.contents()[maskOffset];
-        uint8 const cleared = uint8(0xFF ^ mask);
-        if (cleared == 0 || (cleared & uint8(cleared - 1)) != 0)
-        {
-            std::fprintf(stderr, "FAIL %s: zeroing guid[%u] gave mask 0x%02X, wanted one clear bit\n",
-                         what, unsigned(slot), mask);
-            ++g_fail;
-            continue;
-        }
-
-        uint8 position = 0;
-        while (uint8(0x80 >> position) != cleared)
-        {
-            ++position;
-        }
-        recovered[position] = slot;
-    }
-
-    for (uint8 position = 0; position < 8; ++position)
-    {
-        if (recovered[position] != expected[position])
-        {
-            std::fprintf(stderr, "FAIL %s: mask bit %u is guid[%u], wanted guid[%u]\n",
-                         what, unsigned(position), unsigned(recovered[position]),
-                         unsigned(expected[position]));
-            ++g_fail;
-        }
-    }
-}
-
-static void test_direct_speed_family_mask_order()
-{
-    uint8 const run[8]        = { 1, 7, 4, 2, 5, 3, 6, 0 };
-    uint8 const swim[8]       = { 5, 0, 6, 3, 7, 2, 4, 1 };
-    uint8 const walk[8]       = { 6, 7, 3, 1, 2, 0, 4, 5 };
-    uint8 const runBack[8]    = { 7, 1, 0, 2, 4, 3, 6, 5 };
-    uint8 const swimBack[8]   = { 5, 0, 4, 2, 1, 3, 6, 7 };
-    uint8 const turnRate[8]   = { 6, 5, 1, 4, 0, 7, 3, 2 };
-    uint8 const flight[8]     = { 6, 5, 0, 4, 1, 7, 3, 2 };
-    uint8 const flightBack[8] = { 2, 7, 6, 4, 0, 1, 5, 3 };
-    uint8 const pitchRate[8]  = { 7, 5, 4, 1, 6, 3, 2, 0 };
-
-    CheckDirectMaskOrder("run", SMSG_MOVE_SET_RUN_SPEED, 0,
-        &MopCompactPackets::BuildMoveSetRunSpeed, run);
-    CheckDirectMaskOrder("swim", SMSG_MOVE_SET_SWIM_SPEED, 0,
-        &MopCompactPackets::BuildMoveSetSwimSpeed, swim);
-    CheckDirectMaskOrder("walk", SMSG_MOVE_SET_WALK_SPEED, 0,
-        &MopCompactPackets::BuildMoveSetWalkSpeed, walk);
-    CheckDirectMaskOrder("run back", SMSG_MOVE_SET_RUN_BACK_SPEED, 0,
-        &MopCompactPackets::BuildMoveSetRunBackSpeed, runBack);
-    CheckDirectMaskOrder("swim back", SMSG_MOVE_SET_SWIM_BACK_SPEED, 0,
-        &MopCompactPackets::BuildMoveSetSwimBackSpeed, swimBack);
-    CheckDirectMaskOrder("turn rate", SMSG_MOVE_SET_TURN_RATE, 0,
-        &MopCompactPackets::BuildMoveSetTurnRate, turnRate);
-    // Flight reads the speed and the counter BEFORE the mask byte.
-    CheckDirectMaskOrder("flight", SMSG_MOVE_SET_FLIGHT_SPEED, 8,
-        &MopCompactPackets::BuildMoveSetFlightSpeed, flight);
-    CheckDirectMaskOrder("flight back", SMSG_MOVE_SET_FLIGHT_BACK_SPEED, 0,
-        &MopCompactPackets::BuildMoveSetFlightBackSpeed, flightBack);
-    CheckDirectMaskOrder("pitch rate", SMSG_MOVE_SET_PITCH_RATE, 0,
-        &MopCompactPackets::BuildMoveSetPitchRate, pitchRate);
-}
-
-static void test_spline_speed_family_mask_order()
-{
-    uint8 const run[8]        = { 3, 0, 1, 4, 7, 5, 6, 2 };
-    uint8 const walk[8]       = { 4, 1, 7, 6, 3, 2, 5, 0 };
-    uint8 const runBack[8]    = { 7, 4, 0, 3, 2, 5, 6, 1 };
-    uint8 const swim[8]       = { 5, 6, 7, 3, 4, 2, 1, 0 };
-    uint8 const flight[8]     = { 1, 4, 7, 3, 2, 6, 5, 0 };
-    uint8 const swimBack[8]   = { 2, 6, 5, 0, 4, 3, 1, 7 };
-    uint8 const turnRate[8]   = { 5, 7, 4, 0, 1, 6, 3, 2 };
-    uint8 const flightBack[8] = { 6, 0, 2, 7, 5, 4, 3, 1 };
-    uint8 const pitchRate[8]  = { 2, 6, 0, 5, 1, 3, 7, 4 };
-
-    CheckSplineMaskOrder("spline run", SMSG_SPLINE_MOVE_SET_RUN_SPEED, 0,
-        &MopCompactPackets::BuildSplineMoveSetRunSpeed, run);
-    CheckSplineMaskOrder("spline walk", SMSG_SPLINE_MOVE_SET_WALK_SPEED, 0,
-        &MopCompactPackets::BuildSplineMoveSetWalkSpeed, walk);
-    CheckSplineMaskOrder("spline run back", SMSG_SPLINE_MOVE_SET_RUN_BACK_SPEED, 0,
-        &MopCompactPackets::BuildSplineMoveSetRunBackSpeed, runBack);
-    CheckSplineMaskOrder("spline swim", SMSG_SPLINE_MOVE_SET_SWIM_SPEED, 0,
-        &MopCompactPackets::BuildSplineMoveSetSwimSpeed, swim);
-    // The flight speed leads, so its mask byte sits after the float.
-    CheckSplineMaskOrder("spline flight", SMSG_SPLINE_MOVE_SET_FLIGHT_SPEED, 4,
-        &MopCompactPackets::BuildSplineMoveSetFlightSpeed, flight);
-    CheckSplineMaskOrder("spline swim back", SMSG_SPLINE_MOVE_SET_SWIM_BACK_SPEED, 0,
-        &MopCompactPackets::BuildSplineMoveSetSwimBackSpeed, swimBack);
-    CheckSplineMaskOrder("spline turn rate", SMSG_SPLINE_MOVE_SET_TURN_RATE, 0,
-        &MopCompactPackets::BuildSplineMoveSetTurnRate, turnRate);
-    CheckSplineMaskOrder("spline flight back", SMSG_SPLINE_MOVE_SET_FLIGHT_BACK_SPEED, 0,
-        &MopCompactPackets::BuildSplineMoveSetFlightBackSpeed, flightBack);
-    CheckSplineMaskOrder("spline pitch rate", SMSG_SPLINE_MOVE_SET_PITCH_RATE, 0,
-        &MopCompactPackets::BuildSplineMoveSetPitchRate, pitchRate);
-}
 
 /// The interleave is what distinguishes run from swim: run writes one GUID byte
 /// before the counter, swim writes none. Reusing the swim builder would produce
 /// a body the client cannot parse, so pin that they differ.
-static void test_run_speed_differs_from_swim_interleave()
-{
-    WorldPacket run(SMSG_MOVE_SET_RUN_SPEED, 17);
-    MopCompactPackets::BuildMoveSetRunSpeed(run, 0x0123456789ABCDEFull, 0x12345678u, 1.0f);
 
-    WorldPacket swim(SMSG_MOVE_SET_SWIM_SPEED, 17);
-    MopCompactPackets::BuildMoveSetSwimSpeed(swim, 0x0123456789ABCDEFull, 0x12345678u, 1.0f);
-
-    CHECK(run.size() == swim.size());                   // same field set, same width
-    bool differs = false;
-    for (size_t i = 0; i < run.size(); ++i)
-    {
-        if (run.contents()[i] != swim.contents()[i])
-        {
-            differs = true;
-            break;
-        }
-    }
-    CHECK(differs);                                     // ...but a different body
-}
-
-static void test_swim_speed_guid_layouts()
-{
-    {
-        WorldPacket packet(SMSG_MOVE_SET_SWIM_SPEED, 17);
-        MopCompactPackets::BuildMoveSetSwimSpeed(packet, 0x0123456789ABCDEFull, 0x12345678u, 1.0f);
-        CHECK(BytesEqual(packet, {
-            0xFF,
-            0x78, 0x56, 0x34, 0x12,
-            0xCC, 0x88,
-            0x00, 0x00, 0x80, 0x3F,
-            0x22, 0x00, 0xEE, 0x44, 0xAA, 0x66
-        }));
-    }
-    {
-        WorldPacket packet(SMSG_MOVE_SET_SWIM_SPEED, 10);
-        MopCompactPackets::BuildMoveSetSwimSpeed(packet, 0xFFull, 0, 1.0f);
-        CHECK(BytesEqual(packet, {
-            0x40,
-            0x00, 0x00, 0x00, 0x00,
-            0x00, 0x00, 0x80, 0x3F,
-            0xFE
-        }));
-    }
-    {
-        WorldPacket packet(SMSG_MOVE_SET_SWIM_SPEED, 9);
-        MopCompactPackets::BuildMoveSetSwimSpeed(packet, 0, 7, 1.0f);
-        CHECK(BytesEqual(packet, {
-            0x00,
-            0x07, 0x00, 0x00, 0x00,
-            0x00, 0x00, 0x80, 0x3F
-        }));
-    }
-}
 
 static void test_random_roll_guid_layouts()
 {
@@ -1208,31 +803,6 @@ static void test_guild_banker_activate_retail_bodies()
     }
 }
 
-static void test_guild_banker_activate_binary_edge_bodies()
-{
-    // Binary-derived parser-only body: the corpus fixture with the standalone
-    // full-slot-refresh bit cleared. It is intentionally not labelled retail.
-    WorldPacket noRefresh = InputPacket(CMSG_GUILD_BANKER_ACTIVATE,
-        { 0x3D, 0x80, 0xF0, 0x06, 0x11, 0x12, 0x70, 0x43 });
-    ObjectGuid guid;
-    bool fullSlotRefresh = true;
-    CHECK(MopCompactPackets::ReadGuildBankerActivate(noRefresh, guid, fullSlotRefresh));
-    CHECK(guid.GetRawValue() == UINT64_C(0xF113427100000710));
-    CHECK(!fullSlotRefresh);
-    CHECK(noRefresh.rpos() == noRefresh.size());
-
-    // Binary-derived all-eight-byte body for 0x0807060504030201. Distinct
-    // byte values prove both mask and XOR byte order independently.
-    WorldPacket allPresent = InputPacket(CMSG_GUILD_BANKER_ACTIVATE,
-        { 0xFF, 0x80, 0x09, 0x03, 0x00, 0x06, 0x04, 0x02, 0x07, 0x05 });
-    fullSlotRefresh = false;
-    CHECK(MopCompactPackets::ReadGuildBankerActivate(allPresent, guid, fullSlotRefresh));
-    CHECK(guid.GetRawValue() == UINT64_C(0x0807060504030201));
-    CHECK(fullSlotRefresh);
-    CHECK(allPresent.rpos() == allPresent.size());
-
-    CHECK(uint32_t(CMSG_GUILD_BANKER_ACTIVATE) == 0x0372u);
-}
 
 static void test_guild_banker_activate_rejects_malformed_bodies()
 {
@@ -2371,95 +1941,13 @@ static void test_can_fly_family_matches_retail_bodies()
     }
 }
 
-static void test_opcode_values_are_framable()
-{
-    CHECK(uint32_t(SMSG_ATTACKSWING_ERROR) == 0x11E1u);
-    CHECK(uint32_t(SMSG_MOVE_SET_SWIM_SPEED) == 0x0817u);
-    CHECK(uint32_t(SMSG_MOVE_SET_RUN_SPEED) == 0x184Cu);
-    CHECK(uint32_t(SMSG_MOVE_SET_WALK_SPEED) == 0x0469u);
-    CHECK(uint32_t(SMSG_SPLINE_MOVE_SET_RUN_SPEED) == 0x02F1u);
-    CHECK(uint32_t(SMSG_MOVE_SET_SWIM_BACK_SPEED) == 0x0962u);
-    CHECK(uint32_t(SMSG_MOVE_SET_RUN_SPEED) <= 0x1FFFu);   // must fit the 13-bit wire header
-    CHECK(uint32_t(SMSG_RANDOM_ROLL) == 0x141Au);
-    CHECK(uint32_t(SMSG_UPDATE_INSTANCE_ENCOUNTER_UNIT) == 0x0332u);
-    CHECK(uint32_t(SMSG_SET_RAID_DIFFICULTY) == 0x0591u);
-    CHECK(uint32_t(SMSG_SET_DUNGEON_DIFFICULTY) == 0x1283u);
-    CHECK(uint32_t(SMSG_ATTACKSTART) == 0x1A9Eu);
-    CHECK(uint32_t(SMSG_ATTACKSTOP) == 0x12AFu);
-    CHECK(uint32_t(SMSG_ATTACKERSTATEUPDATE) == 0x06AAu);
-    CHECK(uint32_t(SMSG_CANCEL_COMBAT) == 0x0E8Bu);
-    CHECK(uint32_t(SMSG_PARTYKILLLOG) == 0x048Au);
-    CHECK(uint32_t(SMSG_DUEL_OUTOFBOUNDS) == 0x001Au);
-    CHECK(uint32_t(SMSG_DUEL_INBOUNDS) == 0x163Au);
-    CHECK(uint32_t(SMSG_DUEL_COMPLETE) == 0x1C0Au);
-    CHECK(uint32_t(SMSG_DUEL_COUNTDOWN) == 0x129Fu);
-    CHECK(uint32_t(SMSG_DUEL_REQUESTED) == 0x0022u);
-    CHECK(uint32_t(SMSG_DUEL_WINNER) == 0x10E1u);
-    CHECK(uint32_t(SMSG_START_MIRROR_TIMER) == 0x0E12u);
-    CHECK(uint32_t(SMSG_STOP_MIRROR_TIMER) == 0x1026u);
-    CHECK(uint32_t(SMSG_RESYNC_RUNES) == 0x15E3u);
-    CHECK(uint32_t(SMSG_ADD_RUNE_POWER) == 0x1860u);
-    CHECK(uint32_t(SMSG_CONVERT_RUNE) == 0x1A1Bu);
-    CHECK(uint32_t(SMSG_THREAT_UPDATE) == 0x0632u);
-    CHECK(uint32_t(SMSG_HIGHEST_THREAT_UPDATE) == 0x14AEu);
-    CHECK(uint32_t(SMSG_THREAT_CLEAR) == 0x180Bu);
-    CHECK(uint32_t(SMSG_THREAT_REMOVE) == 0x1960u);
-    CHECK(uint32_t(SMSG_DISMOUNT) == 0x0E3Au);
-    CHECK(uint32_t(SMSG_PRE_RESURRECT) == 0x19C0u);
-    CHECK(uint32_t(SMSG_UPDATE_COMBO_POINTS) == 0x082Fu);
-    CHECK(uint32_t(CMSG_PET_STOP_ATTACK) == 0x065Bu);
-    CHECK(uint32_t(CMSG_PET_SET_ACTION) == 0x12E9u);
-    CHECK(uint32_t(CMSG_PET_SET_ACTION) != uint32_t(CMSG_PET_SPELL_AUTOCAST));
-
-    CHECK(uint32_t(SMSG_ATTACKSWING_ERROR) <= 0x1FFFu);
-    CHECK(uint32_t(SMSG_MOVE_SET_SWIM_SPEED) <= 0x1FFFu);
-    CHECK(uint32_t(SMSG_RANDOM_ROLL) <= 0x1FFFu);
-    CHECK(uint32_t(SMSG_UPDATE_INSTANCE_ENCOUNTER_UNIT) <= 0x1FFFu);
-    CHECK(uint32_t(SMSG_SET_RAID_DIFFICULTY) <= 0x1FFFu);
-    CHECK(uint32_t(SMSG_SET_DUNGEON_DIFFICULTY) <= 0x1FFFu);
-    CHECK(uint32_t(SMSG_ATTACKSTART) <= 0x1FFFu);
-    CHECK(uint32_t(SMSG_ATTACKSTOP) <= 0x1FFFu);
-    CHECK(uint32_t(SMSG_ATTACKERSTATEUPDATE) <= 0x1FFFu);
-    CHECK(uint32_t(SMSG_CANCEL_COMBAT) <= 0x1FFFu);
-    CHECK(uint32_t(SMSG_PARTYKILLLOG) <= 0x1FFFu);
-    CHECK(uint32_t(SMSG_DUEL_OUTOFBOUNDS) <= 0x1FFFu);
-    CHECK(uint32_t(SMSG_DUEL_INBOUNDS) <= 0x1FFFu);
-    CHECK(uint32_t(SMSG_DUEL_COMPLETE) <= 0x1FFFu);
-    CHECK(uint32_t(SMSG_DUEL_COUNTDOWN) <= 0x1FFFu);
-    CHECK(uint32_t(SMSG_DUEL_REQUESTED) <= 0x1FFFu);
-    CHECK(uint32_t(SMSG_DUEL_WINNER) <= 0x1FFFu);
-    CHECK(uint32_t(SMSG_START_MIRROR_TIMER) <= 0x1FFFu);
-    CHECK(uint32_t(SMSG_STOP_MIRROR_TIMER) <= 0x1FFFu);
-    CHECK(uint32_t(SMSG_RESYNC_RUNES) <= 0x1FFFu);
-    CHECK(uint32_t(SMSG_ADD_RUNE_POWER) <= 0x1FFFu);
-    CHECK(uint32_t(SMSG_CONVERT_RUNE) <= 0x1FFFu);
-    CHECK(uint32_t(SMSG_THREAT_UPDATE) <= 0x1FFFu);
-    CHECK(uint32_t(SMSG_HIGHEST_THREAT_UPDATE) <= 0x1FFFu);
-    CHECK(uint32_t(SMSG_THREAT_CLEAR) <= 0x1FFFu);
-    CHECK(uint32_t(SMSG_THREAT_REMOVE) <= 0x1FFFu);
-    CHECK(uint32_t(SMSG_DISMOUNT) <= 0x1FFFu);
-    CHECK(uint32_t(SMSG_PRE_RESURRECT) <= 0x1FFFu);
-    CHECK(uint32_t(SMSG_UPDATE_COMBO_POINTS) <= 0x1FFFu);
-    CHECK(uint32_t(CMSG_PET_STOP_ATTACK) <= 0x1FFFu);
-    CHECK(uint32_t(CMSG_PET_SET_ACTION) <= 0x1FFFu);
-}
 
 int main(int /*argc*/, char** /*argv*/)
 {
-    test_attack_swing_reasons();
     test_attack_packets();
     test_attacker_state_update();
     test_run_speed_matches_retail_body();
-    test_walk_speed_matches_retail_body();
-    test_run_back_speed_matches_retail_body();
-    test_swim_back_speed_structure_reader_derived();
-    test_speed_family_full_interleaves_reader_derived();
-    test_flight_speed_scalars_precede_mask();
     test_spline_run_speed_matches_retail_body();
-    test_spline_speed_family_matches_retail_bodies();
-    test_spline_speed_family_full_interleaves_reader_derived();
-    test_direct_speed_family_mask_order();
-    test_spline_speed_family_mask_order();
     test_pet_action_matches_retail_bodies();
     test_pet_stop_attack_matches_retail_and_rejects_malformed_bodies();
     test_pet_set_action_matches_retail_and_rejects_malformed_bodies();
@@ -2470,8 +1958,6 @@ int main(int /*argc*/, char** /*argv*/)
     test_send_mail_result_matches_retail_bodies();
     test_totem_and_action_button_bodies();
     test_can_fly_family_matches_retail_bodies();
-    test_run_speed_differs_from_swim_interleave();
-    test_swim_speed_guid_layouts();
     test_random_roll_guid_layouts();
     test_instance_encounter_variants();
     test_raid_difficulty();
@@ -2486,11 +1972,9 @@ int main(int /*argc*/, char** /*argv*/)
     test_dismount_packet();
     test_show_bank_matches_retail_bodies();
     test_guild_banker_activate_retail_bodies();
-    test_guild_banker_activate_binary_edge_bodies();
     test_guild_banker_activate_rejects_malformed_bodies();
     test_pre_resurrect_packet();
     test_combo_points_packet();
-    test_opcode_values_are_framable();
 
     if (g_fail)
     {

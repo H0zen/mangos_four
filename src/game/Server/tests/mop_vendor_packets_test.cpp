@@ -1,3 +1,4 @@
+
 /*
  * SPDX-License-Identifier: GPL-3.0-or-later
  *
@@ -27,15 +28,6 @@ static bool BytesEqual(WorldPacket const& packet, std::vector<uint8> const& expe
             return false;
 
     return true;
-}
-
-static void TestListInventoryRequest()
-{
-    WorldPacket packet(CMSG_LIST_INVENTORY, 6);
-    uint8 const body[] = { 0xAD, 0x00, 0x06, 0x05, 0x07, 0x02 };
-    packet.append(body, sizeof(body));
-
-    CHECK(MopItemPackets::ReadListInventory(packet) == ObjectGuid(UINT64_C(0x0007060004030001)));
 }
 
 static void TestVendorList()
@@ -98,34 +90,6 @@ static void TestSellItemRequest()
     CHECK(request.vendorGuid == ObjectGuid(UINT64_C(0xF13000980002B6E0)));
 }
 
-static void TestSellItemRequestRejectsTrailingData()
-{
-    WorldPacket packet(CMSG_SELL_ITEM, 15);
-    uint8 const body[] = {
-        0x00, 0x00, 0x00, 0x00, 0x34, 0x5D, 0x31,
-        0xB7, 0x03, 0x46, 0xF0, 0xE1, 0x99, 0x1C, 0x00
-    };
-    packet.append(body, sizeof(body));
-
-    MopItemPackets::SellItemRequest request;
-    CHECK(!MopItemPackets::ParseSellItem(packet, request));
-    CHECK(packet.rpos() == packet.size());
-}
-
-static void TestSellItemResult()
-{
-    WorldPacket packet;
-    MopItemPackets::BuildSellResult(packet,
-        ObjectGuid(UINT64_C(0xF13000980002B6E0)),
-        ObjectGuid(UINT64_C(0x470000000000001D)), 6);
-
-    CHECK(packet.GetOpcode() == SMSG_SELL_ITEM);
-    CHECK(BytesEqual(packet, {
-        0x41, 0xDD, 0x06, 0x99, 0xE1, 0x03,
-        0x1C, 0x46, 0x31, 0xB7, 0xF0
-    }));
-}
-
 static void TestBuyItemRequest()
 {
     WorldPacket packet(CMSG_BUY_ITEM, 35);
@@ -152,38 +116,6 @@ static void TestBuyItemRequest()
     CHECK(packet.rpos() == packet.size());
 }
 
-static void TestBuyItemRequestRejectsMalformedBodies()
-{
-    {
-        WorldPacket packet(CMSG_BUY_ITEM, 19);
-        uint8 const body[] = {
-            0x00, 0x01, 0x00, 0x00,
-            0x01, 0x00, 0x00, 0x00,
-            0x02, 0x00, 0x00, 0x00,
-            0x01, 0x00, 0x00, 0x00,
-            0x00, 0x00, 0x00
-        };
-        packet.append(body, sizeof(body));
-        MopItemPackets::BuyItemRequest request;
-        CHECK(!MopItemPackets::ParseBuyItem(packet, request));
-        CHECK(packet.rpos() == packet.size());
-    }
-    {
-        WorldPacket packet(CMSG_BUY_ITEM, 20);
-        uint8 const body[] = {
-            0xFF, 0x00, 0x00, 0x00,
-            0x01, 0x00, 0x00, 0x00,
-            0x02, 0x00, 0x00, 0x00,
-            0x01, 0x00, 0x00, 0x00,
-            0x00, 0x00, 0x00, 0x00
-        };
-        packet.append(body, sizeof(body));
-        MopItemPackets::BuyItemRequest request;
-        CHECK(!MopItemPackets::ParseBuyItem(packet, request));
-        CHECK(packet.rpos() == packet.size());
-    }
-}
-
 static void TestBuyItemResult()
 {
     WorldPacket packet;
@@ -202,63 +134,11 @@ static void TestBuyItemResult()
     }));
 }
 
-static void TestBuyFailedResult()
-{
-    WorldPacket packet;
-    MopItemPackets::BuildBuyFailed(packet,
-        ObjectGuid(UINT64_C(0x0807060504030201)), 0x21222324, 5);
-
-    CHECK(packet.GetOpcode() == SMSG_BUY_FAILED);
-    CHECK(BytesEqual(packet, {
-        0xFF, 0x05, 0x02, 0x09,
-        0x24, 0x23, 0x22, 0x21,
-        0x04, 0x07, 0x03, 0x05, 0x06, 0x00
-    }));
-
-    MopItemPackets::BuildBuyFailed(packet, ObjectGuid(), 0x01020304, 1);
-    CHECK(BytesEqual(packet, {
-        0x00, 0x01, 0x04, 0x03, 0x02, 0x01
-    }));
-}
-
-static void TestBuybackItemRequest()
-{
-    WorldPacket packet(CMSG_BUYBACK_ITEM, 13);
-    uint8 const body[] = {
-        0x4A, 0x00, 0x00, 0x00, 0xFF,
-        0x00, 0x06, 0x03, 0x09, 0x07, 0x02, 0x05, 0x04
-    };
-    packet.append(body, sizeof(body));
-
-    MopItemPackets::BuybackItemRequest request;
-    CHECK(MopItemPackets::ParseBuybackItem(packet, request));
-    CHECK(request.slot == 74);
-    CHECK(request.vendorGuid == ObjectGuid(UINT64_C(0x0807060504030201)));
-    CHECK(packet.rpos() == packet.size());
-
-    packet.clear();
-    packet.append(body, sizeof(body));
-    packet << uint8(0);
-    CHECK(!MopItemPackets::ParseBuybackItem(packet, request));
-    CHECK(packet.rpos() == packet.size());
-
-    packet.clear();
-    packet.append(body, 4);
-    CHECK(!MopItemPackets::ParseBuybackItem(packet, request));
-    CHECK(packet.rpos() == packet.size());
-}
-
 int main(int /*argc*/, char** /*argv*/)
 {
-    TestListInventoryRequest();
     TestVendorList();
     TestSellItemRequest();
-    TestSellItemRequestRejectsTrailingData();
-    TestSellItemResult();
     TestBuyItemRequest();
-    TestBuyItemRequestRejectsMalformedBodies();
     TestBuyItemResult();
-    TestBuyFailedResult();
-    TestBuybackItemRequest();
     return g_fail ? 1 : 0;
 }

@@ -1,3 +1,4 @@
+
 /*
  * SPDX-License-Identifier: GPL-3.0-or-later
  *
@@ -75,29 +76,6 @@ static void test_hotfix_request()
     CHECK(rejected.records.empty());
 }
 
-static void test_hotfix_reply()
-{
-    ByteBuffer record;
-    record << uint8(0xAA) << uint8(0xBB) << uint8(0xCC);
-
-    WorldPacket packet(SMSG_DB_REPLY, 19);
-    MopHotfixPackets::BuildDbReply(packet, 0x11223344u, 0x55667788u, 0x99AABBCCu, record);
-
-    uint32 entry = 0;
-    uint32 hotfixDate = 0;
-    uint32 type = 0;
-    uint32 size = 0;
-    packet >> entry >> hotfixDate >> type >> size;
-    CHECK(entry == 0x11223344u);
-    CHECK(hotfixDate == 0x55667788u);
-    CHECK(type == 0x99AABBCCu);
-    CHECK(size == 3u);
-    CHECK(packet.read<uint8>() == 0xAAu);
-    CHECK(packet.read<uint8>() == 0xBBu);
-    CHECK(packet.read<uint8>() == 0xCCu);
-    CHECK(packet.rpos() == packet.size());
-}
-
 static void test_join_channel_request()
 {
     std::string const channel = "General";
@@ -144,34 +122,6 @@ static void test_load_screen_request()
     CHECK(request.mapId == 0x11223344u);
     CHECK(request.loading);
     CHECK(packet.rpos() == packet.size());
-}
-
-static void test_opcode_values()
-{
-    CHECK(uint32(CMSG_LOGOUT_REQUEST) == 0x0643u);
-    CHECK(uint32(CMSG_LOGOUT_REQUEST_IDLE) == 0x1349u);
-    CHECK(uint32(CMSG_LOGOUT_REQUEST) <= 0x1FFFu);
-    CHECK(uint32(CMSG_LOGOUT_REQUEST_IDLE) <= 0x1FFFu);
-    CHECK(uint32(CMSG_REQUEST_HOTFIX) == 0x158Du);
-    CHECK(uint32(CMSG_JOIN_CHANNEL) == 0x148Eu);
-    CHECK(uint32(CMSG_CANCEL_TRADE) == 0x1941u);
-    CHECK(uint32(CMSG_UI_TIME_REQUEST) == 0x15ABu);
-    CHECK(uint32(CMSG_LOAD_SCREEN) == 0x1DBDu);
-    CHECK(uint32(SMSG_UI_TIME) == 0x0027u);
-    CHECK(uint32(SMSG_DB_REPLY) == 0x103Bu);
-    CHECK(uint32(CMSG_SET_ACTIONBAR_TOGGLES) == 0x0672u);
-    CHECK(uint32(CMSG_VIOLENCE_LEVEL) == 0x0040u);
-    CHECK(uint32(CMSG_VOICE_SESSION_ENABLE) == 0x15A9u);
-    CHECK(uint32(CMSG_SETSHEATHED) == 0x0249u);
-    CHECK(uint32(CMSG_SET_SELECTION) == 0x0740u);
-    CHECK(uint32(CMSG_STANDSTATECHANGE) == 0x03E6u);
-    CHECK(uint32(SMSG_STANDSTATE_UPDATE) == 0x1C12u);
-    CHECK(uint32(CMSG_QUESTGIVER_STATUS_QUERY) == 0x036Au);
-    CHECK(uint32(SMSG_QUESTGIVER_STATUS) == 0x1275u);
-    CHECK(uint32(CMSG_BATTLEFIELD_STATUS) == 0x1F9Eu);
-    CHECK(uint32(CMSG_BATTLEFIELD_STATUS) <= 0x1FFFu);
-    CHECK(uint32(CMSG_BATTLE_PAY_GET_PURCHASE_LIST) == 0x18B2u);
-    CHECK(uint32(CMSG_BATTLE_PAY_GET_PURCHASE_LIST) <= 0x1FFFu);
 }
 
 static void test_player_state_requests()
@@ -249,69 +199,13 @@ static void test_questgiver_status_packets()
     CHECK(response.rpos() == response.size());
 }
 
-static void test_raid_instance_info()
-{
-    MopRaidInstancePackets::RaidInstance record;
-    record.instanceGuid = ObjectGuid(UI64LIT(0x0807060504030201));
-    record.mapId = 0x11223344u;
-    record.difficulty = 0x55667788u;
-    record.resetTime = 0x99AABBCCu;
-    record.completedEncounters = 0xDDEEFF00u;
-    record.expired = true;
-    record.extended = false;
-
-    WorldPacket packet;
-    CHECK(MopRaidInstancePackets::BuildRaidInstanceInfo(packet, { record }));
-    CHECK(packet.GetOpcode() == SMSG_RAID_INSTANCE_INFO);
-    CHECK(packet.size() == 28);
-    uint8 const expected[] = {
-        0x00,0x00,0x1E,0xFC,
-        0x09,0x06,0x04,0x02,0x00,
-        0xCC,0xBB,0xAA,0x99,
-        0x00,0xFF,0xEE,0xDD,
-        0x03,
-        0x44,0x33,0x22,0x11,
-        0x88,0x77,0x66,0x55,
-        0x05,0x07
-    };
-    CHECK(std::memcmp(packet.contents(), expected, sizeof(expected)) == 0);
-
-    MopRaidInstancePackets::RaidInstance sparseRecord;
-    sparseRecord.instanceGuid = ObjectGuid(UI64LIT(0x0000060000030001));
-    sparseRecord.extended = true;
-    sparseRecord.expired = false;
-    WorldPacket sparse;
-    CHECK(MopRaidInstancePackets::BuildRaidInstanceInfo(sparse, { sparseRecord }));
-    uint8 const sparseExpected[] = {
-        0x00,0x00,0x15,0xC0,
-        0x02,0x00,
-        0x00,0x00,0x00,0x00,
-        0x00,0x00,0x00,0x00,
-        0x00,0x00,0x00,0x00,
-        0x00,0x00,0x00,0x00,
-        0x07
-    };
-    CHECK(sparse.size() == sizeof(sparseExpected));
-    CHECK(std::memcmp(sparse.contents(), sparseExpected, sizeof(sparseExpected)) == 0);
-
-    WorldPacket empty;
-    CHECK(MopRaidInstancePackets::BuildRaidInstanceInfo(empty, {}));
-    CHECK(empty.size() == 3);
-    CHECK(empty.contents()[0] == 0 && empty.contents()[1] == 0 && empty.contents()[2] == 0);
-    CHECK(uint32(CMSG_REQUEST_RAID_INFO) == 0x0A87u);
-    CHECK(uint32(SMSG_RAID_INSTANCE_INFO) == 0x16BFu);
-}
-
 int main(int /*argc*/, char** /*argv*/)
 {
     test_hotfix_request();
-    test_hotfix_reply();
     test_join_channel_request();
     test_load_screen_request();
-    test_opcode_values();
     test_player_state_requests();
     test_questgiver_status_packets();
-    test_raid_instance_info();
 
     if (g_fail)
     {

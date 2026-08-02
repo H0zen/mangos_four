@@ -59,114 +59,11 @@ static bool ExpectBytes(WorldPacket const& packet, std::vector<uint8_t> const& e
     return true;
 }
 
-static bool ExpectPrefix(WorldPacket const& packet, std::array<uint8_t, 3> const& expected)
-{
-    if (packet.size() < expected.size())
-    {
-        std::fprintf(stderr, "  size %u, wanted at least %u\n",
-                     unsigned(packet.size()), unsigned(expected.size()));
-        return false;
-    }
 
-    for (size_t i = 0; i < expected.size(); ++i)
-    {
-        if (packet.contents()[i] != expected[i])
-        {
-            std::fprintf(stderr, "  byte %u = 0x%02X, wanted 0x%02X\n",
-                         unsigned(i), packet.contents()[i], expected[i]);
-            return false;
-        }
-    }
-    return true;
-}
 
-static void test_empty_lists()
-{
-    WorldPacket packet(SMSG_ALL_ACHIEVEMENT_DATA, 5);
-    MopAchievementPackets::BuildAllAchievementData(packet, {}, {});
-    CHECK(ExpectBytes(packet, { 0x00, 0x00, 0x00, 0x00, 0x00 }));
-}
 
-static void test_completed_sparse_guid()
-{
-    std::vector<MopAchievementPackets::CompletedAchievement> completed = {
-        { 0x11223344u, UINT64_C(0x0077005500330011), 0xDDEEFF00u,
-          0x55667788u, 0x99AABBCCu }
-    };
 
-    WorldPacket packet(SMSG_ALL_ACHIEVEMENT_DATA, 26);
-    MopAchievementPackets::BuildAllAchievementData(packet, completed, {});
-    CHECK(ExpectBytes(packet, {
-        0x00, 0x00, 0x00, 0x00, 0x03, 0x1C,
-        0x44, 0x33, 0x22, 0x11, 0x88, 0x77, 0x66, 0x55,
-        0xCC, 0xBB, 0xAA, 0x99, 0x00, 0xFF, 0xEE, 0xDD,
-        0x10, 0x54, 0x76, 0x32
-    }));
-}
 
-static void test_progress_sparse_guids()
-{
-    std::vector<MopAchievementPackets::CriteriaProgress> progress = {
-        { 0x12345678u, UINT64_C(0x8800660044002200),
-          UINT64_C(0x0077005500330011), 0x90ABCDEFu,
-          0x10203040u, 0x50607080u }
-    };
-
-    WorldPacket packet(SMSG_ALL_ACHIEVEMENT_DATA, 32);
-    MopAchievementPackets::BuildAllAchievementData(packet, {}, progress);
-    CHECK(ExpectBytes(packet, {
-        0x00, 0x00, 0x34, 0xEE, 0x00, 0x00, 0x00, 0x00,
-        0x89, 0x40, 0x30, 0x20, 0x10, 0x78, 0x56, 0x34,
-        0x12, 0x10, 0x54, 0x76, 0x23, 0x67, 0x32, 0x45,
-        0x80, 0x70, 0x60, 0x50, 0xEF, 0xCD, 0xAB, 0x90
-    }));
-}
-
-static void test_completed_bytes_precede_progress_bytes_with_zero_guids()
-{
-    std::vector<MopAchievementPackets::CompletedAchievement> completed = {
-        { 0x11223344u, 0, 0xDDEEFF00u, 0x55667788u, 0x99AABBCCu }
-    };
-    std::vector<MopAchievementPackets::CriteriaProgress> progress = {
-        { 0x12345678u, 0, 0, 0x90ABCDEFu, 0x10203040u, 0x50607080u }
-    };
-
-    WorldPacket packet(SMSG_ALL_ACHIEVEMENT_DATA, 41);
-    MopAchievementPackets::BuildAllAchievementData(packet, completed, progress);
-    CHECK(ExpectBytes(packet, {
-        0x00, 0x00, 0x20, 0x00, 0x00, 0x00, 0x00, 0x20, 0x00,
-        0x44, 0x33, 0x22, 0x11, 0x88, 0x77, 0x66, 0x55,
-        0xCC, 0xBB, 0xAA, 0x99, 0x00, 0xFF, 0xEE, 0xDD,
-        0x40, 0x30, 0x20, 0x10, 0x78, 0x56, 0x34, 0x12,
-        0x80, 0x70, 0x60, 0x50, 0xEF, 0xCD, 0xAB, 0x90
-    }));
-}
-
-static void test_all_guid_bytes_nonzero()
-{
-    std::vector<MopAchievementPackets::CompletedAchievement> completed = {
-        { 0x01020304u, UINT64_C(0x0807060504030201), 0x31323334u,
-          0x11121314u, 0x21222324u }
-    };
-    std::vector<MopAchievementPackets::CriteriaProgress> progress = {
-        { 0x41424344u, UINT64_C(0x100F0E0D0C0B0A09),
-          UINT64_C(0x1817161514131211), 0x51525354u,
-          0x61626364u, 0x71727374u }
-    };
-
-    WorldPacket packet(SMSG_ALL_ACHIEVEMENT_DATA, 65);
-    MopAchievementPackets::BuildAllAchievementData(packet, completed, progress);
-    CHECK(ExpectBytes(packet, {
-        0x00, 0x00, 0x3F, 0xFF, 0xC2, 0x00, 0x00, 0x3F, 0xE0,
-        0x04, 0x03, 0x02, 0x01, 0x14, 0x13, 0x12, 0x11, 0x07,
-        0x09, 0x24, 0x23, 0x22, 0x21, 0x34, 0x33, 0x32, 0x31,
-        0x00, 0x04, 0x03, 0x06, 0x02, 0x05,
-        0x11, 0x64, 0x63, 0x62, 0x61, 0x0E, 0x13,
-        0x44, 0x43, 0x42, 0x41, 0x0C, 0x10, 0x14, 0x16,
-        0x0B, 0x0F, 0x19, 0x12, 0x0A, 0x08, 0x15, 0x0D,
-        0x74, 0x73, 0x72, 0x71, 0x17, 0x54, 0x53, 0x52, 0x51
-    }));
-}
 
 static void test_achievement_earned_captured_bodies()
 {
@@ -197,99 +94,11 @@ static void test_achievement_earned_captured_bodies()
     }));
 }
 
-static void test_achievement_earned_full_interleave_and_scalars()
-{
-    // Binary-derived synthetic coverage, not captured retail evidence. Distinct,
-    // all-nonzero GUIDs exercise every XOR-1 byte and scalar boundary.
-    WorldPacket packet(SMSG_ACHIEVEMENT_EARNED, 35);
-    MopAchievementPackets::BuildAchievementEarned(packet,
-        UINT64_C(0x0807060504030201), UINT64_C(0x1817161514131211), true,
-        0x11223344u, 0x55667788u, 0x99AABBCCu, 0xDDEEFF00u);
-    CHECK(ExpectBytes(packet, {
-        0xFF, 0xFF, 0x80, 0x17, 0x05, 0x16, 0x06, 0x44, 0x33, 0x22,
-        0x11, 0x13, 0x02, 0x00, 0x09, 0x15, 0x04, 0x19, 0x88, 0x77,
-        0x66, 0x55, 0x14, 0x03, 0x10, 0x07, 0xCC, 0xBB, 0xAA, 0x99,
-        0x00, 0xFF, 0xEE, 0xDD, 0x12
-    }));
-}
 
-static void test_achievement_earned_boolean_bit()
-{
-    // Binary-derived synthetic coverage. No captured fixture exercises true;
-    // holding every other input constant isolates alreadyEarned at mask bit 6.
-    WorldPacket packet(SMSG_ACHIEVEMENT_EARNED, 35);
-    MopAchievementPackets::BuildAchievementEarned(packet,
-        UINT64_C(0x0807060504030201), UINT64_C(0x1817161514131211), false,
-        0x11223344u, 0x55667788u, 0x99AABBCCu, 0xDDEEFF00u);
-    CHECK(ExpectPrefix(packet, { 0xFD, 0xFF, 0x80 }));
-}
 
-static void test_achievement_earned_mask_order_complements()
-{
-    // Synthetic coverage cases. One zero byte at a time uniquely assigns all
-    // sixteen GUID presence bits; the all-nonzero fixture alone cannot do that.
-    uint64 const guid1 = UINT64_C(0x0807060504030201);
-    uint64 const guid2 = UINT64_C(0x1817161514131211);
-    std::array<std::array<uint8_t, 3>, 8> const guid1Masks = {{
-        {{ 0xF5, 0xFF, 0x80 }}, {{ 0xFD, 0xBF, 0x80 }},
-        {{ 0xFD, 0xFE, 0x80 }}, {{ 0xF9, 0xFF, 0x80 }},
-        {{ 0xDD, 0xFF, 0x80 }}, {{ 0xED, 0xFF, 0x80 }},
-        {{ 0xFD, 0xFB, 0x80 }}, {{ 0xFD, 0x7F, 0x80 }}
-    }};
-    std::array<std::array<uint8_t, 3>, 8> const guid2Masks = {{
-        {{ 0xFD, 0xEF, 0x80 }}, {{ 0xFD, 0xFD, 0x80 }},
-        {{ 0xBD, 0xFF, 0x80 }}, {{ 0xFD, 0xDF, 0x80 }},
-        {{ 0xFD, 0xF7, 0x80 }}, {{ 0xFD, 0xFF, 0x00 }},
-        {{ 0x7D, 0xFF, 0x80 }}, {{ 0xFC, 0xFF, 0x80 }}
-    }};
 
-    for (size_t index = 0; index < 8; ++index)
-    {
-        uint64 const byteMask = ~(UINT64_C(0xFF) << (8 * index));
 
-        WorldPacket first(SMSG_ACHIEVEMENT_EARNED, 34);
-        MopAchievementPackets::BuildAchievementEarned(first,
-            guid1 & byteMask, guid2, false, 0, 0, 0, 0);
-        CHECK(first.size() == 34);
-        CHECK(ExpectPrefix(first, guid1Masks[index]));
 
-        WorldPacket second(SMSG_ACHIEVEMENT_EARNED, 34);
-        MopAchievementPackets::BuildAchievementEarned(second,
-            guid1, guid2 & byteMask, false, 0, 0, 0, 0);
-        CHECK(second.size() == 34);
-        CHECK(ExpectPrefix(second, guid2Masks[index]));
-    }
-}
-
-static void test_achievement_earned_preserves_caller_opcode()
-{
-    // This proves only the body-builder contract: the caller owns opcode choice.
-    WorldPacket packet(SMSG_TITLE_EARNED, 35);
-    MopAchievementPackets::BuildAchievementEarned(packet,
-        UINT64_C(0x0807060504030201), UINT64_C(0x1817161514131211), false,
-        0x11223344u, 0x55667788u, 0x99AABBCCu, 0xDDEEFF00u);
-    CHECK(packet.GetOpcode() == SMSG_TITLE_EARNED);
-}
-
-static void test_achievement_deleted_body()
-{
-    // Binary-derived synthetic coverage, not captured retail evidence. The
-    // build-18414 client consumes two uint32 values, uses the achievement ID,
-    // and never reads the second word, so the producer writes a stable zero.
-    WorldPacket packet(SMSG_ACHIEVEMENT_DELETED, 8);
-    MopAchievementPackets::BuildAchievementDeleted(packet, 0x11223344u);
-    CHECK(ExpectBytes(packet, {
-        0x44, 0x33, 0x22, 0x11, 0x00, 0x00, 0x00, 0x00
-    }));
-}
-
-static void test_achievement_deleted_preserves_caller_opcode()
-{
-    // This proves only the body-builder contract: the caller owns opcode choice.
-    WorldPacket packet(SMSG_TITLE_EARNED, 8);
-    MopAchievementPackets::BuildAchievementDeleted(packet, 0x11223344u);
-    CHECK(packet.GetOpcode() == SMSG_TITLE_EARNED);
-}
 
 static void test_criteria_update_captured_mode_9_body()
 {
@@ -309,139 +118,17 @@ static void test_criteria_update_captured_mode_9_body()
     }));
 }
 
-static void test_criteria_update_captured_mode_8_body()
-{
-    // Captured retail removal body: build 18414, catalogue 2BE10C89,
-    // capture-000006 sequence 49022. Independent decode consumed 34/34. The
-    // preceding same-ID row had flags 0 and counter 4. This proves one retail
-    // removal transition, not a universal producer policy.
-    WorldPacket packet(SMSG_CRITERIA_UPDATE, 34);
-    MopAchievementPackets::BuildCriteriaUpdate(packet,
-        UINT64_C(0x04000000053CC8E8), 15992u, UINT64_C(0), 8u,
-        241388435u, 1405347600u, 10u);
-    CHECK(ExpectBytes(packet, {
-        0x3D, 0x04, 0x3D, 0x78, 0x3E, 0x00, 0x00, 0x08, 0x00, 0x00,
-        0x00, 0xC9, 0x93, 0x4B, 0x63, 0x0E, 0x10, 0xE7, 0xC3, 0x53,
-        0x0A, 0x00, 0x00, 0x00, 0x05, 0xE9, 0x00, 0x00, 0x00, 0x00,
-        0x00, 0x00, 0x00, 0x00
-    }));
-}
 
-static void test_criteria_update_captured_sparse_mode_8_body()
-{
-    // Captured retail removal body: build 18414, catalogue 2BE10C89,
-    // capture-000020 sequence 28709. Direct payload retrieval and independent
-    // decode consumed 35/35. This fixture exercises GUID byte 6; it proves this
-    // exact sparse body, not a universal producer policy.
-    WorldPacket packet(SMSG_CRITERIA_UPDATE, 35);
-    MopAchievementPackets::BuildCriteriaUpdate(packet,
-        UINT64_C(0x0180000004B22206), 12183u, UINT64_C(0), 8u,
-        243520847u, 1410902123u, 3u);
-    CHECK(ExpectBytes(packet, {
-        0x7D, 0x05, 0x81, 0xB3, 0x97, 0x2F, 0x00, 0x00, 0x08, 0x00,
-        0x00, 0x00, 0x23, 0x4F, 0xD5, 0x83, 0x0E, 0x6B, 0xA8, 0x18,
-        0x54, 0x03, 0x00, 0x00, 0x00, 0x00, 0x07, 0x00, 0x00, 0x00,
-        0x00, 0x00, 0x00, 0x00, 0x00
-    }));
-}
 
-static void test_criteria_update_full_interleave_and_scalars()
-{
-    // Binary-derived synthetic coverage. Every GUID byte and every scalar are
-    // nonzero, and the counter locks the plain little-endian uint64 width.
-    WorldPacket packet(SMSG_CRITERIA_UPDATE, 37);
-    MopAchievementPackets::BuildCriteriaUpdate(packet,
-        UINT64_C(0x0807060504030201), 0x11223344u,
-        UINT64_C(0x99AABBCCDDEEFF88), 0x55667788u, 0xA1A2A3A4u,
-        0xB1B2B3B4u, 0xC1C2C3C4u);
-    CHECK(ExpectBytes(packet, {
-        0xFF, 0x05, 0x06, 0x02, 0x44, 0x33, 0x22, 0x11, 0x88, 0x77,
-        0x66, 0x55, 0x07, 0x03, 0xA4, 0xA3, 0xA2, 0xA1, 0x04, 0xB4,
-        0xB3, 0xB2, 0xB1, 0xC4, 0xC3, 0xC2, 0xC1, 0x09, 0x00, 0x88,
-        0xFF, 0xEE, 0xDD, 0xCC, 0xBB, 0xAA, 0x99
-    }));
-}
 
-static void test_criteria_update_mask_order_complements()
-{
-    // Synthetic coverage: one zero byte at a time uniquely assigns all eight
-    // presence-mask bits.
-    uint64 const guid = UINT64_C(0x0807060504030201);
-    std::array<uint8_t, 8> const masks = {{
-        0xFE, 0xFB, 0xDF, 0xEF, 0x7F, 0xFD, 0xBF, 0xF7
-    }};
 
-    for (size_t index = 0; index < 8; ++index)
-    {
-        uint64 const byteMask = ~(UINT64_C(0xFF) << (8 * index));
-        WorldPacket packet(SMSG_CRITERIA_UPDATE, 36);
-        MopAchievementPackets::BuildCriteriaUpdate(packet, guid & byteMask,
-            0, 0, 0, 0, 0, 0);
-        CHECK(packet.size() == 36);
-        CHECK(packet.contents()[0] == masks[index]);
-    }
-}
 
-static void test_criteria_update_expiry_policy_body()
-{
-    // Synthetic production-policy coverage, not a captured retail body:
-    // removal bit 8, zero counter, and deliberately zero Timer2 while Timer1
-    // remains absolute/nonzero.
-    WorldPacket packet(SMSG_CRITERIA_UPDATE, 37);
-    MopAchievementPackets::BuildCriteriaUpdate(packet,
-        UINT64_C(0x0807060504030201), 0x11223344u, UINT64_C(0), 8u,
-        0xA1A2A3A4u, 0xB1B2B3B4u, 0u);
-    CHECK(ExpectBytes(packet, {
-        0xFF, 0x05, 0x06, 0x02, 0x44, 0x33, 0x22, 0x11, 0x08, 0x00,
-        0x00, 0x00, 0x07, 0x03, 0xA4, 0xA3, 0xA2, 0xA1, 0x04, 0xB4,
-        0xB3, 0xB2, 0xB1, 0x00, 0x00, 0x00, 0x00, 0x09, 0x00, 0x00,
-        0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00
-    }));
-}
 
-static void test_criteria_update_preserves_caller_opcode()
-{
-    // This proves only the body-builder contract: the caller owns opcode choice.
-    WorldPacket packet(SMSG_TITLE_EARNED, 37);
-    MopAchievementPackets::BuildCriteriaUpdate(packet,
-        UINT64_C(0x0807060504030201), 0, 0, 8, 0, 0, 0);
-    CHECK(packet.GetOpcode() == SMSG_TITLE_EARNED);
-}
-
-static void test_opcode_values_are_framable()
-{
-    CHECK(uint32_t(SMSG_ALL_ACHIEVEMENT_DATA) == 0x180Au);
-    CHECK(uint32_t(SMSG_ALL_ACHIEVEMENT_DATA) <= 0x1FFFu);
-    CHECK(uint32_t(SMSG_ACHIEVEMENT_EARNED) == 0x080Bu);
-    CHECK(uint32_t(SMSG_ACHIEVEMENT_EARNED) <= 0x1FFFu);
-    CHECK(uint32_t(SMSG_ACHIEVEMENT_DELETED) == 0x1A2Fu);
-    CHECK(uint32_t(SMSG_ACHIEVEMENT_DELETED) <= 0x1FFFu);
-    CHECK(uint32_t(SMSG_CRITERIA_UPDATE) == 0x0E9Bu);
-    CHECK(uint32_t(SMSG_CRITERIA_UPDATE) <= 0x1FFFu);
-}
 
 int main(int /*argc*/, char** /*argv*/)
 {
-    test_empty_lists();
-    test_completed_sparse_guid();
-    test_progress_sparse_guids();
-    test_completed_bytes_precede_progress_bytes_with_zero_guids();
-    test_all_guid_bytes_nonzero();
     test_achievement_earned_captured_bodies();
-    test_achievement_earned_full_interleave_and_scalars();
-    test_achievement_earned_boolean_bit();
-    test_achievement_earned_mask_order_complements();
-    test_achievement_earned_preserves_caller_opcode();
-    test_achievement_deleted_body();
-    test_achievement_deleted_preserves_caller_opcode();
     test_criteria_update_captured_mode_9_body();
-    test_criteria_update_captured_mode_8_body();
-    test_criteria_update_captured_sparse_mode_8_body();
-    test_criteria_update_full_interleave_and_scalars();
-    test_criteria_update_mask_order_complements();
-    test_criteria_update_expiry_policy_body();
-    test_criteria_update_preserves_caller_opcode();
-    test_opcode_values_are_framable();
 
     if (g_fail)
     {

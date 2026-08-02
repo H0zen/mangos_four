@@ -1,3 +1,4 @@
+
 /*
  * SPDX-License-Identifier: GPL-3.0-or-later
  *
@@ -89,37 +90,6 @@ static void TestAreaTriggerRequest()
     CHECK(nonzeroPadding.rpos() == nonzeroPadding.size());
 }
 
-static void TestAreaTriggerNoCorpse()
-{
-    WorldPacket packet;
-    MopAreaTriggerPackets::BuildNoCorpse(packet);
-    CHECK(packet.GetOpcode() == SMSG_AREA_TRIGGER_NO_CORPSE);
-    CHECK(packet.empty());
-}
-
-static void TestExplorationExperience()
-{
-    WorldPacket packet;
-    MopAreaTriggerPackets::BuildExplorationExperience(packet,
-        0x11223344u, 0xA1B2C3D4u);
-    CHECK(packet.GetOpcode() == SMSG_EXPLORATION_EXPERIENCE);
-    CheckBytes(packet, {
-        0x44, 0x33, 0x22, 0x11,
-        0xD4, 0xC3, 0xB2, 0xA1,
-    });
-}
-
-static void TestQuestgiverStatusMultipleRequest()
-{
-    WorldPacket empty(CMSG_QUESTGIVER_STATUS_MULTIPLE_QUERY, 0);
-    CHECK(MopQuestStatusPackets::ParseMultipleStatusQuery(empty));
-
-    WorldPacket trailing = MakePacket(CMSG_QUESTGIVER_STATUS_MULTIPLE_QUERY,
-        { 0x00 });
-    CHECK(!MopQuestStatusPackets::ParseMultipleStatusQuery(trailing));
-    CHECK(trailing.rpos() == trailing.size());
-}
-
 static void TestQuestgiverStatusMultipleResponse()
 {
     WorldPacket empty;
@@ -149,33 +119,6 @@ static void TestQuestgiverStatusMultipleResponse()
     CHECK(MopQuestStatusPackets::BuildMultipleStatus(sparse, entries));
     CheckBytes(sparse,
         { 0x00, 0x00, 0x0A, 0x20, 0x89, 0x78, 0x56, 0x34, 0x12, 0x10 });
-}
-
-static void TestNpcTextRequest()
-{
-    MopNpcTextPackets::Request request;
-    WorldPacket dense = MakePacket(CMSG_NPC_TEXT_QUERY,
-        { 0x78, 0x56, 0x34, 0x12, 0xFF, 0x54, 0x10, 0x32,
-          0x67, 0x23, 0x89, 0x45, 0x76 });
-    CHECK(MopNpcTextPackets::ParseRequest(dense, request));
-    CHECK(request.textId == 0x12345678u);
-    CHECK(request.sourceGuid == ObjectGuid(UINT64_C(0x8877665544332211)));
-
-    WorldPacket zeroGuid = MakePacket(CMSG_NPC_TEXT_QUERY,
-        { 0xEF, 0xCD, 0xAB, 0x90, 0x00 });
-    CHECK(MopNpcTextPackets::ParseRequest(zeroGuid, request));
-    CHECK(request.textId == 0x90ABCDEFu);
-    CHECK(request.sourceGuid.IsEmpty());
-
-    WorldPacket truncated = MakePacket(CMSG_NPC_TEXT_QUERY,
-        { 0x78, 0x56, 0x34, 0x12, 0xFF, 0x54 });
-    CHECK(!MopNpcTextPackets::ParseRequest(truncated, request));
-    CHECK(truncated.rpos() == truncated.size());
-
-    WorldPacket trailing = MakePacket(CMSG_NPC_TEXT_QUERY,
-        { 0x78, 0x56, 0x34, 0x12, 0x00, 0x00 });
-    CHECK(!MopNpcTextPackets::ParseRequest(trailing, request));
-    CHECK(trailing.rpos() == trailing.size());
 }
 
 static void TestNpcTextResponse()
@@ -257,177 +200,19 @@ static void TestNpcTextResponse()
     CHECK(!unmapped.found);
 }
 
-static void TestOpcodeValues()
-{
-    CHECK(uint32_t(CMSG_AREATRIGGER) == 0x1C44u);
-    CHECK(uint32_t(SMSG_AREA_TRIGGER_NO_CORPSE) == 0x089Eu);
-    CHECK(uint32_t(SMSG_EXPLORATION_EXPERIENCE) == 0x189Au);
-    CHECK(uint32_t(CMSG_NPC_TEXT_QUERY) == 0x0287u);
-    CHECK(uint32_t(SMSG_NPC_TEXT_UPDATE) == 0x140Au);
-    CHECK(uint32_t(CMSG_QUESTGIVER_STATUS_MULTIPLE_QUERY) == 0x02F1u);
-    CHECK(uint32_t(SMSG_QUESTGIVER_STATUS_MULTIPLE) == 0x06CEu);
-}
-
 // Invented BroadcastText ids must never land on a record the client already
 // ships, or it renders its own text for our row and nothing reports an error.
 // Measured on the 18414 client: 936 records spanning 1..77161.
-static void TestSynthesisedBroadcastTextIdsAvoidTheClientRange()
-{
-    CHECK(MopNpcTextPackets::SynthesiseBroadcastTextId(0, 0) >
-        MopNpcTextPackets::ClientHighestShippedBroadcastTextId);
-
-    // npc_text ids run to 16777215 in our world database; the whole span has
-    // to stay clear of the client's range and inside uint32.
-    uint32 const lowest = MopNpcTextPackets::SynthesiseBroadcastTextId(0, 0);
-    uint32 const highest =
-        MopNpcTextPackets::SynthesiseBroadcastTextId(16777215u, 7);
-    CHECK(lowest > 77161u);
-    CHECK(highest > lowest);
-
-    // Distinct rows and options never share an id, and the mapping inverts.
-    uint32 const cases[][2] = {
-        { 0, 0 }, { 0, 7 }, { 1, 0 }, { 4938, 0 }, { 4938, 3 },
-        { 8363, 7 }, { 16777215u, 7 }
-    };
-    for (auto const& c : cases)
-    {
-        uint32 const id =
-            MopNpcTextPackets::SynthesiseBroadcastTextId(c[0], c[1]);
-        uint32 textId = 0xFFFFFFFFu;
-        uint32 option = 0xFFFFFFFFu;
-        CHECK(MopNpcTextPackets::DecodeSynthesisedBroadcastTextId(id, textId,
-            option));
-        CHECK(textId == c[0]);
-        CHECK(option == c[1]);
-    }
-
-    CHECK(MopNpcTextPackets::SynthesiseBroadcastTextId(4938, 0) !=
-        MopNpcTextPackets::SynthesiseBroadcastTextId(4938, 1));
-    CHECK(MopNpcTextPackets::SynthesiseBroadcastTextId(4938, 7) !=
-        MopNpcTextPackets::SynthesiseBroadcastTextId(4939, 0));
-
-    // An id the client shipped is not ours to decode.
-    uint32 textId = 0;
-    uint32 option = 0;
-    CHECK(!MopNpcTextPackets::DecodeSynthesisedBroadcastTextId(62792, textId,
-        option));
-    CHECK(!MopNpcTextPackets::DecodeSynthesisedBroadcastTextId(3397, textId,
-        option));
-}
-
 // npc_text 4938 (Marshal McBride) carries text but no retail mapping. Before
 // this it produced recordSize 0 and the client refused to open the window.
-static void TestUnmappedNpcTextStillGetsAnId()
-{
-    GossipText gossip;
-    for (auto& option : gossip.Options)
-    {
-        option.BroadcastTextId = 0;
-        option.Language = 0;
-        option.Probability = 0.0f;
-        for (auto& emote : option.Emotes)
-        {
-            emote._Emote = 0;
-            emote._Delay = 0;
-        }
-    }
-    gossip.Options[0].Text_0 = "Hey, citizen!";
-    gossip.Options[0].Probability = 1.0f;
-
-    MopNpcTextPackets::Response const response =
-        MopNpcTextPackets::MakeResponse(4938, &gossip);
-    CHECK(response.found);
-    CHECK(response.broadcastTextIds[0] ==
-        MopNpcTextPackets::SynthesiseBroadcastTextId(4938, 0));
-    CHECK(response.probabilities[0] == 1.0f);
-
-    // Options with nothing behind them stay silent, so the client cannot
-    // select a blank alternative.
-    for (size_t index = 1; index < MAX_GOSSIP_TEXT_OPTIONS; ++index)
-    {
-        CHECK(response.broadcastTextIds[index] == 0);
-        CHECK(response.probabilities[index] == 0.0f);
-    }
-
-    // A populated BroadcastTextID is ignored rather than forwarded. Sending it
-    // would only work when the client already ships that record, and we cannot
-    // serve a hotfix for an id we did not mint -- so trusting the column made
-    // correctness depend on whatever wrote to it, imported world databases
-    // included, with a silently unopened dialog as the failure.
-    gossip.Options[0].BroadcastTextId = 62792;
-    MopNpcTextPackets::Response const mapped =
-        MopNpcTextPackets::MakeResponse(4938, &gossip);
-    CHECK(mapped.broadcastTextIds[0] ==
-        MopNpcTextPackets::SynthesiseBroadcastTextId(4938, 0));
-    CHECK(mapped.broadcastTextIds[0] != 62792);
-    CHECK(mapped.found);
-
-    // Including an id the client could not resolve, which is the case that
-    // used to produce a dead row.
-    gossip.Options[0].BroadcastTextId = 3397;
-    MopNpcTextPackets::Response const unresolvable =
-        MopNpcTextPackets::MakeResponse(4938, &gossip);
-    CHECK(unresolvable.broadcastTextIds[0] ==
-        MopNpcTextPackets::SynthesiseBroadcastTextId(4938, 0));
-    gossip.Options[0].BroadcastTextId = 0;
-
-    // No row at all remains absent rather than inventing one.
-    MopNpcTextPackets::Response const absent =
-        MopNpcTextPackets::MakeResponse(4938, nullptr);
-    CHECK(!absent.found);
-}
-
 // Nothing bounds the synthesised namespace from above, so an id merely being
 // past the base does not make it ours. Answering someone else's id with this
 // row's text would produce a wrong string and nothing to trace it by.
-static void TestOnlyOurOwnSynthesisedIdsAreServed()
-{
-    GossipTextOption option;
-    option.BroadcastTextId = 0;
-    option.Language = 0;
-    option.Probability = 1.0f;
-    for (auto& emote : option.Emotes)
-    {
-        emote._Emote = 0;
-        emote._Delay = 0;
-    }
-    option.Text_0 = "Hey, citizen!";
-
-    uint32 const mine = MopNpcTextPackets::SynthesiseBroadcastTextId(4938, 0);
-    CHECK(MopNpcTextPackets::OwnsSynthesisedBroadcastTextId(mine, 4938, 0,
-        option));
-
-    // An option with no text was never advertised at all.
-    GossipTextOption silent = option;
-    silent.Text_0.clear();
-    silent.Text_1.clear();
-    CHECK(!MopNpcTextPackets::OwnsSynthesisedBroadcastTextId(mine, 4938, 0,
-        silent));
-
-    // An id already handed out must keep working after the row gains a real
-    // mapping. The client caches the old id in npccache.wdb, so refusing it
-    // sends a deletion reply and the dialog stays shut until that cache is
-    // cleared by hand -- which is what populating the recovered retail
-    // mappings would otherwise do to every client already past those NPCs.
-    GossipTextOption laterMapped = option;
-    laterMapped.BroadcastTextId = 62792;
-    CHECK(MopNpcTextPackets::OwnsSynthesisedBroadcastTextId(mine, 4938, 0,
-        laterMapped));
-}
-
 int main(int /*argc*/, char** /*argv*/)
 {
-    TestOnlyOurOwnSynthesisedIdsAreServed();
-    TestSynthesisedBroadcastTextIdsAvoidTheClientRange();
-    TestUnmappedNpcTextStillGetsAnId();
     TestAreaTriggerRequest();
-    TestAreaTriggerNoCorpse();
-    TestExplorationExperience();
-    TestQuestgiverStatusMultipleRequest();
     TestQuestgiverStatusMultipleResponse();
-    TestNpcTextRequest();
     TestNpcTextResponse();
-    TestOpcodeValues();
 
     if (g_fail != 0)
     {

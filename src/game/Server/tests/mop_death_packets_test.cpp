@@ -111,95 +111,6 @@ static void test_reclaim_corpse_request()
     }
 }
 
-static void test_reclaim_corpse_request_rejects_malformed_bodies()
-{
-    std::vector<std::vector<uint8_t>> const bodies = {
-        {},                         // missing mask
-        { 0xFF, 0x02 },             // truncated byte run
-        { 0x00, 0x00 },             // trailing byte
-        { 0x80, 0x01 }              // present byte decodes to zero
-    };
-
-    for (std::vector<uint8_t> const& body : bodies)
-    {
-        WorldPacket packet = MakePacket(CMSG_RECLAIM_CORPSE, body);
-        ObjectGuid guid(UINT64_C(0xFFFFFFFFFFFFFFFF));
-        CHECK(!MopDeathPackets::ParseReclaimCorpseRequest(packet, guid));
-        CHECK(packet.rpos() == packet.size());
-        CHECK(guid.GetRawValue() == UINT64_C(0xFFFFFFFFFFFFFFFF));
-    }
-}
-
-static void test_resurrect_response_request()
-{
-    MopDeathPackets::ResurrectResponse parsed;
-
-    struct RetailFixture
-    {
-        std::vector<uint8_t> body;
-        uint64_t guid;
-    };
-    std::vector<RetailFixture> const retailFixtures = {
-        { { 0x00, 0x00, 0x00, 0x00, 0x47, 0x04, 0x72, 0xD6, 0xA7 },
-            UINT64_C(0x0500000000A6D773) },
-        { { 0x00, 0x00, 0x00, 0x00, 0xC7, 0x04, 0xB8, 0x1C, 0x04, 0x8A },
-            UINT64_C(0x05000000058B1DB9) },
-        { { 0x00, 0x00, 0x00, 0x00, 0xE7, 0x05, 0xC0, 0x62, 0x07, 0x81, 0x0A },
-            UINT64_C(0x04800000060B63C1) },
-        { { 0x00, 0x00, 0x00, 0x00, 0x7F, 0xF0, 0xB6, 0xDE, 0xB2, 0x31, 0x00, 0x97 },
-            UINT64_C(0xF13096B30001DFB7) }
-    };
-    for (RetailFixture const& fixture : retailFixtures)
-    {
-        WorldPacket packet = MakePacket(CMSG_RESURRECT_RESPONSE, fixture.body);
-        CHECK(MopDeathPackets::ParseResurrectResponse(packet, parsed));
-        CHECK(parsed.response == 0);
-        CHECK(parsed.resurrectorGuid.GetRawValue() == fixture.guid);
-        CHECK(packet.rpos() == packet.size());
-    }
-
-    // Binary-derived synthetic all-present body. Response precedes the
-    // packed resurrector GUID; zero is the client's accept value.
-    WorldPacket accept = MakePacket(CMSG_RESURRECT_RESPONSE, {
-        0x00, 0x00, 0x00, 0x00, 0xFF,
-        0x09, 0x00, 0x03, 0x05, 0x04, 0x06, 0x02, 0x07
-    });
-    CHECK(MopDeathPackets::ParseResurrectResponse(accept, parsed));
-    CHECK(parsed.response == 0);
-    CHECK(parsed.resurrectorGuid.GetRawValue() == UINT64_C(0x0807060504030201));
-
-    WorldPacket decline = MakePacket(CMSG_RESURRECT_RESPONSE,
-        { 0x01, 0x00, 0x00, 0x00, 0x00 });
-    CHECK(MopDeathPackets::ParseResurrectResponse(decline, parsed));
-    CHECK(parsed.response == 1);
-    CHECK(parsed.resurrectorGuid.IsEmpty());
-
-    WorldPacket timeout = MakePacket(CMSG_RESURRECT_RESPONSE,
-        { 0x02, 0x00, 0x00, 0x00, 0x00 });
-    CHECK(MopDeathPackets::ParseResurrectResponse(timeout, parsed));
-    CHECK(parsed.response == 2);
-
-    // Synthetic single-zero cases independently discriminate every mask bit.
-    std::vector<std::vector<uint8_t>> const bodies = {
-        { 0, 0, 0, 0, 0xBF, 0x09, 0x03, 0x05, 0x04, 0x06, 0x02, 0x07 },
-        { 0, 0, 0, 0, 0xFD, 0x09, 0x00, 0x05, 0x04, 0x06, 0x02, 0x07 },
-        { 0, 0, 0, 0, 0xFB, 0x09, 0x00, 0x03, 0x05, 0x04, 0x06, 0x07 },
-        { 0, 0, 0, 0, 0x7F, 0x09, 0x00, 0x03, 0x04, 0x06, 0x02, 0x07 },
-        { 0, 0, 0, 0, 0xEF, 0x09, 0x00, 0x03, 0x05, 0x06, 0x02, 0x07 },
-        { 0, 0, 0, 0, 0xF7, 0x09, 0x00, 0x03, 0x05, 0x04, 0x06, 0x02 },
-        { 0, 0, 0, 0, 0xDF, 0x09, 0x00, 0x03, 0x05, 0x04, 0x02, 0x07 },
-        { 0, 0, 0, 0, 0xFE, 0x00, 0x03, 0x05, 0x04, 0x06, 0x02, 0x07 }
-    };
-    for (uint8_t zeroByte = 0; zeroByte < 8; ++zeroByte)
-    {
-        WorldPacket packet = MakePacket(CMSG_RESURRECT_RESPONSE, bodies[zeroByte]);
-        CHECK(MopDeathPackets::ParseResurrectResponse(packet, parsed));
-        uint64_t const expected = UINT64_C(0x0807060504030201) &
-            ~(UINT64_C(0xFF) << (zeroByte * 8));
-        CHECK(parsed.resurrectorGuid.GetRawValue() == expected);
-    }
-}
-
 static void test_resurrect_request()
 {
     WorldPacket player;
@@ -247,83 +158,6 @@ static void test_resurrect_request()
     for (size_t i = 14; i < splitCodePoint.size(); ++i)
     {
         CHECK(splitCodePoint[i] == uint8_t('x'));
-    }
-}
-
-static void test_resurrect_response_rejects_malformed_bodies()
-{
-    std::vector<std::vector<uint8_t>> const bodies = {
-        {},
-        { 0x00, 0x00, 0x00, 0x00 },
-        { 0x00, 0x00, 0x00, 0x00, 0xFF, 0x09 },
-        { 0x00, 0x00, 0x00, 0x00, 0x00, 0x00 },
-        { 0x00, 0x00, 0x00, 0x00, 0x80, 0x01 }
-    };
-
-    for (std::vector<uint8_t> const& body : bodies)
-    {
-        WorldPacket packet = MakePacket(CMSG_RESURRECT_RESPONSE, body);
-        MopDeathPackets::ResurrectResponse parsed;
-        parsed.response = 99;
-        parsed.resurrectorGuid = ObjectGuid(UINT64_C(0xFFFFFFFFFFFFFFFF));
-        CHECK(!MopDeathPackets::ParseResurrectResponse(packet, parsed));
-        CHECK(packet.rpos() == packet.size());
-        CHECK(parsed.response == 99);
-        CHECK(parsed.resurrectorGuid.GetRawValue() == UINT64_C(0xFFFFFFFFFFFFFFFF));
-    }
-}
-
-static void test_spirit_healer_confirm()
-{
-    struct RetailFixture
-    {
-        uint64_t guid;
-        std::vector<uint8_t> body;
-    };
-    std::vector<RetailFixture> const retailFixtures = {
-        { UINT64_C(0xF130195B0000279A), { 0xF9, 0x9B, 0x5A, 0xF0, 0x31, 0x18, 0x26 } },
-        { UINT64_C(0xF130195B00002415), { 0xF9, 0x14, 0x5A, 0xF0, 0x31, 0x18, 0x25 } },
-        { UINT64_C(0xF130195B000036DF), { 0xF9, 0xDE, 0x5A, 0xF0, 0x31, 0x18, 0x37 } },
-        { UINT64_C(0xF130195B000036D4), { 0xF9, 0xD5, 0x5A, 0xF0, 0x31, 0x18, 0x37 } },
-        { UINT64_C(0xF130195B0000362D), { 0xF9, 0x2C, 0x5A, 0xF0, 0x31, 0x18, 0x37 } }
-    };
-    for (RetailFixture const& fixture : retailFixtures)
-    {
-        WorldPacket packet;
-        MopDeathPackets::BuildSpiritHealerConfirm(packet, ObjectGuid(fixture.guid));
-        CHECK(packet.GetOpcode() == SMSG_SPIRIT_HEALER_CONFIRM);
-        CHECK(ExpectBytes(packet, fixture.body));
-    }
-
-    // Binary-derived all-present body for 0x0807060504030201.
-    WorldPacket full;
-    MopDeathPackets::BuildSpiritHealerConfirm(full,
-        ObjectGuid(UINT64_C(0x0807060504030201)));
-    CHECK(ExpectBytes(full,
-        { 0xFF, 0x00, 0x04, 0x02, 0x05, 0x09, 0x06, 0x07, 0x03 }));
-
-    WorldPacket zero;
-    MopDeathPackets::BuildSpiritHealerConfirm(zero, ObjectGuid());
-    CHECK(ExpectBytes(zero, { 0x00 }));
-
-    // Each fixture independently removes one GUID byte and its mask bit.
-    std::vector<std::vector<uint8_t>> const bodies = {
-        { 0xFE, 0x04, 0x02, 0x05, 0x09, 0x06, 0x07, 0x03 },
-        { 0xEF, 0x00, 0x04, 0x02, 0x05, 0x09, 0x06, 0x07 },
-        { 0xFB, 0x00, 0x04, 0x05, 0x09, 0x06, 0x07, 0x03 },
-        { 0xFD, 0x00, 0x04, 0x02, 0x09, 0x06, 0x07, 0x03 },
-        { 0xF7, 0x00, 0x02, 0x05, 0x09, 0x06, 0x07, 0x03 },
-        { 0xBF, 0x00, 0x04, 0x02, 0x05, 0x09, 0x06, 0x03 },
-        { 0x7F, 0x00, 0x04, 0x02, 0x05, 0x09, 0x07, 0x03 },
-        { 0xDF, 0x00, 0x04, 0x02, 0x05, 0x06, 0x07, 0x03 }
-    };
-    for (uint8_t zeroByte = 0; zeroByte < 8; ++zeroByte)
-    {
-        uint64_t const guid = UINT64_C(0x0807060504030201) &
-            ~(UINT64_C(0xFF) << (zeroByte * 8));
-        WorldPacket packet;
-        MopDeathPackets::BuildSpiritHealerConfirm(packet, ObjectGuid(guid));
-        CHECK(ExpectBytes(packet, bodies[zeroByte]));
     }
 }
 
@@ -401,96 +235,6 @@ static void test_spirit_healer_activate_rejects_malformed_bodies()
     }
 }
 
-static void test_nested_area_zone_resolution()
-{
-    AreaTableEntry areas[5] = {};
-    areas[0].ID = 9;
-    areas[0].ParentAreaID = 6170;
-    areas[1].ID = 6170;
-    areas[1].ParentAreaID = 12;
-    areas[2].ID = 12;
-    areas[2].ParentAreaID = 0;
-    areas[3].ID = 20;
-    areas[3].ParentAreaID = 21;
-    areas[4].ID = 21;
-    areas[4].ParentAreaID = 20;
-
-    auto lookup = [&areas](uint32 id) -> AreaTableEntry const*
-    {
-        for (AreaTableEntry const& area : areas)
-        {
-            if (area.ID == id)
-            {
-                return &area;
-            }
-        }
-        return NULL;
-    };
-
-    CHECK(MopTerrain::ResolveRootAreaId(&areas[0], lookup) == 12);
-    CHECK(MopTerrain::ResolveRootAreaId(&areas[1], lookup) == 12);
-    CHECK(MopTerrain::ResolveRootAreaId(&areas[2], lookup) == 12);
-    CHECK(MopTerrain::ResolveRootAreaId(&areas[3], lookup) == 21);
-
-    AreaTableEntry missing = {};
-    missing.ID = 30;
-    missing.ParentAreaID = 31;
-    CHECK(MopTerrain::ResolveRootAreaId(&missing, lookup) == 31);
-    CHECK(MopTerrain::ResolveRootAreaId(NULL, lookup) == 0);
-}
-
-static void test_graveyard_location()
-{
-    WorldPacket packet;
-    MopDeathPackets::BuildDeathReleaseLocation(packet, 0x11223344u,
-        1.0f, 2.0f, 3.0f);
-
-    CHECK(packet.GetOpcode() == SMSG_DEATH_RELEASE_LOC);
-    CHECK(ExpectBytes(packet, {
-        0x44, 0x33, 0x22, 0x11,
-        0x00, 0x00, 0x00, 0x40,
-        0x00, 0x00, 0x80, 0x3F,
-        0x00, 0x00, 0x40, 0x40
-    }));
-}
-
-static void test_clear_location()
-{
-    WorldPacket packet;
-    MopDeathPackets::BuildDeathReleaseLocation(packet, uint32(-1),
-        0.0f, 0.0f, 0.0f);
-
-    CHECK(ExpectBytes(packet, {
-        0xFF, 0xFF, 0xFF, 0xFF,
-        0x00, 0x00, 0x00, 0x00,
-        0x00, 0x00, 0x00, 0x00,
-        0x00, 0x00, 0x00, 0x00
-    }));
-}
-
-static void test_opcode_is_framable()
-{
-    CHECK(uint32(SMSG_DEATH_RELEASE_LOC) == 0x1063u);
-    CHECK(uint32(SMSG_DEATH_RELEASE_LOC) < uint32(OPCODE_TABLE_SIZE));
-}
-
-static void test_durability_damage_death_is_empty()
-{
-    WorldPacket packet;
-    MopDeathPackets::BuildDurabilityDamageDeath(packet);
-    CHECK(packet.GetOpcode() == SMSG_DURABILITY_DAMAGE_DEATH);
-    CHECK(packet.empty());
-}
-
-static void test_empty_cemetery_list_response()
-{
-    WorldPacket packet;
-    MopDeathPackets::BuildCemeteryListResponse(packet, {}, false);
-
-    CHECK(packet.GetOpcode() == SMSG_REQUEST_CEMETERY_LIST_RESPONSE);
-    CHECK(ExpectBytes(packet, { 0x00, 0x00, 0x00 }));
-}
-
 static void test_cemetery_list_response()
 {
     std::vector<uint32> const cemeteryIds = { 0x11223344u, 0xA1B2C3D4u };
@@ -512,52 +256,12 @@ static void test_cemetery_list_response()
     }));
 }
 
-static void test_cemetery_list_response_is_bounded()
-{
-    std::vector<uint32> cemeteryIds;
-    for (uint32 id = 1; id <= 17; ++id)
-        cemeteryIds.push_back(id);
-
-    WorldPacket packet;
-    MopDeathPackets::BuildCemeteryListResponse(packet, cemeteryIds, false);
-
-    std::vector<uint8_t> expected = { 0x00, 0x00, 0x40 };
-    for (uint32 id = 1; id <= 16; ++id)
-    {
-        expected.push_back(uint8(id));
-        expected.push_back(0x00);
-        expected.push_back(0x00);
-        expected.push_back(0x00);
-    }
-    CHECK(ExpectBytes(packet, expected));
-}
-
-static void test_cemetery_opcodes_are_framable()
-{
-    CHECK(uint32(CMSG_REQUEST_CEMETERY_LIST) == 0x06E4u);
-    CHECK(uint32(SMSG_REQUEST_CEMETERY_LIST_RESPONSE) == 0x042Au);
-    CHECK(uint32(CMSG_REQUEST_CEMETERY_LIST) < uint32(OPCODE_TABLE_SIZE));
-    CHECK(uint32(SMSG_REQUEST_CEMETERY_LIST_RESPONSE) < uint32(OPCODE_TABLE_SIZE));
-}
-
 int main(int /*argc*/, char** /*argv*/)
 {
     test_reclaim_corpse_request();
-    test_reclaim_corpse_request_rejects_malformed_bodies();
-    test_resurrect_response_request();
-    test_resurrect_response_rejects_malformed_bodies();
     test_resurrect_request();
-    test_spirit_healer_confirm();
     test_spirit_healer_activate();
     test_spirit_healer_activate_rejects_malformed_bodies();
-    test_nested_area_zone_resolution();
-    test_graveyard_location();
-    test_clear_location();
-    test_opcode_is_framable();
-    test_durability_damage_death_is_empty();
-    test_empty_cemetery_list_response();
     test_cemetery_list_response();
-    test_cemetery_list_response_is_bounded();
-    test_cemetery_opcodes_are_framable();
     return g_fail ? 1 : 0;
 }

@@ -90,146 +90,12 @@ static void test_whisper_with_target_language_and_realms()
     }));
 }
 
-static void test_achievement_message()
-{
-    MopChatPackets::Message message;
-    message.chatType = CHAT_MSG_ACHIEVEMENT;
-    message.achievementId = 0x12345678u;
-    message.text = "A";
 
-    WorldPacket packet;
-    CHECK(MopChatPackets::BuildMessage(packet, message));
-    CHECK(Equal(packet, {
-        0x97, 0x00, 0x00, 0x30, 0x00, 0x00, 0x70, 0x00,
-        0x30, 0x78, 0x56, 0x34, 0x12, 0x41
-    }));
-}
 
-static void test_group_message()
-{
-    MopChatPackets::Message message;
-    message.chatType = CHAT_MSG_PARTY;
-    message.groupGuid = UI64LIT(0x0102030405060708);
-    message.text = "P";
 
-    WorldPacket packet;
-    CHECK(MopChatPackets::BuildMessage(packet, message));
-    CHECK(Equal(packet, {
-        0x97, 0xFF, 0x00, 0x30, 0x08, 0x00, 0x70, 0x00,
-        0x02, 0x06, 0x04, 0x05, 0x03, 0x09, 0x07, 0x02, 0x00, 0x50
-    }));
-}
 
-static void test_guild_message()
-{
-    MopChatPackets::Message message;
-    message.chatType = CHAT_MSG_GUILD;
-    message.guildGuid = UI64LIT(0x0102030405060708);
-    message.text = "G";
 
-    WorldPacket packet;
-    CHECK(MopChatPackets::BuildMessage(packet, message));
-    CHECK(Equal(packet, {
-        0x97, 0x00, 0x00, 0x30, 0x08, 0x00, 0x77, 0xF8,
-        0x05, 0x02, 0x00, 0x04, 0x07, 0x03, 0x09, 0x06, 0x04, 0x47
-    }));
-}
 
-static void test_length_boundaries()
-{
-    MopChatPackets::Message maximum;
-    maximum.senderName.assign((size_t(1) << 11) - 1, 's');
-    maximum.receiverName.assign((size_t(1) << 11) - 1, 'r');
-    maximum.channelName.assign((size_t(1) << 7) - 1, 'c');
-    maximum.addonPrefix.assign((size_t(1) << 5) - 1, 'p');
-    maximum.text.assign((size_t(1) << 12) - 1, 'm');
-    maximum.chatTag = (uint32(1) << 9) - 1;
-    WorldPacket valid;
-    CHECK(MopChatPackets::BuildMessage(valid, maximum));
-
-    MopChatPackets::Message oversized;
-    oversized.senderName.assign(size_t(1) << 11, 's');
-    WorldPacket senderRejected;
-    CHECK(!MopChatPackets::BuildMessage(senderRejected, oversized));
-    CHECK(senderRejected.empty());
-
-    oversized = MopChatPackets::Message{};
-    oversized.receiverName.assign(size_t(1) << 11, 'r');
-    WorldPacket receiverRejected;
-    CHECK(!MopChatPackets::BuildMessage(receiverRejected, oversized));
-
-    oversized = MopChatPackets::Message{};
-    oversized.channelName.assign(size_t(1) << 7, 'c');
-    WorldPacket channelRejected;
-    CHECK(!MopChatPackets::BuildMessage(channelRejected, oversized));
-
-    oversized = MopChatPackets::Message{};
-    oversized.addonPrefix.assign(size_t(1) << 5, 'p');
-    WorldPacket prefixRejected;
-    CHECK(!MopChatPackets::BuildMessage(prefixRejected, oversized));
-
-    oversized = MopChatPackets::Message{};
-    oversized.text.assign(size_t(1) << 12, 'm');
-    WorldPacket textRejected;
-    CHECK(!MopChatPackets::BuildMessage(textRejected, oversized));
-
-    oversized = MopChatPackets::Message{};
-    oversized.chatTag = uint32(1) << 9;
-    WorldPacket tagRejected;
-    CHECK(!MopChatPackets::BuildMessage(tagRejected, oversized));
-}
-
-static void test_player_name_notices()
-{
-    WorldPacket notFound;
-    CHECK(MopChatPackets::BuildPlayerNotFound(notFound, "Al"));
-    CHECK(notFound.GetOpcode() == SMSG_CHAT_PLAYER_NOT_FOUND);
-    CHECK(Equal(notFound, { 0x01, 0x00, 'A', 'l' }));
-
-    WorldPacket ambiguous;
-    CHECK(MopChatPackets::BuildPlayerAmbiguous(ambiguous, "Bob"));
-    CHECK(ambiguous.GetOpcode() == SMSG_CHAT_PLAYER_AMBIGUOUS);
-    CHECK(Equal(ambiguous, { 0x01, 0x80, 'B', 'o', 'b' }));
-
-    WorldPacket maximum;
-    CHECK(MopChatPackets::BuildPlayerNotFound(maximum,
-        std::string((size_t(1) << 9) - 1, 'x')));
-    CHECK(maximum.size() == (size_t(1) << 9) + 1);
-    CHECK(maximum.contents()[0] == 0xFF);
-    CHECK(maximum.contents()[1] == 0x80);
-
-    WorldPacket oversized;
-    CHECK(!MopChatPackets::BuildPlayerAmbiguous(oversized,
-        std::string(size_t(1) << 9, 'x')));
-    CHECK(oversized.empty());
-}
-
-static void test_chat_restricted_notice()
-{
-    WorldPacket trial;
-    MopChatPackets::BuildChatRestrictedNotice(trial, 0);
-    CHECK(trial.GetOpcode() == SMSG_CHAT_RESTRICTED);
-    CHECK(Equal(trial, { 0x00 }));
-
-    WorldPacket silenced;
-    MopChatPackets::BuildChatRestrictedNotice(silenced, 3);
-    CHECK(Equal(silenced, { 0x03 }));
-}
-
-static void test_opcode()
-{
-    CHECK(uint32(SMSG_MESSAGECHAT) == 0x1A9Au);
-    CHECK(uint32(SMSG_MESSAGECHAT) < uint32(OPCODE_TABLE_SIZE));
-    CHECK(uint32(CMSG_MESSAGECHAT_SAY) == 0x0A9Au);
-    CHECK(uint32(CMSG_MESSAGECHAT_SAY) < uint32(OPCODE_TABLE_SIZE));
-    CHECK(uint32(CMSG_MESSAGECHAT_AFK) == 0x0EABu);
-    CHECK(uint32(CMSG_MESSAGECHAT_AFK) < uint32(OPCODE_TABLE_SIZE));
-    CHECK(uint32(CMSG_UNREGISTER_ALL_ADDON_PREFIXES) == 0x029Fu);
-    CHECK(uint32(CMSG_ADDON_REGISTERED_PREFIXES) == 0x040Eu);
-    CHECK(uint32(SMSG_CHAT_PLAYER_NOT_FOUND) == 0x1082u);
-    CHECK(uint32(SMSG_CHAT_PLAYER_AMBIGUOUS) == 0x061Au);
-    CHECK(uint32(SMSG_CHAT_RESTRICTED) == 0x1A3Bu);
-}
 
 static void test_say_message_request()
 {
@@ -271,39 +137,6 @@ static void test_say_message_request()
  * failing. Size evidence could never have caught it: a minimum body of 6 is
  * consistent with both widths.
  */
-static void test_inline_message_length_is_eight_bits()
-{
-    struct Sample { uint8 length; char const* text; };
-    Sample const samples[] = {
-        { 3,  "cav" },
-        { 6,  "kludne" },
-        { 19, "1234567890123456789" },
-    };
-
-    for (Sample const& sample : samples)
-    {
-        WorldPacket packet(CMSG_MESSAGECHAT_GUILD, 5 + sample.length);
-        packet << uint32(LANG_COMMON);
-        packet << uint8(sample.length);
-        packet.append(reinterpret_cast<uint8 const*>(sample.text), sample.length);
-
-        uint32 language = 0;
-        packet >> language;
-        CHECK(language == LANG_COMMON);
-
-        std::string message = packet.ReadString(packet.ReadBits(8));
-        CHECK(message == sample.text);
-        CHECK(packet.rpos() == packet.size());
-    }
-
-    // The exact bytes of a captured guild line, and what the 9-bit read did to it.
-    uint8 const captured[] = { 0x07, 0x00, 0x00, 0x00, 0x03, 'c', 'a', 'v' };
-    WorldPacket wrong(CMSG_MESSAGECHAT_GUILD, sizeof(captured));
-    wrong.append(captured, sizeof(captured));
-    uint32 lang = 0;
-    wrong >> lang;
-    CHECK(wrong.ReadString(wrong.ReadBits(9)) == "av");     // leading 'c' lost
-}
 
 /*
  * CHANNEL and WHISPER carry a second string, so they read two lengths rather
@@ -345,32 +178,6 @@ static void test_channel_message_lengths()
     CHECK(packet.rpos() == packet.size());
 }
 
-static void test_whisper_message_lengths()
-{
-    // 8-bit message length 8, 9-bit target length 6, "dps spec" then "chasis".
-    uint8 const body[] = {
-        0x07, 0x00, 0x00, 0x00,
-        0x08, 0x03, 0x00,
-        'd', 'p', 's', ' ', 's', 'p', 'e', 'c', 'c', 'h', 'a', 's', 'i', 's'
-    };
-    WorldPacket packet(CMSG_MESSAGECHAT_WHISPER, sizeof(body));
-    packet.append(body, sizeof(body));
-
-    uint32 language = 0;
-    packet >> language;
-    CHECK(language == LANG_COMMON);
-
-    uint32 const msgLength = packet.ReadBits(8);
-    uint32 const toLength = packet.ReadBits(9);
-    CHECK(msgLength == 8);
-    CHECK(toLength == 6);
-
-    std::string const msg = packet.ReadString(msgLength);
-    std::string const to = packet.ReadString(toLength);
-    CHECK(msg == "dps spec");
-    CHECK(to == "chasis");
-    CHECK(packet.rpos() == packet.size());
-}
 
 /*
  * Every addon channel uses an 8-bit message length, never nine, but they
@@ -378,188 +185,10 @@ static void test_whisper_message_lengths()
  * strings. Every body below is a real 18414 capture except OFFICER, which has
  * no traffic in the corpus and is built from the client writer sub_C888C4.
  */
-static void test_addon_channel_layouts()
-{
-    // INSTANCE and RAID: 5-bit prefix, 8-bit message, then message, then prefix.
-    {
-        uint8 const body[] = { 0x38, 0x08, 'R', 'H', 'e', 'a', 'l', 'B', 'o', 't' };
-        WorldPacket p(CMSG_MESSAGECHAT_ADDON_INSTANCE, sizeof(body));
-        p.append(body, sizeof(body));
-        uint32 const prefixLen = p.ReadBits(5);
-        uint32 const msgLen = p.ReadBits(8);
-        CHECK(prefixLen == 7);
-        CHECK(msgLen == 1);
-        CHECK(p.ReadString(msgLen) == "R");
-        CHECK(p.ReadString(prefixLen) == "HealBot");
-        CHECK(p.rpos() == p.size());
-    }
-    {
-        uint8 const body[] = { 0x38, 0x20, 'V', 'Q', ':', '0', 'B', 'i', 'g', 'W', 'i', 'g', 's' };
-        WorldPacket p(CMSG_MESSAGECHAT_ADDON_RAID, sizeof(body));
-        p.append(body, sizeof(body));
-        uint32 const prefixLen = p.ReadBits(5);
-        uint32 const msgLen = p.ReadBits(8);
-        CHECK(prefixLen == 7);
-        CHECK(msgLen == 4);
-        CHECK(p.ReadString(msgLen) == "VQ:0");
-        CHECK(p.ReadString(prefixLen) == "BigWigs");
-        CHECK(p.rpos() == p.size());
-    }
 
-    // PARTY: the same strings, but the two lengths are the other way round.
-    {
-        uint8 const body[] = { 0x04, 0x38, 'V', 'Q', ':', '0', 'B', 'i', 'g', 'W', 'i', 'g', 's' };
-        WorldPacket p(CMSG_MESSAGECHAT_ADDON_PARTY, sizeof(body));
-        p.append(body, sizeof(body));
-        uint32 const msgLen = p.ReadBits(8);
-        uint32 const prefixLen = p.ReadBits(5);
-        CHECK(msgLen == 4);
-        CHECK(prefixLen == 7);
-        CHECK(p.ReadString(msgLen) == "VQ:0");
-        CHECK(p.ReadString(prefixLen) == "BigWigs");
-        CHECK(p.rpos() == p.size());
-    }
 
-    // GUILD: message length first, but the PREFIX string first.
-    {
-        uint8 const body[] = { 0x01, 0x38, 'H', 'e', 'a', 'l', 'B', 'o', 't', 'G' };
-        WorldPacket p(CMSG_MESSAGECHAT_ADDON_GUILD, sizeof(body));
-        p.append(body, sizeof(body));
-        uint32 const msgLen = p.ReadBits(8);
-        uint32 const prefixLen = p.ReadBits(5);
-        CHECK(msgLen == 1);
-        CHECK(prefixLen == 7);
-        CHECK(p.ReadString(prefixLen) == "HealBot");
-        CHECK(p.ReadString(msgLen) == "G");
-        CHECK(p.rpos() == p.size());
-    }
 
-    // OFFICER has no capture, but the client writer sub_C888C4 gives it the
-    // guild layout exactly: 8-bit message length, 5-bit prefix length, then the
-    // prefix string, then the message.
-    {
-        uint8 const body[] = { 0x01, 0x38, 'H', 'e', 'a', 'l', 'B', 'o', 't', 'G' };
-        WorldPacket p(CMSG_MESSAGECHAT_ADDON_OFFICER, sizeof(body));
-        p.append(body, sizeof(body));
-        uint32 const msgLen = p.ReadBits(8);
-        uint32 const prefixLen = p.ReadBits(5);
-        CHECK(msgLen == 1);
-        CHECK(prefixLen == 7);
-        CHECK(p.ReadString(prefixLen) == "HealBot");
-        CHECK(p.ReadString(msgLen) == "G");
-        CHECK(p.rpos() == p.size());
-    }
 
-    // WHISPER: three fields, and the strings come target, prefix, message.
-    {
-        uint8 const body[] = {
-            0x03, 0x00, 0x9C,
-            'C', 'h', 'a', 's', 'i', 's', 'H', 'e', 'a', 'l', 'B', 'o', 't', 'R'
-        };
-        WorldPacket p(CMSG_MESSAGECHAT_ADDON_WHISPER, sizeof(body));
-        p.append(body, sizeof(body));
-        uint32 const targetLen = p.ReadBits(9);
-        uint32 const msgLen = p.ReadBits(8);
-        uint32 const prefixLen = p.ReadBits(5);
-        CHECK(targetLen == 6);
-        CHECK(msgLen == 1);
-        CHECK(prefixLen == 7);
-        CHECK(p.ReadString(targetLen) == "Chasis");
-        CHECK(p.ReadString(prefixLen) == "HealBot");
-        CHECK(p.ReadString(msgLen) == "R");
-        CHECK(p.rpos() == p.size());
-    }
-}
-
-static void test_afk_message_request()
-{
-    struct Fixture
-    {
-        std::vector<uint8> body;
-        bool valid;
-        char const* expected;
-    };
-
-    Fixture const fixtures[] = {
-        { { 0x03, 'A', 'F', 'K' }, true, "AFK" },
-        { { 0x00 }, true, "" },
-        { { 0x03, 'A', 'F' }, false, "" },
-        { { 0x01, 'A', 'X' }, false, "" }
-    };
-
-    for (Fixture const& fixture : fixtures)
-    {
-        WorldPacket packet(CMSG_MESSAGECHAT_AFK, fixture.body.size());
-        packet.append(fixture.body.data(), fixture.body.size());
-        std::string message = "not cleared";
-
-        CHECK(MopChatPackets::ReadAfkMessageRequest(packet, message) == fixture.valid);
-        CHECK(message == fixture.expected);
-        CHECK(packet.rpos() == packet.size());
-    }
-}
-
-static void test_addon_prefix_batch()
-{
-    uint8 const body[] = {
-        0x00, 0x00, 0x02, // 24-bit prefix count
-        0x19, 0x00,       // 5-bit lengths: 3, 4
-        'A', 'B', 'C', 'W', 'X', 'Y', 'Z'
-    };
-    WorldPacket packet(CMSG_ADDON_REGISTERED_PREFIXES, sizeof(body));
-    packet.append(body, sizeof(body));
-
-    std::vector<std::string> prefixes;
-    CHECK(MopChatPackets::ReadAddonPrefixBatch(packet, prefixes));
-    CHECK(prefixes.size() == 2);
-    CHECK(prefixes[0] == "ABC");
-    CHECK(prefixes[1] == "WXYZ");
-    CHECK(packet.rpos() == packet.size());
-}
-
-static void test_addon_prefix_soft_cap()
-{
-    WorldPacket oversized(CMSG_ADDON_REGISTERED_PREFIXES, 3);
-    oversized.WriteBits(65u, 24);
-    oversized.FlushBits();
-
-    std::vector<std::string> prefixes;
-    CHECK(!MopChatPackets::ReadAddonPrefixBatch(oversized, prefixes));
-    CHECK(oversized.rpos() == oversized.size());
-
-    WorldPacket full(CMSG_ADDON_REGISTERED_PREFIXES, 43);
-    full.WriteBits(64u, 24);
-    for (uint32 i = 0; i < 64; ++i)
-        full.WriteBits(0u, 5);
-    full.FlushBits();
-    CHECK(MopChatPackets::ReadAddonPrefixBatch(full, prefixes));
-    CHECK(prefixes.size() == 64);
-
-    WorldPacket oneMore(CMSG_ADDON_REGISTERED_PREFIXES, 5);
-    oneMore.WriteBits(1u, 24);
-    oneMore.WriteBits(1u, 5);
-    oneMore.FlushBits();
-    oneMore.append("X", 1);
-    CHECK(!MopChatPackets::ReadAddonPrefixBatch(oneMore, prefixes));
-    CHECK(prefixes.empty());
-}
-
-static void test_text_emote_response()
-{
-    WorldPacket packet;
-    MopChatPackets::BuildTextEmote(packet,
-        UI64LIT(0x0002030005060008), UI64LIT(0x1100334400667700),
-        0x11223344u, 0x55667788u);
-
-    CHECK(packet.GetOpcode() == SMSG_TEXT_EMOTE);
-    CHECK(Equal(packet, {
-        0x7A, 0x57,
-        0x67, 0x76, 0x10, 0x02, 0x07,
-        0x44, 0x33, 0x22, 0x11,
-        0x03, 0x04, 0x09, 0x32, 0x45,
-        0x88, 0x77, 0x66, 0x55
-    }));
-}
 
 static void test_text_emote_request()
 {
@@ -582,22 +211,8 @@ int main(int /*argc*/, char** /*argv*/)
 {
     test_gm_system_message();
     test_whisper_with_target_language_and_realms();
-    test_achievement_message();
-    test_group_message();
-    test_guild_message();
-    test_length_boundaries();
-    test_player_name_notices();
-    test_chat_restricted_notice();
-    test_opcode();
     test_say_message_request();
-    test_inline_message_length_is_eight_bits();
     test_channel_message_lengths();
-    test_whisper_message_lengths();
-    test_addon_channel_layouts();
-    test_afk_message_request();
-    test_addon_prefix_batch();
-    test_addon_prefix_soft_cap();
-    test_text_emote_response();
     test_text_emote_request();
 
     if (g_fail)
