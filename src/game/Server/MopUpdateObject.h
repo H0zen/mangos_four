@@ -275,10 +275,22 @@ namespace MopUpdateObject
         float speedFlightBack;
         float speedTurn;
         float speedPitch;
+        uint64 transportGuid;
+        float transportX;
+        float transportY;
+        float transportZ;
+        float transportO;
+        uint32 transportTime;
+        uint32 transportTime2;
+        uint32 transportTime3;
+        int8 transportSeat;
+        bool hasTransportTime2;
+        bool hasTransportTime3;
         bool self;
     };
 
-    /// Append the proved no-flags/no-transport/no-fall/no-spline living subset.
+    /// Append the proved no-flags/no-fall/no-spline living subset, optionally
+    /// parented to a transport with transport-local coordinates.
     void AppendSimpleLivingMovement(ByteBuffer& out, SimpleLivingMovement const& movement);
 
     /// Append one complete simple-living CREATE block to an UpdateData buffer.
@@ -304,6 +316,13 @@ namespace MopUpdateObject
         // movement speeds
         float speedWalk, speedRun, speedRunBack, speedSwim, speedSwimBack;
         float speedFlight, speedFlightBack, speedTurn, speedPitch;
+
+        // Optional MO_TRANSPORT parent and transport-local movement state.
+        uint64 transportGuid;
+        float transportX, transportY, transportZ, transportO;
+        uint32 transportTime, transportTime2, transportTime3;
+        int8 transportSeat;
+        bool hasTransportTime2, hasTransportTime3;
 
         // values (18414 UNIT/OBJECT fields)
         uint8  race, class_, gender, powerType;

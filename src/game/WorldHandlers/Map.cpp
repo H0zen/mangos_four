@@ -1880,19 +1880,6 @@ void Map::SendInitSelf(Player* player)
     // (15595) format and is not read by an 18414 client. Essential-field bootstrap
     // (the minimal field set to stand and function); the full field set is a follow-up.
     //
-    // Transport guard: the MoP self create-block does not yet carry transport parenting
-    // (movement-block ON_TRANSPORT + transport GUID/offset). A player attached to a transport
-    // here (must have logged out on a moving transport; impossible on the bring-up start maps)
-    // is emitted at absolute position without parenting -- the client would stand correctly but
-    // not ride the transport until a later update. Flag it so the case is diagnosable rather
-    // than a silent desync; full transport support is a follow-up.
-    if (player->GetTransport())
-    {
-        sLog.outError("Map::SendInitSelf: player %s is on a transport; MoP self create-block omits "
-                      "transport parenting (position sent absolute). Transport support is TODO.",
-                      player->GetGuidStr().c_str());
-    }
-
     MopUpdateObject::SelfPlayer sp{};
     sp.guid = player->GetObjectGuid().GetRawValue();
     sp.mapId = uint16(player->GetMapId());
@@ -1910,6 +1897,22 @@ void Map::SendInitSelf(Player* player)
     sp.speedFlightBack = player->GetSpeed(MOVE_FLIGHT_BACK);
     sp.speedTurn = player->GetSpeed(MOVE_TURN_RATE);
     sp.speedPitch = player->GetSpeed(MOVE_PITCH_RATE);
+    if (player->GetTransport())
+    {
+        MovementInfo const& movement = player->m_movementInfo;
+        Position const* transportPosition = movement.GetTransportPos();
+        sp.transportGuid = movement.GetTransportGuid().GetRawValue();
+        sp.transportX = transportPosition->x;
+        sp.transportY = transportPosition->y;
+        sp.transportZ = transportPosition->z;
+        sp.transportO = transportPosition->o;
+        sp.transportTime = movement.GetTransportTime();
+        sp.transportTime2 = movement.GetTransportTime2();
+        sp.transportTime3 = movement.GetTransportTime3();
+        sp.transportSeat = movement.GetTransportSeat();
+        sp.hasTransportTime2 = movement.GetStatusInfo().hasTransportTime2;
+        sp.hasTransportTime3 = movement.GetStatusInfo().hasTransportTime3;
+    }
     Powers pw = player->GetPowerType();
     sp.race = player->getRace();
     sp.class_ = player->getClass();
@@ -1938,7 +1941,7 @@ void Map::SendInitSelf(Player* player)
     sp.displayId = player->GetDisplayId();
     sp.nativeDisplayId = player->GetNativeDisplayId();
 
-    // One packet, item creates first, the self player's create block last -
+    // One packet, prerequisite object creates first, the self player's create block last -
     // measured from the 18414 retail login burst, where 62 of 62 fully
     // accounted packets order it that way and none put the player first.
     //
@@ -1950,8 +1953,16 @@ void Map::SendInitSelf(Player* player)
     // that is simply not how the client behaves.
     //
     // Player's existing traversal emits top-level items/bags, while Bag's
-    // override recursively emits its contents.
+    // override recursively emits its contents. A current transport is emitted
+    // before those objects because the self movement block references its GUID.
     UpdateData inventoryData(player->GetMapId());
+    if (Transport* transport = player->GetTransport())
+    {
+        // The client must know the hull before the self movement block names it
+        // as a parent. MO_TRANSPORT motion is then interpolated client-side
+        // from its route clock while the player retains these local offsets.
+        transport->BuildCreateUpdateBlockForPlayer(&inventoryData, player);
+    }
     player->BuildCreateUpdateBlockForPlayer(&inventoryData, player);
 
     // The core create block carries only the fixed login fields, so seed the

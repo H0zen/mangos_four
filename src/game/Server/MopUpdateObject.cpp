@@ -671,6 +671,8 @@ void MopUpdateObject::AppendStationaryGameObjectCreateBlock(ByteBuffer& out, uin
 void MopUpdateObject::AppendSimpleLivingMovement(ByteBuffer& out, SimpleLivingMovement const& movement)
 {
     const uint64 g = movement.guid;
+    const uint64 transportGuid = movement.transportGuid;
+    const bool hasTransport = transportGuid != 0;
 
     out.WriteBit(0);                     // game-object data
     out.WriteBit(0);                     // animation kits
@@ -697,8 +699,21 @@ void MopUpdateObject::AppendSimpleLivingMovement(ByteBuffer& out, SimpleLivingMo
     out.WriteBit(GuidByte(g, 2) != 0);
     out.WriteBit(0);
     out.WriteBit(1);                     // pitch omitted
-    out.WriteBit(0);                     // unit transport
+    out.WriteBit(hasTransport);          // unit transport
     out.WriteBit(0);
+    if (hasTransport)
+    {
+        out.WriteBit(GuidByte(transportGuid, 4) != 0);
+        out.WriteBit(GuidByte(transportGuid, 2) != 0);
+        out.WriteBit(movement.hasTransportTime3);
+        out.WriteBit(GuidByte(transportGuid, 0) != 0);
+        out.WriteBit(GuidByte(transportGuid, 1) != 0);
+        out.WriteBit(GuidByte(transportGuid, 3) != 0);
+        out.WriteBit(GuidByte(transportGuid, 6) != 0);
+        out.WriteBit(GuidByte(transportGuid, 7) != 0);
+        out.WriteBit(movement.hasTransportTime2);
+        out.WriteBit(GuidByte(transportGuid, 5) != 0);
+    }
     out.WriteBit(0);                     // movement time present
     out.WriteBit(GuidByte(g, 6) != 0);
     out.WriteBit(GuidByte(g, 4) != 0);
@@ -718,6 +733,32 @@ void MopUpdateObject::AppendSimpleLivingMovement(ByteBuffer& out, SimpleLivingMo
     out.WriteBit(GuidByte(g, 1) != 0);
     out.WriteBit(1);                     // extra movement flags omitted
     out.FlushBits();
+
+    if (hasTransport)
+    {
+        out.WriteByteSeq(GuidByte(transportGuid, 7));
+        out << movement.transportX;
+        if (movement.hasTransportTime3)
+        {
+            out << movement.transportTime3;
+        }
+        out << movement.transportO;
+        out << movement.transportY;
+        out.WriteByteSeq(GuidByte(transportGuid, 4));
+        out.WriteByteSeq(GuidByte(transportGuid, 1));
+        out.WriteByteSeq(GuidByte(transportGuid, 3));
+        out << movement.transportZ;
+        out.WriteByteSeq(GuidByte(transportGuid, 5));
+        if (movement.hasTransportTime2)
+        {
+            out << movement.transportTime2;
+        }
+        out.WriteByteSeq(GuidByte(transportGuid, 0));
+        out << movement.transportSeat;
+        out.WriteByteSeq(GuidByte(transportGuid, 6));
+        out.WriteByteSeq(GuidByte(transportGuid, 2));
+        out << movement.transportTime;
+    }
 
     out.WriteByteSeq(GuidByte(g, 4));
     out << movement.speedFlight;
@@ -811,6 +852,17 @@ void MopUpdateObject::AppendSelfCreateBlock(ByteBuffer& out, const SelfPlayer& e
     movement.speedFlightBack = e.speedFlightBack;
     movement.speedTurn = e.speedTurn;
     movement.speedPitch = e.speedPitch;
+    movement.transportGuid = e.transportGuid;
+    movement.transportX = e.transportX;
+    movement.transportY = e.transportY;
+    movement.transportZ = e.transportZ;
+    movement.transportO = e.transportO;
+    movement.transportTime = e.transportTime;
+    movement.transportTime2 = e.transportTime2;
+    movement.transportTime3 = e.transportTime3;
+    movement.transportSeat = e.transportSeat;
+    movement.hasTransportTime2 = e.hasTransportTime2;
+    movement.hasTransportTime3 = e.hasTransportTime3;
     movement.self = true;
     // ---- values block (essential 18414 fields, ascending index order) ----
     // UNIT_FIELD_SEX (renamed BYTES_0): race, class, power type, gender.
