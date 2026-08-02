@@ -254,6 +254,8 @@ static DBCStorage <TaxiPathNodeEntry> sTaxiPathNodeStore(TaxiPathNodeEntryfmt);
 
 TransportAnimationsByEntry sTransportAnimationsByEntry;
 DBCStorage <TransportAnimationEntry> sTransportAnimationStore(TransportAnimationEntryfmt);
+TransportRotationsByEntry sTransportRotationsByEntry;
+DBCStorage <TransportRotationEntry> sTransportRotationStore(TransportRotationEntryfmt);
 DBCStorage <TotemCategoryEntry> sTotemCategoryStore(TotemCategoryEntryfmt);
 DBCStorage <VehicleEntry> sVehicleStore(VehicleEntryfmt);
 DBCStorage <VehicleSeatEntry> sVehicleSeatStore(VehicleSeatEntryfmt);
@@ -567,7 +569,7 @@ void LoadDBCStores(const std::string& dataPath)
         exit(1);
     }
 
-    const uint32 DBCFilesCount = 130;
+    const uint32 DBCFilesCount = 131;
 
     BarGoLink bar(DBCFilesCount);
 
@@ -1113,12 +1115,41 @@ void LoadDBCStores(const std::string& dataPath)
 
     LoadDBC(availableDbcLocales, bar, bad_dbc_files, sTotemCategoryStore,       dbcPath, "TotemCategory.dbc");
 
-    LoadDBC(availableDbcLocales,bar,bad_dbc_files,sTransportAnimationStore,  dbcPath,"TransportAnimation.dbc");
+    LoadDBC(availableDbcLocales, bar, bad_dbc_files, sTransportAnimationStore, dbcPath, "TransportAnimation.dbc");
+    sTransportAnimationsByEntry.clear();
     for (uint32 i = 0; i < sTransportAnimationStore.GetNumRows(); ++i)
+    {
         if (TransportAnimationEntry const* entry = sTransportAnimationStore.LookupEntry(i))
         {
-            sTransportAnimationsByEntry[entry->TransportEntry][entry->TimeIndex] = entry;
+            TransportAnimationEntryMap& route = sTransportAnimationsByEntry[entry->TransportEntry];
+            if (!route.insert(TransportAnimationEntryMap::value_type(entry->TimeIndex, entry)).second)
+            {
+                sLog.outError("TransportAnimation.dbc has duplicate entry %u at time %u", entry->TransportEntry, entry->TimeIndex);
+            }
         }
+    }
+
+    for (TransportAnimationsByEntry::const_iterator itr = sTransportAnimationsByEntry.begin(); itr != sTransportAnimationsByEntry.end(); ++itr)
+    {
+        if (itr->second.size() < 2 || itr->second.rbegin()->first == 0)
+        {
+            sLog.outError("TransportAnimation.dbc entry %u has no usable animation route", itr->first);
+        }
+    }
+
+    LoadDBC(availableDbcLocales, bar, bad_dbc_files, sTransportRotationStore, dbcPath, "TransportRotation.dbc");
+    sTransportRotationsByEntry.clear();
+    for (uint32 i = 0; i < sTransportRotationStore.GetNumRows(); ++i)
+    {
+        if (TransportRotationEntry const* entry = sTransportRotationStore.LookupEntry(i))
+        {
+            TransportRotationEntryMap& route = sTransportRotationsByEntry[entry->TransportEntry];
+            if (!route.insert(TransportRotationEntryMap::value_type(entry->TimeIndex, entry)).second)
+            {
+                sLog.outError("TransportRotation.dbc has duplicate entry %u at time %u", entry->TransportEntry, entry->TimeIndex);
+            }
+        }
+    }
 
     LoadDBC(availableDbcLocales, bar, bad_dbc_files, sVehicleStore,             dbcPath, "Vehicle.dbc");
     LoadDBC(availableDbcLocales, bar, bad_dbc_files, sVehicleSeatStore,         dbcPath, "VehicleSeat.dbc");

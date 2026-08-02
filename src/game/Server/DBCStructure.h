@@ -2600,10 +2600,21 @@ struct TransportAnimationEntry
     //uint32    id;                                         // 0
     uint32    TransportEntry;                               // 1
     uint32    TimeIndex;                                    // 2  (was timeFrame)
-    //float     xOffs;                                      // 3
-    //float     yOffs;                                      // 4
-    //float     zOffs;                                      // 5
+    float     xOffs;                                        // 3
+    float     yOffs;                                        // 4
+    float     zOffs;                                        // 5
     //uint32    unk;                                        // 6
+};
+
+struct TransportRotationEntry
+{
+    //uint32    id;                                         // 0
+    uint32    TransportEntry;                               // 1
+    uint32    TimeIndex;                                    // 2
+    float     x;                                            // 3
+    float     y;                                            // 4
+    float     z;                                            // 5
+    float     w;                                            // 6
 };
 
 #define MAX_VEHICLE_SEAT 8
@@ -2855,8 +2866,10 @@ struct TaxiPathNodePtr
 typedef Path<TaxiPathNodePtr, TaxiPathNodeEntry const> TaxiPathNodeList;
 typedef std::vector<TaxiPathNodeList> TaxiPathNodesByPath;
 
-typedef std::unordered_map<uint32 /*frame*/, TransportAnimationEntry const*> TransportAnimationEntryMap;
-typedef std::unordered_map<uint32, TransportAnimationEntryMap> TransportAnimationsByEntry;
+typedef std::map<uint32 /*frame*/, TransportAnimationEntry const*> TransportAnimationEntryMap;
+typedef std::map<uint32, TransportAnimationEntryMap> TransportAnimationsByEntry;
+typedef std::map<uint32 /*frame*/, TransportRotationEntry const*> TransportRotationEntryMap;
+typedef std::map<uint32, TransportRotationEntryMap> TransportRotationsByEntry;
 
 #define TaxiMaskSize 162
 typedef uint8 TaxiMask[TaxiMaskSize];

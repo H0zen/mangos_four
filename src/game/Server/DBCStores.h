@@ -351,6 +351,8 @@ extern TaxiPathNodesByPath                       sTaxiPathNodesByPath;
 extern DBCStorage <TotemCategoryEntry>           sTotemCategoryStore;
 extern TransportAnimationsByEntry                sTransportAnimationsByEntry;
 extern DBCStorage <TransportAnimationEntry>      sTransportAnimationStore;
+extern TransportRotationsByEntry                 sTransportRotationsByEntry;
+extern DBCStorage <TransportRotationEntry>       sTransportRotationStore;
 extern DBCStorage <VehicleEntry>                 sVehicleStore;
 extern DBCStorage <VehicleSeatEntry>             sVehicleSeatStore;
 extern DBCStorage <WMOAreaTableEntry>            sWMOAreaTableStore;

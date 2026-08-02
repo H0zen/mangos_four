@@ -158,7 +158,8 @@ const char TaxiNodesEntryfmt[]="nifffsiixxxx";                      // TODO: NEE
 const char TaxiPathEntryfmt[] = "niii";                             // 5.3.0 Checked
 const char TaxiPathNodeEntryfmt[] = "diiifffiiii";                  // 5.3.0 Checked
 const char TotemCategoryEntryfmt[]="nxii";                          // 5.3.0 Checked
-const char TransportAnimationEntryfmt[]="diixxxx";                  // 5.3.0 Checked
+const char TransportAnimationEntryfmt[]="diifffx";                  // 5.4.8 Checked
+const char TransportRotationEntryfmt[]="diiffff";                   // 5.4.8 Checked
 const char VehicleEntryfmt[]="nixffffiiiiiiiifffffffffffffffssssfifiixx"; // 16357
 //                                1        10        20        30        40        50        60        70        80        90        100       110       120       130       140       150       160
 const char VehicleSeatEntryfmt[]="niiffffffffffiiiiiifffffffiiifffiiiiiiiffiiiifxxxxxxxxxxxxxxxxxxxx"; // 5.4.8 registry: idx45 CameraEnteringDelay(float), was i m_flagsB
