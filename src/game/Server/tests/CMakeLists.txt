@@ -161,7 +161,8 @@ add_test(NAME mop_pet_set_action_capability
 if(WIN32)
     get_filename_component(MOP_PET_SET_ACTION_MYSQL_RUNTIME_DIR "${MySQL_LIBRARY}" DIRECTORY)
     set_tests_properties(mop_pet_set_action_capability PROPERTIES
-        ENVIRONMENT_MODIFICATION "PATH=path_list_prepend:${MOP_PET_SET_ACTION_MYSQL_RUNTIME_DIR}")
+        ENVIRONMENT_MODIFICATION
+        "PATH=path_list_prepend:${MOP_PET_SET_ACTION_MYSQL_RUNTIME_DIR};PATH=path_list_prepend:$<TARGET_FILE_DIR:lualib>")
 endif()
 
 add_executable(mop_mail_take_item_security_test
@@ -267,7 +268,8 @@ add_test(NAME mop_group_invite_response_packets
 if(WIN32)
     get_filename_component(MOP_GROUP_INVITE_MYSQL_RUNTIME_DIR "${MySQL_LIBRARY}" DIRECTORY)
     set_tests_properties(mop_group_invite_response_packets PROPERTIES
-        ENVIRONMENT_MODIFICATION "PATH=path_list_prepend:${MOP_GROUP_INVITE_MYSQL_RUNTIME_DIR}")
+        ENVIRONMENT_MODIFICATION
+        "PATH=path_list_prepend:${MOP_GROUP_INVITE_MYSQL_RUNTIME_DIR};PATH=path_list_prepend:$<TARGET_FILE_DIR:lualib>")
 endif()
 
 add_executable(mop_auction_packets_test mop_auction_packets_test.cpp)
@@ -792,7 +794,8 @@ add_test(NAME mop_use_item_packets COMMAND mop_use_item_packets_test)
 if(WIN32)
     get_filename_component(MOP_SPELL_CAST_MYSQL_RUNTIME_DIR "${MySQL_LIBRARY}" DIRECTORY)
     set_tests_properties(mop_spell_cast_packets mop_use_item_packets PROPERTIES
-        ENVIRONMENT_MODIFICATION "PATH=path_list_prepend:${MOP_SPELL_CAST_MYSQL_RUNTIME_DIR}")
+        ENVIRONMENT_MODIFICATION
+        "PATH=path_list_prepend:${MOP_SPELL_CAST_MYSQL_RUNTIME_DIR};PATH=path_list_prepend:$<TARGET_FILE_DIR:lualib>")
 endif()
 
 add_executable(mop_battlefield_status_packets_test mop_battlefield_status_packets_test.cpp)
@@ -805,7 +808,8 @@ add_test(NAME mop_battlefield_status_packets COMMAND mop_battlefield_status_pack
 if(WIN32)
     get_filename_component(MOP_BATTLEFIELD_STATUS_MYSQL_RUNTIME_DIR "${MySQL_LIBRARY}" DIRECTORY)
     set_tests_properties(mop_battlefield_status_packets PROPERTIES
-        ENVIRONMENT_MODIFICATION "PATH=path_list_prepend:${MOP_BATTLEFIELD_STATUS_MYSQL_RUNTIME_DIR}")
+        ENVIRONMENT_MODIFICATION
+        "PATH=path_list_prepend:${MOP_BATTLEFIELD_STATUS_MYSQL_RUNTIME_DIR};PATH=path_list_prepend:$<TARGET_FILE_DIR:lualib>")
 endif()
 
 add_executable(mop_battle_pet_packets_test mop_battle_pet_packets_test.cpp)
