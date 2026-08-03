@@ -51,7 +51,9 @@ namespace
      * @param startZ Leg start Z-coordinate.
      * @param endNode Waypoint the leg ends at.
      * @param pathPoints Path being built; the leg start point is added only when empty.
-     * @return True if a real navmesh leg of at least two points was appended.
+     * @return False if the leg could not be routed, or if it does not start where the
+     *         previous one was committed. Near-duplicate points are dropped, so a
+     *         degenerate leg may append nothing while still succeeding.
      */
     bool AppendWaypointPathSegment(Creature& creature, float startX, float startY, float startZ, WaypointNode const& endNode, PointsArray& pathPoints)
     {
@@ -72,6 +74,28 @@ namespace
             return false;
         }
 
+        // Later legs are welded by omitting segment.front(), which only holds if this
+        // leg really does start where the previous one was committed. That was
+        // guaranteed while the shortcut fallback returned the exact requested
+        // endpoints, but a routed leg ends on a navmesh-adjusted point while the next
+        // leg is calculated from the raw waypoint, so the two can part company.
+        //
+        // The resulting seam is small and finite, and survives the point filter below
+        // whenever it is at least MIN_SEGMENT_LENGTH. It still cannot be sent: the
+        // linear path packs intermediate offsets by truncating each component toward
+        // zero at 0.25yd (ByteBuffer::appendPackXYZ), so a seam under a quarter yard
+        // per component packs to all-zero fields and the client reconstructs the point
+        // on top of its neighbour. That zero-length segment makes the client divide by
+        // the segment length, compute 0/0, and store NaN as the mover's position.
+        //
+        // Refuse the leg instead. The builder already treats a later failed leg as a
+        // clean chunk boundary and keeps what it has assembled.
+        if (!pathPoints.empty() &&
+            (segment.front() - pathPoints.back()).length() >= WAYPOINT_SMOOTHING_MIN_SEGMENT_LENGTH)
+        {
+            return false;
+        }
+
         if (pathPoints.empty())
         {
             pathPoints.push_back(segment.front());
@@ -79,6 +103,12 @@ namespace
 
         for (PointsArray::const_iterator itr = segment.begin() + 1; itr != segment.end(); ++itr)
         {
+            // Drop zero-length segments: the client cannot interpolate across them.
+            if ((*itr - pathPoints.back()).length() < WAYPOINT_SMOOTHING_MIN_SEGMENT_LENGTH)
+            {
+                continue;
+            }
+
             pathPoints.push_back(*itr);
         }
 
@@ -448,7 +478,9 @@ void WaypointMovementGenerator<Creature>::BuildSmoothPath(Creature& creature, Wa
         currPoint = nextPoint;
     }
 
-    if (m_activeSegmentWaypoints.size() <= 1)
+    // A merged path can collapse below a usable spline when every leg was
+    // degenerate; fall back to per-waypoint movement in that case too.
+    if (m_activeSegmentWaypoints.size() <= 1 || pathPoints.size() < 2)
     {
         ClearActiveSegment();
         pathPoints.clear();
