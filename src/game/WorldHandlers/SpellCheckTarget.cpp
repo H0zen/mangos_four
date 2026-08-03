@@ -68,7 +68,6 @@
 #include "Policies/Singleton.h"
 #include "SharedDefines.h"
 #include "LootMgr.h"
-#include "VMapFactory.h"
 #include "BattleGround/BattleGround.h"
 #include "Util.h"
 #include "Chat.h"
@@ -242,7 +241,7 @@ bool Spell::CheckTarget(Unit* target, SpellEffectIndex eff)
             // fall through
         case SPELL_EFFECT_RESURRECT_NEW:
             // player far away, maybe his corpse near?
-            if (target != m_caster && !m_spellInfo->HasAttribute(SPELL_ATTR_EX2_IGNORE_LOS) && !target->IsWithinLOSInMap(m_caster, VMAP::ModelIgnoreFlags::M2))
+            if (target != m_caster && !m_spellInfo->HasAttribute(SPELL_ATTR_EX2_IGNORE_LOS) && !target->IsWithinLOSInMap(m_caster, world::terrain::ModelIgnoreFlags::M2))
             {
                 if (!m_targets.getCorpseTargetGuid())
                 {
@@ -260,7 +259,7 @@ bool Spell::CheckTarget(Unit* target, SpellEffectIndex eff)
                     return false;
                 }
 
-                if (!m_spellInfo->HasAttribute(SPELL_ATTR_EX2_IGNORE_LOS) && !corpse->IsWithinLOSInMap(m_caster, VMAP::ModelIgnoreFlags::M2))
+                if (!m_spellInfo->HasAttribute(SPELL_ATTR_EX2_IGNORE_LOS) && !corpse->IsWithinLOSInMap(m_caster, world::terrain::ModelIgnoreFlags::M2))
                 {
                     return false;
                 }
@@ -274,7 +273,7 @@ bool Spell::CheckTarget(Unit* target, SpellEffectIndex eff)
             {
                 if (WorldObject* caster = GetCastingObject())
                 {
-                    if (!m_spellInfo->HasAttribute(SPELL_ATTR_EX2_IGNORE_LOS) && !target->IsWithinLOSInMap(caster, VMAP::ModelIgnoreFlags::M2))
+                    if (!m_spellInfo->HasAttribute(SPELL_ATTR_EX2_IGNORE_LOS) && !target->IsWithinLOSInMap(caster, world::terrain::ModelIgnoreFlags::M2))
                     {
                         return false;
                     }

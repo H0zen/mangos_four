@@ -397,8 +397,9 @@ void WorldSession::HandleCorpseQueryOpcode(WorldPacket & /*recv_data*/)
                         response.displayMapId = corpseMapEntry->CorpseMapID;
                         response.x = corpseMapEntry->ghost_entrance_x;
                         response.y = corpseMapEntry->ghost_entrance_y;
-                        response.z = entranceMap->GetHeightStatic(response.x,
+                        const auto entranceFloor = entranceMap->StaticFloor(response.x,
                             response.y, MAX_HEIGHT);
+                        response.z = entranceFloor ? *entranceFloor : INVALID_HEIGHT;
                     }
                 }
             }

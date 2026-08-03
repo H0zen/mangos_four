@@ -5226,7 +5226,7 @@ void Player::UpdateUnderwaterState(Map* m, float x, float y, float z)
     }
 
     // All liquids type - check under water position
-    if (liquid_status.CreatureTypeFlags & (MAP_LIQUID_TYPE_WATER | MAP_LIQUID_TYPE_OCEAN | MAP_LIQUID_TYPE_MAGMA | MAP_LIQUID_TYPE_SLIME))
+    if (liquid_status.type_flags & (MAP_LIQUID_TYPE_WATER | MAP_LIQUID_TYPE_OCEAN | MAP_LIQUID_TYPE_MAGMA | MAP_LIQUID_TYPE_SLIME))
     {
         // A transport deck is the player's local ground. Do not let the
         // underlying ocean start a breath timer while the player is aboard.
@@ -5241,7 +5241,7 @@ void Player::UpdateUnderwaterState(Map* m, float x, float y, float z)
     }
 
     // Allow travel in dark water on taxi or transport
-    if ((liquid_status.CreatureTypeFlags & MAP_LIQUID_TYPE_DARK_WATER) && !IsTaxiFlying() && !GetTransport())
+    if ((liquid_status.type_flags & MAP_LIQUID_TYPE_DARK_WATER) && !IsTaxiFlying() && !GetTransport())
     {
         m_MirrorTimerFlags |= UNDERWATER_INDARKWATER;
     }
@@ -5251,7 +5251,7 @@ void Player::UpdateUnderwaterState(Map* m, float x, float y, float z)
     }
 
     // in lava check, anywhere in lava level
-    if (liquid_status.CreatureTypeFlags & MAP_LIQUID_TYPE_MAGMA)
+    if (liquid_status.type_flags & MAP_LIQUID_TYPE_MAGMA)
     {
         if (res & (LIQUID_MAP_UNDER_WATER | LIQUID_MAP_IN_WATER | LIQUID_MAP_WATER_WALK))
         {
@@ -5263,7 +5263,7 @@ void Player::UpdateUnderwaterState(Map* m, float x, float y, float z)
         }
     }
     // in slime check, anywhere in slime level
-    if (liquid_status.CreatureTypeFlags & MAP_LIQUID_TYPE_SLIME)
+    if (liquid_status.type_flags & MAP_LIQUID_TYPE_SLIME)
     {
         if (res & (LIQUID_MAP_UNDER_WATER | LIQUID_MAP_IN_WATER | LIQUID_MAP_WATER_WALK))
         {

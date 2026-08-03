@@ -47,7 +47,7 @@
 #include "OutdoorPvP/OutdoorPvP.h"
 #include "Util.h"
 #include "ScriptMgr.h"
-#include "vmap/GameObjectModel.h"
+#include "GameObjectModel.h"
 #include "CreatureAISelector.h"
 #include "SQLStorages.h"
 #include "GameObjectAI.h"

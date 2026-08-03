@@ -47,7 +47,7 @@
 #include "OutdoorPvP/OutdoorPvP.h"
 #include "Util.h"
 #include "ScriptMgr.h"
-#include "vmap/GameObjectModel.h"
+#include "GameObjectModel.h"
 #include "CreatureAISelector.h"
 #include "SQLStorages.h"
 #include "GameObjectAI.h"
@@ -1348,7 +1348,8 @@ void GameObject::UpdateCollisionState() const
         return;
     }
 
-    m_model->enable(IsCollisionEnabled() ? GetPhaseMask() : 0);
+    m_model->SetCollidable(IsCollisionEnabled());
+    m_model->SetPhaseMask(IsCollisionEnabled() ? GetPhaseMask() : 0);
 }
 
 /**

@@ -1783,7 +1783,8 @@ bool Creature::LoadFromDB(uint32 guidlow, Map* map)
         m_deathState = DEAD;
         if (CanFly())
         {
-            float tz = GetTerrain()->GetHeightStatic(data->posX, data->posY, data->posZ, false);
+            const auto spawnFloor = GetTerrain()->StaticFloor(data->posX, data->posY, data->posZ);
+            float tz = spawnFloor ? *spawnFloor : INVALID_HEIGHT;
             if (data->posZ - tz > 0.1)
             {
                 Relocate(data->posX, data->posY, tz);
@@ -1817,7 +1818,8 @@ bool Creature::LoadFromDB(uint32 guidlow, Map* map)
             // Just set to dead, so need to relocate like above
             if (CanFly())
             {
-                float tz = GetTerrain()->GetHeightStatic(data->posX, data->posY, data->posZ, false);
+                const auto spawnFloor = GetTerrain()->StaticFloor(data->posX, data->posY, data->posZ);
+            float tz = spawnFloor ? *spawnFloor : INVALID_HEIGHT;
                 if (data->posZ - tz > 0.1)
                 {
                     Relocate(data->posX, data->posY, tz);

@@ -669,7 +669,8 @@ INPUT                  = @TOP_SRCDIR@/src/shared/ \
                          @TOP_SRCDIR@/src/game/BattleGround/ \
                          @TOP_SRCDIR@/src/game/movement/ \
                          @TOP_SRCDIR@/src/game/OutdoorPvP/ \
-                         @TOP_SRCDIR@/src/game/vmap/ \
+                         @TOP_SRCDIR@/src/shared/Geometry/ \
+                         @TOP_SRCDIR@/src/shared/terrain/ \
                          @TOP_SRCDIR@/src/realmd/ \
                          @TOP_SRCDIR@/src/mangosd/ \
                          @TOP_SRCDIR@/doc/DocStructure.dox \

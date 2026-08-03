@@ -18,21 +18,14 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-add_subdirectory(Extractor_projects)
+# The unified baker. One tool reads the client and writes everything mangosd
+# needs -- the DBC set, the fused terrain + collision tiles, the game-object
+# models and the navmesh -- replacing the map-extractor / vmap-extractor /
+# Movemap-Generator trio and its shell scripts.
+add_subdirectory(extractor)
 
-# Used for install targets
-set(TOOLS_DIR "tools")
-
-#install documentation and generation scripts
-install(
-    FILES
-       "${CMAKE_CURRENT_SOURCE_DIR}/Extractor_Binaries/ExtractResources.sh"
-       "${CMAKE_CURRENT_SOURCE_DIR}/Extractor_Binaries/make_vmaps.bat"
-      # "${CMAKE_CURRENT_SOURCE_DIR}/Extractor_Binaries/mmap_excluded.txt"
-      # "${CMAKE_CURRENT_SOURCE_DIR}/Extractor_Binaries/MoveMapGen.sh"
-      # "${CMAKE_CURRENT_SOURCE_DIR}/Extractor_Binaries/offmesh.txt"
-        "${CMAKE_CURRENT_SOURCE_DIR}/Extractor_Binaries/README.txt"
-    DESTINATION
-        "${BIN_DIR}/${TOOLS_DIR}"
-)
-
+# Scores those tiles against the world database's own ground-only creature spawns.
+# A clean parse is not correct geometry; this is what says whether it is.
+if(BUILD_TOOLS)
+    add_subdirectory(height-check)
+endif()

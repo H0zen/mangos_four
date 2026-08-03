@@ -36,7 +36,7 @@
 #include "Camera.h"
 #include "GameTime.h"
 #include "Util.h"
-#include "vmap/ModelIgnoreFlags.h"
+#include "terrain/ICollisionModel.hpp"
 
 #ifdef ENABLE_ELUNA
 #include "LuaValue.h"
@@ -815,8 +815,8 @@ class WorldObject : public Object
         {
             return obj && IsInMap(obj) && _IsWithinDist(obj, dist2compare, is3D);
         }
-        bool IsWithinLOS(float x, float y, float z, VMAP::ModelIgnoreFlags ignoreFlags = VMAP::ModelIgnoreFlags::Nothing) const;
-        bool IsWithinLOSInMap(const WorldObject* obj, VMAP::ModelIgnoreFlags ignoreFlags = VMAP::ModelIgnoreFlags::Nothing) const;
+        bool IsWithinLOS(float x, float y, float z, world::terrain::ModelIgnoreFlags ignoreFlags = world::terrain::ModelIgnoreFlags::Nothing) const;
+        bool IsWithinLOSInMap(const WorldObject* obj, world::terrain::ModelIgnoreFlags ignoreFlags = world::terrain::ModelIgnoreFlags::Nothing) const;
         bool GetDistanceOrder(WorldObject const* obj1, WorldObject const* obj2, bool is3D = true) const;
         bool IsInRange(WorldObject const* obj, float minRange, float maxRange, bool is3D = true) const;
         bool IsInRange2d(float x, float y, float minRange, float maxRange) const;

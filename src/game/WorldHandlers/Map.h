@@ -67,14 +67,14 @@
 #include "Utilities/TypeList.h"
 #include "ScriptMgr.h"
 #include "CreatureLinkingMgr.h"
-#include "DynamicTree.h"
-#include "vmap/ModelIgnoreFlags.h"
+#include "DynamicCollision.h"
 #ifdef ENABLE_ELUNA
 #include "LuaValue.h"
 #endif /* ENABLE_ELUNA */
 
 #include <bitset>
 #include <list>
+#include <optional>
 #include <set>
 
 struct CreatureInfo;
@@ -345,16 +345,29 @@ class Map : public GridRefManager<NGridType>
         void MonsterYellToMap(CreatureInfo const* cinfo, int32 textId, Language language, Unit const* target, uint32 senderLowGuid = 0) const;
         void PlayDirectSoundToMap(uint32 soundId, uint32 zoneId = 0) const;
 
-        // Dynamic VMaps
+        /// Every surface stacked over (x, y) between zTop and zBottom, static and
+        /// live geometry fused. A scalar height cannot say "there is an open hatch
+        /// here, refuse" rather than "the deck two levels down".
+        world::terrain::Column ColumnAt(uint32 phasemask, float x, float y, float zTop,
+                                        float zBottom) const;
+
+        /// The floor under (x, y, z), or nothing where the map has none. Core code asks
+        /// this and never GetHeight: an absent floor must not arrive as a number that
+        /// arithmetic will consume, which is the whole reason INVALID_HEIGHT leaked.
+        std::optional<float> Floor(uint32 phasemask, float x, float y, float z) const;
+        std::optional<float> FloorNear(uint32 phasemask, float x, float y, float z, float maxSearchDist = 4.0f) const;
         float GetHeight(uint32 phasemask, float x, float y, float z) const;
         bool GetHeightInRange(uint32 phasemask, float x, float y, float& z, float maxSearchDist = 4.0f) const;
-        bool IsInLineOfSight(float x1, float y1, float z1, float x2, float y2, float z2, uint32 phasemask, VMAP::ModelIgnoreFlags ignoreFlags = VMAP::ModelIgnoreFlags::Nothing) const;
+        bool IsInLineOfSight(float x1, float y1, float z1, float x2, float y2, float z2, uint32 phasemask,
+                             world::terrain::ModelIgnoreFlags ignore =
+                                 world::terrain::ModelIgnoreFlags::Nothing) const;
         bool GetHitPosition(float srcX, float srcY, float srcZ, float& destX, float& destY, float& destZ, uint32 phasemask, float modifyDist) const;
 
-        // Object Model insertion/remove/test for dynamic vmaps use
+        // A game object's collision body, as this map holds it.
         void InsertGameObjectModel(const GameObjectModel& mdl);
         void RemoveGameObjectModel(const GameObjectModel& mdl);
         bool ContainsGameObjectModel(const GameObjectModel& mdl) const;
+        void RefreshGameObjectModel(GameObjectModel& mdl);
 
         // Get Holder for Creature Linking
         CreatureLinkingHolder* GetCreatureLinkingHolder() { return &m_creatureLinkingHolder; }
@@ -528,7 +541,7 @@ class Map : public GridRefManager<NGridType>
         CreatureLinkingHolder m_creatureLinkingHolder;
 
         // Dynamic Map tree object
-        DynamicMapTree m_dyn_tree;
+        DynamicCollision m_dyn_tree;
 
         // WeatherSystem
         WeatherSystem* m_weatherSystem;

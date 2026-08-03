@@ -42,7 +42,6 @@
 #include "Transports.h"
 #include "TargetedMovementGenerator.h"
 #include "WaypointMovementGenerator.h"
-#include "VMapFactory.h"
 #include "CellImpl.h"
 #include "GridNotifiers.h"
 #include "GridNotifiersImpl.h"
@@ -435,7 +434,7 @@ namespace
     }
 }
 
-bool WorldObject::IsWithinLOSInMap(const WorldObject* obj, VMAP::ModelIgnoreFlags ignoreFlags) const
+bool WorldObject::IsWithinLOSInMap(const WorldObject* obj, world::terrain::ModelIgnoreFlags ignoreFlags) const
 {
     if (!IsInMap(obj))
     {
@@ -483,13 +482,13 @@ bool WorldObject::IsWithinLOSInMap(const WorldObject* obj, VMAP::ModelIgnoreFlag
  * @param ox Target X coordinate
  * @param oy Target Y coordinate
  * @param oz Target Z coordinate
- * @param ignoreFlags Caller-supplied filter — e.g. VMAP::ModelIgnoreFlags::M2
+ * @param ignoreFlags Caller-supplied filter — e.g. world::terrain::ModelIgnoreFlags::M2
  *                    skips MOD_M2 doodads for spell LoS checks.
  * @return True if within line of sight
  *
  * Checks if this object has line of sight to the specified point.
  */
-bool WorldObject::IsWithinLOS(float ox, float oy, float oz, VMAP::ModelIgnoreFlags ignoreFlags) const
+bool WorldObject::IsWithinLOS(float ox, float oy, float oz, world::terrain::ModelIgnoreFlags ignoreFlags) const
 {
     float x, y, z;
     GetPosition(x, y, z);

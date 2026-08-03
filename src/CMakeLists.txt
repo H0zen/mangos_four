@@ -18,6 +18,11 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
+# Geometry is header-only and sits below everything else: it knows nothing
+# about WoW, so both the server and the offline baker link it.
+add_subdirectory(shared/Geometry)
+add_subdirectory(shared/terrain)
+
 # Build the mangos shared library
 add_subdirectory(shared)
 
@@ -47,9 +52,15 @@ if(BUILD_REALMD)
     add_subdirectory(realmd)
 endif()
 
-# If we want the tools for map/vmap/mmap extraction
-if(BUILD_TOOLS)
+# The client-data parsers are configured whenever the TESTS need them, not only for
+# the tools: mangos_tests links extractor_client and extractor_data and nothing else
+# of the baker. The baker executables themselves stay gated on BUILD_TOOLS, inside.
+if(BUILD_TOOLS OR WITH_TESTS)
     add_subdirectory(tools)
+endif()
+
+if(WITH_TESTS)
+    add_subdirectory(tests)
 endif()
 
 if (BUILD_MANGOSD OR BUILD_REALMD)

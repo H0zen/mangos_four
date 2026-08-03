@@ -68,7 +68,7 @@
 #include "Policies/Singleton.h"
 #include "SharedDefines.h"
 #include "LootMgr.h"
-#include "VMapFactory.h"
+#include "LineOfSightExemptions.h"
 #include "BattleGround/BattleGround.h"
 #include "Util.h"
 #include "Chat.h"
@@ -125,8 +125,7 @@ SpellCastResult Spell::CheckCast(bool strict)
         }
 
     if (m_caster->GetTypeId() == TYPEID_PLAYER && !((Player*)m_caster)->isGameMaster() &&
-        sWorld.getConfig(CONFIG_BOOL_VMAP_INDOOR_CHECK) &&
-        VMAP::VMapFactory::createOrGetVMapManager()->isLineOfSightCalcEnabled())
+        sWorld.getConfig(CONFIG_BOOL_VMAP_INDOOR_CHECK))
     {
         if (m_spellInfo->HasAttribute(SPELL_ATTR_OUTDOORS_ONLY) &&
             !m_caster->GetTerrain()->IsOutdoors(m_caster->GetPositionX(), m_caster->GetPositionY(), m_caster->GetPositionZ()))
@@ -292,7 +291,7 @@ SpellCastResult Spell::CheckCast(bool strict)
                 }
             }
 
-            if (!m_IsTriggeredSpell && !DisableMgr::IsDisabledFor(DISABLE_TYPE_SPELL, m_spellInfo->ID, NULL, SPELL_ATTR_EX2_IGNORE_LOS) && VMAP::VMapFactory::checkSpellForLoS(m_spellInfo->ID) && !m_caster->IsWithinLOSInMap(target, VMAP::ModelIgnoreFlags::M2))
+            if (!m_IsTriggeredSpell && !DisableMgr::IsDisabledFor(DISABLE_TYPE_SPELL, m_spellInfo->ID, NULL, SPELL_ATTR_EX2_IGNORE_LOS) && !LineOfSightExemptions::Has(m_spellInfo->ID) && !m_caster->IsWithinLOSInMap(target, world::terrain::ModelIgnoreFlags::M2))
             {
                 return SPELL_FAILED_LINE_OF_SIGHT;
             }
