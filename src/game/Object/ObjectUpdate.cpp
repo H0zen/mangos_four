@@ -342,6 +342,12 @@ namespace
         addTranslated(UNIT_FIELD_DISPLAYID);
         addTranslated(UNIT_FIELD_NATIVEDISPLAYID);
         addTranslated(UNIT_FIELD_MOUNTDISPLAYID, true);
+        // Emote state, so a player who becomes visible while someone is
+        // already in a state emote sees it. The incremental path only reaches
+        // observers who were present at the moment it changed. Zero is the
+        // default and carries no information here, so it is omitted like the
+        // mount display id above.
+        addTranslated(UNIT_NPC_EMOTESTATE, true);
         // The packed appearance words. These must be in the CREATE, not left
         // to the changed-value path: Object::ClearUpdateMask drops the change
         // flags on entering the world, and PLAYER_BYTES in particular never
@@ -695,6 +701,10 @@ void Object::BuildValuesUpdateBlockForPlayer(UpdateData* data, Player* target) c
             addIfChanged(UNIT_FIELD_DISPLAYID);
             addIfChanged(UNIT_FIELD_NATIVEDISPLAYID);
             addIfChanged(UNIT_FIELD_MOUNTDISPLAYID);
+            // Emote state. Ordered here because the serializer requires
+            // ascending legacy indices and 83 falls between the mount display
+            // id at 65 and PLAYER_FLAGS at 157.
+            addIfChanged(UNIT_NPC_EMOTESTATE);
             // PLAYER_FLAGS_GHOST lives here. Until this was projected the
             // client was never told the character had died, so nothing
             // downstream of death worked: no release dialog, therefore no

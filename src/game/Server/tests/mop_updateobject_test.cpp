@@ -219,6 +219,50 @@ int main(int /*argc*/, char** /*argv*/)
     CHECK(projectedUnitFlags[0].index == 61);
     CHECK(projectedUnitFlags[0].value == 0x00000008u);
 
+    // Emote state. The create projection has always carried this at 89, but
+    // until it was added to the incremental paths a state emote was delivered
+    // once and then frozen: /dance could start and nothing could end it.
+    MopUpdateObject::StaticField const changedEmoteState[] = {
+        { 83, 0x000001E3u }
+    };
+    std::vector<MopUpdateObject::StaticField> projectedEmoteState;
+    MopUpdateObject::TranslateSelfPlayerFields(changedEmoteState, 1,
+        projectedEmoteState);
+    CHECK(projectedEmoteState.size() == 1);
+    CHECK(projectedEmoteState[0].index == 89);
+    CHECK(projectedEmoteState[0].value == 0x000001E3u);
+
+    // AppendStaticValuesNoDynamic asserts that projected indices ascend, so
+    // 83 has to land between the mount display id and PLAYER_FLAGS. Getting
+    // that wrong is a runtime assert, not a wrong pixel.
+    MopUpdateObject::StaticField const changedAroundEmote[] = {
+        { 65, 0x00000010u },
+        { 83, 0x00000000u },
+        { 157, 0x00000020u }
+    };
+    std::vector<MopUpdateObject::StaticField> projectedAroundEmote;
+    MopUpdateObject::TranslateSelfPlayerFields(changedAroundEmote, 3,
+        projectedAroundEmote);
+    CHECK(projectedAroundEmote.size() == 3);
+    CHECK(projectedAroundEmote[0].index == 71);
+    CHECK(projectedAroundEmote[1].index == 89);
+    CHECK(projectedAroundEmote[2].index == 162);
+    // A cleared emote state is the whole point: zero is what ends the loop.
+    CHECK(projectedAroundEmote[1].value == 0x00000000u);
+
+    uint16 lastProjectedIndex = 0;
+    for (size_t i = 0; i < projectedAroundEmote.size(); ++i)
+    {
+        CHECK(i == 0 || projectedAroundEmote[i].index > lastProjectedIndex);
+        lastProjectedIndex = projectedAroundEmote[i].index;
+    }
+
+    // The observer path is a separate table; without it a watcher keeps
+    // rendering the emote after the actor has stopped.
+    uint16 observerEmoteIndex = 0;
+    CHECK(MopUpdateObject::TranslateObserverPlayerIndex(83, observerEmoteIndex));
+    CHECK(observerEmoteIndex == 89);
+
     if (g_failures)
     {
         std::printf("%d FAILURES\n", g_failures);

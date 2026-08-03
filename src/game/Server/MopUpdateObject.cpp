@@ -115,6 +115,9 @@ bool MopUpdateObject::TranslateObserverPlayerIndex(uint16 legacyIndex, uint16& t
         case 63: targetIndex = 69; return true; // display ID
         case 64: targetIndex = 70; return true; // native display ID
         case 65: targetIndex = 71; return true; // mount display ID
+        // Emote state, so an observer sees a state emote end. Without this a
+        // watcher keeps rendering the dance after the dancer has walked away.
+        case 83: targetIndex = 89; return true; // emote state
         // Packed appearance words, all PUBLIC in the legacy layout and all
         // previously dropped here. Facial hair and gender are visible to
         // other players, not just to the owner. See the self projection for
@@ -506,6 +509,14 @@ void MopUpdateObject::TranslateSelfPlayerFields(StaticField const* sourceFields,
             case 63: fields.push_back({ 69, value }); break;
             case 64: fields.push_back({ 70, value }); break;
             case 65: fields.push_back({ 71, value }); break;
+            // Emote state. BuildMopUnitStaticFields maps this to 89 for units,
+            // but no PLAYER path carried it at all - neither the create block
+            // nor either incremental path - so a player's state emote never
+            // reached any client. /dance begins only because the text-emote
+            // path also fires SMSG_EMOTE, and then never ends: every cancel
+            // route, moving and talking alike, writes just this field, and
+            // that write never left the server.
+            case 83: fields.push_back({ 89, value }); break;
             // PLAYER_FLAGS, which carries PLAYER_FLAGS_GHOST. Without it the
             // client is never told the character died: no release dialog, so
             // no CMSG_REPOP_REQUEST, so release and .revive have nothing to
