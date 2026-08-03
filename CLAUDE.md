@@ -11,8 +11,9 @@ later-expansion assumptions.
 
 - **Database changes go in the separate `mangosfour/Database` repo**, not here — as transactional, idempotent
   `Rel##_##_###_*.sql` migrations that chain via `db_version`.
-- Clone/update **recursively**: `dep`, `src/modules/SD3`, `src/modules/Eluna`, `src/realmd` are submodules. Never shallow-update
+- Clone/update **recursively**: `src/modules/SD3` and `src/modules/Eluna` are submodules. Never shallow-update
   a submodule to a non-tip pinned SHA.
+- Two further submodules live here: `dep` (→ `mangos/mangosDeps`) and `src/realmd` (→ `mangos/realmd`).
 - Less-obvious locations: scripting in `src/modules/` (Eluna = Lua, SD3 = C++, Bots = playerbots). The
   `src/game/` tree is under an ongoing **decomp cohesion-split** (large classes like `Player`/`Unit`/`SpellEffects`
   are being broken into topical `*.cpp` files, e.g. `UnitCombat.cpp`, `UnitAura.cpp`,
