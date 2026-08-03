@@ -202,6 +202,11 @@ namespace
         add(6, MopUpdateObject::TranslateUnitDynamicFlagsForViewer(
             dynamicFlags, dynamicFlagView));
         add(7, object.GetUInt32Value(OBJECT_FIELD_SCALE_X));
+        // Current target, as a two-word GUID at CGUnitData::target. Without it
+        // a client cannot show what a creature is attacking, which is what
+        // drives target-of-target on a targeted mob.
+        add(22, object.GetUInt32Value(UNIT_FIELD_TARGET));
+        add(23, object.GetUInt32Value(UNIT_FIELD_TARGET + 1));
         add(30, MopUpdateObject::RepackUnitBytes0(bytes0));
         add(31, (bytes0 >> 24) & 0xFFu);
         add(32, object.GetUInt32Value(UNIT_OVERRIDE_DISPLAY_POWER_ID));
@@ -340,6 +345,12 @@ namespace
         add(1, object.GetUInt32Value(OBJECT_FIELD_GUID + 1));
         add(4, 0x19u); // OBJECT | UNIT | PLAYER
         addTranslated(OBJECT_FIELD_SCALE_X);
+        // Current target, so an observer's UI can show target-of-target and
+        // who is targeting them. Emitted unconditionally: zero is the real
+        // "no target" value and an observer that only saw the create would
+        // otherwise start from whatever the client defaults to.
+        addTranslated(UNIT_FIELD_TARGET);
+        addTranslated(uint16(UNIT_FIELD_TARGET + 1));
         addTranslated(UNIT_FIELD_BYTES_0);
         // Byte 3 of the packed bytes0 word is carried separately at 31, the
         // same split TranslateSelfPlayerFields performs for the owner. The
@@ -552,7 +563,8 @@ void Object::BuildCreateUpdateBlockForPlayer(UpdateData* data, Player* target) c
         }
         else
         {
-            fields.reserve(47);
+            // 49: BuildMopUnitStaticFields emits 47 plus the two target words.
+            fields.reserve(49);
             BuildMopUnitStaticFields(*this, target, fields);
         }
         MopUpdateObject::AppendSimpleLivingCreateBlock(data->GetBuffer(), updateType, guid,

@@ -230,6 +230,18 @@ int main(int /*argc*/, char** /*argv*/)
     CHECK(MopUpdateObject::ProjectPlayerUnitFlags(0x00000000u) == 0x00000000u);
     CHECK(MopUpdateObject::ProjectPlayerUnitFlags(0xFFFFFFFFu) == 0xFFFFFFFEu);
 
+    // Current target, so target-of-target and "who is targeting me" work.
+    // Client 22/23 are CGUnitData::target; the two-word GUID must translate as
+    // a contiguous ascending pair, since SetUInt64Value dirties both words and
+    // the serializer asserts ascending indices.
+    uint16 observerTargetLo = 0;
+    uint16 observerTargetHi = 0;
+    CHECK(MopUpdateObject::TranslateObserverPlayerIndex(20, observerTargetLo));
+    CHECK(MopUpdateObject::TranslateObserverPlayerIndex(21, observerTargetHi));
+    CHECK(observerTargetLo == 22);
+    CHECK(observerTargetHi == 23);
+    CHECK(observerTargetHi == observerTargetLo + 1);
+
     // Stand state / animation tier must reach observers too. Client index 76
     // is CGUnitData::animTier, whose byte 0 is the stand state. Creatures got
     // it; players never did, so a watcher could not see another player sit or

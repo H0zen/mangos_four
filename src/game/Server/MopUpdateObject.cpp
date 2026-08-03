@@ -111,6 +111,15 @@ bool MopUpdateObject::TranslateObserverPlayerIndex(uint16 legacyIndex, uint16& t
     switch (legacyIndex)
     {
         case 7:  targetIndex = 7;  return true; // scale
+        // The current target, as a two-word GUID. Client indices 22/23 are
+        // CGUnitData::target in the 18414 descriptor table. Nothing projected
+        // this before, for players OR creatures, so no client ever learned
+        // what any other unit was targeting - which is why target-of-target
+        // was blank and a player could not see who was targeting them.
+        // SetUInt64Value marks both words changed, so the incremental path
+        // emits the pair together.
+        case 20: targetIndex = 22; return true; // target guid, low
+        case 21: targetIndex = 23; return true; // target guid, high
         case 26: targetIndex = 30; return true; // packed race/class/gender/power
         case 56: targetIndex = 62; return true; // flags2
         case 61: targetIndex = 67; return true; // bounding radius
