@@ -10,7 +10,6 @@
 # Placeholder files for directories needed to be inside git but empty
 !.gitignore
 !.gitattributes
-!.travis.yml
 
 # JetBrains - project settings
 /.idea/
@@ -131,3 +130,9 @@ msbuild.cmd
 
 # File generated during compile
 /dep/libmpq/compile
+
+# Compiler caches. The cache action picks its own directory inside the
+# checkout, so without these the "working tree is clean" guard fails on the
+# cache rather than on a real change.
+.ccache/
+.sccache/
