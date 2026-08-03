@@ -126,28 +126,41 @@ void WorldSession::SendGroupInvite(Player* player, bool alreadyInGroup /*= false
  */
 void WorldSession::HandleGroupInviteOpcode(WorldPacket& recv_data)
 {
-    ObjectGuid guid;
+    MopGroupInvitePackets::Request request;
+    if (!MopGroupInvitePackets::ParseRequest(recv_data, request))
+    {
+        return;
+    }
 
-    recv_data.read_skip<uint32>();      // cross-realm party related
-    recv_data.read_skip<uint32>();      // roles mask?
+    std::string membername = request.targetName;
 
-    recv_data.ReadGuidMask<2, 7>(guid);
-    uint32 realmLength = recv_data.ReadBits(9);
-    recv_data.ReadGuidMask<3>(guid);
-    uint32 nameLength = recv_data.ReadBits(10);
-    recv_data.ReadGuidMask<5, 4, 6, 0, 1>(guid);
+    // Lua InviteUnit refuses a target longer than 48 bytes before it ever
+    // reaches the wire, so a longer one is not something a real client sends.
+    // Applied to the received bytes, ahead of normalisation.
+    if (membername.empty() || membername.size() > 48)
+    {
+        SendPartyResult(PARTY_OP_INVITE, membername, ERR_BAD_PLAYER_NAME_S);
+        return;
+    }
 
-    recv_data.ReadGuidBytes<4, 7, 6>(guid);
-
-    std::string membername = recv_data.ReadString(nameLength);
-    std::string realmname = recv_data.ReadString(realmLength);
-    // TODO before CMSG_GROUP_INVITE is registered: this field is read and then
-    // dropped, so an invite naming a character on another realm would resolve
-    // against a LOCAL character of the same name and invite the wrong player.
-    // Unlike whisper and guild invite, which carry the realm inside the name as
-    // a "-Realm" suffix and strip it (StripHomeRealmSuffix), this packet has its
-    // own realm field and must instead REJECT anything that is neither empty nor
-    // this realm. The opcode is currently unregistered, so it is unreachable.
+    // This packet carries its own realm field rather than the "-Realm" suffix
+    // that whisper and guild invite strip, so there is nothing to strip here.
+    // Accepting a foreign realm would resolve the invite against a LOCAL
+    // character of the same name and invite the wrong player, so anything
+    // that is neither empty nor this realm is rejected. The client sends the
+    // display form, which may contain spaces, so the space-free form is
+    // accepted too.
+    //
+    // request.targetGuid and request.realmSelectorHint are deliberately
+    // unused: they are client-supplied routing hints, and letting either
+    // select a Player would hand the caller a target of their choosing.
+    if (!request.realmName.empty() &&
+        request.realmName != CachedRealmName() &&
+        request.realmName != NormalizeRealmName(CachedRealmName()))
+    {
+        SendPartyResult(PARTY_OP_INVITE, membername, ERR_BAD_PLAYER_NAME_S);
+        return;
+    }
 
     // attempt add selected player
 

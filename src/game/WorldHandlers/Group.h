@@ -171,7 +171,24 @@ namespace MopGroupInvitePackets
         uint32 roles = 0;
     };
 
+    /// A parsed CMSG_GROUP_INVITE body.
+    ///
+    /// Only `targetName` may be acted on. The packed GUID, realm selector and
+    /// role mask are client-supplied routing hints: none of them may select a
+    /// Player, override a name lookup or confer group authority. `realmName`
+    /// exists so the handler can REJECT a cross-realm invite rather than
+    /// silently resolving it against a local character of the same name.
+    struct Request
+    {
+        ObjectGuid targetGuid;
+        uint32 realmSelectorHint = 0;
+        uint32 roleMask = 0;
+        std::string realmName;
+        std::string targetName;
+    };
+
     bool ParseResponse(WorldPacket& in, Response& out);
+    bool ParseRequest(WorldPacket& in, Request& out);
 }
 
 namespace MopGroupMarkerPackets

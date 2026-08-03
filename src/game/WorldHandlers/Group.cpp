@@ -108,6 +108,131 @@ bool MopGroupInvitePackets::ParseResponse(WorldPacket& in, Response& out)
     return true;
 }
 
+bool MopGroupInvitePackets::ParseRequest(WorldPacket& in, Request& out)
+{
+    // Build 18414 writer sub_66CBDC (Wow.exe.c:883281-883356). Fixed head is
+    // a uint32 realm-selector hint, the 0x7F marker and a uint32 role mask.
+    // Then an MSB-first packed header: guid[7], a 9-bit realm length,
+    // guid[3], a 9-bit target length, guid[2,5,4,0,1,6], six zero padding
+    // bits. The byte-aligned tail is guid[7,6,0,4], the realm string,
+    // guid[1,2,3], the target string, guid[5]. Neither string is terminated.
+    //
+    // The client writes both lengths as (len >> 1) in eight bits followed by
+    // (len & 1) in one, which is simply a nine-bit big-endian length. The
+    // legacy reader took the target length as ten bits, read the mask in a
+    // different order, skipped uint32+uint32 instead of uint32+uint8+uint32
+    // and read the target before the realm, so it could not decode even the
+    // ordinary twenty-byte body.
+    auto fail = [&in]()
+    {
+        in.rfinish();
+        return false;
+    };
+
+    // uint32 + uint8 + uint32 + the four packed header bytes
+    if (in.rpos() != 0 || in.size() - in.rpos() < 13)
+    {
+        return fail();
+    }
+
+    Request parsed;
+    uint8 marker = 0;
+    in >> parsed.realmSelectorHint;
+    in >> marker;
+    if (marker != 0x7F)
+    {
+        return fail();
+    }
+    in >> parsed.roleMask;
+
+    bool present[8] = { false };
+    present[7] = in.ReadBit();
+    uint32 const realmLength = in.ReadBits(9);
+    present[3] = in.ReadBit();
+    uint32 const targetLength = in.ReadBits(9);
+    present[2] = in.ReadBit();
+    present[5] = in.ReadBit();
+    present[4] = in.ReadBit();
+    present[0] = in.ReadBit();
+    present[1] = in.ReadBit();
+    present[6] = in.ReadBit();
+    uint8 const padding = uint8(in.ReadBits(6));
+    in.ResetBitReader();
+    if (padding != 0)
+    {
+        return fail();
+    }
+
+    size_t presentCount = 0;
+    for (size_t i = 0; i < 8; ++i)
+    {
+        if (present[i])
+        {
+            ++presentCount;
+        }
+    }
+
+    // Exact tail. Both declared lengths are bounded by this equality, so a
+    // huge length cannot over-read; it simply fails to match.
+    if (in.size() - in.rpos() != presentCount + realmLength + targetLength)
+    {
+        return fail();
+    }
+
+    uint8 bytes[8] = { 0 };
+    bool canonical = true;
+    auto readGuidByte = [&in, &present, &bytes, &canonical](uint8 index)
+    {
+        if (!present[index])
+        {
+            return;
+        }
+        uint8 raw = 0;
+        in >> raw;
+        // WriteByteSeq emits (value ^ 1) for a present byte, so a raw one
+        // would decode to zero and contradict its own presence bit.
+        if (raw == 1)
+        {
+            canonical = false;
+        }
+        bytes[index] = raw ^ 1;
+    };
+
+    readGuidByte(7);
+    readGuidByte(6);
+    readGuidByte(0);
+    readGuidByte(4);
+    parsed.realmName = in.ReadString(realmLength);
+    readGuidByte(1);
+    readGuidByte(2);
+    readGuidByte(3);
+    parsed.targetName = in.ReadString(targetLength);
+    readGuidByte(5);
+
+    if (!canonical || in.rpos() != in.size())
+    {
+        return fail();
+    }
+
+    // An embedded NUL would truncate every downstream comparison and let two
+    // different wire bodies resolve to the same name.
+    if (parsed.realmName.find('\0') != std::string::npos ||
+        parsed.targetName.find('\0') != std::string::npos)
+    {
+        return fail();
+    }
+
+    uint64 rawGuid = 0;
+    for (size_t i = 0; i < 8; ++i)
+    {
+        rawGuid |= uint64(bytes[i]) << (i * 8);
+    }
+    parsed.targetGuid = ObjectGuid(rawGuid);
+
+    out = parsed;
+    return true;
+}
+
 //===================================================
 //============== Roll ===============================
 //===================================================

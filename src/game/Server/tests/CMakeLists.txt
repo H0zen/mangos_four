@@ -272,6 +272,23 @@ if(WIN32)
         "PATH=path_list_prepend:${MOP_GROUP_INVITE_MYSQL_RUNTIME_DIR};PATH=path_list_prepend:$<TARGET_FILE_DIR:lualib>")
 endif()
 
+add_executable(mop_group_invite_request_packets_test
+    mop_group_invite_request_packets_test.cpp)
+target_include_directories(mop_group_invite_request_packets_test PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}/..
+    ${CMAKE_SOURCE_DIR}/src/shared)
+set_target_properties(mop_group_invite_request_packets_test PROPERTIES
+    CXX_STANDARD 17 CXX_STANDARD_REQUIRED ON)
+target_link_libraries(mop_group_invite_request_packets_test PRIVATE game)
+add_test(NAME mop_group_invite_request_packets
+    COMMAND mop_group_invite_request_packets_test)
+if(WIN32)
+    get_filename_component(MOP_GROUP_INVITE_REQUEST_MYSQL_RUNTIME_DIR "${MySQL_LIBRARY}" DIRECTORY)
+    set_tests_properties(mop_group_invite_request_packets PROPERTIES
+        ENVIRONMENT_MODIFICATION
+        "PATH=path_list_prepend:${MOP_GROUP_INVITE_REQUEST_MYSQL_RUNTIME_DIR};PATH=path_list_prepend:$<TARGET_FILE_DIR:lualib>")
+endif()
+
 add_executable(mop_auction_packets_test mop_auction_packets_test.cpp)
 target_include_directories(mop_auction_packets_test PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/..
