@@ -9,7 +9,7 @@ this repo. Humans: also read [`doc/CodingStandard.md`](doc/CodingStandard.md).
 **18414**. Compatibility target is **5.4.8 only**; do **not** introduce 6.x/Warlords of Draenor or
 later-expansion assumptions.
 
-- **Database changes go in the separate `mangosfour/Database` repo**, not here — as transactional, idempotent
+- **Database changes go in the separate `mangosfour/database` repo**, not here — as transactional, idempotent
   `Rel##_##_###_*.sql` migrations that chain via `db_version`.
 - Clone/update **recursively**: `src/modules/SD3` and `src/modules/Eluna` are submodules. Never shallow-update
   a submodule to a non-tip pinned SHA.
@@ -69,9 +69,31 @@ world/map-update threads never block on console I/O. Two rules follow:
 Recommended runtime mode: `LogLevel=1` (quiet console) + `LogFileLevel=3` (buffered full file). Packet
 logging is opt-in via `PacketLoggingEnabled` (off by default).
 
+## MoP 5.4.8 wire specifics
+
+Three build-18414 rules that are invisible from the code alone and each cause silent, hard-to-diagnose
+failures:
+
+- **Update fields are re-indexed for the client.** `src/game/Object/ObjectUpdate.cpp` maps engine field
+  constants to 18414 client indices (`UNIT_NPC_EMOTESTATE` → 89, `UNIT_FIELD_HOVERHEIGHT` → 154). Setting a
+  field the client cares about without adding it to that projection means the value never reaches the client,
+  even though `SetUInt32Value` succeeded and the server state is correct.
+- **`IsEnterWorldConverted` is the send gate, not `DefS`/`DefC`.** `WorldSession::SendPacket` drops any opcode
+  missing from that switch while `m_suppressWorldSends` is raised. `DefS`/`DefC` in `Opcodes.cpp` is **logging
+  metadata only** — it names a packet in the log, it does not admit it. An unadmitted packet is built, silently
+  dropped, and the command still reports success.
+- **CMSG and SMSG are separate opcode number spaces.** The same value legitimately means different things per
+  direction — `0x09D3` is both `CMSG_MOVE_GRAVITY_DISABLE_ACK` and `SMSG_SET_PCT_SPELL_MODIFIER`. Always join
+  on numeric value **and** direction; matching on value alone invents bugs that do not exist.
+
+When establishing a packet layout, the client binary outranks decoded payload bytes, which outrank corpus
+aggregates, which outrank reference forks. A fork value is a hypothesis, never a conclusion. Payload length
+proves only `1 + popcount(mask)` for a bit-packed body — it cannot distinguish byte order, so a layout is only
+verified by a byte-exact fixture built from a real captured body.
+
 ## Review focus (for `@claude`)
 
 Prioritise: **(1)** correctness/safety in `src/game/` handlers and anything touching live world/DB state;
 **(2)** coding-standard conformance above; **(3)** build/CI impact (GCC *and* Clang, Windows/AppVeyor); **(4)**
-DB-migration correctness (use the `mangosfour/Database` pattern). Keep feedback concrete and minimal-diff; flag
+DB-migration correctness (use the `mangosfour/database` pattern). Keep feedback concrete and minimal-diff; flag
 correctness/standard issues, not style preferences the standard doesn't cover.
