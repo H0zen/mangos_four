@@ -5,13 +5,15 @@ this repo. Humans: also read [`doc/CodingStandard.md`](doc/CodingStandard.md).
 
 ## Project
 
-**MangosThree** — The Cataclysm World of Warcraft **4.3.4** server (C++, MySQL/MariaDB). Compatibility
-target is **4.3.4 only**; do **not** introduce 5.x/MoP or later-expansion assumptions.
+**MangosFour** — The Mists of Pandaria World of Warcraft **5.4.8** server (C++, MySQL/MariaDB), client build
+**18414**. Compatibility target is **5.4.8 only**; do **not** introduce 6.x/Warlords of Draenor or
+later-expansion assumptions.
 
-- **Database changes go in the separate `mangosthree/database` repo**, not here — as transactional, idempotent
+- **Database changes go in the separate `mangosfour/Database` repo**, not here — as transactional, idempotent
   `Rel##_##_###_*.sql` migrations that chain via `db_version`.
 - Clone/update **recursively**: `src/modules/SD3` and `src/modules/Eluna` are submodules. Never shallow-update
   a submodule to a non-tip pinned SHA.
+- Two further submodules live here: `dep` (→ `mangos/mangosDeps`) and `src/realmd` (→ `mangos/realmd`).
 - Less-obvious locations: scripting in `src/modules/` (Eluna = Lua, SD3 = C++, Bots = playerbots). The
   `src/game/` tree is under an ongoing **decomp cohesion-split** (large classes like `Player`/`Unit`/`SpellEffects`
   are being broken into topical `*.cpp` files, e.g. `UnitCombat.cpp`, `UnitAura.cpp`,
@@ -24,13 +26,14 @@ target is **4.3.4 only**; do **not** introduce 5.x/MoP or later-expansion assump
 (Linux/macOS/BSD) or MSVC ≥ 2015 (Windows). The exact flags CI builds with:
 
 ```sh
-git clone --recursive https://github.com/mangosthree/server.git && cd server
+git clone --recursive https://github.com/mangosfour/server.git && cd server
 sudo apt-get install -y git cmake make build-essential \
   libssl-dev libbz2-dev default-libmysqlclient-dev libreadline-dev   # Debian/Ubuntu deps
 mkdir -p _build _install && cd _build
 cmake .. -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX=../_install \
   -DBUILD_TOOLS=1 -DBUILD_MANGOSD=1 -DBUILD_REALMD=1 -DSOAP=1 \
   -DSCRIPT_LIB_ELUNA=1 -DSCRIPT_LIB_SD3=1 -DPLAYERBOTS=0 \
+  -DWITH_TESTS=1 -DWITH_NET_TESTS=0 \
   -DPCH=0
 make -j"$(nproc)" && make install -j"$(nproc)"
 ```
@@ -49,8 +52,6 @@ Source of truth: [`doc/CodingStandard.md`](doc/CodingStandard.md). Non-default r
   not de-brace existing ones. (Exception: do not brace `switch`/`case` bodies.)
 - **One space before `(`, none inside**: `if (x)`, not `if( x )`.
 - Doxygen: `///` above a member, `///<` trailing, `/** ... */` multi-line.
-- Some `.cpp`/`.h` carry **Windows-1252** bytes (e.g. `Map.cpp`); preserve them byte-for-byte. Tools that
-  re-encode to UTF-8 corrupt non-ASCII bytes — use byte-preserving edits and check `git diff` after.
 
 ## Logging
 
@@ -71,7 +72,6 @@ logging is opt-in via `PacketLoggingEnabled` (off by default).
 ## Review focus (for `@claude`)
 
 Prioritise: **(1)** correctness/safety in `src/game/` handlers and anything touching live world/DB state;
-**(2)** coding-standard conformance above (including the Windows-1252 byte-preservation rule); **(3)** build/CI
-impact (GCC *and* Clang, Windows/AppVeyor); **(4)** DB-migration correctness (use the `mangosthree/database`
-pattern). Keep feedback concrete and minimal-diff; flag correctness/standard issues, not style preferences
-the standard doesn't cover.
+**(2)** coding-standard conformance above; **(3)** build/CI impact (GCC *and* Clang, Windows/AppVeyor); **(4)**
+DB-migration correctness (use the `mangosfour/Database` pattern). Keep feedback concrete and minimal-diff; flag
+correctness/standard issues, not style preferences the standard doesn't cover.
