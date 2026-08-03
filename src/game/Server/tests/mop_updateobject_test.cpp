@@ -219,6 +219,17 @@ int main(int /*argc*/, char** /*argv*/)
     CHECK(projectedUnitFlags[0].index == 61);
     CHECK(projectedUnitFlags[0].value == 0x00000008u);
 
+    // Unit flags must reach OBSERVERS too, or another player's combat, stun,
+    // fear and silence state never updates after they come into view. The
+    // value has to go through the same projection as the self path: bit 0 is
+    // Four's internal GM mode and must not leak to other players.
+    uint16 observerFlagsIndex = 0;
+    CHECK(MopUpdateObject::TranslateObserverPlayerIndex(55, observerFlagsIndex));
+    CHECK(observerFlagsIndex == 61);
+    CHECK(MopUpdateObject::ProjectPlayerUnitFlags(0x00000009u) == 0x00000008u);
+    CHECK(MopUpdateObject::ProjectPlayerUnitFlags(0x00000000u) == 0x00000000u);
+    CHECK(MopUpdateObject::ProjectPlayerUnitFlags(0xFFFFFFFFu) == 0xFFFFFFFEu);
+
     // Emote state. The create projection has always carried this at 89, but
     // until it was added to the incremental paths a state emote was delivered
     // once and then frozen: /dance could start and nothing could end it.

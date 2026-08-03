@@ -320,6 +320,10 @@ namespace
             {
                 value = MopUpdateObject::RepackUnitBytes0(value);
             }
+            else if (sourceIndex == UNIT_FIELD_FLAGS)
+            {
+                value = MopUpdateObject::ProjectPlayerUnitFlags(value);
+            }
             if (!omitZero || value != 0)
             {
                 fields.push_back({ targetIndex, value });
@@ -339,6 +343,12 @@ namespace
         {
             addTranslated(uint16(UNIT_VIRTUAL_ITEM_SLOT_ID + i), true);
         }
+        // Unit flags, so an observer sees another player's combat, stun,
+        // fear and silence state. Emitted unconditionally: zero is a real
+        // value here (a player standing idle out of combat), and an observer
+        // that only ever saw the create would otherwise start from whatever
+        // the client defaults to rather than from the truth.
+        addTranslated(UNIT_FIELD_FLAGS);
         addTranslated(UNIT_FIELD_DISPLAYID);
         addTranslated(UNIT_FIELD_NATIVEDISPLAYID);
         addTranslated(UNIT_FIELD_MOUNTDISPLAYID, true);
@@ -820,6 +830,10 @@ void Object::BuildValuesUpdateBlockForPlayer(UpdateData* data, Player* target) c
             if (i == UNIT_FIELD_BYTES_0)
             {
                 value = MopUpdateObject::RepackUnitBytes0(value);
+            }
+            else if (i == UNIT_FIELD_FLAGS)
+            {
+                value = MopUpdateObject::ProjectPlayerUnitFlags(value);
             }
             fields.push_back({ targetIndex, value });
         }

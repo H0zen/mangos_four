@@ -43,13 +43,6 @@ namespace
 
     inline uint32 FloatBits(float f) { uint32 u; std::memcpy(&u, &f, 4); return u; }
 
-    uint32 ProjectSelfUnitFlags(uint32 flags)
-    {
-        // Four uses bit 0 internally for GM mode. The 18414 client treats it
-        // as server-controlled and refuses to attach that player to an
-        // MO_TRANSPORT, so keep the server state but omit the client flag.
-        return flags & ~MopUnitFlagServerControlled;
-    }
 
     // Classic pack-guid (mask byte + present bytes), as used in the CREATE preamble.
     void AppendPackedGuid(ByteBuffer& out, uint64 guid)
@@ -112,6 +105,16 @@ bool MopUpdateObject::TranslateObserverPlayerIndex(uint16 legacyIndex, uint16& t
         case 52: targetIndex = 58; return true; // virtual item 1
         case 53: targetIndex = 59; return true; // virtual item 2
         case 54: targetIndex = 60; return true; // virtual item 3
+        // Unit flags. 61 is CGUnitData::flags in the client's own descriptor
+        // table, and a player object is CGUnitData-derived, so the client
+        // reads it at the same index for a player as for a creature - which
+        // the unit projection at ObjectUpdate.cpp already relies on. Without
+        // this an observer never learns another player entered or left
+        // combat, was stunned, feared or silenced: nothing else carries
+        // those bits, and the observer create block omitted them too.
+        // Callers MUST pass the value through ProjectPlayerUnitFlags so a
+        // GM's internal bit 0 does not leak to other players.
+        case 55: targetIndex = 61; return true; // unit flags
         case 63: targetIndex = 69; return true; // display ID
         case 64: targetIndex = 70; return true; // native display ID
         case 65: targetIndex = 71; return true; // mount display ID
@@ -134,6 +137,14 @@ uint32 MopUpdateObject::RepackUnitBytes0(uint32 legacyBytes0)
     return (legacyBytes0 & 0x0000FFFFu) |
         ((legacyBytes0 & 0xFF000000u) >> 8) |
         ((legacyBytes0 & 0x00FF0000u) << 8);
+}
+
+uint32 MopUpdateObject::ProjectPlayerUnitFlags(uint32 legacyFlags)
+{
+    // Four uses bit 0 internally for GM mode. The 18414 client treats it
+    // as server-controlled and refuses to attach that player to an
+    // MO_TRANSPORT, so keep the server state but omit the client flag.
+    return legacyFlags & ~MopUnitFlagServerControlled;
 }
 
 uint32 MopUpdateObject::TranslateUnitDynamicFlags(uint32 legacyFlags)
@@ -503,7 +514,7 @@ void MopUpdateObject::TranslateSelfPlayerFields(StaticField const* sourceFields,
             case 34: fields.push_back({ 39, value }); break;
             case 50: fields.push_back({ 55, value }); break;
             case 51: fields.push_back({ 57, value }); break;
-            case 55: fields.push_back({ 61, ProjectSelfUnitFlags(value) }); break;
+            case 55: fields.push_back({ 61, ProjectPlayerUnitFlags(value) }); break;
             case 61: fields.push_back({ 67, value }); break;
             case 62: fields.push_back({ 68, value }); break;
             case 63: fields.push_back({ 69, value }); break;
@@ -902,7 +913,7 @@ void MopUpdateObject::AppendSelfCreateBlock(ByteBuffer& out, const SelfPlayer& e
         { 44, e.maxPower[4] },                  // UNIT_FIELD_MAXPOWER5 (+0x24)
         { 55, uint32(e.level) },                // UNIT_FIELD_LEVEL (+0x2F)
         { 57, e.faction },                      // UNIT_FIELD_FACTION_TEMPLATE (+0x31)
-        { 61, ProjectSelfUnitFlags(e.unitFlags) }, // UNIT_FIELD_FLAGS (+0x35)
+        { 61, ProjectPlayerUnitFlags(e.unitFlags) }, // UNIT_FIELD_FLAGS (+0x35)
         { 67, FloatBits(e.boundingRadius) },    // UNIT_FIELD_BOUNDING_RADIUS (+0x3B)
         { 68, FloatBits(e.combatReach) },       // UNIT_FIELD_COMBAT_REACH (+0x3C)
         { 69, e.displayId },                    // UNIT_FIELD_DISPLAY_ID (+0x3D)

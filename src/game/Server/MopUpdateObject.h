@@ -160,6 +160,13 @@ namespace MopUpdateObject
     /// [race,class,power,gender] layout.
     uint32 RepackUnitBytes0(uint32 legacyBytes0);
 
+    /// Project a PLAYER's legacy unit flags into the 18414 client view. Four
+    /// uses bit 0 internally for GM mode; the client treats that bit as
+    /// server-controlled and will not attach the unit to an MO_TRANSPORT, so
+    /// it is withheld. Used by the self and observer paths alike - a GM's
+    /// internal state must not leak to other players either.
+    uint32 ProjectPlayerUnitFlags(uint32 legacyFlags);
+
     /// Translate the eight defined legacy Unit dynamic flags past the 18414
     /// DISABLE_CLIENT_SIDE bit. Unknown legacy bits are deliberately dropped.
     uint32 TranslateUnitDynamicFlags(uint32 legacyFlags);
