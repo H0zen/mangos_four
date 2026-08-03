@@ -43,6 +43,7 @@
  */
 
 #include "ObjectMgr.h"                                      // for normalizePlayerName
+#include "World.h"                                          // for StripHomeRealmSuffix
 #include "ChannelMgr.h"
 
 /**
@@ -175,6 +176,10 @@ void WorldSession::HandleChannelSetOwnerOpcode(WorldPacket& recvPacket)
     newp = recvPacket.ReadString(nameLen);
     channelname = recvPacket.ReadString(channelLen);
 
+    // Channel moderation targets are usually clicked, not typed, so the
+    // client supplies "Name-Realm". Strip our realm before the lookup.
+    StripHomeRealmSuffix(newp);
+
     if (!normalizePlayerName(newp))
     {
         return;
@@ -222,6 +227,10 @@ void WorldSession::HandleChannelModeratorOpcode(WorldPacket& recvPacket)
     otp = recvPacket.ReadString(nameLen);
     channelname = recvPacket.ReadString(channelLen);
 
+    // Channel moderation targets are usually clicked, not typed, so the
+    // client supplies "Name-Realm". Strip our realm before the lookup.
+    StripHomeRealmSuffix(otp);
+
     if (!normalizePlayerName(otp))
     {
         return;
@@ -250,6 +259,10 @@ void WorldSession::HandleChannelUnmoderatorOpcode(WorldPacket& recvPacket)
     nameLen = recvPacket.ReadBits(7);
     otp = recvPacket.ReadString(nameLen);
     channelname = recvPacket.ReadString(channelLen);
+
+    // Channel moderation targets are usually clicked, not typed, so the
+    // client supplies "Name-Realm". Strip our realm before the lookup.
+    StripHomeRealmSuffix(otp);
 
     if (!normalizePlayerName(otp))
     {
@@ -280,6 +293,10 @@ void WorldSession::HandleChannelMuteOpcode(WorldPacket& recvPacket)
     otp = recvPacket.ReadString(nameLen);
     channelname = recvPacket.ReadString(channelLen);
 
+    // Channel moderation targets are usually clicked, not typed, so the
+    // client supplies "Name-Realm". Strip our realm before the lookup.
+    StripHomeRealmSuffix(otp);
+
     if (!normalizePlayerName(otp))
     {
         return;
@@ -308,6 +325,10 @@ void WorldSession::HandleChannelUnmuteOpcode(WorldPacket& recvPacket)
     nameLen = recvPacket.ReadBits(7);
     otp = recvPacket.ReadString(nameLen);
     channelname = recvPacket.ReadString(channelLen);
+
+    // Channel moderation targets are usually clicked, not typed, so the
+    // client supplies "Name-Realm". Strip our realm before the lookup.
+    StripHomeRealmSuffix(otp);
 
     if (!normalizePlayerName(otp))
     {
@@ -338,6 +359,10 @@ void WorldSession::HandleChannelInviteOpcode(WorldPacket& recvPacket)
     otp = recvPacket.ReadString(nameLen);
     channelname = recvPacket.ReadString(channelLen);
 
+    // Channel moderation targets are usually clicked, not typed, so the
+    // client supplies "Name-Realm". Strip our realm before the lookup.
+    StripHomeRealmSuffix(otp);
+
     if (!normalizePlayerName(otp))
     {
         return;
@@ -366,6 +391,10 @@ void WorldSession::HandleChannelKickOpcode(WorldPacket& recvPacket)
     nameLen = recvPacket.ReadBits(7);
     channelname = recvPacket.ReadString(channelLen);
     otp = recvPacket.ReadString(nameLen);
+
+    // Channel moderation targets are usually clicked, not typed, so the
+    // client supplies "Name-Realm". Strip our realm before the lookup.
+    StripHomeRealmSuffix(otp);
 
     if (!normalizePlayerName(otp))
     {
@@ -396,6 +425,10 @@ void WorldSession::HandleChannelBanOpcode(WorldPacket& recvPacket)
     otp = recvPacket.ReadString(nameLen);
     channelname = recvPacket.ReadString(channelLen);
 
+    // Channel moderation targets are usually clicked, not typed, so the
+    // client supplies "Name-Realm". Strip our realm before the lookup.
+    StripHomeRealmSuffix(otp);
+
     if (!normalizePlayerName(otp))
     {
         return;
@@ -424,6 +457,10 @@ void WorldSession::HandleChannelUnbanOpcode(WorldPacket& recvPacket)
     channelLen = recvPacket.ReadBits(8);
     otp = recvPacket.ReadString(nameLen);
     channelname = recvPacket.ReadString(channelLen);
+
+    // Channel moderation targets are usually clicked, not typed, so the
+    // client supplies "Name-Realm". Strip our realm before the lookup.
+    StripHomeRealmSuffix(otp);
 
     if (!normalizePlayerName(otp))
     {

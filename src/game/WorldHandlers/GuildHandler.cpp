@@ -789,6 +789,10 @@ void WorldSession::HandleGuildLeaderOpcode(WorldPacket& recvPacket)
 
     Player* oldLeader = GetPlayer();
 
+    // Promoting from the guild roster hands us "Name-Realm"; same strip the
+    // guild INVITE path above already performs.
+    StripHomeRealmSuffix(name);
+
     if (!normalizePlayerName(name))
     {
         return;

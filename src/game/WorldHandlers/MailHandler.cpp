@@ -169,6 +169,15 @@ void WorldSession::HandleSendMail(WorldPacket& recv_data)
         return;
     }
 
+    // The 18414 client appends "-Realm" to a recipient it did not get typed by
+    // hand - a reply, a chat link, a who-list or guild-roster click - so
+    // "Gregory-Four" arrives on the wire and never resolves. Strip our own
+    // realm before normalising, exactly as whisper and guild invite do. A
+    // foreign realm survives the strip and correctly falls through to
+    // MAIL_ERR_RECIPIENT_NOT_FOUND rather than silently delivering to a local
+    // character who happens to share the name.
+    StripHomeRealmSuffix(request.receiver);
+
     ObjectGuid rc;
     if (normalizePlayerName(request.receiver))
         rc = sObjectMgr.GetPlayerGuidByName(request.receiver);

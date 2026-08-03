@@ -1092,6 +1092,9 @@ ObjectGuid ChatHandler::ExtractGuidFromLink(char** text)
         case GUID_LINK_PLAYER:
         {
             std::string name = idS;
+            // An Hplayer shift-click link carries the home-realm suffix, so
+            // this is not purely hand-typed input.
+            StripHomeRealmSuffix(name);
             if (!normalizePlayerName(name))
             {
                 return ObjectGuid();
@@ -1207,6 +1210,8 @@ bool ChatHandler::ExtractLocationFromLink(char** text, uint32& mapid, float& x, 
         case LOCATION_LINK_PLAYER:
         {
             std::string name = idS;
+            // As above: a shift-click player link is realm-qualified.
+            StripHomeRealmSuffix(name);
             if (!normalizePlayerName(name))
             {
                 return false;
@@ -1448,6 +1453,8 @@ std::string ChatHandler::ExtractPlayerNameFromLink(char** text)
     }
 
     std::string name = name_str;
+    // Extracted straight out of an Hplayer link, so realm-qualified.
+    StripHomeRealmSuffix(name);
     if (!normalizePlayerName(name))
     {
         return "";

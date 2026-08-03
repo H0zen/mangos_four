@@ -426,6 +426,11 @@ void WorldSession::HandleGroupUninviteOpcode(WorldPacket& recv_data)
     std::string membername;
     recv_data >> membername;
 
+    // Unlike the invite request, this packet carries no separate realm field,
+    // so a name that came from a click rather than the keyboard arrives as
+    // "Name-Realm" and must be stripped before the lookup.
+    StripHomeRealmSuffix(membername);
+
     // player not found
     if (!normalizePlayerName(membername))
     {
