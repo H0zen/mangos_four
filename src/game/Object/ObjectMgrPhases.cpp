@@ -27,6 +27,7 @@
 
 #include "Database/DatabaseEnv.h"
 #include "Log.h"
+#include "SQLStorages.h"
 
 namespace
 {
