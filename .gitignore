@@ -10,7 +10,6 @@
 # Placeholder files for directories needed to be inside git but empty
 !.gitignore
 !.gitattributes
-!.travis.yml
 
 # JetBrains - project settings
 /.idea/
