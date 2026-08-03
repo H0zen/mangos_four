@@ -330,13 +330,35 @@ namespace
             }
         };
 
+        // Object block: only guid, type and scale. m_data (2/3), m_entryID (5)
+        // and m_dynamicFlags (6) are deliberately NOT sent - the player's own
+        // self create does not carry them either, there is no corresponding
+        // incremental translation (so a guild change would go stale), index 5
+        // is zero for players, and index 6 has viewer-relative semantics that
+        // this builder cannot evaluate.
         add(0, object.GetUInt32Value(OBJECT_FIELD_GUID));
         add(1, object.GetUInt32Value(OBJECT_FIELD_GUID + 1));
         add(4, 0x19u); // OBJECT | UNIT | PLAYER
         addTranslated(OBJECT_FIELD_SCALE_X);
         addTranslated(UNIT_FIELD_BYTES_0);
+        // Byte 3 of the packed bytes0 word is carried separately at 31, the
+        // same split TranslateSelfPlayerFields performs for the owner. The
+        // observer incremental path emits both 30 and 31 for a change to this
+        // source, so a power-type change does not leave 31 stale.
+        add(31, (object.GetUInt32Value(UNIT_FIELD_BYTES_0) >> 24) & 0xFFu);
         addTranslated(UNIT_FIELD_HEALTH);
+        // Powers and max powers. The creature create and the player's own self
+        // create have always carried these; the observer create did not, which
+        // left a watcher with no power values for a targeted player.
+        for (uint16 i = 0; i < 5; ++i)
+        {
+            addTranslated(uint16(UNIT_FIELD_POWER1 + i));
+        }
         addTranslated(UNIT_FIELD_MAXHEALTH);
+        for (uint16 i = 0; i < 5; ++i)
+        {
+            addTranslated(uint16(UNIT_FIELD_MAXPOWER1 + i));
+        }
         addTranslated(UNIT_FIELD_LEVEL);
         addTranslated(UNIT_FIELD_FACTIONTEMPLATE);
         for (uint16 i = 0; i < 3; ++i)
@@ -349,15 +371,48 @@ namespace
         // that only ever saw the create would otherwise start from whatever
         // the client defaults to rather than from the truth.
         addTranslated(UNIT_FIELD_FLAGS);
+        // flags2 carries genuinely visible state such as feign death and
+        // transforms, and is already in updateVisualBits.
+        //
+        // Deliberately NOT sent alongside it:
+        //  - 63 auraState is viewer-relative. The creature projection masks
+        //    AURA_STATE_CONFLAGRATE for viewers who are not the relevant
+        //    caster; this builder has no target and would send the raw word.
+        //  - 64/65 attack timers are stored as FLOAT (Player uses
+        //    SetFloatValue), so reading them as uint32 here would ship the
+        //    IEEE-754 bit pattern rather than milliseconds. The creature path
+        //    converts explicitly; until that conversion and a proven need
+        //    exist, they stay out.
+        //  - 66 ranged attack time is classified PRIVATE.
+        addTranslated(UNIT_FIELD_FLAGS_2);
+        // Model geometry. Both the creature create and the owner's own create
+        // carry these; without them a watcher has no bounding radius or combat
+        // reach for the player it is rendering.
+        addTranslated(UNIT_FIELD_BOUNDINGRADIUS);
+        addTranslated(UNIT_FIELD_COMBATREACH);
         addTranslated(UNIT_FIELD_DISPLAYID);
         addTranslated(UNIT_FIELD_NATIVEDISPLAYID);
         addTranslated(UNIT_FIELD_MOUNTDISPLAYID, true);
-        // Emote state, so a player who becomes visible while someone is
-        // already in a state emote sees it. The incremental path only reaches
-        // observers who were present at the moment it changed. Zero is the
-        // default and carries no information here, so it is omitted like the
-        // mount display id above.
-        addTranslated(UNIT_NPC_EMOTESTATE, true);
+        // Stand state and animation tier. Emitted unconditionally because zero
+        // is the ordinary standing value and an observer that never received
+        // it renders the player from whatever the client defaults to. Without
+        // this a watcher cannot see another player sit, kneel, or hold a
+        // looping state emote - the emote state at 89 below arrives correctly
+        // but the client will not play it.
+        addTranslated(UNIT_FIELD_BYTES_1);
+        // Emote state is deliberately NOT sent here.
+        //
+        // The 18414 client starts a player state-emote animation from a change
+        // to this field, not from its initial create value. Carrying it in the
+        // create seeds the client's cached value, after which every later
+        // update repeats the same number and is a no-op - which is why sending
+        // it again, in the same packet or a later one, never made the player
+        // animate. GridNotifiers sends it as a standalone update immediately
+        // after this create instead, so the client observes a real 0 -> N
+        // transition. See VisibleNotifier::Notify.
+        //
+        // Creatures are unaffected: BuildMopUnitStaticFields still carries the
+        // field, and a creature create demonstrably does animate.
         // The packed appearance words. These must be in the CREATE, not left
         // to the changed-value path: Object::ClearUpdateMask drops the change
         // flags on entering the world, and PLAYER_BYTES in particular never
@@ -829,9 +884,17 @@ void Object::BuildValuesUpdateBlockForPlayer(UpdateData* data, Player* target) c
             uint32 value = m_uint32Values[i];
             if (i == UNIT_FIELD_BYTES_0)
             {
-                value = MopUpdateObject::RepackUnitBytes0(value);
+                // The packed word splits across two client indices. The create
+                // seeds both 30 and 31, so the incremental must maintain both
+                // or a power-type change (SetPowerType writes byte 3 of this
+                // same source) would leave 31 permanently stale for observers.
+                // Pushed in ascending order: AppendStaticValuesNoDynamic
+                // asserts that projected indices ascend.
+                fields.push_back({ 30, MopUpdateObject::RepackUnitBytes0(value) });
+                fields.push_back({ 31, (value >> 24) & 0xFFu });
+                continue;
             }
-            else if (i == UNIT_FIELD_FLAGS)
+            if (i == UNIT_FIELD_FLAGS)
             {
                 value = MopUpdateObject::ProjectPlayerUnitFlags(value);
             }

@@ -37,6 +37,7 @@
 #include "QuestDef.h"
 #include "GossipDef.h"
 #include "UpdateData.h"
+#include "MopUpdateObject.h"
 #include "Channel.h"
 #include "ChannelMgr.h"
 #include "MapManager.h"
@@ -259,6 +260,88 @@ void Player::UpdateVisibilityOf(WorldObject const* viewPoint, WorldObject* targe
                 SendAurasForTarget((Unit*)target);
                 ((Unit*)target)->SendCurrentSplineTo(this);
             }
+
+            // Same reasoning as the bulk path below: queue rather than send
+            // inline, so the emote reaches the client as a standalone packet
+            // on a later tick.
+            if (target != this && target->GetTypeId() == TYPEID_PLAYER &&
+                target->GetUInt32Value(UNIT_NPC_EMOTESTATE) != 0)
+            {
+                QueueEmoteRefresh(target->GetObjectGuid());
+            }
+        }
+    }
+}
+
+void Player::FlushPendingEmoteRefresh(uint32 diff)
+{
+    if (m_pendingEmoteRefresh.empty())
+    {
+        return;
+    }
+
+    // Hold everything while the client is showing a loading screen. Sending
+    // now would spend the single usable transition on a client that cannot
+    // render it; SetAwaitingLoadScreen re-arms the delays when the screen
+    // clears.
+    //
+    // Bounded: if the matching "screen gone" never arrives - the opcode is
+    // STATUS_AUTHED and no flow is guaranteed to emit balanced pairs - give up
+    // holding and let the normal delay run, rather than latching emote
+    // refreshes off for the remainder of the session.
+    if (m_awaitingLoadScreen)
+    {
+        m_loadScreenHeldMs += diff;
+        if (m_loadScreenHeldMs < EMOTE_LOAD_SCREEN_MAX_HOLD_MS)
+        {
+            return;
+        }
+
+        m_awaitingLoadScreen = false;
+        m_loadScreenHeldMs = 0;
+    }
+
+    for (std::map<ObjectGuid, uint32>::iterator itr = m_pendingEmoteRefresh.begin();
+         itr != m_pendingEmoteRefresh.end();)
+    {
+        if (itr->second > diff)
+        {
+            itr->second -= diff;
+            ++itr;
+            continue;
+        }
+
+        ObjectGuid const emoterGuid = itr->first;
+        itr = m_pendingEmoteRefresh.erase(itr);
+
+        // The player may have moved out of view, logged out or stopped
+        // emoting while the delay ran; all three mean there is nothing to
+        // re-send.
+        Player* emoter = GetMap()->GetPlayer(emoterGuid);
+        if (!emoter || !HaveAtClient(emoter))
+        {
+            continue;
+        }
+
+        const uint32 emoteState = emoter->GetUInt32Value(UNIT_NPC_EMOTESTATE);
+        if (emoteState == 0)
+        {
+            continue;
+        }
+
+        MopUpdateObject::StaticField const emoteField[] =
+        {
+            { 89, emoteState }
+        };
+        UpdateData emoteData(uint16(emoter->GetMapId()));
+        MopUpdateObject::AppendValuesBlock(emoteData.GetBuffer(),
+            emoter->GetObjectGuid().GetRawValue(), emoteField, 1);
+        emoteData.AddUpdateBlock();
+
+        WorldPacket emotePacket;
+        if (emoteData.BuildPacket(&emotePacket))
+        {
+            GetSession()->SendPacket(&emotePacket);
         }
     }
 }
@@ -312,6 +395,12 @@ void Player::UpdateVisibilityOf(WorldObject const* viewPoint, T* target, UpdateD
             {
                 return;
             }
+
+            // Emote refresh for an arriving observer is queued by
+            // VisibleNotifier::Notify, which iterates visibleNow after this
+            // UpdateData has actually been sent. Queuing here as well would be
+            // redundant - the pending map is keyed by GUID and would simply
+            // reset the same entry's delay.
 
             visibleNow.insert(target);
             UpdateVisibilityOf_helper(m_clientGUIDs, target);

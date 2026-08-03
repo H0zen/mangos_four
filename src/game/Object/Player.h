@@ -2127,6 +2127,33 @@ typedef std::deque<Mail*> PlayerMails;
 // PLAYER_SKILL_LINEID_0 + i/2 past +128 into the RANK block and wipe every loaded skill's
 // rank -> GetSkillValue()==0 -> gear fails CanEquipItem (no proficiency) + no languages.
 // Cata/Three uses 128 for the same layout.
+// How long to wait after a player becomes visible before re-sending their
+// active state emote. The 18414 client plays the emote from a change callback
+// on client field 89, and for a player that callback does nothing useful while
+// the model is still being built - the value lands but never animates, and a
+// repeat of the same value is not a change. This delay lets the model exist
+// first. See Player::FlushPendingEmoteRefresh.
+//
+// Tuning note: too LOW is worse than too high, and fails silently. If the
+// refresh arrives before the model is ready the value is cached, and because a
+// later repeat of the same value is not a change (client scalar callbacks run
+// only on a changed flag, Wow.exe.c:1166810) there is no second chance - the
+// emote stays invisible until the emoter next changes it.
+//
+// 2000ms was verified working but visibly late. 200ms is the operator's
+// preference for responsiveness. If an arriving observer ever sees a
+// non-animating emoter - most likely on a cold asset cache or the first
+// sighting of an unusual race/gear combination - raise this rather than
+// looking elsewhere.
+#define EMOTE_REFRESH_DELAY_MS      200
+
+// Ceiling on how long a client-reported loading screen may hold queued emote
+// refreshes. CMSG_LOAD_SCREEN is STATUS_AUTHED and not guaranteed to arrive in
+// balanced pairs for every flow, so the hold must be able to expire by itself
+// rather than latch for the session. Generous: a slow zone load should not be
+// cut short, but a lost "screen gone" message must not be permanent.
+#define EMOTE_LOAD_SCREEN_MAX_HOLD_MS  30000
+
 #define PLAYER_MAX_SKILLS           128
 #define PLAYER_MAX_DAILY_QUESTS     750
 #define PLAYER_EXPLORED_ZONES_SIZE  200
@@ -5848,6 +5875,71 @@ class Player : public Unit
 
         // Currently visible objects at the player's client
         GuidSet m_clientGUIDs;
+
+        // Players who were already holding a state emote when they became
+        // visible to this client. The 18414 client will not animate a player
+        // emote that arrives as initial create state, and appending the field
+        // again inside the same packet does not help either - the client
+        // applies every block in a packet before evaluating, so it sees no
+        // change. These are re-sent as a standalone packet on the next
+        // Player::Update tick, which is the only remaining way to present the
+        // value as a genuine transition. See FlushPendingEmoteRefresh.
+        // Players who were already holding a state emote when they became
+        // visible to this client, mapped to the delay still to elapse before
+        // the emote is re-sent.
+        //
+        // Client index 89 has a change callback that plays the emote
+        // animation, and the same routine is re-invoked after model setup. For
+        // a creature that second invocation recovers a create-time value; for
+        // a player it does not, so an emote delivered while the model is still
+        // loading is applied to the data and never animated. Sending it again
+        // immediately cannot help either, because by then the client's cached
+        // value already matches and there is no change to react to. Waiting
+        // until the model exists is what actually produces a visible emote.
+        std::map<ObjectGuid, uint32> m_pendingEmoteRefresh;
+
+        // True between the client reporting its loading screen up and
+        // reporting it gone (CMSG_LOAD_SCREEN). Queued emote refreshes are
+        // held while it is set: a teleport rebuilds visibility and would
+        // otherwise fire the refresh mid-loading-screen, before the model
+        // exists, which silently wastes the one transition available.
+        //
+        // The hold is BOUNDED. CMSG_LOAD_SCREEN is STATUS_AUTHED and can be
+        // delivered with no Player attached, and nothing guarantees every
+        // flow (instance, battleground, death/release, cinematic) emits a
+        // balanced true/false pair. Without a ceiling a missing "false" would
+        // latch this on and silently disable emote refreshes for the rest of
+        // the session, so the hold expires on its own.
+        bool m_awaitingLoadScreen = false;
+        uint32 m_loadScreenHeldMs = 0;
+
+        /// Queue a visible player whose active state emote must be re-sent.
+        void QueueEmoteRefresh(ObjectGuid guid)
+        {
+            m_pendingEmoteRefresh[guid] = EMOTE_REFRESH_DELAY_MS;
+        }
+
+        /// Client reported its loading screen appearing or disappearing.
+        void SetAwaitingLoadScreen(bool loading)
+        {
+            m_awaitingLoadScreen = loading;
+            m_loadScreenHeldMs = 0;
+            if (!loading)
+            {
+                // Re-arm every pending refresh from the moment the screen
+                // actually cleared, so the delay is measured against the
+                // client being able to render rather than against a
+                // server-side visibility pass that may long predate it.
+                for (std::map<ObjectGuid, uint32>::iterator itr = m_pendingEmoteRefresh.begin();
+                     itr != m_pendingEmoteRefresh.end(); ++itr)
+                {
+                    itr->second = EMOTE_REFRESH_DELAY_MS;
+                }
+            }
+        }
+
+        /// Tick queued emote refreshes and send those whose delay has elapsed.
+        void FlushPendingEmoteRefresh(uint32 diff);
 
         // Check if an object is visible to the client
         bool HaveAtClient(WorldObject const* u) { return u == this || m_clientGUIDs.find(u->GetObjectGuid()) != m_clientGUIDs.end(); }

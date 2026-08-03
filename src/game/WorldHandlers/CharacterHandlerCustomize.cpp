@@ -606,6 +606,16 @@ void WorldSession::HandleLoadScreenOpcode(WorldPacket& recvPacket)
     // that first restoration attempt is still ineligible, then reports the end
     // of destination loading here.  Retry at that stable lifecycle boundary;
     // the PetMgr guard makes this a no-op unless a pet is still pending.
+    if (GetPlayer())
+    {
+        // Gate queued state-emote refreshes on the client's own loading
+        // screen. A teleport rebuilds visibility while the screen is still
+        // up, and an emote delivered then is applied but never animated -
+        // and because a later repeat of the same value is not a change,
+        // there is no second chance. See Player::SetAwaitingLoadScreen.
+        GetPlayer()->SetAwaitingLoadScreen(request.loading);
+    }
+
     if (!request.loading && GetPlayer())
     {
         GetPlayer()->ResummonPetTemporaryUnSummonedIfAny();

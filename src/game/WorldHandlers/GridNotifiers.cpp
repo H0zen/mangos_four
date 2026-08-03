@@ -47,6 +47,7 @@
 #include "WorldPacket.h"
 #include "WorldSession.h"
 #include "UpdateData.h"
+#include "MopUpdateObject.h"
 #include "Item.h"
 #include "Map.h"
 #include "Transports.h"
@@ -143,6 +144,18 @@ void VisibleNotifier::Notify()
         {
             player.SendAurasForTarget((Unit*)(*vItr));
             ((Unit*)(*vItr))->SendCurrentSplineTo(&player);
+        }
+
+        // A player already holding a state emote does not animate for an
+        // arriving client. The observer create deliberately omits
+        // UNIT_NPC_EMOTESTATE (see BuildMopObserverPlayerStaticFields) so the
+        // client's cached value stays zero; queue the real value to be sent
+        // afterwards as its own packet, producing the 0 -> N transition the
+        // client needs. Creatures are excluded - their create animates.
+        if ((*vItr) != &player && (*vItr)->GetTypeId() == TYPEID_PLAYER &&
+            (*vItr)->GetUInt32Value(UNIT_NPC_EMOTESTATE) != 0)
+        {
+            player.QueueEmoteRefresh((*vItr)->GetObjectGuid());
         }
     }
 }

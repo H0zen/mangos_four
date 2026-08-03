@@ -94,10 +94,27 @@ bool MopUpdateObject::TranslateObserverPlayerIndex(uint16 legacyIndex, uint16& t
         return true;
     }
 
+    // Powers and max powers, which the creature create and the player's own
+    // self create have always carried but the observer create did not. Both
+    // shift by five, exactly as TranslateSelfPlayerFields does.
+    if (legacyIndex >= 29 && legacyIndex <= 33)
+    {
+        targetIndex = uint16(legacyIndex + 5);          // POWER1..5 -> 34..38
+        return true;
+    }
+    if (legacyIndex >= 35 && legacyIndex <= 39)
+    {
+        targetIndex = uint16(legacyIndex + 5);          // MAXPOWER1..5 -> 40..44
+        return true;
+    }
+
     switch (legacyIndex)
     {
         case 7:  targetIndex = 7;  return true; // scale
         case 26: targetIndex = 30; return true; // packed race/class/gender/power
+        case 56: targetIndex = 62; return true; // flags2
+        case 61: targetIndex = 67; return true; // bounding radius
+        case 62: targetIndex = 68; return true; // combat reach
         case 28: targetIndex = 33; return true; // health
         case 34: targetIndex = 39; return true; // max health
         case 50: targetIndex = 55; return true; // level
@@ -118,6 +135,15 @@ bool MopUpdateObject::TranslateObserverPlayerIndex(uint16 legacyIndex, uint16& t
         case 63: targetIndex = 69; return true; // display ID
         case 64: targetIndex = 70; return true; // native display ID
         case 65: targetIndex = 71; return true; // mount display ID
+        // The packed UNIT_FIELD_BYTES_1. Client index 76 is
+        // CGUnitData::animTier in the 18414 descriptor table, and the client
+        // names each packed word after its byte 3 - byte 0 of the same word is
+        // the STAND STATE. The unit projection has always sent this for
+        // creatures; no player path ever did, so an observer never learned
+        // another player's stand state or animation tier. Sitting, kneeling
+        // and looping state emotes all failed to render on a watcher as a
+        // result, even once the emote state itself was being delivered.
+        case 70: targetIndex = 76; return true; // bytes1: stand state, anim tier
         // Emote state, so an observer sees a state emote end. Without this a
         // watcher keeps rendering the dance after the dancer has walked away.
         case 83: targetIndex = 89; return true; // emote state

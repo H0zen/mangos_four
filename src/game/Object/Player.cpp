@@ -1005,6 +1005,10 @@ void Player::Update(uint32 update_diff, uint32 p_time)
         return;
     }
 
+    // Re-send state emotes for players who were already emoting when they
+    // became visible, once their client has had time to build the model.
+    FlushPendingEmoteRefresh(update_diff);
+
     // Remove failed timed Achievements
     GetAchievementMgr().DoFailedTimedAchievementCriterias();
 

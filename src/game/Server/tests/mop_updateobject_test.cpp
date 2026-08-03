@@ -230,9 +230,18 @@ int main(int /*argc*/, char** /*argv*/)
     CHECK(MopUpdateObject::ProjectPlayerUnitFlags(0x00000000u) == 0x00000000u);
     CHECK(MopUpdateObject::ProjectPlayerUnitFlags(0xFFFFFFFFu) == 0xFFFFFFFEu);
 
-    // Emote state. The create projection has always carried this at 89, but
-    // until it was added to the incremental paths a state emote was delivered
-    // once and then frozen: /dance could start and nothing could end it.
+    // Stand state / animation tier must reach observers too. Client index 76
+    // is CGUnitData::animTier, whose byte 0 is the stand state. Creatures got
+    // it; players never did, so a watcher could not see another player sit or
+    // hold a looping emote even once emote state itself was delivered.
+    uint16 observerBytes1Index = 0;
+    CHECK(MopUpdateObject::TranslateObserverPlayerIndex(70, observerBytes1Index));
+    CHECK(observerBytes1Index == 76);
+
+    // Emote state maps to client index 89 on the incremental paths. The
+    // observer CREATE deliberately omits it so the client's cached value stays
+    // zero and the post-create refresh is a real 0 -> N transition; the client
+    // runs the animation callback only on a changed value.
     MopUpdateObject::StaticField const changedEmoteState[] = {
         { 83, 0x000001E3u }
     };
