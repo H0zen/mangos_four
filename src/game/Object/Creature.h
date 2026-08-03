@@ -572,6 +572,15 @@ enum TemporaryFactionFlags                                  // Used at real fact
 // grace period a creature keeps trying before evading a target it has no path to (TC parity)
 #define CREATURE_NOPATH_EVADE_TIME (5 * IN_MILLISECONDS)
 
+// How long a creature that cannot fight back stays in combat after the last
+// sign of engagement. Such a creature never attacks, so it never changes its
+// own threat list and nothing else can end the fight either: the attacker's
+// countdown in Unit::Update only runs once m_HostileRefManager is empty, and
+// the dummy holds a reference indefinitely. Without this the only release is
+// the distance check in IsOutOfThreatArea, so a player stays in combat next
+// to a training dummy until they walk ThreatRadius (100y) away.
+#define CREATURE_NO_ENGAGEMENT_EVADE_TIME (5 * IN_MILLISECONDS)
+
 class Creature : public Unit
 {
         CreatureAI* i_AI;
@@ -635,6 +644,21 @@ class Creature : public Unit
 
         void SetCannotReachTarget(bool cannotReach);        ///< Arms/disarms the no-path evade grace timer.
         bool CanNotReachTarget() const { return m_cannotReachTarget; }
+        /// Restart the no-engagement combat-release grace period (see Creature::Update).
+        void ResetEngagementTimer() { m_noEngagementTimer = 0; }
+
+        /// True when this creature's own template marks it PACIFIED, i.e. it is
+        /// designed never to fight back (training dummies and similar props).
+        ///
+        /// Deliberately reads the immutable template rather than
+        /// UNIT_FIELD_FLAGS: Aura::HandleAuraModPacify sets and clears that
+        /// same live flag on ordinary creatures, so gating combat release on
+        /// it would let any mob pacified for five seconds evade, drop its
+        /// threat list and end the fight mid-encounter.
+        bool IsPermanentlyPacified() const
+        {
+            return (GetCreatureInfo()->UnitFlags & UNIT_FLAG_PACIFIED) != 0;
+        }
 
         bool IsImmuneToSpell(SpellEntry const* spellInfo, bool castOnSelf) override;
         bool IsImmuneToSpellEffect(SpellEntry const* spellInfo, SpellEffectIndex index, bool castOnSelf) const override;
@@ -926,6 +950,7 @@ class Creature : public Unit
         uint32 m_aggroDelay;                                // (msecs)delay between respawn and aggro due to movement
         bool m_cannotReachTarget;                           // victim is unreachable (no path); armed by SelectHostileTarget
         uint32 m_cannotReachTimer;                          // (msecs)time spent unable to reach the victim
+        uint32 m_noEngagementTimer;                         // (msecs)time spent in combat with no sign of engagement
         bool m_ignoreCorpseDecayRatio;
         float m_respawnradius;
 

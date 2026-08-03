@@ -612,6 +612,15 @@ void ThreatManager::addThreat(Unit* pVictim, float pThreat, bool crit, SpellScho
 
     MANGOS_ASSERT(getOwner()->GetTypeId() == TYPEID_UNIT);
 
+    // Any accepted threat means something is still engaging this creature, so
+    // restart the no-engagement combat release here rather than in
+    // Unit::AddThreat. This is the real funnel: HostileRefManager::threatAssist
+    // calls straight into this method, so healing and buff assistance -
+    // including the zero-threat path - would otherwise hold the creature in
+    // combat without ever refreshing the timer. Placed after the self, GM and
+    // dead guards so a rejected call does not count as engagement.
+    static_cast<Creature*>(getOwner())->ResetEngagementTimer();
+
     float threat = ThreatCalcHelper::CalcThreat(pVictim, iOwner, pThreat, crit, schoolMask, pThreatSpell);
 
     if (threat > 0.0f)

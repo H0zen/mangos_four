@@ -663,6 +663,17 @@ uint32 Unit::DealDamage(Unit* pVictim, uint32 damage, CleanDamage const* cleanDa
         }
     }
 
+    // Restart the no-engagement combat-release grace period (see
+    // Creature::Update). Deliberately ahead of the zero-damage early-out
+    // below: a melee miss, a dodge or a fully absorbed hit still reaches here
+    // with damage 0, and all of them mean the attacker is still engaged.
+    // Threat-only engagement is covered separately in Unit::AddThreat, which
+    // catches the paths that never reach here at all.
+    if (pVictim->GetTypeId() == TYPEID_UNIT)
+    {
+        ((Creature*)pVictim)->ResetEngagementTimer();
+    }
+
     if (!damage)
     {
         // Rage from physical damage received .

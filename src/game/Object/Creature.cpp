@@ -216,7 +216,7 @@ Creature::Creature(CreatureSubtype subtype) : Unit(),
     m_groupLootTimer(0), m_groupLootId(0),
     m_lootMoney(0), m_lootGroupRecipientId(0),
     m_corpseDecayTimer(0), m_respawnTime(0), m_respawnDelay(25), m_corpseDelay(60), m_ignoreCorpseDecayRatio(false), m_aggroDelay(0),
-    m_cannotReachTarget(false), m_cannotReachTimer(0),
+    m_cannotReachTarget(false), m_cannotReachTimer(0), m_noEngagementTimer(0),
     m_respawnradius(5.0f), m_subtype(subtype), m_defaultMovementType(IDLE_MOTION_TYPE), m_equipmentId(0),
     m_AlreadyCallAssistance(false), m_AlreadySearchedAssistance(false),
     m_AI_locked(false), m_IsDeadByDefault(false), m_temporaryFactionFlags(TEMPFACTION_NONE),
@@ -898,6 +898,40 @@ void Creature::Update(uint32 update_diff, uint32 diff)
                         AI()->EnterEvadeMode();
                     }
                 }
+            }
+
+            // A creature that cannot fight back deals no damage, so it never
+            // changes its own threat list and no other path ends the fight.
+            // Release combat once it has gone long enough with no sign of
+            // engagement, which is what lets a player stop hitting a training
+            // dummy and leave combat where they stand instead of walking 100
+            // yards.
+            //
+            // Three conditions, and all three are needed. The template bit
+            // says this creature is a prop by design, so a pacify aura cast on
+            // an ordinary mob cannot arm the timer. The live flag says it
+            // cannot fight back RIGHT NOW, so a dummy whose pacify was lifted
+            // by TEMPFACTION_TOGGLE_PACIFIED is left alone while it can act.
+            // And a creature under player control - possessed or ridden - is
+            // excluded outright, because auto-evading something a player is
+            // driving would yank it out of their hands.
+            if (IsInCombat() && !IsInEvadeMode() && IsPermanentlyPacified() &&
+                HasFlag(UNIT_FIELD_FLAGS, UNIT_FLAG_PACIFIED) &&
+                !GetCharmerOrOwnerPlayerOrPlayerItself())
+            {
+                m_noEngagementTimer += update_diff;
+                if (m_noEngagementTimer >= CREATURE_NO_ENGAGEMENT_EVADE_TIME)
+                {
+                    m_noEngagementTimer = 0;
+                    if (AI())
+                    {
+                        AI()->EnterEvadeMode();
+                    }
+                }
+            }
+            else
+            {
+                m_noEngagementTimer = 0;
             }
 
             RegenerateAll(update_diff);

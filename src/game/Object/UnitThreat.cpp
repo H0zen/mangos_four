@@ -146,6 +146,10 @@ void Unit::AddThreat(Unit* pVictim, float threat /*= 0.0f*/, bool crit /*= false
     // Only mobs can manage threat lists
     if (CanHaveThreatList())
     {
+        // The no-engagement combat release is refreshed inside
+        // ThreatManager::addThreat rather than here, because that is the real
+        // funnel: HostileRefManager::threatAssist bypasses this method and
+        // calls it directly.
         m_ThreatManager.addThreat(pVictim, threat, crit, schoolMask, threatSpell);
     }
 }
