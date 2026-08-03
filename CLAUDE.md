@@ -11,8 +11,8 @@ later-expansion assumptions.
 
 - **Database changes go in the separate `mangosfour/Database` repo**, not here — as transactional, idempotent
   `Rel##_##_###_*.sql` migrations that chain via `db_version`.
-- Clone/update **recursively**: `dep`, `src/modules/SD3`, `src/modules/Eluna`, and `src/realmd` are submodules.
-  Never shallow-update a submodule to a non-tip pinned SHA.
+- Clone/update **recursively**: `dep`, `src/modules/SD3`, `src/modules/Eluna`, `src/realmd` are submodules. Never shallow-update
+  a submodule to a non-tip pinned SHA.
 - Less-obvious locations: scripting in `src/modules/` (Eluna = Lua, SD3 = C++, Bots = playerbots). The
   `src/game/` tree is under an ongoing **decomp cohesion-split** (large classes like `Player`/`Unit`/`SpellEffects`
   are being broken into topical `*.cpp` files, e.g. `UnitCombat.cpp`, `UnitAura.cpp`,
@@ -30,9 +30,10 @@ sudo apt-get install -y git cmake make build-essential \
   libssl-dev libbz2-dev default-libmysqlclient-dev libreadline-dev   # Debian/Ubuntu deps
 mkdir -p _build _install && cd _build
 cmake .. -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX=../_install \
-  -DBUILD_TOOLS=1 -DBUILD_MANGOSD=1 -DBUILD_REALMD=1 -DWITH_TESTS=1 \
-  -DWITH_NET_TESTS=0 -DSOAP=1 -DSCRIPT_LIB_ELUNA=1 -DSCRIPT_LIB_SD3=1 \
-  -DPLAYERBOTS=0 -DPCH=0
+  -DBUILD_TOOLS=1 -DBUILD_MANGOSD=1 -DBUILD_REALMD=1 -DSOAP=1 \
+  -DSCRIPT_LIB_ELUNA=1 -DSCRIPT_LIB_SD3=1 -DPLAYERBOTS=0 \
+  -DWITH_TESTS=1 -DWITH_NET_TESTS=0 \
+  -DPCH=0
 make -j"$(nproc)" && make install -j"$(nproc)"
 ```
 
