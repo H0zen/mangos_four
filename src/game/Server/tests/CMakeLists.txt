@@ -18,6 +18,14 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
+# Eluna's lualib is only built when SCRIPT_LIB_ELUNA is on, so a test that names
+# the target unconditionally makes CMake generation fail outright with Eluna off
+# -- not just the test, the whole configure. Resolve it once, conditionally.
+set(MOP_TEST_LUA_PATH "")
+if(TARGET lualib)
+    set(MOP_TEST_LUA_PATH ";PATH=path_list_prepend:$<TARGET_FILE_DIR:lualib>")
+endif()
+
 # MopWireCodec.h/MopHandshake.h/MopFrameReader.h relocated to src/proto/ (Stage 2 CP2,
 # ACE removal) -- they were already game-free and are proto's framing/handshake layer
 # now. Add proto's include dir; the bare quote-includes in mop_framing_test.cpp are
@@ -162,7 +170,7 @@ if(WIN32)
     get_filename_component(MOP_PET_SET_ACTION_MYSQL_RUNTIME_DIR "${MySQL_LIBRARY}" DIRECTORY)
     set_tests_properties(mop_pet_set_action_capability PROPERTIES
         ENVIRONMENT_MODIFICATION
-        "PATH=path_list_prepend:${MOP_PET_SET_ACTION_MYSQL_RUNTIME_DIR};PATH=path_list_prepend:$<TARGET_FILE_DIR:lualib>")
+        "PATH=path_list_prepend:${MOP_PET_SET_ACTION_MYSQL_RUNTIME_DIR}${MOP_TEST_LUA_PATH}")
 endif()
 
 add_executable(mop_mail_take_item_security_test
@@ -269,7 +277,7 @@ if(WIN32)
     get_filename_component(MOP_GROUP_INVITE_MYSQL_RUNTIME_DIR "${MySQL_LIBRARY}" DIRECTORY)
     set_tests_properties(mop_group_invite_response_packets PROPERTIES
         ENVIRONMENT_MODIFICATION
-        "PATH=path_list_prepend:${MOP_GROUP_INVITE_MYSQL_RUNTIME_DIR};PATH=path_list_prepend:$<TARGET_FILE_DIR:lualib>")
+        "PATH=path_list_prepend:${MOP_GROUP_INVITE_MYSQL_RUNTIME_DIR}${MOP_TEST_LUA_PATH}")
 endif()
 
 add_executable(mop_group_invite_request_packets_test
@@ -286,7 +294,7 @@ if(WIN32)
     get_filename_component(MOP_GROUP_INVITE_REQUEST_MYSQL_RUNTIME_DIR "${MySQL_LIBRARY}" DIRECTORY)
     set_tests_properties(mop_group_invite_request_packets PROPERTIES
         ENVIRONMENT_MODIFICATION
-        "PATH=path_list_prepend:${MOP_GROUP_INVITE_REQUEST_MYSQL_RUNTIME_DIR};PATH=path_list_prepend:$<TARGET_FILE_DIR:lualib>")
+        "PATH=path_list_prepend:${MOP_GROUP_INVITE_REQUEST_MYSQL_RUNTIME_DIR}${MOP_TEST_LUA_PATH}")
 endif()
 
 add_executable(mop_auction_packets_test mop_auction_packets_test.cpp)
@@ -629,7 +637,7 @@ if(WIN32)
     get_filename_component(MOP_TAXI_MASK_MYSQL_RUNTIME_DIR "${MySQL_LIBRARY}" DIRECTORY)
     set_tests_properties(mop_taxi_mask_domain_test PROPERTIES
         ENVIRONMENT_MODIFICATION
-            "PATH=path_list_prepend:${MOP_TAXI_MASK_MYSQL_RUNTIME_DIR};PATH=path_list_prepend:$<TARGET_FILE_DIR:lualib>")
+            "PATH=path_list_prepend:${MOP_TAXI_MASK_MYSQL_RUNTIME_DIR}${MOP_TEST_LUA_PATH}")
 endif()
 
 add_executable(mop_taxi_persistence_test mop_taxi_persistence_test.cpp)
@@ -643,7 +651,7 @@ if(WIN32)
     get_filename_component(MOP_TAXI_PERSISTENCE_MYSQL_RUNTIME_DIR "${MySQL_LIBRARY}" DIRECTORY)
     set_tests_properties(mop_taxi_persistence_test PROPERTIES
         ENVIRONMENT_MODIFICATION
-            "PATH=path_list_prepend:${MOP_TAXI_PERSISTENCE_MYSQL_RUNTIME_DIR};PATH=path_list_prepend:$<TARGET_FILE_DIR:lualib>")
+            "PATH=path_list_prepend:${MOP_TAXI_PERSISTENCE_MYSQL_RUNTIME_DIR}${MOP_TEST_LUA_PATH}")
 endif()
 
 add_executable(mop_taxi_menu_packets_test mop_taxi_menu_packets_test.cpp)
@@ -657,7 +665,7 @@ if(WIN32)
     get_filename_component(MOP_TAXI_MENU_MYSQL_RUNTIME_DIR "${MySQL_LIBRARY}" DIRECTORY)
     set_tests_properties(mop_taxi_menu_packets PROPERTIES
         ENVIRONMENT_MODIFICATION
-            "PATH=path_list_prepend:${MOP_TAXI_MENU_MYSQL_RUNTIME_DIR};PATH=path_list_prepend:$<TARGET_FILE_DIR:lualib>")
+            "PATH=path_list_prepend:${MOP_TAXI_MENU_MYSQL_RUNTIME_DIR}${MOP_TEST_LUA_PATH}")
 endif()
 
 add_executable(mop_taxi_activation_packets_test mop_taxi_activation_packets_test.cpp)
@@ -671,7 +679,7 @@ if(WIN32)
     get_filename_component(MOP_TAXI_ACTIVATION_PACKETS_MYSQL_RUNTIME_DIR "${MySQL_LIBRARY}" DIRECTORY)
     set_tests_properties(mop_taxi_activation_packets PROPERTIES
         ENVIRONMENT_MODIFICATION
-            "PATH=path_list_prepend:${MOP_TAXI_ACTIVATION_PACKETS_MYSQL_RUNTIME_DIR};PATH=path_list_prepend:$<TARGET_FILE_DIR:lualib>")
+            "PATH=path_list_prepend:${MOP_TAXI_ACTIVATION_PACKETS_MYSQL_RUNTIME_DIR}${MOP_TEST_LUA_PATH}")
 endif()
 
 add_executable(mop_taxi_activation_runtime_test mop_taxi_activation_runtime_test.cpp)
@@ -687,7 +695,7 @@ if(WIN32)
         "${MySQL_LIBRARY}" DIRECTORY)
     set_tests_properties(mop_taxi_activation_runtime PROPERTIES
         ENVIRONMENT_MODIFICATION
-            "PATH=path_list_prepend:${MOP_TAXI_ACTIVATION_MYSQL_RUNTIME_DIR};PATH=path_list_prepend:$<TARGET_FILE_DIR:lualib>")
+            "PATH=path_list_prepend:${MOP_TAXI_ACTIVATION_MYSQL_RUNTIME_DIR}${MOP_TEST_LUA_PATH}")
 endif()
 
 add_executable(mop_taxi_completion_packets_test mop_taxi_completion_packets_test.cpp)
@@ -702,7 +710,7 @@ if(WIN32)
         "${MySQL_LIBRARY}" DIRECTORY)
     set_tests_properties(mop_taxi_completion_packets PROPERTIES
         ENVIRONMENT_MODIFICATION
-            "PATH=path_list_prepend:${MOP_TAXI_COMPLETION_MYSQL_RUNTIME_DIR};PATH=path_list_prepend:$<TARGET_FILE_DIR:lualib>")
+            "PATH=path_list_prepend:${MOP_TAXI_COMPLETION_MYSQL_RUNTIME_DIR}${MOP_TEST_LUA_PATH}")
 endif()
 
 add_executable(mop_taxi_express_packets_test mop_taxi_express_packets_test.cpp)
@@ -716,7 +724,7 @@ if(WIN32)
     get_filename_component(MOP_TAXI_EXPRESS_MYSQL_RUNTIME_DIR "${MySQL_LIBRARY}" DIRECTORY)
     set_tests_properties(mop_taxi_express_packets PROPERTIES
         ENVIRONMENT_MODIFICATION
-            "PATH=path_list_prepend:${MOP_TAXI_EXPRESS_MYSQL_RUNTIME_DIR};PATH=path_list_prepend:$<TARGET_FILE_DIR:lualib>")
+            "PATH=path_list_prepend:${MOP_TAXI_EXPRESS_MYSQL_RUNTIME_DIR}${MOP_TEST_LUA_PATH}")
 endif()
 
 add_executable(mop_taxi_completion_lifecycle_test mop_taxi_completion_lifecycle_test.cpp)
@@ -732,7 +740,7 @@ if(WIN32)
         "${MySQL_LIBRARY}" DIRECTORY)
     set_tests_properties(mop_taxi_completion_lifecycle PROPERTIES
         ENVIRONMENT_MODIFICATION
-            "PATH=path_list_prepend:${MOP_TAXI_COMPLETION_LIFECYCLE_MYSQL_RUNTIME_DIR};PATH=path_list_prepend:$<TARGET_FILE_DIR:lualib>")
+            "PATH=path_list_prepend:${MOP_TAXI_COMPLETION_LIFECYCLE_MYSQL_RUNTIME_DIR}${MOP_TEST_LUA_PATH}")
 endif()
 
 add_executable(mop_death_packets_test mop_death_packets_test.cpp)
@@ -812,7 +820,7 @@ if(WIN32)
     get_filename_component(MOP_SPELL_CAST_MYSQL_RUNTIME_DIR "${MySQL_LIBRARY}" DIRECTORY)
     set_tests_properties(mop_spell_cast_packets mop_use_item_packets PROPERTIES
         ENVIRONMENT_MODIFICATION
-        "PATH=path_list_prepend:${MOP_SPELL_CAST_MYSQL_RUNTIME_DIR};PATH=path_list_prepend:$<TARGET_FILE_DIR:lualib>")
+        "PATH=path_list_prepend:${MOP_SPELL_CAST_MYSQL_RUNTIME_DIR}${MOP_TEST_LUA_PATH}")
 endif()
 
 add_executable(mop_battlefield_status_packets_test mop_battlefield_status_packets_test.cpp)
@@ -826,7 +834,7 @@ if(WIN32)
     get_filename_component(MOP_BATTLEFIELD_STATUS_MYSQL_RUNTIME_DIR "${MySQL_LIBRARY}" DIRECTORY)
     set_tests_properties(mop_battlefield_status_packets PROPERTIES
         ENVIRONMENT_MODIFICATION
-        "PATH=path_list_prepend:${MOP_BATTLEFIELD_STATUS_MYSQL_RUNTIME_DIR};PATH=path_list_prepend:$<TARGET_FILE_DIR:lualib>")
+        "PATH=path_list_prepend:${MOP_BATTLEFIELD_STATUS_MYSQL_RUNTIME_DIR}${MOP_TEST_LUA_PATH}")
 endif()
 
 add_executable(mop_battle_pet_packets_test mop_battle_pet_packets_test.cpp)
