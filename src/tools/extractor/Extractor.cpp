@@ -49,6 +49,7 @@
 #include <filesystem>
 #include <fstream>
 #include <sstream>
+#include <set>
 #include <string>
 #include <vector>
 
@@ -537,7 +538,8 @@ namespace
         return written;
     }
 
-    bool BakeNav(const Options& opt, const std::string& tileDir)
+    bool BakeNav(const Options& opt, const std::string& tileDir,
+                 const std::set<uint32_t>& only = {})
     {
         if (!opt.nav)
         {
@@ -554,7 +556,7 @@ namespace
         builder.SetProgress(&NavProgress, nullptr);
         builder.SetMapDone(&NavMapDone);
 
-        const int written = builder.BakeAll(opt.mapFilter);
+        const int written = builder.BakeAll(opt.mapFilter, only);
         if (written < 0)
         {
             g_console.Error("nav: bake failed; inspect the earlier diagnostics and " +
@@ -794,7 +796,21 @@ int main(int argc, char** argv)
     if (!opt.dbc && !opt.tiles && !opt.goModels)
     {
         BakeVessels();
-        const bool ok = BakeNav(opt, tileDir);
+
+        // ASKED FOR THE SHIPS, GETS THE SHIPS. Nothing that feeds the world's tiles was
+        // named, so a navmesh here can only have been meant for the decks trans just wrote
+        // -- baking every continent instead is hours of work nobody asked for. An explicit
+        // "map <id>" still wins, and nav on its own still covers everything.
+        std::set<uint32_t> vesselMaps;
+        if (opt.nav && opt.vessels && opt.mapFilter < 0)
+        {
+            for (const VesselMap& v : ReadVesselMaps(opt.vesselList))
+            {
+                vesselMaps.insert(v.mapId);
+            }
+        }
+
+        const bool ok = BakeNav(opt, tileDir, vesselMaps);
         g_console.SetStage("done");
         g_console.Progress(-1);
         g_console.Stop();

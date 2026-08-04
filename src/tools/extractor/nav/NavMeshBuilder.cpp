@@ -1150,7 +1150,7 @@ namespace world::nav
         return written.load();
     }
 
-    int NavMeshBuilder::BakeAll(long mapFilter)
+    int NavMeshBuilder::BakeAll(long mapFilter, const std::set<uint32_t>& only)
     {
         std::error_code ec;
         std::filesystem::create_directories(m_outDir, ec);
@@ -1166,16 +1166,25 @@ namespace world::nav
             const std::string leaf = entry.path().filename().string();
             unsigned mapId = 0;
             int gx = 0, gy = 0;
+            const auto wanted = [&](unsigned id)
+            {
+                if (mapFilter >= 0 && uint32_t(mapFilter) != id)
+                {
+                    return false;
+                }
+                return only.empty() || only.count(id) != 0;
+            };
+
             if (std::sscanf(leaf.c_str(), "t_%u_%d_%d.tile", &mapId, &gx, &gy) == 3)
             {
-                if (mapFilter < 0 || uint32_t(mapFilter) == mapId)
+                if (wanted(mapId))
                 {
                     byMap[mapId].emplace_back(gx, gy);
                 }
             }
             else if (std::sscanf(leaf.c_str(), "w_%u.tile", &mapId) == 1)
             {
-                if (mapFilter < 0 || uint32_t(mapFilter) == mapId)
+                if (wanted(mapId))
                 {
                     globalWmoMaps.insert(mapId);
                 }

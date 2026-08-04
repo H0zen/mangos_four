@@ -16,6 +16,7 @@
 
 #include <cstdint>
 #include <memory>
+#include <set>
 #include <string>
 #include <utility>
 #include <vector>
@@ -85,7 +86,10 @@ namespace world::nav
 
         /// Bakes every map that has tiles, or only `mapFilter` when >= 0.
         /// Returns the number of .mmtile files written, or -1 on a fatal error.
-        int BakeAll(long mapFilter = -1);
+        /// `mapFilter` restricts to ONE map, as before. `only`, when non-empty, restricts
+        /// to exactly those map ids -- what "bake the vessels and their meshes" needs, since
+        /// a run like that touches 35 decks and no continent.
+        int BakeAll(long mapFilter = -1, const std::set<uint32_t>& only = {});
 
     private:
         // `globalWmo`, when set, is a WMO-only map's single shared tile: every grid in
