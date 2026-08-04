@@ -744,10 +744,12 @@ int main(int argc, char** argv)
         };
         struct Need { bool wanted; bool feeds; const char* who; const char* needs;
                       const char* dir; };
+        // trans writes its hull tiles into the same tiles/ directory tile does, and they
+        // are what a vessel navmesh is built from -- so it satisfies nav just as tile does.
         const Need needs[] = {
-            { opt.nav,     opt.tiles,    "nav",   "tile",     "/tiles"    },
-            { opt.tiles,   opt.goModels, "tile",  "gomodels", "/gomodels" },
-            { opt.vessels, opt.goModels, "trans", "gomodels", "/gomodels" },
+            { opt.nav,     opt.tiles || opt.vessels, "nav",   "tile or trans", "/tiles"    },
+            { opt.tiles,   opt.goModels,             "tile",  "gomodels",      "/gomodels" },
+            { opt.vessels, opt.goModels,             "trans", "gomodels",      "/gomodels" },
         };
         for (const Need& n : needs)
         {

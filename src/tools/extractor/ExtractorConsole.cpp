@@ -556,10 +556,14 @@ namespace world::terrain
             // being checked is whether the input will EXIST, not whether it was ticked.
             struct Need { bool wanted; bool feeds; const char* who; const char* needs;
                           const char* dir; };
+            // trans (5) writes w_<mapId>.tile into the SAME tiles/ directory that tile (4)
+            // fills, and those hull tiles are exactly what a vessel navmesh is built from.
+            // Crediting only (4) refused "5 6" -- bake the decks and their meshes -- and
+            // sent people to bake every continent for a mesh they did not want.
             const Need needs[] = {
-                { out.nav,     out.tiles,    "nav",   "tiles (4)",    "/tiles"    },
-                { out.tiles,   out.goModels, "tiles", "gomodels (3)", "/gomodels" },
-                { out.vessels, out.goModels, "trans", "gomodels (3)", "/gomodels" },
+                { out.nav,     out.tiles || out.vessels, "nav",   "tiles (4) or trans (5)", "/tiles"    },
+                { out.tiles,   out.goModels,             "tiles", "gomodels (3)",           "/gomodels" },
+                { out.vessels, out.goModels,             "trans", "gomodels (3)",           "/gomodels" },
             };
 
             // THE DEST IN EFFECT, not the one the menu opened with. `dest` is where the
