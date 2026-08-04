@@ -467,7 +467,11 @@ namespace
         uint8 const (&byteOrder)[8], ObjectGuid& guid, bool* extraBit,
         size_t extraBitPosition, uint8* leadingByte = nullptr)
     {
-        size_t const fixed = leadingByte ? 3u : 2u;
+        // The mask is 8 bits normally, but a caller supplying extraBit reads
+        // NINE, which spills into a second byte. Budgeting one byte for the
+        // mask let a two-byte body reach the ninth ReadBit and throw past the
+        // end instead of being refused cleanly.
+        size_t const fixed = (leadingByte ? 3u : 2u) + (extraBit ? 1u : 0u);
         if (in.rpos() != 0 || in.size() - in.rpos() < fixed)
         {
             return false;
@@ -495,6 +499,13 @@ namespace
             {
                 *extraBit = bit;
                 continue;
+            }
+            // Guards a future caller passing an extraBitPosition beyond the
+            // mask: without this, maskOrder[8] is an out-of-bounds read and
+            // present[] an out-of-bounds write.
+            if (maskIndex >= 8)
+            {
+                return false;
             }
             present[maskOrder[maskIndex++]] = bit;
         }
@@ -1116,6 +1127,17 @@ bool Group::ConvertToParty()
     }
 
     m_groupType = GroupType(m_groupType & ~GROUPTYPE_RAID);
+
+    // Raid-only rank must not survive the downgrade. An assistant keeps the
+    // uninvite right granted by Player::CanUninviteFromGroup, which has no raid
+    // test, so a former assistant could kick anyone in what is now a 5-man
+    // party while the client shows them as an ordinary member.
+    for (member_witerator itr = m_memberSlots.begin(); itr != m_memberSlots.end(); ++itr)
+    {
+        itr->assistant = false;
+    }
+    m_mainTankGuid.Clear();
+    m_mainAssistantGuid.Clear();
 
     if (!isBGGroup())
     {

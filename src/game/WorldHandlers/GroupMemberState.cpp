@@ -122,6 +122,7 @@ bool Group::_addMember(ObjectGuid guid, const char* name, bool isAssistant, uint
     member.assistant = isAssistant;
     member.lastMap   = lastMap;
     member.readyCheckHasResponded = false;
+    member.roles     = 0;
     m_memberSlots.push_back(member);
 
     SubGroupCounterIncrease(group);

@@ -1301,8 +1301,11 @@ class Group
             bool        assistant;
             uint32      lastMap;
             bool        readyCheckHasResponded;
-            /* LFG role bitmask the player chose: tank, healer, damage. */
-            uint8       roles;
+            /* LFG role bitmask the player chose: tank, healer, damage.
+             * Defaulted here as well as at every add site: this value is
+             * transmitted in SMSG_GROUP_LIST, so an indeterminate byte reaches
+             * the wire and renders as arbitrary role icons. */
+            uint8       roles = 0;
         };
         typedef std::list<MemberSlot> MemberSlotList;
         typedef MemberSlotList::const_iterator member_citerator;

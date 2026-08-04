@@ -406,6 +406,16 @@ void WorldSession::HandleGroupUninviteGuidOpcode(WorldPacket& recv_data)
         return;
     }
 
+    // Nobody may kick the leader. Player::CanUninviteFromGroup grants the right
+    // to any assistant with no leader test, and the client offers the Remove
+    // entry in this case (UnitPopup.lua only hides assistant-on-assistant and
+    // leader-on-self), so the server is the only thing that can refuse it.
+    if (grp->IsLeader(guid))
+    {
+        SendPartyResult(PARTY_OP_LEAVE, "", ERR_NOT_LEADER);
+        return;
+    }
+
     if (grp->IsMember(guid))
     {
         Player::RemoveFromGroup(grp, guid);
@@ -617,6 +627,11 @@ void WorldSession::HandleRandomRollOpcode(WorldPacket& recv_data)
     // tripped the range check below and dropped every roll in silence. The
     // trailing marker also has to be consumed or the packet reports unprocessed
     // tail data.
+    if (recv_data.size() != 9)
+    {
+        return;
+    }
+
     uint32 minimum, maximum, roll;
     uint8 marker = 0;
     recv_data >> maximum;
@@ -798,6 +813,15 @@ void WorldSession::HandleGroupChangeSubGroupOpcode(WorldPacket& recv_data)
     }
     /********************/
 
+    // Subgroups only exist in a raid. ConvertToParty leaves m_subGroupsCounts
+    // allocated, so HasFreeSlotSubGroup still answers true for a party and this
+    // handler -- unlike the assistant and party-assignment ones -- had no raid
+    // test of its own.
+    if (!group->isRaidGroup())
+    {
+        return;
+    }
+
     // The 18414 request identifies the target by GUID, so there is no name to
     // resolve and no chance of moving a same-named character in another group.
     if (!group->IsMember(request.targetGuid))
@@ -913,7 +937,7 @@ void WorldSession::HandleGroupSetRolesOpcode(WorldPacket& recv_data)
     //   bits   GUID mask 2,0,7,4,1,3,6,5, then FlushBits
     //   bytes  GUID 1,5,2,6,7,0,4,3, each ^1, omitted when zero
     //
-    // Verified byte-exact against 7F 08 00 00 00 EC EC C9 3D 05 E9 04.
+    // Verified byte-exact against 7F 08 00 00 00 EC C9 3D 05 E9 04.
     if (recv_data.rpos() != 0 || recv_data.size() < 6)
     {
         recv_data.rfinish();
@@ -985,11 +1009,30 @@ void WorldSession::HandleGroupSetRolesOpcode(WorldPacket& recv_data)
         return;
     }
 
-    // A role is chosen for oneself. The GUID in the body is the sender's own,
-    // and honouring an arbitrary one would let a player set anybody's role.
-    if (target && target != GetPlayer()->GetObjectGuid())
+    // A player always sets their OWN role, and a leader or assistant may set
+    // anyone's. The client drives both from the same menu: UnitPopup.lua:1732
+    // passes the right-clicked unit to UnitSetRole, and :1195 shows the Set Role
+    // submenu when isLeader, isAssistant, or the unit is the player. The client
+    // binary agrees -- UnitSetRole compares the target to the caller's own GUID
+    // and, when they differ, requires the caller's group rank to be leader or
+    // assistant before sending the TARGET's GUID.
+    //
+    // An earlier version accepted only the sender's own GUID, on the stated but
+    // wrong premise that the body always carries it. That silently discarded
+    // every role a leader assigned.
+    ObjectGuid const subject = target ? target : GetPlayer()->GetObjectGuid();
+    if (subject != GetPlayer()->GetObjectGuid())
     {
-        return;
+        if (!group->IsLeader(GetPlayer()->GetObjectGuid()) &&
+            !group->IsAssistant(GetPlayer()->GetObjectGuid()))
+        {
+            return;
+        }
+
+        if (!group->IsMember(subject))
+        {
+            return;
+        }
     }
 
     // Only tank, healer and damage exist; anything else is not a role the
@@ -1000,7 +1043,7 @@ void WorldSession::HandleGroupSetRolesOpcode(WorldPacket& recv_data)
         return;
     }
 
-    group->SetMemberRoles(GetPlayer()->GetObjectGuid(), accepted);
+    group->SetMemberRoles(subject, accepted);
 }
 
 /**
