@@ -1032,8 +1032,11 @@ void WorldSession::HandleGroupInitiateRolePollOpcode(WorldPacket& recv_data)
         return;
     }
 
-    // Starting a check clears what everyone previously chose, so the roster
-    // shows the poll in progress rather than last time's answers.
+    // The request is parsed and authorised, but the PROMPT that would reach the
+    // other members is SMSG_GROUP_ROLE_POLL_INFORM 0x1007, which is not yet
+    // derived or admitted -- see Group::BeginRolePoll. Registered rather than
+    // left unhandled so the body is consumed correctly and the gap is visible
+    // here rather than as an UNKNOWN opcode in the log.
     group->BeginRolePoll(GetPlayer()->GetObjectGuid());
 }
 

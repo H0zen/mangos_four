@@ -1518,32 +1518,31 @@ class Group
             return slot != m_memberSlots.end() ? slot->roles : uint8(0);
         }
         /**
-         * @brief Starts a role check, clearing every member's chosen role.
+         * @brief Starts a role check.
          *
-         * The client shows the poll as in progress while roles are unset, so
-         * clearing is what makes a second check ask again rather than display
-         * the previous answers.
+         * NOT IMPLEMENTED, deliberately, and it must not silently do damage in
+         * the meantime.
+         *
+         * A role check has to PROMPT each member, which means sending
+         * SMSG_GROUP_ROLE_POLL_INFORM 0x1007. That opcode is declared but not
+         * admitted, and its body is not yet derived: three captured bodies show
+         * a GUID mask byte, a second byte, then popcount(mask) GUID bytes, but
+         * every sample has a mask of 0x7C or 0x7D, so whether that second byte
+         * is a count or something that merely tracks it cannot be told apart.
+         * The client reader at 0x903C3C is the event raiser rather than the
+         * packet reader, so the layout still needs recovering.
+         *
+         * An earlier version of this cleared every member's role and resent the
+         * roster, on the assumption the client would render an unset role as a
+         * poll in progress. Live testing falsified that: the other client showed
+         * nothing, and the only effect was to discard roles people had chosen.
          *
          * @param initiator the leader or assistant who started it.
          */
-        void BeginRolePoll(ObjectGuid initiator)
+        void BeginRolePoll(ObjectGuid /*initiator*/)
         {
-            bool changed = false;
-            for (member_witerator itr = m_memberSlots.begin(); itr != m_memberSlots.end(); ++itr)
-            {
-                if (itr->roles != 0)
-                {
-                    itr->roles = 0;
-                    changed = true;
-                }
-            }
-
-            // The roster carries the roles, so a poll is expressed by resending
-            // it with them cleared.
-            if (changed || initiator)
-            {
-                SendUpdate();
-            }
+            // Intentionally empty until the prompt packet is derived. Clearing
+            // roles here would destroy real state to no visible effect.
         }
         void SetEveryoneIsAssistant(bool state)
         {

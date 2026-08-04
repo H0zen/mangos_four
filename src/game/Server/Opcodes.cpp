@@ -1291,6 +1291,10 @@ void InitializeOpcodes()
     // Storing the choice is what makes the roster meaningful, which is why no
     // separate reply needs admitting.
     DefC(CMSG_GROUP_SET_ROLES, "CMSG_GROUP_SET_ROLES", STATUS_LOGGEDIN, PROCESS_THREADUNSAFE, &WorldSession::HandleGroupSetRolesOpcode);
+    // NOTE: the role CHECK is only half done. The request is parsed and
+    // authorised, but the prompt that reaches the other members --
+    // SMSG_GROUP_ROLE_POLL_INFORM 0x1007 -- is not derived or admitted, so
+    // clicking it still does nothing for them. Choosing a role works.
     DefC(CMSG_GROUP_INITIATE_ROLE_POLL, "CMSG_GROUP_INITIATE_ROLE_POLL", STATUS_LOGGEDIN, PROCESS_THREADUNSAFE, &WorldSession::HandleGroupInitiateRolePollOpcode);
 
     // NOT registered, deliberately: CMSG_SET_DUNGEON_DIFFICULTY 0x1A36 and
