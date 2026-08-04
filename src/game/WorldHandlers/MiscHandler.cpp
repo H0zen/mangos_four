@@ -1650,40 +1650,113 @@ void WorldSession::HandleComplainOpcode(WorldPacket& recv_data)
     DEBUG_LOG("WORLD: Received opcode CMSG_COMPLAIN");
     recv_data.hexlike();
 
+    // 18414 body, derived from the client writer at Wow.exe sub_66BD81 (the
+    // packet class is built by sub_6668BE, vtable off_D6386C, slot 1). The
+    // inherited reader below was the pre-MoP one: a direct `>> spam_type >>
+    // spammerGuid`, which cannot parse a bit-packed body at all.
+    //
+    // Shape: a byte-aligned spam type, then one bit stream, then the packed
+    // GUID bytes, then the optional trailing scalars. The client has exactly
+    // two senders - sub_9A7D76 reports an inbox item (type 0) and sub_CD85CE
+    // reports chat spam (type 1). Type 2 exists in the writer but no caller in
+    // this build reaches it, so it is refused rather than guessed at: a wrong
+    // parse desynchronises the whole stream.
+    //
+    // NOT byte-verified. Neither this opcode nor SMSG_COMPLAIN_RESULT appears
+    // anywhere in the 18414 sniff corpus, so gate 3 is unmet and CMSG_COMPLAIN
+    // is deliberately left unregistered in Opcodes.cpp. This reader exists so a
+    // single live capture can confirm it and flip the switch.
     uint8 spam_type;                                        // 0 - mail, 1 - chat
     ObjectGuid spammerGuid;
-    uint32 unk1 = 0;
-    uint32 unk2 = 0;
-    uint32 unk3 = 0;
-    uint32 unk4 = 0;
+    uint32 unk1 = 0;                                        // writer field this+0x1C
+    uint32 unk2 = 0;                                        // mail index, or chat this+0x38
+    uint32 unk3 = 0;                                        // writer field this+0x18
+    uint32 unk4 = 0;                                        // chat this+0x3C
     std::string description = "";
-    recv_data >> spam_type;                                 // unk 0x01 const, may be spam type (mail/chat)
-    recv_data >> spammerGuid;                               // player guid
-    switch (spam_type)
+
+    recv_data >> spam_type;
+    if (spam_type > 1)
     {
-        case 0:
-            recv_data >> unk1;                              // const 0
-            recv_data >> unk2;                              // probably mail id
-            recv_data >> unk3;                              // const 0
-            break;
-        case 1:
-            recv_data >> unk1;                              // probably language
-            recv_data >> unk2;                              // message type?
-            recv_data >> unk3;                              // probably channel id
-            recv_data >> unk4;                              // unk random value
-            recv_data >> description;                       // spam description string (messagetype, channel name, player name, message)
-            break;
+        sLog.outError("CMSG_COMPLAIN: unsupported spam type %u from account %u; refusing to parse",
+            spam_type, GetAccountId());
+        return;
+    }
+
+    // Each "absent" bit is set when the matching field is zero, so the field is
+    // omitted from the tail.
+    bool const field1CAbsent = recv_data.ReadBit();
+    bool const field18Absent = recv_data.ReadBit();
+    recv_data.ReadBit();                                    // whole GUID is zero; redundant with the mask
+
+    bool field38Absent = true;
+    bool field3CAbsent = true;
+    uint32 messageLength = 0;
+    if (spam_type == 1)
+    {
+        field38Absent = recv_data.ReadBit();
+        messageLength = recv_data.ReadBits(8);
+        field3CAbsent = recv_data.ReadBit();
+    }
+
+    recv_data.ReadGuidMask<4, 5, 6, 7, 3, 1, 2, 0>(spammerGuid);
+
+    bool mailIndexAbsent = true;
+    if (spam_type == 0)
+    {
+        mailIndexAbsent = recv_data.ReadBit();
+    }
+
+    recv_data.ReadGuidBytes<0, 1, 4, 3, 6, 5, 2, 7>(spammerGuid);
+
+    if (spam_type == 1)
+    {
+        // The writer emits 0x3C before 0x38, which is the reverse of the order
+        // their presence bits were written in.
+        if (!field3CAbsent)
+        {
+            recv_data >> unk4;
+        }
+        if (!field38Absent)
+        {
+            recv_data >> unk2;
+        }
+        description = recv_data.ReadString(messageLength);
+    }
+    else if (!mailIndexAbsent)
+    {
+        recv_data >> unk2;                                  // mail index, writer field this+0xBF8
+    }
+
+    if (!field1CAbsent)
+    {
+        recv_data >> unk1;
+    }
+    if (!field18Absent)
+    {
+        recv_data >> unk3;
     }
 
     // NOTE: all chat messages from this spammer automatically ignored by spam reporter until logout in case chat spam.
     // if it's mail spam - ALL mails from this spammer automatically removed by client
 
-    // Complaint Received message
+    // Complaint Received message.
+    //
+    // STALE: this is the pre-MoP single-uint8 body, not an 18414 one, and it has
+    // never been verified. It is inert today behind a double gate -- CMSG_COMPLAIN
+    // is unregistered so this handler is unreachable, and SMSG_COMPLAIN_RESULT is
+    // not admitted by IsEnterWorldConverted so the packet would be dropped anyway.
+    // The client also has no reader for 0x128F at all: the binary carries seven
+    // immediates for 0x319 and none for 0x128F. Re-derive or delete this reply
+    // before either gate is opened. CalendarHandler.cpp sends the same opcode with
+    // a different, equally stale two-uint8 body; both need settling together.
     WorldPacket data(SMSG_COMPLAIN_RESULT, 1);
     data << uint8(0);
     SendPacket(&data);
 
-    DEBUG_LOG("REPORT SPAM: type %u, spammer %s, unk1 %u, unk2 %u, unk3 %u, unk4 %u, message %s", spam_type, spammerGuid.GetString().c_str(), unk1, unk2, unk3, unk4, description.c_str());
+    DEBUG_LOG("REPORT SPAM: type %u, spammer %s, unk1 %u, unk2 %u, unk3 %u, "
+              "unk4 %u, message %s",
+              spam_type, spammerGuid.GetString().c_str(),
+              unk1, unk2, unk3, unk4, description.c_str());
 }
 
 void WorldSession::HandleRealmSplitOpcode(WorldPacket& recv_data)
