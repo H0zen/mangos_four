@@ -460,13 +460,22 @@ namespace
     /// Shared shape of the 18414 group-management requests: a 0x7F family
     /// marker, a bit-packed GUID presence mask, then the present bytes each
     /// XORed with one. Only the mask and byte orders differ per opcode.
+    /// `leadingByte`, when given, is read BEFORE the marker. Most of the family
+    /// leads with the marker, but CMSG_GROUP_CHANGE_SUB_GROUP puts its subgroup
+    /// number first and the marker second.
     bool ReadMarkedGuid(WorldPacket& in, uint8 const (&maskOrder)[8],
         uint8 const (&byteOrder)[8], ObjectGuid& guid, bool* extraBit,
-        size_t extraBitPosition)
+        size_t extraBitPosition, uint8* leadingByte = nullptr)
     {
-        if (in.rpos() != 0 || in.size() - in.rpos() < 2)
+        size_t const fixed = leadingByte ? 3u : 2u;
+        if (in.rpos() != 0 || in.size() - in.rpos() < fixed)
         {
             return false;
+        }
+
+        if (leadingByte)
+        {
+            in >> *leadingByte;
         }
 
         uint8 marker = 0;
@@ -578,6 +587,45 @@ bool MopGroupPromotePackets::ParseAssistant(WorldPacket& in, AssistantRequest& o
         return false;
     }
 
+    out = parsed;
+    return true;
+}
+
+bool MopGroupPromotePackets::ParseChangeSubGroup(WorldPacket& in, ChangeSubGroupRequest& out)
+{
+    // Build 18414 writer sub_66920A, vtable D63250 slot 1; slot 2 sub_661D90
+    // writes opcode 6041. The subgroup number LEADS and the 0x7F marker is
+    // second -- the only member of this family that does not lead with the
+    // marker. Mask order 1,4,6,3,7,2,0,5, byte order 2,6,1,5,3,4,0,7.
+    //
+    // Verified byte-exact against a captured body: 05 7F 9E 88 E8 07 A6 07,
+    // decoding to subgroup 5 with five present GUID bytes.
+    //
+    // Two reference forks disagree on the two leading bytes and the binary
+    // settles it: one reads them as PartyIndex then groupNr, which takes the
+    // 0x7F marker as the subgroup number and so rejects every request against
+    // MAX_RAID_SUBGROUPS. The order below is what the client actually writes.
+    //
+    // The legacy reader took a std::string first, so it would have read the
+    // subgroup byte 0x05 as a string length.
+    static uint8 const maskOrder[8] = { 1, 4, 6, 3, 7, 2, 0, 5 };
+    static uint8 const byteOrder[8] = { 2, 6, 1, 5, 3, 4, 0, 7 };
+
+    ChangeSubGroupRequest parsed;
+    uint8 subGroup = 0;
+    if (!ReadMarkedGuid(in, maskOrder, byteOrder, parsed.targetGuid, nullptr, 0, &subGroup))
+    {
+        in.rfinish();
+        return false;
+    }
+
+    if (subGroup >= MAX_RAID_SUBGROUPS)
+    {
+        in.rfinish();
+        return false;
+    }
+
+    parsed.subGroup = subGroup;
     out = parsed;
     return true;
 }

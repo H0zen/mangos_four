@@ -1245,6 +1245,14 @@ void InitializeOpcodes()
     // like a working feature that simply never fires.
     DefC(CMSG_RANDOM_ROLL, "CMSG_RANDOM_ROLL", STATUS_LOGGEDIN, PROCESS_THREADUNSAFE, &WorldSession::HandleRandomRollOpcode);
 
+    // Moving a raid member between subgroups. Same family as the others, but
+    // the subgroup number LEADS and the 0x7F marker is second. Answers over the
+    // already-admitted SMSG_GROUP_LIST, so no reply admission is needed.
+    //
+    // The legacy reader took a std::string first, so it would have read the
+    // subgroup byte as a string length.
+    DefC(CMSG_GROUP_CHANGE_SUB_GROUP, "CMSG_GROUP_CHANGE_SUB_GROUP", STATUS_LOGGEDIN, PROCESS_THREADUNSAFE, &WorldSession::HandleGroupChangeSubGroupOpcode);
+
     // NOT registered, deliberately: CMSG_SET_DUNGEON_DIFFICULTY 0x1A36 and
     // CMSG_SET_RAID_DIFFICULTY 0x0591. Both values are binary-proved and both
     // handlers exist with their reply SMSGs already admitted, so they look ready.

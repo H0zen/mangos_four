@@ -277,8 +277,19 @@ namespace MopGroupPromotePackets
         uint8 partyIndex = 1;                               // 1 in every observed body
     };
 
+    /// A parsed CMSG_GROUP_CHANGE_SUB_GROUP body.
+    ///
+    /// Unusually for this family the subgroup number leads and the 0x7F marker
+    /// is second. `subGroup` is range-checked during parsing.
+    struct ChangeSubGroupRequest
+    {
+        ObjectGuid targetGuid;
+        uint8 subGroup = 0;
+    };
+
     bool ParseSetLeader(WorldPacket& in, SetLeaderRequest& out);
     bool ParseAssistant(WorldPacket& in, AssistantRequest& out);
+    bool ParseChangeSubGroup(WorldPacket& in, ChangeSubGroupRequest& out);
     bool BuildSetLeader(WorldPacket& out, SetLeaderBroadcast const& broadcast);
 }
 

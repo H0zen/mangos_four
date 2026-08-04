@@ -607,11 +607,28 @@ void WorldSession::HandleMinimapPingOpcode(WorldPacket& recv_data)
  */
 void WorldSession::HandleRandomRollOpcode(WorldPacket& recv_data)
 {
+    // Build 18414 writer sub_66748A, vtable D62DF0 slot 1; slot 2 sub_661642
+    // writes opcode 2211. The wire order is MAXIMUM then MINIMUM, then the 0x7F
+    // family marker -- not minimum-first as inherited, and not eight bytes:
+    //
+    //   64 00 00 00 | 01 00 00 00 | 7F      = /roll 1 100
+    //
+    // Read in the inherited order this yielded minimum=100, maximum=1, which
+    // tripped the range check below and dropped every roll in silence. The
+    // trailing marker also has to be consumed or the packet reports unprocessed
+    // tail data.
     uint32 minimum, maximum, roll;
-    recv_data >> minimum;
+    uint8 marker = 0;
     recv_data >> maximum;
+    recv_data >> minimum;
+    recv_data >> marker;
 
     /** error handling **/
+    if (marker != 0x7F)
+    {
+        return;
+    }
+
     if (minimum > maximum || maximum > 10000)               // < 32768 for urand call
     {
         return;
@@ -708,16 +725,13 @@ void WorldSession::HandleGroupRaidConvertOpcode(WorldPacket& /*recv_data*/)
  */
 void WorldSession::HandleGroupChangeSubGroupOpcode(WorldPacket& recv_data)
 {
-    std::string name;
-    uint8 groupNr;
-    recv_data >> name;
-
-    recv_data >> groupNr;
-
-    if (groupNr >= MAX_RAID_SUBGROUPS)
+    MopGroupPromotePackets::ChangeSubGroupRequest request;
+    if (!MopGroupPromotePackets::ParseChangeSubGroup(recv_data, request))
     {
         return;
     }
+
+    uint8 const groupNr = request.subGroup;
 
     // we will get correct pointer for group here, so we don't have to check if group is BG raid
     Group* group = GetPlayer()->GetGroup();
@@ -737,17 +751,21 @@ void WorldSession::HandleGroupChangeSubGroupOpcode(WorldPacket& recv_data)
     }
     /********************/
 
+    // The 18414 request identifies the target by GUID, so there is no name to
+    // resolve and no chance of moving a same-named character in another group.
+    if (!group->IsMember(request.targetGuid))
+    {
+        return;
+    }
+
     // everything is fine, do it
-    if (Player* player = sObjectMgr.GetPlayer(name.c_str()))
+    if (Player* player = sObjectMgr.GetPlayer(request.targetGuid))
     {
         group->ChangeMembersGroup(player, groupNr);
     }
     else
     {
-        if (ObjectGuid guid = sObjectMgr.GetPlayerGuidByName(name.c_str()))
-        {
-            group->ChangeMembersGroup(guid, groupNr);
-        }
+        group->ChangeMembersGroup(request.targetGuid, groupNr);
     }
 }
 
