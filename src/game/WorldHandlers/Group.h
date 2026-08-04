@@ -1301,6 +1301,8 @@ class Group
             bool        assistant;
             uint32      lastMap;
             bool        readyCheckHasResponded;
+            /* LFG role bitmask the player chose: tank, healer, damage. */
+            uint8       roles;
         };
         typedef std::list<MemberSlot> MemberSlotList;
         typedef MemberSlotList::const_iterator member_citerator;
@@ -1488,6 +1490,61 @@ class Group
          *
          * @param state true to make everyone an assistant, false to clear.
          */
+        /**
+         * @brief Records the LFG role a member chose for themselves.
+         *
+         * SMSG_GROUP_LIST already transmits this per member, so the roster
+         * carries it once stored; there was simply no way to set it.
+         *
+         * @param guid  the member choosing a role.
+         * @param roles the role bitmask.
+         * @return true when the value changed.
+         */
+        bool SetMemberRoles(ObjectGuid guid, uint8 roles)
+        {
+            member_witerator slot = _getMemberWSlot(guid);
+            if (slot == m_memberSlots.end() || slot->roles == roles)
+            {
+                return false;
+            }
+
+            slot->roles = roles;
+            SendUpdate();
+            return true;
+        }
+        uint8 GetMemberRoles(ObjectGuid guid) const
+        {
+            member_citerator slot = _getMemberCSlot(guid);
+            return slot != m_memberSlots.end() ? slot->roles : uint8(0);
+        }
+        /**
+         * @brief Starts a role check, clearing every member's chosen role.
+         *
+         * The client shows the poll as in progress while roles are unset, so
+         * clearing is what makes a second check ask again rather than display
+         * the previous answers.
+         *
+         * @param initiator the leader or assistant who started it.
+         */
+        void BeginRolePoll(ObjectGuid initiator)
+        {
+            bool changed = false;
+            for (member_witerator itr = m_memberSlots.begin(); itr != m_memberSlots.end(); ++itr)
+            {
+                if (itr->roles != 0)
+                {
+                    itr->roles = 0;
+                    changed = true;
+                }
+            }
+
+            // The roster carries the roles, so a poll is expressed by resending
+            // it with them cleared.
+            if (changed || initiator)
+            {
+                SendUpdate();
+            }
+        }
         void SetEveryoneIsAssistant(bool state)
         {
             if (!isRaidGroup())

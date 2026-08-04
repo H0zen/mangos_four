@@ -1955,6 +1955,8 @@ class WorldSession
         void HandleGroupChangeSubGroupOpcode(WorldPacket& recv_data);
         void HandleGroupAssistantLeaderOpcode(WorldPacket& recv_data);
         void HandleGroupEveryoneIsAssistantOpcode(WorldPacket& recv_data);
+        void HandleGroupSetRolesOpcode(WorldPacket& recv_data);
+        void HandleGroupInitiateRolePollOpcode(WorldPacket& recv_data);
         void HandlePartyAssignmentOpcode(WorldPacket& recv_data);
 
         void HandlePetitionBuyOpcode(WorldPacket& recv_data);

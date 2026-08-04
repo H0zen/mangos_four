@@ -885,6 +885,8 @@ enum OpcodesList
     MSG_PARTY_ASSIGNMENT                         = 0x0424,    // 4.3.4 15595 (no client leaf)
     CMSG_SET_PARTY_ASSIGNMENT                    = 0x1802,    // 5.4.8 18414 (Wow.exe binary: sub_902C83 -> sub_66105D writes 6146)
     CMSG_SET_EVERYONE_IS_ASSISTANT               = 0x01E1,    // 5.4.8 18414 (Wow.exe binary: sub_661450 writes 481; no corpus traffic)
+    CMSG_GROUP_SET_ROLES                         = 0x1A92,    // 5.4.8 18414 (Wow.exe binary: sub_660FCB writes 6802)
+    CMSG_GROUP_INITIATE_ROLE_POLL                = 0x1882,    // 5.4.8 18414 (Wow.exe binary: sub_660E1F writes 6274)
     SMSG_OFFER_PETITION_ERROR                    = 0x161E,    // 5.4.8 18414 (Wow.exe leaf; name single-source fork)
     SMSG_TIME_SYNC_REQ                           = 0x1A8F,    // 5.4.8 18414 (Wow.exe binary; reader sub_6D9F28, handler sub_7AED46)
     CMSG_TIME_SYNC_RESP                          = 0x01DB, // 5.4.8 18414 (Wow.exe writer sub_670801, body sub_6707E0)

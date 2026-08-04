@@ -899,6 +899,145 @@ void WorldSession::HandleGroupEveryoneIsAssistantOpcode(WorldPacket& recv_data)
 }
 
 /**
+ * @brief Handles a player choosing their own LFG role.
+ *
+ * @param recv_data The received opcode packet.
+ */
+void WorldSession::HandleGroupSetRolesOpcode(WorldPacket& recv_data)
+{
+    // Build 18414 writer sub_665BD9, vtable D6369C slot 1; slot 2 sub_660FCB
+    // writes opcode 6802. Layout:
+    //
+    //   uint8  0x7F marker
+    //   uint32 role bitmask
+    //   bits   GUID mask 2,0,7,4,1,3,6,5, then FlushBits
+    //   bytes  GUID 1,5,2,6,7,0,4,3, each ^1, omitted when zero
+    //
+    // Verified byte-exact against 7F 08 00 00 00 EC EC C9 3D 05 E9 04.
+    if (recv_data.rpos() != 0 || recv_data.size() < 6)
+    {
+        recv_data.rfinish();
+        return;
+    }
+
+    uint8 marker = 0;
+    uint32 roles = 0;
+    recv_data >> marker;
+    if (marker != 0x7F)
+    {
+        recv_data.rfinish();
+        return;
+    }
+    recv_data >> roles;
+
+    static uint8 const maskOrder[8] = { 2, 0, 7, 4, 1, 3, 6, 5 };
+    static uint8 const byteOrder[8] = { 1, 5, 2, 6, 7, 0, 4, 3 };
+
+    bool present[8] = { false };
+    for (uint8 index : maskOrder)
+    {
+        present[index] = recv_data.ReadBit();
+    }
+    recv_data.ResetBitReader();
+
+    size_t presentCount = 0;
+    for (size_t i = 0; i < 8; ++i)
+    {
+        if (present[i])
+        {
+            ++presentCount;
+        }
+    }
+
+    if (recv_data.size() - recv_data.rpos() != presentCount)
+    {
+        recv_data.rfinish();
+        return;
+    }
+
+    uint8 bytes[8] = { 0 };
+    for (uint8 index : byteOrder)
+    {
+        if (!present[index])
+        {
+            continue;
+        }
+        uint8 raw = 0;
+        recv_data >> raw;
+        if (raw == 1)
+        {
+            recv_data.rfinish();
+            return;
+        }
+        bytes[index] = raw ^ 1;
+    }
+
+    uint64 rawGuid = 0;
+    for (size_t i = 0; i < 8; ++i)
+    {
+        rawGuid |= uint64(bytes[i]) << (i * 8);
+    }
+    ObjectGuid const target(rawGuid);
+
+    Group* group = GetPlayer()->GetGroup();
+    if (!group)
+    {
+        return;
+    }
+
+    // A role is chosen for oneself. The GUID in the body is the sender's own,
+    // and honouring an arbitrary one would let a player set anybody's role.
+    if (target && target != GetPlayer()->GetObjectGuid())
+    {
+        return;
+    }
+
+    // Only tank, healer and damage exist; anything else is not a role the
+    // roster or the dungeon finder can represent.
+    uint8 const accepted = uint8(roles & (PLAYER_ROLE_TANK | PLAYER_ROLE_HEALER | PLAYER_ROLE_DAMAGE));
+    if (uint32(accepted) != roles)
+    {
+        return;
+    }
+
+    group->SetMemberRoles(GetPlayer()->GetObjectGuid(), accepted);
+}
+
+/**
+ * @brief Handles a leader or assistant starting a role check.
+ *
+ * @param recv_data The received opcode packet.
+ */
+void WorldSession::HandleGroupInitiateRolePollOpcode(WorldPacket& recv_data)
+{
+    // Build 18414 writer sub_6696A8, vtable D63110 slot 1; slot 2 sub_660E1F
+    // writes opcode 6274. The whole body is a single byte.
+    if (recv_data.size() != 1)
+    {
+        return;
+    }
+
+    uint8 partyIndex = 0;
+    recv_data >> partyIndex;
+
+    Group* group = GetPlayer()->GetGroup();
+    if (!group)
+    {
+        return;
+    }
+
+    if (!group->IsLeader(GetPlayer()->GetObjectGuid()) &&
+        !group->IsAssistant(GetPlayer()->GetObjectGuid()))
+    {
+        return;
+    }
+
+    // Starting a check clears what everyone previously chose, so the roster
+    // shows the poll in progress rather than last time's answers.
+    group->BeginRolePoll(GetPlayer()->GetObjectGuid());
+}
+
+/**
  * @brief Updates main tank or main assist raid assignments.
  *
  * @param recv_data The received opcode packet.

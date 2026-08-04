@@ -1052,6 +1052,7 @@ bool Group::LoadMemberFromDB(uint32 guidLow, uint8 subgroup, bool assistant)
     member.group     = subgroup;
     member.assistant = assistant;
     member.readyCheckHasResponded = false;
+    member.roles     = 0;
     m_memberSlots.push_back(member);
 
     SubGroupCounterIncrease(subgroup);
@@ -2347,6 +2348,9 @@ void Group::SendUpdateToPlayer(ObjectGuid guid)
             record.status |= MEMBER_STATUS_PVP;
         record.subgroup = citr->group;
         record.flags = uint8(GetFlags(*citr));
+        // The roster has always carried a per-member role byte; nothing ever
+        // filled it, so every member reported "no role" regardless of choice.
+        record.roles = citr->roles;
         update.members.push_back(record);
     }
 

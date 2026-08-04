@@ -1283,6 +1283,16 @@ void InitializeOpcodes()
     // UI exposes the toggle. Answers over the already-admitted SMSG_GROUP_LIST.
     DefC(CMSG_SET_EVERYONE_IS_ASSISTANT, "CMSG_SET_EVERYONE_IS_ASSISTANT", STATUS_LOGGEDIN, PROCESS_THREADUNSAFE, &WorldSession::HandleGroupEveryoneIsAssistantOpcode);
 
+    // Roles and the role check. Both were UNDECLARED -- the client sends them
+    // and they were logged as unhandled UNKNOWN opcodes.
+    //
+    // SMSG_GROUP_LIST has always carried a per-member role byte, but nothing
+    // filled it, so every member reported "no role" no matter what they picked.
+    // Storing the choice is what makes the roster meaningful, which is why no
+    // separate reply needs admitting.
+    DefC(CMSG_GROUP_SET_ROLES, "CMSG_GROUP_SET_ROLES", STATUS_LOGGEDIN, PROCESS_THREADUNSAFE, &WorldSession::HandleGroupSetRolesOpcode);
+    DefC(CMSG_GROUP_INITIATE_ROLE_POLL, "CMSG_GROUP_INITIATE_ROLE_POLL", STATUS_LOGGEDIN, PROCESS_THREADUNSAFE, &WorldSession::HandleGroupInitiateRolePollOpcode);
+
     // NOT registered, deliberately: CMSG_SET_DUNGEON_DIFFICULTY 0x1A36 and
     // CMSG_SET_RAID_DIFFICULTY 0x0591. Both values are binary-proved and both
     // handlers exist with their reply SMSGs already admitted, so they look ready.
