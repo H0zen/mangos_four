@@ -2275,7 +2275,10 @@ void Player::SetGameMaster(bool on)
 
         if (Pet* pet = GetPet())
         {
-            if (m_ExtraFlags |= PLAYER_EXTRA_GM_ON)
+            // `&`, not `|=`: this is a test. The assignment made the condition always true,
+            // which happened to be the right answer here -- the flag is set unconditionally a
+            // dozen lines up -- so it never showed a symptom.
+            if (m_ExtraFlags & PLAYER_EXTRA_GM_ON)
                 pet->setFaction(35);
             pet->GetHostileRefManager().setOnlineOfflineState(false);
         }

@@ -40,6 +40,12 @@
 
 #include "SQLStorage.h"
 
+// Named rather than inherited from an umbrella header: this file calls strlen/memset,
+// asserts, and holds a std::map index.
+#include <cassert>
+#include <cstring>
+#include <map>
+
 // -----------------------------------  SQLStorageBase  ---------------------------------------- //
 
 /**
