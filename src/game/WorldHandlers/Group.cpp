@@ -602,6 +602,98 @@ bool MopGroupPromotePackets::ParseAssistant(WorldPacket& in, AssistantRequest& o
     return true;
 }
 
+bool MopLfgLeavePackets::ParseRequest(WorldPacket& in, Request& out)
+{
+    // Build 18414 writer sub_6674C9 (Wow.exe.c:879339-879394). Layout:
+    //
+    //   uint32 ticketType
+    //   uint32 ticketFlags
+    //   uint32 ticketTime
+    //   uint32 clientQueueId
+    //   bits   GUID presence in index order 6,0,2,3,1,5,4,7, then alignment
+    //   bytes  GUID in index order 2,0,4,6,3,1,5,7, each ^1, omitted when zero
+    //
+    // Exact size is 17 + popcount(GUID). Verified byte-exact against four real
+    // captured bodies, including the 17-byte zero-mask form a client sends when
+    // it has no ticket -- so an empty mask is legitimate and must parse, not be
+    // rejected.
+    //
+    // CAVEAT: retail coverage carries only two distinct nonzero masks, so GUID
+    // indices 4 and 5 are never present in any captured body. Their positions
+    // rest on the writer alone.
+    auto fail = [&in]()
+    {
+        in.rfinish();
+        return false;
+    };
+
+    if (in.rpos() != 0 || in.size() < 17)
+    {
+        return fail();
+    }
+
+    Request parsed;
+    in >> parsed.ticketType;
+    in >> parsed.ticketFlags;
+    in >> parsed.ticketTime;
+    in >> parsed.clientQueueId;
+
+    static uint8 const maskOrder[8] = { 6, 0, 2, 3, 1, 5, 4, 7 };
+    static uint8 const byteOrder[8] = { 2, 0, 4, 6, 3, 1, 5, 7 };
+
+    bool present[8] = { false };
+    for (uint8 index : maskOrder)
+    {
+        present[index] = in.ReadBit();
+    }
+    in.ResetBitReader();
+
+    size_t presentCount = 0;
+    for (size_t i = 0; i < 8; ++i)
+    {
+        if (present[i])
+        {
+            ++presentCount;
+        }
+    }
+
+    if (in.size() - in.rpos() != presentCount)
+    {
+        return fail();
+    }
+
+    uint8 bytes[8] = { 0 };
+    for (uint8 index : byteOrder)
+    {
+        if (!present[index])
+        {
+            continue;
+        }
+        uint8 raw = 0;
+        in >> raw;
+        if (raw == 1)
+        {
+            return fail();
+        }
+        bytes[index] = raw ^ 1;
+    }
+
+    if (in.rpos() != in.size())
+    {
+        return fail();
+    }
+
+    uint64 rawGuid = 0;
+    for (size_t i = 0; i < 8; ++i)
+    {
+        rawGuid |= uint64(bytes[i]) << (i * 8);
+    }
+    parsed.ticketGuid = ObjectGuid(rawGuid);
+
+    out = parsed;
+    return true;
+}
+
 bool MopGroupPromotePackets::BuildRolePollInform(WorldPacket& out, RolePollInform const& inform)
 {
     // The prompt a role check sends to every member. Layout:

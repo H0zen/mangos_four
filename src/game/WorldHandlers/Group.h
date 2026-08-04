@@ -314,6 +314,25 @@ namespace MopGroupPromotePackets
     bool BuildSetLeader(WorldPacket& out, SetLeaderBroadcast const& broadcast);
 }
 
+namespace MopLfgLeavePackets
+{
+    /// A parsed CMSG_LFG_LEAVE body.
+    ///
+    /// Every field is a client-supplied ticket echo. None of it is authority:
+    /// the server cancels the caller's OWN queue entry, so the ticket is only
+    /// useful for matching what the client thinks it is leaving.
+    struct Request
+    {
+        ObjectGuid ticketGuid;
+        uint32 ticketType = 0;
+        uint32 ticketFlags = 0;
+        uint32 ticketTime = 0;
+        uint32 clientQueueId = 0;
+    };
+
+    bool ParseRequest(WorldPacket& in, Request& out);
+}
+
 namespace MopGroupMarkerPackets
 {
     struct MinimapPingRequest

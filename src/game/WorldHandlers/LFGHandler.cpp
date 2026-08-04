@@ -155,11 +155,33 @@ void WorldSession::HandleLfgJoinOpcode(WorldPacket& recv_data)
     sLFGMgr.JoinLFG(roles, requested, comment, GetPlayer());
 }
 
-void WorldSession::HandleLfgLeaveOpcode(WorldPacket& /*recv_data*/)
+void WorldSession::HandleLfgLeaveOpcode(WorldPacket& recv_data)
 {
     DEBUG_LOG("CMSG_LFG_LEAVE");
 
-    // SendLfgUpdate(false, LFG_UPDATE_LEAVE, 0);
+    // The body is a ticket echo -- type, flags, time, queue id and a packed
+    // GUID. None of it is authority: the server cancels the CALLER's own queue
+    // entry, so the ticket only says what the client believes it is leaving.
+    // It is parsed rather than skipped so a malformed body is refused instead
+    // of silently cancelling something.
+    MopLfgLeavePackets::Request request;
+    if (!MopLfgLeavePackets::ParseRequest(recv_data, request))
+    {
+        return;
+    }
+
+    Player* plr = GetPlayer();
+    if (!plr)
+    {
+        return;
+    }
+
+    // A grouped player leaves on behalf of the group, which is how the queue
+    // stores it -- JoinLFG keys group entries by the GROUP guid.
+    Group* pGroup = plr->GetGroup();
+    bool const isGroup = pGroup && pGroup->IsLeader(plr->GetObjectGuid());
+
+    sLFGMgr.LeaveLFG(plr, isGroup);
 }
 
 void WorldSession::HandleLfgGetStatusOpcode(WorldPacket& /*recv_data*/)

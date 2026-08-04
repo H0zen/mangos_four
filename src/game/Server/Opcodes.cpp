@@ -1498,6 +1498,12 @@ void InitializeOpcodes()
     // length before anything is allocated from it.
     DefC(CMSG_LFG_JOIN, "CMSG_LFG_JOIN", STATUS_LOGGEDIN, PROCESS_THREADUNSAFE, &WorldSession::HandleLfgJoinOpcode);
 
+    // Leaving the queue. Registered WITH the join being wired, because a
+    // player who can queue and cannot cancel is worse off than one who
+    // cannot queue at all. Body is a ticket echo verified byte-exact against
+    // four captured bodies, including the 17-byte zero-mask form.
+    DefC(CMSG_LFG_LEAVE, "CMSG_LFG_LEAVE", STATUS_LOGGEDIN, PROCESS_THREADUNSAFE, &WorldSession::HandleLfgLeaveOpcode);
+
     // The mailbox family and the guild-bank tab query. Each inherited reader took
     // a raw ObjectGuid first; at 18414 all four pack it and the scalars lead. The
     // readers and their fixtures are in place for all four.
