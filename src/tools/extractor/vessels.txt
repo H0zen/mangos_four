@@ -9,6 +9,9 @@
 # If those two ever disagree the baker writes w_<id>.tile for a map the server never asks for,
 # and the ship sails with no deck.
 #
+# REGENERATE THIS WHENEVER `transports` GAINS A ROW. A vessel absent from this list gets no
+# baked hull, and mangosd says so at start-up: "map <id> has no baked terrain".
+#
 # Map.dbc ALSO has rows named for a ROUTE -- Transport_Menethil_Valgarde (612),
 # Transport_Moa'ki_Kamagua (621), Transport_Orgrimmar_to_Thunderbluff (647) and eight more.
 # Those ids exist and are deliberately NOT used, for two reasons:
@@ -25,32 +28,40 @@
 # as a game object model, so the baker fills the deck from go_<displayId>.tile either way, and
 # the map id never goes on the wire.
 #
-# 27 vessels: 12 matched, 15 minted.
+# 35 vessels: 12 matched, 23 minted. 17 distinct hull models, all present in gomodels/.
 
-593      3015   # Steamwheedle Cartel ports, Ratchet and Booty Bay ("The Maiden's Fancy") (entry 20808)
-591      3031   # Orgrimmar, Durotar and Undercity, Tirisfal Glades ("The Thundercaller") (entry 164871)
-589      3031   # Orgrimmar, Durotar and Grom'gol Base Camp, Stranglethorn Vale ("The Iron Eagle") (entry 175080)
-584      3015   # Menethil Harbor, Wetlands and Theramore Isle, Dustwallow Marsh ("The Lady Mehley") (entry 176231)
-588      3015   # Stormwind Harbor and Auberdine, Darkshore ("Ship (The Bravery)") (entry 176310)
-590      3031   # Undercity, Tirisfal Glades and Grom'gol Base Camp, Stranglethorn Vale ("The Purple Princess") (entry 176495)
-587      7087   # The Forgotten Coast, Feralas and Feathermoon Stronghold, Sardor Isle, Feralas ("Feathermoon Ferry") (entry 177233)
-1181646  7087   # Valaar's Berth, Azuremyst Isle and Auberdine, Darkshore ("Elune's Blessing") (entry 181646) [minted]
-1181688  7446   # Menethil Harbor, Wetlands and Valgarde, Howling Fjord ("Northspear") (entry 181688) [minted]
-1181689  7546   # Undercity, Tirisfal Glades and Vengeance Landing, Howling Fjord ("Zeppelin, Horde (Cloudkisser)") (entry 181689) [minted]
-592      7546   # Orgrimmar, Durotar and Warsong Hold, Borean Tundra ("Zeppelin, Horde (The Mighty Wind)") (entry 186238)
-1186371  3031   # Westguard Keep in Howling Fjord to bombard pirate ("Zeppelin") (entry 186371) [minted]
-594      7570   # Not Boardable - Cyrcling in Howling Fjord ("Sister Mercy") (entry 187038)
-1187568  7636   # Unu'pe, Borean Tundra and Moa'ki Harbor, Dragonblight ("Turtle (Walker of Waves)") (entry 187568) [minted]
-1188511  7636   # Moa'ki Harbor and Kamagua ("Turtle (Green Island)") (entry 188511) [minted]
-1190536  7446   # Stormwing Harbor and Valiance Keep, Borean Tundra ("The Kraken") (entry 190536) [minted]
+593      3015   # Ratchet and Booty Bay (entry 20808)
+591      3031   # Orgrimmar and Undercity (entry 164871)
+589      3031   # Grom'Gol Base Camp and Orgrimmar (entry 175080)
+584      3015   # Menethil Harbor and Theramore Isle (entry 176231)
+588      3015   # Menethil Harbor and Auberdine (entry 176310)
+590      3031   # Grom'Gol Base Camp and Undercity (entry 176495)
+1181646  7087   # Azuremyst and Auberdine (entry 181646) [minted]
+1181688  7446   # Valgarde and Menethil (entry 181688) [minted]
+1181689  7546   # Undercity and Vengeance Landing (entry 181689) [minted]
+592      7546   # Orgrimmar and Warsong Hold (entry 186238)
+1186371  3031   # Stolen Zeppelin (entry 186371) [minted]
+594      7570   # Pirate boat (entry 187038)
+1187568  7636   # Moa'ki Harbor Turtle Boat (entry 187568) [minted]
+1188511  7636   # Unu'pe Turtle Boat (entry 188511) [minted]
+1190536  7446   # Stormwind Harbor and Valiance Keep, Borean Tundra ("The Kraken") (entry 190536) [minted]
 1190549  3031   # Orgrimmar and Thunder Bluff (entry 190549) [minted]
 622      8253   # Horde gunship patrolling above Icecrown ("Orgrim's Hammer") (entry 192241)
 623      8254   # Alliance gunship patrolling above Icecrown ("The Skybreaker") (entry 192242)
-662      9534   # Ship to Vashj'ir - (Alliance) (entry 197195)
-1203428  8253   # Worgen area - Orc Gunship (entry 203428) [minted]
-1203466  9534   # Ship to Vashj'ir - (Horde) (entry 203466) [minted]
-1203626  7546   # The Spear of Durotar (entry 203626) [minted]
-1204018  8254   # Deepholm - Alliance Gunship (entry 204018) [minted]
+1195121  9002   # Alliance Gunship on Isle of Conquest BG (entry 195121) [minted]
+1195276  9001   # Horde Gunship on Isle of Conquest BG (entry 195276) [minted]
+662      9534   # Alliance Ship to Vashj'ir (entry 197195)
+1201598  9002   # The Skybreaker (entry 201598) [minted]
+1201599  8253   # Orgrim's Hammer (entry 201599) [minted]
+1201811  9150   # Icecrown_Citadel_Alliance_10 (entry 201811) [minted]
+1201812  9151   # Icecrown_Citadel_Horde_10 (entry 201812) [minted]
+1203428  8253   # Orc Gunship in Gilneas (quest 26706) (entry 203428) [minted]
+1203466  9534   # Horde Ship to Vashj'ir (entry 203466) [minted]
+1203620  9582   # Alliance Submarine to Leviathan Cave (entry 203620) [minted]
+1203621  9583   # Horde Submarine to Leviathan Cave (entry 203621) [minted]
+1203626  7546   # <Need Name for entry: 203626> (entry 203626) [minted]
+743      10308  # Horde Submarine circling Abyssal Maw (entry 203730)
+1204018  8254   # Alliance Gunship patrolling in Deepholm (entry 204018) [minted]
 1206328  3031   # Krazzworks to Dragonmaw Port (entry 206328) [minted]
 1206329  3031   # Dragonmaw Port to Krazzworks (entry 206329) [minted]
-1207227  3031   # Krazzworks Attack Zeppelin (entry 207227) [minted]
+1207227  3031   # Krazzworks Attack Zeppelin (quest 28590) (entry 207227) [minted]
