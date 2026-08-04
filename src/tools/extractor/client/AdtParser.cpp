@@ -108,11 +108,15 @@ namespace world::terrain
             return 0;
         }
 
+        using ChunkSeen = std::array<bool, size_t(ADT_CHUNKS) * ADT_CHUNKS>;
+
         /// False when the record is unreadable, which FAILS THE WHOLE PARSE rather than
         /// skipping the chunk: the height arrays are zero-filled before the walk, so a
         /// chunk quietly left out is not a hole in the tile -- it is 8x8 cells of flat
-        /// ground at 0.0, baked and counted as a successful map square.
-        bool ReadMcnk(const uint8_t* mcnk, uint32_t mcnkSize, AdtData& out)
+        /// ground at 0.0, baked and counted as a successful map square. Marks its own
+        /// index in @p filled, which is how the caller knows the grid is whole.
+        bool ReadMcnk(const uint8_t* mcnk, uint32_t mcnkSize, AdtData& out,
+                      ChunkSeen& filled)
         {
             // Every field below is read from the 128-byte header, and the caller has only
             // proved that the record's DECLARED size fits the file. A record shorter than
@@ -142,31 +146,38 @@ namespace world::terrain
                     : WidenLowResHoles(uint16_t(RdU32(h + MCNK_HOLES_LOW_RES) & 0xFFFF));
             out.areaIds[iy * ADT_CHUNKS + ix] = static_cast<uint16_t>(RdU32(h + MCNK_AREA_ID) & 0xFFFF);
 
+            // MCVT is the chunk's ENTIRE contribution to the heightmap, and the grid was
+            // zero-filled before the walk, so a chunk without one is not a gap in the
+            // tile -- it is 9x9 corners of flat ground at 0.0 that nothing downstream can
+            // tell from real terrain. Skipping it here is what let a corrupt ADT bake.
             uint32_t mcvtSize = 0;
             const uint32_t offsMcvt = FindSubChunk(mcnk, span, "MCVT", mcvtSize);
-            if (offsMcvt && mcvtSize >= 145 * 4)
+            if (!offsMcvt || mcvtSize < 145 * 4)
             {
-                // MCVT is 145 floats: 9 V9 corners then 8 V8 centres, per row.
-                const uint8_t* hm = mcnk + offsMcvt;
-                for (int y = 0; y <= CELL; ++y)
+                return false;
+            }
+
+            // MCVT is 145 floats: 9 V9 corners then 8 V8 centres, per row.
+            const uint8_t* hm = mcnk + offsMcvt;
+            for (int y = 0; y <= CELL; ++y)
+            {
+                const int cy = int(iy) * CELL + y;
+                for (int x = 0; x <= CELL; ++x)
                 {
-                    const int cy = int(iy) * CELL + y;
-                    for (int x = 0; x <= CELL; ++x)
-                    {
-                        const int cx = int(ix) * CELL + x;
-                        out.v9[cy * ADT_V9 + cx] = baseZ + RdF32(hm + (y * 17 + x) * 4);
-                    }
-                }
-                for (int y = 0; y < CELL; ++y)
-                {
-                    const int cy = int(iy) * CELL + y;
-                    for (int x = 0; x < CELL; ++x)
-                    {
-                        const int cx = int(ix) * CELL + x;
-                        out.v8[cy * ADT_GRID + cx] = baseZ + RdF32(hm + (y * 17 + 9 + x) * 4);
-                    }
+                    const int cx = int(ix) * CELL + x;
+                    out.v9[cy * ADT_V9 + cx] = baseZ + RdF32(hm + (y * 17 + x) * 4);
                 }
             }
+            for (int y = 0; y < CELL; ++y)
+            {
+                const int cy = int(iy) * CELL + y;
+                for (int x = 0; x < CELL; ++x)
+                {
+                    const int cx = int(ix) * CELL + x;
+                    out.v8[cy * ADT_GRID + cx] = baseZ + RdF32(hm + (y * 17 + 9 + x) * 4);
+                }
+            }
+            filled[iy * ADT_CHUNKS + ix] = true;
 
             // MCLQ is the pre-WotLK liquid chunk and is absent from 3.3.5a client data;
             // it is read only so an older or hand-made tile is not silently dry. MH2O,
@@ -403,6 +414,7 @@ namespace world::terrain
         uint32_t mh2oSize = 0;
 
         bool sawMcnk = false;
+        ChunkSeen filled{};
         size_t pos = 0;
         while (pos + 8 <= size)
         {
@@ -424,7 +436,7 @@ namespace world::terrain
                     out.areaIds.fill(0);
                     sawMcnk = true;
                 }
-                if (!ReadMcnk(tag, csize, out))
+                if (!ReadMcnk(tag, csize, out, filled))
                 {
                     return false;
                 }
@@ -485,7 +497,22 @@ namespace world::terrain
             out.m2Names = ResolveNames(mmdx, mmdxSize, mmid, mmidSize);
         }
 
-        out.hasTerrain = out.hasTerrain || sawMcnk;
+        // hasTerrain HAS to mean the heightmap was read, and sawMcnk only meant a chunk
+        // tag went past. The grid is 16x16 disjoint 9x9 blocks, so one chunk missing --
+        // absent, indexed twice, or cut off by a truncated file, which the loop above
+        // exits by breaking -- leaves a block of flat 0.0 in an otherwise real tile, and
+        // every check downstream sees a tile that parsed. Partial is not terrain.
+        if (sawMcnk)
+        {
+            for (const bool ok : filled)
+            {
+                if (!ok)
+                {
+                    return false;
+                }
+            }
+            out.hasTerrain = true;
+        }
         return true;
     }
 }

@@ -2,18 +2,12 @@
 #include "terrain/WmoModel.hpp"
 
 #include <algorithm>
-#include <cmath>
 
 namespace world::terrain
 {
     namespace
     {
         constexpr float LIQUID_TILE_SIZE = 533.333f / 128.f;
-
-        // How far down to look for the floor that says which room the point is in. Longer
-        // than any storey and shorter than a WMO's full height, so a point in an open
-        // shaft does not adopt the room at the bottom of it.
-        constexpr float FLOOR_SEARCH = 60.f;
     }
 
     WmoModel::WmoModel(TriSoup soup, std::vector<uint16_t> triGroup,
@@ -122,39 +116,18 @@ namespace world::terrain
         return out;
     }
 
-    std::optional<ICollisionModel::LocalLiquid> WmoModel::LiquidLocal(const Vec3& p) const
+    void WmoModel::LiquidsLocal(const Vec3& p, std::vector<LocalLiquid>& out) const
     {
-        // WHICH ROOM the point is in decides which water it is in, and the model already
-        // answers that: the group owning the surface directly beneath it, by the same
-        // downward cast AreaInfo uses. Deciding by how NEAR a surface is instead reports a
-        // player standing between two floors as swimming in the pool one storey up -- and
-        // preferring the surface ABOVE, as this first did, gets that case wrong every time.
-        uint32_t tri = 0;
-        const Vec3 down{0.f, 0.f, -1.f};
-        if (m_bvh.Raycast(m_soup, p, down, FLOOR_SEARCH, &tri) && tri < m_triGroup.size())
-        {
-            const uint16_t gi = m_triGroup[tri];
-            if (gi < m_groups.size())
-            {
-                if (auto own = GroupLiquidAt(m_groups[gi], p))
-                {
-                    return own;
-                }
-            }
-        }
-
-        // No floor under the point -- outside the geometry, or a group that carries water
-        // and no collidable floor of its own. Nearest surface then, in either direction:
-        // it is a guess, but an unbiased one, where "above wins" was a wrong answer.
-        std::optional<LocalLiquid> best;
+        // Every group with water over this column, in serialized order. Two previous
+        // attempts chose one here instead -- first in serialized order, then by nearest
+        // surface -- and both are unanswerable from inside the model: p is a point on the
+        // sweep column, not the queried position, so "which room" cannot be decided here.
         for (const Group& g : m_groups)
         {
-            const auto cur = GroupLiquidAt(g, p);
-            if (cur && (!best || std::fabs(cur->z - p.z) < std::fabs(best->z - p.z)))
+            if (auto cur = GroupLiquidAt(g, p))
             {
-                best = cur;
+                out.push_back(*cur);
             }
         }
-        return best;
     }
 }

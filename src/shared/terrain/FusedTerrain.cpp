@@ -277,6 +277,7 @@ namespace world::terrain
         const Vec3 downWorld{0.0f, 0.0f, -1.0f};
 
         std::vector<float> hits;
+        std::vector<ICollisionModel::LocalLiquid> liquids;
 
         auto probe = [&](const std::vector<StaticInstance>& instances)
         {
@@ -312,26 +313,33 @@ namespace world::terrain
                 // The ray origin doubles as the liquid probe: MLIQ is indexed by local X
                 // and Y alone, and every real placement is a Z-rotation plus a
                 // translation, so which height along the column it is taken from cannot
-                // change the pair those come out as.
+                // change the pair those come out as. That holds ONLY while the model
+                // gathers every surface over the column; the moment it picks one, this
+                // origin is the sweep top rather than the query, and it picks by the
+                // wrong Z. Keep the choice out of the model.
                 const Vec3 pointLocal = inst.xf.worldToLocal(originWorld);
-                if (auto local = inst.model->LiquidLocal(pointLocal))
+                liquids.clear();
+                inst.model->LiquidsLocal(pointLocal, liquids);
+                for (const auto& local : liquids)
                 {
-                    const LiquidKind kind = static_cast<LiquidKind>(local->kind);
-                    if (kind != LiquidKind::None)
+                    const LiquidKind kind = static_cast<LiquidKind>(local.kind);
+                    if (kind == LiquidKind::None)
                     {
-                        // Lift the surface back through the placement itself: it sits
-                        // directly over the query column, so transforming that exact
-                        // point is exact. Reconstructing the lift by hand applies the
-                        // placement scale twice and assumes the model's local Z is
-                        // parallel to world Z.
-                        const Vec3 surfaceLocal{pointLocal.x, pointLocal.y, local->z};
-                        LiquidInfo info;
-                        info.level = inst.xf.localToWorld(surfaceLocal).z;
-                        info.kind = kind;
-                        info.entry = local->entry;
-                        info.deep = local->deep;
-                        column.AddLiquid(info);
+                        continue;
                     }
+
+                    // Lift the surface back through the placement itself: it sits
+                    // directly over the query column, so transforming that exact
+                    // point is exact. Reconstructing the lift by hand applies the
+                    // placement scale twice and assumes the model's local Z is
+                    // parallel to world Z.
+                    const Vec3 surfaceLocal{pointLocal.x, pointLocal.y, local.z};
+                    LiquidInfo info;
+                    info.level = inst.xf.localToWorld(surfaceLocal).z;
+                    info.kind = kind;
+                    info.entry = local.entry;
+                    info.deep = local.deep;
+                    column.AddLiquid(info);
                 }
             }
         };

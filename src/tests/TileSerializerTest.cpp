@@ -311,14 +311,50 @@ TEST(TileRoundTripPreservesTheBakedBvhAndItsQueries)
     }
     CHECK_EQ(mismatches, size_t(0));
 
-    const auto liquid = readWmo->LiquidLocal(Vec3{-2.f, -2.f, 0.f});
-    REQUIRE(liquid.has_value());
-    CHECK_EQ(liquid->z, 2.5f);
-    CHECK_EQ(liquid->entry, uint16_t(19));
+    std::vector<ICollisionModel::LocalLiquid> liquid;
+    readWmo->LiquidsLocal(Vec3{-2.f, -2.f, 0.f}, liquid);
+    REQUIRE(liquid.size() == size_t(1));
+    CHECK_EQ(liquid[0].z, 2.5f);
+    CHECK_EQ(liquid[0].entry, uint16_t(19));
 
     REQUIRE(back->instances[2].model->Kind() == ModelKind::Mesh);
     CHECK(back->instances[2].model->RaycastNearest(Vec3{0, 0, 20}, Vec3{0, 0, -1}, 100.f)
               .has_value());
+}
+
+TEST(TileDeclaringAGridItDoesNotCarryIsRejected)
+{
+    // Right magic, right version, and every declared count fits the file: this tile
+    // simply says it has terrain and carries none. Accepting empty unconditionally --
+    // which the first shape check did -- let it pass the startup probe, after which
+    // every height query answered nothing at all and the map was silently flat.
+    TerrainTile noGrid = MakeTile();
+    noGrid.v9.clear();
+    noGrid.v8.clear();
+
+    ScopedFile a("emptyterrain.tile");
+    REQUIRE(WriteTile(noGrid, a.path));
+    CHECK(ReadTile(a.path) == nullptr);
+
+    TerrainTile noLiquid = MakeTile();
+    noLiquid.liquidHeight.clear();
+    noLiquid.liquidShow.clear();
+    noLiquid.liquidKind.clear();
+    noLiquid.liquidEntry.clear();
+    noLiquid.liquidDeep.clear();
+
+    ScopedFile b("emptyliquid.tile");
+    REQUIRE(WriteTile(noLiquid, b.path));
+    CHECK(ReadTile(b.path) == nullptr);
+
+    // The other direction is just as malformed: a full heightmap under a flag that
+    // says there is none, which every reader skips on the flag alone.
+    TerrainTile ghost = MakeTile();
+    ghost.hasTerrain = false;
+
+    ScopedFile c("ghostterrain.tile");
+    REQUIRE(WriteTile(ghost, c.path));
+    CHECK(ReadTile(c.path) == nullptr);
 }
 
 TEST(TileReaderRejectsAForeignMagic)

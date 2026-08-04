@@ -254,7 +254,7 @@ int main(int argc, char** argv)
 
         const float delta = std::fabs(*floor - p.expected);
 
-        const auto wetSurface = column.HighestLiquid();
+        const auto wetSurface = column.LiquidAt(p.z);
         const bool wet = wetSurface && wetSurface->z >= p.z - 0.05f;
         if (wet)
         {
@@ -282,7 +282,7 @@ int main(int argc, char** argv)
 
         if (verbose)
         {
-            const auto liquid = column.HighestLiquid();
+            const auto liquid = column.LiquidAt(p.z);
             char liq[80] = "none";
             if (liquid)
             {
