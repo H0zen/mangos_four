@@ -142,23 +142,52 @@ static void SizeRule()
     CHECK(built.size() == 32 + 5 + 10 + 3 + 5);
 }
 
-// A same-realm invite, which is what this server actually sends: no realm
-// strings, no identity scalars, and every dialog-selecting flag clear so the
-// client shows PARTY_INVITE rather than the LFG or cross-realm popup.
+// The one configuration this server actually emits, asserted byte-wise across
+// the whole header rather than by length alone.
+//
+// This is where the FrameXML requirement is pinned. UIParent.lua:800 chooses the
+// dialog from these bits: any role bit shows the LFG invite popup, and the
+// cross-realm flag shows PARTY_INVITE_XREALM. If a future change sets one, an
+// ordinary friend invite silently renders as the wrong dialog while remaining a
+// well-formed packet -- which no size or round-trip check would catch.
+//
+// The GUID is a realistic one: HIGHGUID_PLAYER is 0 and a player's raw GUID is
+// its counter, so bytes 4..7 are always zero on this server. An earlier version
+// of this fixture used a captured retail GUID with byte 7 set, a shape this
+// server cannot produce.
 static void OrdinarySameRealmInvite()
 {
+    static uint8 const expectedHeader[] = {
+        0x00,   // compactRealmByteLength = 0
+        0x00,   // displayRealmByteLength = 0
+        0x0C,   // guid[2]=0, flagA=0, inviterNameByteLength=12
+        0x28,   // guid[7]=0 guid[5]=0 notAlreadyInGroup=1 flagB=0 guid[1]=1
+                // crossRealmName=0 realmTransferWarning=0, extraCount begins
+        0x00, 0x00,
+        0x02,   // extraCount ends; guid[3]=0 guid[0]=1 guid[4]=0
+        0x00    // guid[6]=0, then padding to the eighth byte
+    };
+
     MopGroupInvitePackets::Invite invite;
-    invite.inviterGuid = ObjectGuid(uint64(0x0600000002803859ULL));
+    invite.inviterGuid = ObjectGuid(uint64(0x0000000000001234ULL));
     invite.inviterName = "Humanwarrior";
 
     WorldPacket built;
     CHECK(MopGroupInvitePackets::BuildInvite(built, invite));
     CHECK(built.GetOpcode() == SMSG_GROUP_INVITE);
-    CHECK(built.size() == 32 + 0 + 0 + 12 + 5);
 
-    // compact and display realm lengths both zero in the first two bytes
-    CHECK(built.contents()[0] == 0x00);
-    CHECK(built.contents()[1] == 0x00);
+    // 32 + compactRealm(0) + displayRealm(0) + name(12) + popcount(GUID)(2)
+    CHECK(built.size() == 46);
+
+    for (size_t i = 0; i < sizeof(expectedHeader); ++i)
+    {
+        if (built.size() > i && built.contents()[i] != expectedHeader[i])
+        {
+            std::fprintf(stderr, "  same-realm header byte %u: built 0x%02X expected 0x%02X\n",
+                         uint32(i), built.contents()[i], expectedHeader[i]);
+            ++g_fail;
+        }
+    }
 }
 
 // A name the six-bit length field cannot represent must be refused rather than
