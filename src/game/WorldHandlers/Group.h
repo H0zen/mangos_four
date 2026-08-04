@@ -298,6 +298,15 @@ namespace MopGroupPromotePackets
         bool apply = false;
     };
 
+    /// SMSG_GROUP_ROLE_POLL_INFORM: the prompt each member receives when a
+    /// role check starts. `partyIndex` is 0 for the home group.
+    struct RolePollInform
+    {
+        ObjectGuid initiatorGuid;
+        uint8 partyIndex = 0;
+    };
+
+    bool BuildRolePollInform(WorldPacket& out, RolePollInform const& inform);
     bool ParsePartyAssignment(WorldPacket& in, PartyAssignmentRequest& out);
     bool ParseSetLeader(WorldPacket& in, SetLeaderRequest& out);
     bool ParseAssistant(WorldPacket& in, AssistantRequest& out);
@@ -1521,31 +1530,38 @@ class Group
             return slot != m_memberSlots.end() ? slot->roles : uint8(0);
         }
         /**
-         * @brief Starts a role check.
+         * @brief Starts a role check: clears every chosen role and prompts the
+         *        whole group to choose again.
          *
-         * NOT IMPLEMENTED, deliberately, and it must not silently do damage in
-         * the meantime.
+         * The prompt is SMSG_GROUP_ROLE_POLL_INFORM, whose body was recovered
+         * from two reference implementations that agree and verified byte-exact
+         * against three captured bodies.
          *
-         * A role check has to PROMPT each member, which means sending
-         * SMSG_GROUP_ROLE_POLL_INFORM 0x1007. That opcode is declared but not
-         * admitted, and its body is not yet derived: three captured bodies show
-         * a GUID mask byte, a second byte, then popcount(mask) GUID bytes, but
-         * every sample has a mask of 0x7C or 0x7D, so whether that second byte
-         * is a count or something that merely tracks it cannot be told apart.
-         * The client reader at 0x903C3C is the event raiser rather than the
-         * packet reader, so the layout still needs recovering.
-         *
-         * An earlier version of this cleared every member's role and resent the
-         * roster, on the assumption the client would render an unset role as a
-         * poll in progress. Live testing falsified that: the other client showed
-         * nothing, and the only effect was to discard roles people had chosen.
+         * Clearing is done FIRST so the roster and the prompt agree; an earlier
+         * version cleared roles and sent no prompt at all, which discarded
+         * people's choices to no visible effect.
          *
          * @param initiator the leader or assistant who started it.
          */
-        void BeginRolePoll(ObjectGuid /*initiator*/)
+        void BeginRolePoll(ObjectGuid initiator)
         {
-            // Intentionally empty until the prompt packet is derived. Clearing
-            // roles here would destroy real state to no visible effect.
+            for (member_witerator itr = m_memberSlots.begin(); itr != m_memberSlots.end(); ++itr)
+            {
+                itr->roles = 0;
+            }
+
+            MopGroupPromotePackets::RolePollInform inform;
+            inform.initiatorGuid = initiator;
+
+            WorldPacket data;
+            if (MopGroupPromotePackets::BuildRolePollInform(data, inform))
+            {
+                BroadcastPacket(&data, false);
+            }
+
+            // The roster carries the per-member roles, so it has to follow the
+            // prompt for the frames to show the check in progress.
+            SendUpdate();
         }
         void SetEveryoneIsAssistant(bool state)
         {

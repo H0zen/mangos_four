@@ -602,6 +602,62 @@ bool MopGroupPromotePackets::ParseAssistant(WorldPacket& in, AssistantRequest& o
     return true;
 }
 
+bool MopGroupPromotePackets::BuildRolePollInform(WorldPacket& out, RolePollInform const& inform)
+{
+    // The prompt a role check sends to every member. Layout:
+    //
+    //   bits   GUID mask 5,7,3,1,2,0,4,6, then FlushBits
+    //   bytes  GUID[7]
+    //          uint8 party index
+    //          GUID[6],[5],[0],[1],[4],[2],[3]
+    //
+    // Each present byte is written ^1 and omitted when zero, so exact size is
+    // 2 + popcount(GUID).
+    //
+    // Verified byte-exact against three captured bodies:
+    //   7C 05 01 E6 9C 4C 04        (7 B, index 1)
+    //   7D 06 00 81 62 F6 76 04     (8 B, index 0)
+    //   7D 06 00 81 69 F9 6D 05     (8 B, index 0)
+    //
+    // Note the second byte is GUID[7], NOT a count. It equals popcount in all
+    // three samples purely because every captured mask is 0x7C or 0x7D; reading
+    // it as a length field was an earlier mistake this comment exists to
+    // prevent repeating.
+    uint64 const rawGuid = inform.initiatorGuid.GetRawValue();
+    auto guidByte = [rawGuid](uint8 index)
+    {
+        return uint8((rawGuid >> (index * 8)) & 0xFF);
+    };
+
+    static uint8 const maskOrder[8] = { 5, 7, 3, 1, 2, 0, 4, 6 };
+    static uint8 const tailOrder[7] = { 6, 5, 0, 1, 4, 2, 3 };
+
+    out.Initialize(SMSG_GROUP_ROLE_POLL_INFORM, 2 + 8);
+    for (uint8 index : maskOrder)
+    {
+        out.WriteBit(guidByte(index) != 0);
+    }
+    out.FlushBits();
+
+    auto writeGuidByte = [&out, &guidByte](uint8 index)
+    {
+        uint8 const value = guidByte(index);
+        if (value != 0)
+        {
+            out << uint8(value ^ 1);
+        }
+    };
+
+    writeGuidByte(7);
+    out << uint8(inform.partyIndex);
+    for (uint8 index : tailOrder)
+    {
+        writeGuidByte(index);
+    }
+
+    return true;
+}
+
 bool MopGroupPromotePackets::ParsePartyAssignment(WorldPacket& in, PartyAssignmentRequest& out)
 {
     // Build 18414 writer sub_665D70, vtable D63430 slot 1; slot 2 sub_66105D
