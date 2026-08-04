@@ -1039,6 +1039,57 @@ void Group::ConvertToRaid()
 }
 
 /**
+ * @brief Converts a raid back to an ordinary party.
+ *
+ * The 18414 client offers this as a separate unit-popup button, ConvertToParty,
+ * which shares CMSG_GROUP_RAID_CONVERT with ConvertToRaid and is distinguished
+ * only by a single cleared bit.
+ *
+ * @return false when the group cannot be converted, so the caller can refuse
+ *         rather than silently do nothing.
+ */
+bool Group::ConvertToParty()
+{
+    if (!isRaidGroup())
+    {
+        return false;
+    }
+
+    // A party has no subgroups, so anyone parked outside the first one would be
+    // unreachable in the party frame. Refuse rather than move people silently.
+    for (member_citerator citr = m_memberSlots.begin(); citr != m_memberSlots.end(); ++citr)
+    {
+        if (citr->group != 0)
+        {
+            return false;
+        }
+    }
+
+    if (m_memberSlots.size() > MAX_GROUP_SIZE)
+    {
+        return false;
+    }
+
+    m_groupType = GroupType(m_groupType & ~GROUPTYPE_RAID);
+
+    if (!isBGGroup())
+    {
+        CharacterDatabase.PExecute("UPDATE `groups` SET `groupType` = %u WHERE `groupId`='%u'", uint8(m_groupType), m_Id);
+    }
+    SendUpdate();
+
+    // Raid membership gates some quest object states, so the same refresh the
+    // raid direction performs is needed coming back.
+    for (member_citerator citr = m_memberSlots.begin(); citr != m_memberSlots.end(); ++citr)
+        if (Player* player = sObjectMgr.GetPlayer(citr->guid))
+        {
+            player->UpdateForQuestWorldObjects();
+        }
+
+    return true;
+}
+
+/**
  * @brief Adds a pending invitation for a player.
  *
  * @param player The invited player.

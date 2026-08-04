@@ -1253,6 +1253,19 @@ void InitializeOpcodes()
     // subgroup byte as a string length.
     DefC(CMSG_GROUP_CHANGE_SUB_GROUP, "CMSG_GROUP_CHANGE_SUB_GROUP", STATUS_LOGGEDIN, PROCESS_THREADUNSAFE, &WorldSession::HandleGroupChangeSubGroupOpcode);
 
+    // Converting between party and raid. ONE opcode carries BOTH directions,
+    // distinguished by a single bit -- 0x80 to raid, 0x00 to party -- which is
+    // why this was held until the handler stopped discarding its body. The
+    // polarity comes from the client's own Lua natives, identical apart from
+    // that value (sub_9056D2 ConvertToRaid sets it, sub_905736 ConvertToParty
+    // clears it).
+    //
+    // Group::ConvertToParty is new; only the raid direction existed before, so
+    // "Convert to Party" had nothing to call even once the bit was read.
+    // Answers over the already-admitted SMSG_GROUP_LIST and
+    // SMSG_PARTY_COMMAND_RESULT.
+    DefC(CMSG_GROUP_RAID_CONVERT, "CMSG_GROUP_RAID_CONVERT", STATUS_LOGGEDIN, PROCESS_THREADUNSAFE, &WorldSession::HandleGroupRaidConvertOpcode);
+
     // NOT registered, deliberately: CMSG_SET_DUNGEON_DIFFICULTY 0x1A36 and
     // CMSG_SET_RAID_DIFFICULTY 0x0591. Both values are binary-proved and both
     // handlers exist with their reply SMSGs already admitted, so they look ready.

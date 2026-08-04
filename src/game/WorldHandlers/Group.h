@@ -1432,6 +1432,7 @@ class Group
 
         // some additional raid methods
         void ConvertToRaid();
+        bool ConvertToParty();
 
         void SetBattlegroundGroup(BattleGround* bg)
         {

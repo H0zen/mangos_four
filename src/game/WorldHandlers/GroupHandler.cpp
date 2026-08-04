@@ -693,8 +693,28 @@ void WorldSession::HandleRaidTargetUpdateOpcode(WorldPacket& recv_data)
  *
  * @param recv_data The received opcode packet.
  */
-void WorldSession::HandleGroupRaidConvertOpcode(WorldPacket& /*recv_data*/)
+void WorldSession::HandleGroupRaidConvertOpcode(WorldPacket& recv_data)
 {
+    // ONE opcode carries BOTH directions. Build 18414 writer sub_688B4B (vtable
+    // D634B8 slot 1, slot 2 sub_66113B writes 812) emits a single bit and
+    // flushes it, so the whole body is one byte: 0x80 set, 0x00 clear.
+    //
+    // The polarity is taken from the client's own Lua natives, which are
+    // identical apart from that value:
+    //
+    //   sub_9056D2  ConvertToRaid    v5 = 1   -> 0x80
+    //   sub_905736  ConvertToParty   v5 = 0   -> 0x00
+    //
+    // Discarding the body -- as this handler did while it was unregistered --
+    // would make "Convert to Party" convert to raid instead.
+    bool toRaid = false;
+    if (recv_data.size() != 1)
+    {
+        return;
+    }
+    toRaid = recv_data.ReadBit();
+    recv_data.ResetBitReader();
+
     Group* group = GetPlayer()->GetGroup();
     if (!group)
     {
@@ -713,9 +733,28 @@ void WorldSession::HandleGroupRaidConvertOpcode(WorldPacket& /*recv_data*/)
     }
     /********************/
 
-    // everything is fine, do it (is it 0 (PARTY_OP_INVITE) correct code)
+    if (toRaid)
+    {
+        if (group->isRaidGroup())
+        {
+            return;
+        }
+
+        SendPartyResult(PARTY_OP_INVITE, "", ERR_PARTY_RESULT_OK);
+        group->ConvertToRaid();
+        return;
+    }
+
+    // Coming back the other way can fail -- a member parked outside the first
+    // subgroup would be unreachable in a party frame -- so report rather than
+    // appear to succeed.
+    if (!group->ConvertToParty())
+    {
+        SendPartyResult(PARTY_OP_INVITE, "", ERR_NOT_LEADER);
+        return;
+    }
+
     SendPartyResult(PARTY_OP_INVITE, "", ERR_PARTY_RESULT_OK);
-    group->ConvertToRaid();
 }
 
 /**
