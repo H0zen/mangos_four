@@ -91,6 +91,24 @@ void Player::SaveToDB()
     // delay auto save at any saves (manual, in code, or autosave)
     m_nextSave = sWorld.getConfig(CONFIG_UINT32_INTERVAL_SAVE);
 
+    // A handler may have declared this character's in-memory state
+    // untrustworthy, because a transaction that moved money could not be shown
+    // to have committed or rolled back. Writing memory could then create or
+    // destroy player property, while the database rows are self-consistent
+    // whichever way the transaction went.
+    //
+    // The refusal belongs here rather than at any one caller because every
+    // persist route converges on this function: the logout save, the periodic
+    // save, SaveAllPlayers, GM commands, and the deferred DELAYED_SAVE_PLAYER
+    // that ProcessDelayedOperations replays after a far teleport. Gating a
+    // single call site leaves the others open. Returning before the
+    // IsBeingTeleportedFar branch below also declines to schedule a delayed
+    // save, so the refusal cannot be deferred past the session's teardown.
+    if (GetSession() && GetSession()->IsCharacterSaveSuppressed())
+    {
+        return;
+    }
+
     // lets allow only players in world to be saved
     if (IsBeingTeleportedFar())
     {

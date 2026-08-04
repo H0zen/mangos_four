@@ -49,8 +49,10 @@ static void test_cross_mail_item_is_rejected()
         attachment, itemB) == MailTakeItemPolicy::Decision::RejectInternal);
 }
 
-// Break caught: allowing COD or mutating mail state during preflight.
-static void test_cod_item_is_rejected_without_mutation()
+// Break caught: mutating mail state during preflight. COD is now a route, not a
+// refusal -- the handler settles the payment -- but the preflight that selects
+// that route must still be side-effect free, which is what the rest asserts.
+static void test_cod_item_proceeds_without_mutation()
 {
     Mail mailB = MakeMailB();
     MailItemInfo const* const attachment =
@@ -63,7 +65,7 @@ static void test_cod_item_is_rejected_without_mutation()
     MailState const stateBefore = mailB.state;
 
     CHECK(MailTakeItemPolicy::Evaluate(mailB, receiver, 0xBB02u,
-        attachment, itemB) == MailTakeItemPolicy::Decision::RejectInternal);
+        attachment, itemB) == MailTakeItemPolicy::Decision::ProceedWithCod);
     CHECK(mailB.COD == codBefore);
     CHECK(mailB.items.size() == itemCountBefore);
     CHECK(mailB.items[0].item_guid == itemGuidBefore);
@@ -132,7 +134,10 @@ static void test_non_cod_template_drift_is_diagnostic()
         0xBB02u, attachment, driftedItem));
 }
 
-// Break caught: attacker-driven cross-mail/COD/authority rejects reaching logs.
+// Break caught: attacker-driven cross-mail/authority rejects reaching logs.
+// A COD mail is deliberately NOT exempt any more: template drift is a genuine
+// integrity fault worth a log line whether or not money is attached, and the
+// attacker cannot choose it, so it is covered by the drift test instead.
 static void test_attacker_driven_rejections_are_not_diagnostic()
 {
     Mail mailA = MakeMailA();
@@ -145,8 +150,6 @@ static void test_attacker_driven_rejections_are_not_diagnostic()
 
     CHECK(!MailTakeItemPolicy::HasTemplateCoherenceDrift(mailA, receiver,
         0xBB02u, MailTakeItemPolicy::FindAttachment(mailA, 0xBB02u), driftedItem));
-    CHECK(!MailTakeItemPolicy::HasTemplateCoherenceDrift(mailB, receiver,
-        0xBB02u, attachmentB, driftedItem));
 
     mailB.COD = 0;
     CHECK(!MailTakeItemPolicy::HasTemplateCoherenceDrift(mailB,
@@ -160,7 +163,7 @@ static void test_attacker_driven_rejections_are_not_diagnostic()
 int main()
 {
     test_cross_mail_item_is_rejected();
-    test_cod_item_is_rejected_without_mutation();
+    test_cod_item_proceeds_without_mutation();
     test_valid_non_cod_item_proceeds();
     test_receiver_mismatch_is_rejected();
     test_missing_or_mismatched_item_is_rejected();

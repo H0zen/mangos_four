@@ -14,6 +14,7 @@ namespace MailTakeItemPolicy
 enum class Decision : uint8
 {
     ProceedNonCod,
+    ProceedWithCod,
     RejectInternal
 };
 
@@ -43,12 +44,13 @@ inline bool HasTemplateCoherenceDrift(Mail const& mail,
     MailItemInfo const* attachment,
     ResolvedItem const& item)
 {
+    // The COD == 0 guard was dropped: a template mismatch is just as worth
+    // logging on a COD attachment, and COD is no longer a rejection reason.
     return mail.receiverGuid == playerGuid &&
         attachment != NULL &&
         attachment->item_guid == requestedItemGuidLow &&
         item.exists &&
         item.guidLow == requestedItemGuidLow &&
-        mail.COD == 0 &&
         item.itemTemplate != attachment->item_template;
 }
 
@@ -63,10 +65,17 @@ inline Decision Evaluate(Mail const& mail,
         attachment->item_guid != requestedItemGuidLow ||
         !item.exists ||
         item.guidLow != requestedItemGuidLow ||
-        item.itemTemplate != attachment->item_template ||
-        mail.COD != 0)
+        item.itemTemplate != attachment->item_template)
     {
         return Decision::RejectInternal;
+    }
+
+    // COD is a structural fact, not a rejection. The caller owns the money
+    // economics; this policy stays side-effect free and only reports which
+    // path applies.
+    if (mail.COD > 0)
+    {
+        return Decision::ProceedWithCod;
     }
 
     return Decision::ProceedNonCod;

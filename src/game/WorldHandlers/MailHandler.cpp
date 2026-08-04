@@ -685,26 +685,116 @@ void WorldSession::HandleMailTakeItem(WorldPacket& recv_data)
             mailId, itemId, attachment->item_template, resolved.itemTemplate);
     }
 
-    if (MailTakeItemPolicy::Evaluate(*m, pl->GetObjectGuid(), itemId,
-            attachment, resolved) == MailTakeItemPolicy::Decision::RejectInternal)
+    MailTakeItemPolicy::Decision const decision = MailTakeItemPolicy::Evaluate(
+        *m, pl->GetObjectGuid(), itemId, attachment, resolved);
+    if (decision == MailTakeItemPolicy::Decision::RejectInternal)
     {
         pl->SendMailResult(mailId, MAIL_ITEM_TAKEN,
             MAIL_ERR_INTERNAL_ERROR, 0, itemId, 0);
         return;
     }
 
-    ItemPosCountVec dest;
-    InventoryResult msg = _player->CanStoreItem(NULL_BAG, NULL_SLOT, dest, it, false);
-    if (msg == EQUIP_ERR_OK)
+    // Cash on delivery. The take is the moment the sale settles: the buyer's
+    // gold, the item and the seller's payment mail all have to move together or
+    // not at all, so everything below is preflight only until the transaction.
+    bool const isCod = decision == MailTakeItemPolicy::Decision::ProceedWithCod;
+    uint64 const cod = isCod ? m->COD : uint64(0);
+    uint64 const currentMoney = pl->GetMoney();
+    // Only meaningful once the affordability check below has passed; clamped so
+    // an unaffordable COD cannot underflow it before that check runs.
+    uint64 const nextMoney = cod <= currentMoney ? currentMoney - cod : currentMoney;
+    ObjectGuid const codSender(HIGHGUID_PLAYER, m->sender);
+    Player* codReceiver = NULL;
+
+    if (isCod)
     {
-        if (!m->RemoveItem(itemId))
+        // COD is only meaningful on player-to-player mail; auction and creature
+        // mail has nowhere to send the payment.
+        if (m->messageType != MAIL_NORMAL || !m->sender)
         {
             pl->SendMailResult(mailId, MAIL_ITEM_TAKEN,
                 MAIL_ERR_INTERNAL_ERROR, 0, itemId, 0);
             return;
         }
-        m->removedItems.push_back(itemId);
+        if (m->expire_time < time(NULL))
+        {
+            pl->SendMailResult(mailId, MAIL_ITEM_TAKEN,
+                MAIL_ERR_ITEM_HAS_EXPIRED, 0, itemId, 0);
+            return;
+        }
 
+        codReceiver = sObjectMgr.GetPlayer(codSender);
+        uint32 const codSenderAccount = codReceiver ?
+            codReceiver->GetSession()->GetAccountId() :
+            sObjectMgr.GetPlayerAccountIdByGUID(codSender);
+        if (!codSenderAccount)
+        {
+            // The seller is gone. Paying into a mail nobody can collect would
+            // destroy the gold, so refuse rather than half-settle.
+            pl->SendMailResult(mailId, MAIL_ITEM_TAKEN,
+                MAIL_ERR_INTERNAL_ERROR, 0, itemId, 0);
+            return;
+        }
+        if (!MailMoneyPolicy::CanDebitWithFee(currentMoney, cod, 0))
+        {
+            pl->SendMailResult(mailId, MAIL_ITEM_TAKEN,
+                MAIL_ERR_NOT_ENOUGH_MONEY, 0, itemId, 0);
+            return;
+        }
+    }
+
+    ItemPosCountVec dest;
+    InventoryResult msg = _player->CanStoreItem(NULL_BAG, NULL_SLOT, dest, it, false);
+    if (msg == EQUIP_ERR_OK)
+    {
+        MailDraft codPayment;
+        MailReceiver codDelivery(codReceiver, codSender);
+        Mail* codOnlineMail = NULL;
+        if (isCod)
+        {
+            // Named after the original so the seller can tell which sale paid
+            // out. Retail leaves the body empty and delivers with no delay.
+            codPayment.SetSubjectAndBody("COD Payment: " + m->subject, "");
+            codPayment.SetMoney(cod);
+        }
+
+        // Opened before the first in-memory mutation so a failure to start has
+        // nothing to undo.
+        if (!CharacterDatabase.BeginTransaction())
+        {
+            pl->SendMailResult(mailId, MAIL_ITEM_TAKEN,
+                MAIL_ERR_INTERNAL_ERROR, 0, itemId, 0);
+            return;
+        }
+
+        // Stage the seller's payment before the first in-memory mutation. It is
+        // the last step that can fail on its own, and ordering it here means a
+        // failure leaves nothing to undo: the mail is untouched and the client
+        // can simply try again, with no need to kick the session.
+        if (isCod && !codPayment.StageMailToDB(codDelivery,
+                MailSender(MAIL_NORMAL, pl->GetGUIDLow()),
+                MAIL_CHECK_MASK_COD_PAYMENT, 0, codOnlineMail))
+        {
+            CharacterDatabase.RollbackTransaction();
+            delete codOnlineMail;
+            sLog.outError("CMSG_MAIL_TAKE_ITEM: failed to stage COD payment for account %u, player %u, mail %u, item %u, cod=" UI64FMTD,
+                GetAccountId(), pl->GetGUIDLow(), mailId, itemId, cod);
+            pl->SendMailResult(mailId, MAIL_ITEM_TAKEN,
+                MAIL_ERR_INTERNAL_ERROR, 0, itemId, 0);
+            return;
+        }
+
+        if (!m->RemoveItem(itemId))
+        {
+            CharacterDatabase.RollbackTransaction();
+            delete codOnlineMail;
+            pl->SendMailResult(mailId, MAIL_ITEM_TAKEN,
+                MAIL_ERR_INTERNAL_ERROR, 0, itemId, 0);
+            return;
+        }
+
+        m->removedItems.push_back(itemId);
+        m->COD = 0;
         m->state = MAIL_STATE_CHANGED;
         pl->m_mailsUpdated = true;
         pl->RemoveMItem(it->GetGUIDLow());
@@ -712,10 +802,96 @@ void WorldSession::HandleMailTakeItem(WorldPacket& recv_data)
         uint32 count = it->GetCount();                      // save counts before store and possible merge with deleting
         pl->MoveItemToInventory(dest, it, true);
 
-        CharacterDatabase.BeginTransaction();
         pl->SaveInventoryAndGoldToDB();
         pl->_SaveMail();
-        CharacterDatabase.CommitTransaction();
+
+        // SaveInventoryAndGoldToDB has just written the PRE-debit balance,
+        // because it persists GetMoney() rather than staging a delta. Supersede
+        // it with a later statement in the same transaction, which wins by
+        // ordering, instead of calling SetMoney before the save.
+        //
+        // The distinction matters because CommitTransactionDirect returning
+        // false does not mean the outcome is unknown: SqlTransaction::Execute
+        // rolls back and returns false as soon as any statement fails. Had the
+        // debit been applied to memory first, that rollback would leave the DB
+        // untouched while the kick below saved the debited GetMoney() -- and
+        // the save calls above have already cleared m_itemUpdateQueue and reset
+        // the mail to MAIL_STATE_UNCHANGED, so the matching item move would NOT
+        // be rewritten. Gold destroyed, item still in the mail, seller unpaid.
+        // Keeping memory clean until the commit returns makes a rollback a
+        // no-op that the client simply retries.
+        if (isCod && !CharacterDatabase.PExecute(
+                "UPDATE `characters` SET `money` = " UI64FMTD " WHERE `guid` = '%u'",
+                nextMoney, pl->GetGUIDLow()))
+        {
+            CharacterDatabase.RollbackTransaction();
+            delete codOnlineMail;
+            sLog.outError("CMSG_MAIL_TAKE_ITEM: failed to stage COD debit for account %u, player %u, mail %u, item %u, cod=" UI64FMTD,
+                GetAccountId(), pl->GetGUIDLow(), mailId, itemId, cod);
+            pl->SendMailResult(mailId, MAIL_ITEM_TAKEN,
+                MAIL_ERR_INTERNAL_ERROR, 0, itemId, 0);
+            KickPlayer();
+            return;
+        }
+
+        if (!CharacterDatabase.CommitTransactionDirect())
+        {
+            delete codOnlineMail;
+            sLog.outError("CMSG_MAIL_TAKE_ITEM: commit failed for account %u, player %u, mail %u, item %u, cod=" UI64FMTD,
+                GetAccountId(), pl->GetGUIDLow(), mailId, itemId, cod);
+
+            // A false result here is genuinely ambiguous, and the ambiguity is
+            // what makes this dangerous. SqlTransaction::Execute returns false
+            // both when a statement failed and was rolled back, leaving nothing
+            // durable, and when the COMMIT itself could not be confirmed, which
+            // may already have applied everything. No ordering of SetMoney is
+            // safe against both: debiting before the commit destroys the COD on
+            // a rollback, and debiting after it recreates the COD when the
+            // commit actually landed, because KickPlayer performs a full
+            // character save that writes whatever GetMoney() holds.
+            //
+            // So do not guess. Read the balance the database actually has and
+            // adopt it, which makes that save a no-op for money either way.
+            // The item and mail need no equivalent: the save calls above
+            // already cleared their dirty tracking, so the logout save will not
+            // rewrite them and the durable rows stand whichever way it went.
+            if (isCod)
+            {
+                QueryResult* durable = CharacterDatabase.PQuery(
+                    "SELECT `money` FROM `characters` WHERE `guid` = '%u'",
+                    pl->GetGUIDLow());
+                if (durable)
+                {
+                    pl->SetMoney((*durable)[0].GetUInt64());
+                    delete durable;
+                }
+                else
+                {
+                    // Without the authoritative balance there is no safe value
+                    // to hold in memory, and the logout below would persist
+                    // whichever way it is currently wrong. Discard the session's
+                    // character state instead: the database rows are
+                    // self-consistent for both outcomes, so losing the unsaved
+                    // progress is the cheaper error than minting or burning the
+                    // COD amount.
+                    sLog.outError("CMSG_MAIL_TAKE_ITEM: could not re-read durable balance for player %u after a failed commit; discarding in-memory character state",
+                        pl->GetGUIDLow());
+                    SuppressCharacterSave();
+                }
+            }
+
+            pl->SendMailResult(mailId, MAIL_ITEM_TAKEN,
+                MAIL_ERR_INTERNAL_ERROR, 0, itemId, 0);
+            KickPlayer();
+            return;
+        }
+
+        // Durable now, so the buyer's balance can follow.
+        if (isCod)
+        {
+            pl->SetMoney(nextMoney);
+            codPayment.CompleteMailDelivery(codDelivery, codOnlineMail);
+        }
 
         pl->SendMailResult(mailId, MAIL_ITEM_TAKEN, MAIL_OK, 0, itemId, count);
     }

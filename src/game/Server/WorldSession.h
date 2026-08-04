@@ -1644,6 +1644,15 @@ class WorldSession
         void LogoutPlayer(bool Save);
         void KickPlayer();
 
+        /// Declare the in-memory character state untrustworthy, so that NO
+        /// route persists it: Player::SaveToDB refuses outright once this is
+        /// set. For use when a transaction's durable outcome could not be
+        /// established and saving memory could therefore create or destroy
+        /// player property. Costs the unsaved progress since the last save,
+        /// which is the cheaper error. Intended to be followed by KickPlayer().
+        void SuppressCharacterSave() { m_suppressCharacterSave = true; }
+        bool IsCharacterSaveSuppressed() const { return m_suppressCharacterSave; }
+
         void QueuePacket(WorldPacket* new_packet);
 
         bool Update(PacketFilter& updater);
@@ -2349,6 +2358,7 @@ class WorldSession
         bool m_playerLogout;                                // code processed in LogoutPlayer
         bool m_playerRecentlyLogout;
         bool m_playerSave;                                  // code processed in LogoutPlayer with save request
+        bool m_suppressCharacterSave;                       // set by SuppressCharacterSave(); makes Player::SaveToDB refuse
         LocaleConstant m_sessionDbcLocale;
         int m_sessionDbLocaleIndex;
         uint32 m_latency;

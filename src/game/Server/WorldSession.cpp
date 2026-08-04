@@ -175,6 +175,7 @@ WorldSession::WorldSession(uint32 id, std::shared_ptr<proto::IClientLink> link,
     m_pendingTransferRootCounter(0), m_suspendTokenCounter(0), m_pendingSuspendToken(0), m_waitingForTransferRootAck(false), m_waitingForSuspendToken(false),
     m_inQueue(false), m_playerLoading(false), m_suppressWorldSends(false),
     m_playerLogout(false), m_playerRecentlyLogout(false), m_playerSave(false),
+    m_suppressCharacterSave(false),
     m_sessionDbcLocale(sWorld.GetAvailableDbcLocale(locale)), m_sessionDbLocaleIndex(sObjectMgr.GetIndexForLocale(locale)),
     m_latency(0), m_clientTimeDelay(0), m_tutorialState(TUTORIALDATA_UNCHANGED)
 {
@@ -994,6 +995,13 @@ void WorldSession::LogoutPlayer(bool Save)
     }
 
     m_playerLogout = true;
+    // Deliberately records the save the caller ASKED for, not whether one will
+    // actually be written. m_playerSave feeds PlayerLogoutWithSave(), which
+    // other code reads as "logout is going to persist me, so I need not" --
+    // SpawnCorpseBones() saves the player itself when it returns false. Clearing
+    // it to express suppression would therefore invert that safeguard and
+    // provoke the very nested SaveToDB the suppression exists to prevent. The
+    // suppression is applied at the save call below instead.
     m_playerSave = Save;
 
     if (_player)
@@ -1164,6 +1172,10 @@ void WorldSession::LogoutPlayer(bool Save)
 
         ///- empty buyback items and save the player in the database
         // some save parts only correctly work in case player present in map/player_lists (pets, etc)
+        // Not gated on SuppressCharacterSave() here: Player::SaveToDB refuses
+        // on its own once that is set, which also covers the routes this call
+        // site cannot see, such as the deferred DELAYED_SAVE_PLAYER replayed
+        // by ProcessDelayedOperations during logout's far-teleport completion.
         if (Save)
         {
             _player->SaveToDB();
