@@ -710,13 +710,16 @@ int main(int argc, char** argv)
         {
             opt.mapFilter = choice.mapFilter;
         }
+        // Normalised HERE as well as above: the pass before the menu only ever saw the
+        // command line's paths, so anything typed into the menu kept whatever separators
+        // it was typed with.
         if (!choice.src.empty())
         {
-            opt.src = choice.src;
+            opt.src = ExtractorConsole::ToUnixPath(choice.src);
         }
         if (!choice.dest.empty())
         {
-            opt.dest = choice.dest;
+            opt.dest = ExtractorConsole::ToUnixPath(choice.dest);
         }
     }
     else if (!opt.named)
