@@ -1208,6 +1208,20 @@ void InitializeOpcodes()
     DefC(CMSG_GROUP_UNINVITE_GUID, "CMSG_GROUP_UNINVITE_GUID", STATUS_LOGGEDIN, PROCESS_THREADUNSAFE, &WorldSession::HandleGroupUninviteGuidOpcode);
     DefS(SMSG_GROUP_UNINVITE, "SMSG_GROUP_UNINVITE");
 
+    // Loot rules. One opcode gates three separate leader controls -- the loot
+    // method submenu, "set as master looter", and the loot threshold submenu --
+    // plus five slash commands, all of which did nothing.
+    //
+    // Its reply needs no admission of its own: the handler answers with
+    // Group::SendUpdate, and SMSG_GROUP_LIST already carries lootMethod,
+    // lootThreshold and the master-looter GUID, so the display half has been
+    // working all along with nothing able to change it.
+    //
+    // The reader was rebuilt: the legacy one took uint32 + raw ObjectGuid +
+    // uint32 with no marker, so it folded the 0x7F marker and the method byte
+    // into a single bogus 32-bit loot method.
+    DefC(CMSG_LOOT_METHOD, "CMSG_LOOT_METHOD", STATUS_LOGGEDIN, PROCESS_THREADUNSAFE, &WorldSession::HandleLootMethodOpcode);
+
     // Wave 15 stable-pet list request, list response, and operation result.
     DefC(CMSG_REQUEST_STABLED_PETS, "CMSG_REQUEST_STABLED_PETS", STATUS_LOGGEDIN, PROCESS_THREADUNSAFE, &WorldSession::HandleListStabledPetsOpcode);
     DefS(SMSG_PET_STABLE_LIST, "SMSG_PET_STABLE_LIST");

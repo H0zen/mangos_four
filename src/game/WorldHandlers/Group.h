@@ -236,6 +236,23 @@ namespace MopGroupUninvitePackets
     bool ParseRequest(WorldPacket& in, Request& out);
 }
 
+namespace MopGroupLootMethodPackets
+{
+    /// A parsed CMSG_LOOT_METHOD body.
+    ///
+    /// `method` and `threshold` are validated against their enum ranges during
+    /// parsing, so the handler may cast them. `looterGuid` is only meaningful
+    /// for MASTER_LOOT and must still be checked for group membership.
+    struct Request
+    {
+        ObjectGuid looterGuid;
+        uint32 method = 0;
+        uint32 threshold = 0;
+    };
+
+    bool ParseRequest(WorldPacket& in, Request& out);
+}
+
 namespace MopGroupMarkerPackets
 {
     struct MinimapPingRequest

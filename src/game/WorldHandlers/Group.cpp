@@ -341,6 +341,120 @@ bool MopGroupUninvitePackets::ParseRequest(WorldPacket& in, Request& out)
     return true;
 }
 
+bool MopGroupLootMethodPackets::ParseRequest(WorldPacket& in, Request& out)
+{
+    // Build 18414 writer sub_6678EB, reached through vtable D634E0 slot 1;
+    // slot 2 sub_661728 writes opcode 3553. Layout:
+    //
+    //   uint8  0x7F marker
+    //   uint8  loot method
+    //   uint32 loot threshold  (sub_40F075 writes four bytes)
+    //   bits   GUID presence in order 7,1,2,0,4,5,6,3, then FlushBits
+    //   bytes  GUID in order 7,1,3,4,6,5,0,2, each ^1, omitted when zero
+    //
+    // Verified byte-exact against two captured bodies, decoding to method 0
+    // (free-for-all) and 3 (group loot), both at threshold 2 (uncommon) with no
+    // master looter.
+    //
+    // CAVEAT: every captured body has an empty GUID mask, because a master
+    // looter is only carried for MASTER_LOOT. The GUID orders above therefore
+    // come from the client writer alone and are not corroborated by traffic. If
+    // a body with a non-empty mask ever appears, it decides them.
+    //
+    // The legacy reader took uint32 + raw ObjectGuid + uint32 with no marker,
+    // so it decoded the marker and method as one bogus 32-bit loot method.
+    auto fail = [&in]()
+    {
+        in.rfinish();
+        return false;
+    };
+
+    // marker + method + threshold + mask
+    if (in.rpos() != 0 || in.size() - in.rpos() < 7)
+    {
+        return fail();
+    }
+
+    uint8 marker = 0;
+    uint8 method = 0;
+    uint32 threshold = 0;
+    in >> marker;
+    if (marker != 0x7F)
+    {
+        return fail();
+    }
+    in >> method;
+    in >> threshold;
+
+    // Both are cast straight onto enums by the caller. NOT_GROUP_TYPE_LOOT is
+    // internal and must never arrive from the wire.
+    if (method >= NOT_GROUP_TYPE_LOOT || threshold > ITEM_QUALITY_HEIRLOOM)
+    {
+        return fail();
+    }
+
+    static uint8 const maskOrder[8] = { 7, 1, 2, 0, 4, 5, 6, 3 };
+    static uint8 const byteOrder[8] = { 7, 1, 3, 4, 6, 5, 0, 2 };
+
+    bool present[8] = { false };
+    for (size_t i = 0; i < 8; ++i)
+    {
+        present[maskOrder[i]] = in.ReadBit();
+    }
+    in.ResetBitReader();
+
+    size_t presentCount = 0;
+    for (size_t i = 0; i < 8; ++i)
+    {
+        if (present[i])
+        {
+            ++presentCount;
+        }
+    }
+
+    if (in.size() - in.rpos() != presentCount)
+    {
+        return fail();
+    }
+
+    uint8 bytes[8] = { 0 };
+    bool canonical = true;
+    for (size_t i = 0; i < 8; ++i)
+    {
+        uint8 const index = byteOrder[i];
+        if (!present[index])
+        {
+            continue;
+        }
+        uint8 raw = 0;
+        in >> raw;
+        if (raw == 1)
+        {
+            canonical = false;
+        }
+        bytes[index] = raw ^ 1;
+    }
+
+    if (!canonical || in.rpos() != in.size())
+    {
+        return fail();
+    }
+
+    Request parsed;
+    parsed.method = method;
+    parsed.threshold = threshold;
+
+    uint64 rawGuid = 0;
+    for (size_t i = 0; i < 8; ++i)
+    {
+        rawGuid |= uint64(bytes[i]) << (i * 8);
+    }
+    parsed.looterGuid = ObjectGuid(rawGuid);
+
+    out = parsed;
+    return true;
+}
+
 bool MopGroupInvitePackets::BuildInvite(WorldPacket& out, Invite const& invite)
 {
     // Build 18414 popup grammar, recovered from the client reader and proved

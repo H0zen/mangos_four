@@ -540,10 +540,11 @@ void WorldSession::HandleGroupDisbandOpcode(WorldPacket& /*recv_data*/)
  */
 void WorldSession::HandleLootMethodOpcode(WorldPacket& recv_data)
 {
-    uint32 lootMethod;
-    ObjectGuid lootMaster;
-    uint32 lootThreshold;
-    recv_data >> lootMethod >> lootMaster >> lootThreshold;
+    MopGroupLootMethodPackets::Request request;
+    if (!MopGroupLootMethodPackets::ParseRequest(recv_data, request))
+    {
+        return;
+    }
 
     Group* group = GetPlayer()->GetGroup();
     if (!group)
@@ -556,12 +557,25 @@ void WorldSession::HandleLootMethodOpcode(WorldPacket& recv_data)
     {
         return;
     }
+
+    // A master looter who is not in the group would be unreachable for every
+    // later loot decision, so refuse rather than store an unusable GUID. The
+    // client only carries one for MASTER_LOOT; any other method clears it.
+    ObjectGuid looter;
+    if (request.method == MASTER_LOOT)
+    {
+        if (!request.looterGuid || !group->IsMember(request.looterGuid))
+        {
+            return;
+        }
+        looter = request.looterGuid;
+    }
     /********************/
 
-    // everything is fine, do it
-    group->SetLootMethod((LootMethod)lootMethod);
-    group->SetLooterGuid(lootMaster);
-    group->SetLootThreshold((ItemQualities)lootThreshold);
+    // everything is fine, do it. Both values were range-checked while parsing.
+    group->SetLootMethod((LootMethod)request.method);
+    group->SetLooterGuid(looter);
+    group->SetLootThreshold((ItemQualities)request.threshold);
     group->SendUpdate();
 }
 
