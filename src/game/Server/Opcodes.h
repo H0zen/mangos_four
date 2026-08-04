@@ -540,7 +540,8 @@ enum OpcodesList
     SMSG_PARTYKILLLOG                            = 0x048A,    // 5.4.8 18414 (Wow.exe leaf; name reference-consensus)
     SMSG_COMPRESSED_UPDATE_OBJECT                = 0x11F7,    // (no client leaf)
     SMSG_EXPLORATION_EXPERIENCE                  = 0x189A,    // 5.4.8 18414 (Wow.exe leaf; name reference-consensus)
-    MSG_RANDOM_ROLL                              = 0x0905,    // 4.3.4 15595 (no client leaf)
+    MSG_RANDOM_ROLL                              = 0x0905,    // 4.3.4 15595 (no client leaf; superseded by CMSG_RANDOM_ROLL)
+    CMSG_RANDOM_ROLL                             = 0x08A3,    // 5.4.8 18414 (Wow.exe binary: sub_CC28BB -> sub_660C6B -> sub_661642 writes 2211)
     SMSG_ENVIRONMENTALDAMAGELOG                  = 0x0DF1,    // 5.4.8 18414 (Wow.exe leaf; name reference-consensus)
     CMSG_CHANGEPLAYER_DIFFICULTY                 = 0x1F8E, // 5.4.8 18414
     SMSG_RWHOIS                                  = 0x11FF,    // (value unverified; no client leaf)

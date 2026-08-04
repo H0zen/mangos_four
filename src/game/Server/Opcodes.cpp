@@ -1237,6 +1237,27 @@ void InitializeOpcodes()
     DefS(SMSG_GROUP_SET_LEADER, "SMSG_GROUP_SET_LEADER");
     DefC(CMSG_GROUP_ASSISTANT_LEADER, "CMSG_GROUP_ASSISTANT_LEADER", STATUS_LOGGEDIN, PROCESS_THREADUNSAFE, &WorldSession::HandleGroupAssistantLeaderOpcode);
 
+    // /roll and /random. Everything except the request constant was already in
+    // place: the handler validates its own range, and SMSG_RANDOM_ROLL 0x141A is
+    // a converted body that is already admitted. The value we HAD, MSG_RANDOM_ROLL
+    // 0x0905, is a 4.3.4 carry-over the 18414 client never sends -- registering
+    // that would have bound the handler to an opcode nothing emits, which looks
+    // like a working feature that simply never fires.
+    DefC(CMSG_RANDOM_ROLL, "CMSG_RANDOM_ROLL", STATUS_LOGGEDIN, PROCESS_THREADUNSAFE, &WorldSession::HandleRandomRollOpcode);
+
+    // NOT registered, deliberately: CMSG_SET_DUNGEON_DIFFICULTY 0x1A36 and
+    // CMSG_SET_RAID_DIFFICULTY 0x0591. Both values are binary-proved and both
+    // handlers exist with their reply SMSGs already admitted, so they look ready.
+    // They are not.
+    //
+    // The client sends a RAW Difficulty.dbc DifficultyID, while the internal
+    // Difficulty enum is 0-based (DUNGEON_DIFFICULTY_NORMAL = 0,
+    // RAID_DIFFICULTY_10MAN_NORMAL = 0). The handlers cast one onto the other with
+    // Difficulty(mode). No raw id except 0 equals its own internal mode, so a
+    // player choosing Heroic would land on whatever internal mode the raw id
+    // collides with. The translation lives in the unmerged instance-difficulty
+    // work; these two are held until it lands.
+
     // Wave 15 stable-pet list request, list response, and operation result.
     DefC(CMSG_REQUEST_STABLED_PETS, "CMSG_REQUEST_STABLED_PETS", STATUS_LOGGEDIN, PROCESS_THREADUNSAFE, &WorldSession::HandleListStabledPetsOpcode);
     DefS(SMSG_PET_STABLE_LIST, "SMSG_PET_STABLE_LIST");
