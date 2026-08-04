@@ -854,6 +854,51 @@ void WorldSession::HandleGroupAssistantLeaderOpcode(WorldPacket& recv_data)
 }
 
 /**
+ * @brief Handles the raid "Everyone is Assistant" toggle.
+ *
+ * @param recv_data The received opcode packet.
+ */
+void WorldSession::HandleGroupEveryoneIsAssistantOpcode(WorldPacket& recv_data)
+{
+    // Build 18414 writer sub_666B59, vtable D62E40 slot 1; slot 2 sub_661450
+    // writes opcode 481. The whole body is a 0x7F marker byte then a single
+    // bit, flushed -- two bytes.
+    //
+    // No corpus packet exists for this opcode at 18414, so the layout rests on
+    // the client writer alone. It is a rare action rather than an invented
+    // value: the writer is present in the binary and the UI exposes the toggle.
+    if (recv_data.size() != 2)
+    {
+        return;
+    }
+
+    uint8 marker = 0;
+    recv_data >> marker;
+    if (marker != 0x7F)
+    {
+        return;
+    }
+
+    bool const apply = recv_data.ReadBit();
+    recv_data.ResetBitReader();
+
+    Group* group = GetPlayer()->GetGroup();
+    if (!group)
+    {
+        return;
+    }
+
+    // Unlike individual promotion, this one is the leader's alone -- an
+    // assistant could otherwise promote the whole raid to their own rank.
+    if (!group->IsLeader(GetPlayer()->GetObjectGuid()))
+    {
+        return;
+    }
+
+    group->SetEveryoneIsAssistant(apply);
+}
+
+/**
  * @brief Updates main tank or main assist raid assignments.
  *
  * @param recv_data The received opcode packet.

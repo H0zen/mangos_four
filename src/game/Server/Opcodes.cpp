@@ -1276,6 +1276,13 @@ void InitializeOpcodes()
     // all. Answers over the already-admitted SMSG_GROUP_LIST.
     DefC(CMSG_SET_PARTY_ASSIGNMENT, "CMSG_SET_PARTY_ASSIGNMENT", STATUS_LOGGEDIN, PROCESS_THREADUNSAFE, &WorldSession::HandlePartyAssignmentOpcode);
 
+    // The raid "Everyone is Assistant" toggle. Body is a 0x7F marker and one
+    // bit. This one has ZERO corpus traffic at 18414, so unlike the rest of
+    // this wave its layout rests on the client writer alone -- a rare action
+    // rather than an invented value, since the writer is in the binary and the
+    // UI exposes the toggle. Answers over the already-admitted SMSG_GROUP_LIST.
+    DefC(CMSG_SET_EVERYONE_IS_ASSISTANT, "CMSG_SET_EVERYONE_IS_ASSISTANT", STATUS_LOGGEDIN, PROCESS_THREADUNSAFE, &WorldSession::HandleGroupEveryoneIsAssistantOpcode);
+
     // NOT registered, deliberately: CMSG_SET_DUNGEON_DIFFICULTY 0x1A36 and
     // CMSG_SET_RAID_DIFFICULTY 0x0591. Both values are binary-proved and both
     // handlers exist with their reply SMSGs already admitted, so they look ready.

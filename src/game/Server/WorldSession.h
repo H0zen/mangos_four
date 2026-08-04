@@ -1954,6 +1954,7 @@ class WorldSession
         void HandleGroupRequestJoinUpdates(WorldPacket& recv_data);
         void HandleGroupChangeSubGroupOpcode(WorldPacket& recv_data);
         void HandleGroupAssistantLeaderOpcode(WorldPacket& recv_data);
+        void HandleGroupEveryoneIsAssistantOpcode(WorldPacket& recv_data);
         void HandlePartyAssignmentOpcode(WorldPacket& recv_data);
 
         void HandlePetitionBuyOpcode(WorldPacket& recv_data);

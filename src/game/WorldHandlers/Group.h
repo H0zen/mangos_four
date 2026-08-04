@@ -1475,6 +1475,45 @@ class Group
                 SendUpdate();
             }
         }
+        /**
+         * @brief Applies or clears the assistant flag on every member at once.
+         *
+         * The 18414 client's "Everyone is Assistant" raid toggle. Note this is
+         * expressed through the SAME per-member flag as an individual promotion
+         * rather than a separate group-level state, because neither the Group
+         * type flags nor SMSG_GROUP_LIST carry one. The visible behaviour
+         * matches; the difference is that switching the toggle OFF clears
+         * individually promoted assistants too, since there is nothing
+         * recording which were set by hand.
+         *
+         * @param state true to make everyone an assistant, false to clear.
+         */
+        void SetEveryoneIsAssistant(bool state)
+        {
+            if (!isRaidGroup())
+            {
+                return;
+            }
+
+            bool changed = false;
+            for (member_citerator citr = m_memberSlots.begin(); citr != m_memberSlots.end(); ++citr)
+            {
+                // The leader is not an assistant to themselves.
+                if (citr->guid == m_leaderGuid)
+                {
+                    continue;
+                }
+                if (_setAssistantFlag(citr->guid, state))
+                {
+                    changed = true;
+                }
+            }
+
+            if (changed)
+            {
+                SendUpdate();
+            }
+        }
         void SetMainTank(ObjectGuid guid)
         {
             if (!isRaidGroup())
