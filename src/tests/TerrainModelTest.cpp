@@ -312,6 +312,15 @@ TEST(WmoLiquidPicksTheSurfaceEnclosingTheQuery)
     CHECK_EQ(upper->z, 40.f);
     CHECK_EQ(upper->entry, uint16_t(13));
 
+    // THE CASE BETWEEN THEM, which is the one an "above wins" rule gets wrong and the one
+    // a fixture that only probes below-both and above-both never asks: standing on the
+    // lower floor, well clear of both surfaces. Answering with the upper pool puts a
+    // player who is dry on the ground floor underwater in the storey above.
+    const auto between = m.LiquidLocal(Vec3{1.f, 1.f, 20.f});
+    REQUIRE(between.has_value());
+    CHECK_EQ(between->z, 5.f);
+    CHECK_EQ(between->entry, uint16_t(41));
+
     // Above both: the highest below is the one being stood over.
     const auto above = m.LiquidLocal(Vec3{1.f, 1.f, 100.f});
     REQUIRE(above.has_value());

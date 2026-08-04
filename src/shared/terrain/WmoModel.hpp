@@ -63,6 +63,9 @@ namespace world::terrain
     private:
         void DeriveWmoBounds();
 
+        /// One group's liquid surface under @p pModel, if that group carries any there.
+        std::optional<LocalLiquid> GroupLiquidAt(const Group& g, const Vec3& pModel) const;
+
         std::vector<uint16_t> m_triGroup;
         std::vector<Group> m_groups;
         uint32_t m_rootId = 0;

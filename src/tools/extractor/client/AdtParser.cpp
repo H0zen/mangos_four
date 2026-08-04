@@ -108,14 +108,18 @@ namespace world::terrain
             return 0;
         }
 
-        void ReadMcnk(const uint8_t* mcnk, uint32_t mcnkSize, AdtData& out)
+        /// False when the record is unreadable, which FAILS THE WHOLE PARSE rather than
+        /// skipping the chunk: the height arrays are zero-filled before the walk, so a
+        /// chunk quietly left out is not a hole in the tile -- it is 8x8 cells of flat
+        /// ground at 0.0, baked and counted as a successful map square.
+        bool ReadMcnk(const uint8_t* mcnk, uint32_t mcnkSize, AdtData& out)
         {
             // Every field below is read from the 128-byte header, and the caller has only
             // proved that the record's DECLARED size fits the file. A record shorter than
             // its own header reads past the end of the last chunk in the archive.
             if (mcnkSize < MCNK_HEADER)
             {
-                return;
+                return false;
             }
 
             const uint8_t* h = mcnk + 8;
@@ -124,7 +128,7 @@ namespace world::terrain
             const uint32_t iy = RdU32(h + MCNK_INDEX_Y);
             if (ix > 15 || iy > 15)
             {
-                return;
+                return false;
             }
 
             const uint32_t offsMclq = RdU32(h + MCNK_OFS_MCLQ);
@@ -170,7 +174,7 @@ namespace world::terrain
             constexpr uint32_t MCLQ_BYTES = 8 + 81 * 8 + 64;
             if (!offsMclq || sizeMclq <= 8 || offsMclq + 8 + MCLQ_BYTES > span)
             {
-                return;
+                return true;      // no MCLQ is the 5.4.8 norm, and the heights are read
             }
 
             const uint8_t* lq = mcnk + offsMclq + 8;
@@ -226,6 +230,7 @@ namespace world::terrain
                     out.liquidDark[idx] = (cellFlags & MCLQ_DARK) ? 1 : 0;
                 }
             }
+            return true;
         }
 
         // MH2O: 256 SMLiquidChunk headers, one per MCNK in IndexY-major order, followed
@@ -419,7 +424,10 @@ namespace world::terrain
                     out.areaIds.fill(0);
                     sawMcnk = true;
                 }
-                ReadMcnk(tag, csize, out);
+                if (!ReadMcnk(tag, csize, out))
+                {
+                    return false;
+                }
             }
             else if (TagIs(tag, "MH2O") && wantTerrain)
             {

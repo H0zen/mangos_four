@@ -588,17 +588,24 @@ namespace
         if (!wdt->HasAnyAdt())
         {
             auto tile = source.Load(mapId, 0, 0);
-            if (tile && tile->isGlobalWmo)
+            const bool baked = tile && tile->isGlobalWmo &&
+                               WriteTile(*tile, dest + "/" + GlobalWmoFileName(mapId));
+
+            // The WDT ITSELF says whether this map is one global WMO, so a map that
+            // declares one and could not be baked -- a missing or malformed model -- is a
+            // failure, not an absence. Reading that from the loaded tile instead would
+            // have called the failure "nothing to do here" and exited 0 on a map with no
+            // terrain at all.
+            if (!wdt->hasGlobalWmo)
             {
-                const bool ok =
-                    WriteTile(*tile, dest + "/" + GlobalWmoFileName(mapId));
-                char msg[256];
-                std::snprintf(msg, sizeof(msg), "  map %4u %-24s global WMO %s", mapId,
-                              name.c_str(), ok ? "ok" : "FAILED");
-                if (ok) { g_console.Detail(msg); } else { g_console.Error(msg); }
-                return ok ? 0 : 1;
+                return 0;
             }
-            return 0;
+
+            char msg[256];
+            std::snprintf(msg, sizeof(msg), "  map %4u %-24s global WMO %s", mapId,
+                          name.c_str(), baked ? "ok" : "FAILED");
+            if (baked) { g_console.Detail(msg); } else { g_console.Error(msg); }
+            return baked ? 0 : 1;
         }
 
         size_t expected = 0;
