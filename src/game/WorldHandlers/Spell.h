@@ -1571,6 +1571,20 @@ namespace MopCombatLogPackets
         uint32 resist;
     };
 
+    struct SpellNonMeleeDamageLog
+    {
+        uint64 attackerGuid;
+        uint64 targetGuid;
+        uint32 spellId;
+        uint32 damage;
+        uint32 overkill;
+        uint32 schoolMask;
+        uint32 absorb;
+        uint32 resist;
+        uint32 blocked;
+        uint32 hitInfo;
+    };
+
     struct SpellMissTarget
     {
         uint64 guid;
@@ -1690,6 +1704,91 @@ namespace MopCombatLogPackets
         };
         for (auto const& byte : bytes)
             out.WriteByteSeq(GuidByte(byte[1] ? log.targetGuid : log.casterGuid, byte[0]));
+    }
+
+    /**
+     * Inverse of the complete 18414 reader at Wow.exe sub_C75861, reached from
+     * the combat-log dispatcher sub_C6763F. That dispatcher does not switch on
+     * the raw opcode -- it compacts the 16-bit value into a dense index first --
+     * which is why no literal 0x1450 appears anywhere in the client image.
+     * SMSG_SPELLNONMELEEDAMAGELOG compacts to index 320.
+     *
+     * The reader holds the attacker GUID bytes at object offsets 80..87 and the
+     * target GUID bytes at 144..151, so those two runs give the sixteen packed
+     * presence bits below. The four remaining bits are, in reader order: an
+     * unknown flag, a second unknown flag, a has-power-data flag guarding a
+     * variable-length block, and a has-floats flag guarding ten optional floats.
+     * The server populates none of the three optional blocks, so all four are
+     * written false, which is also what every observed packet carries.
+     *
+     * Byte-reconciled against real captured traffic at both extremes of the
+     * observed size range: 38 bytes (the corpus minimum, capture-000075
+     * seq 1746844) and 48 bytes (the maximum, capture-000625 seq 35331). The
+     * whole 38-48 spread across 5,272,845 corpus packets is explained by
+     * GUID-byte presence alone.
+     */
+    inline void BuildSpellNonMeleeDamageLog(WorldPacket& out, SpellNonMeleeDamageLog const& log)
+    {
+        // { guid byte index, 1 = target / 0 = attacker }, in reader bit order.
+        uint8 const mask[][2] = {
+            { 2, 1 }, { 7, 0 }, { 6, 0 }, { 1, 0 }, { 5, 0 },
+            { 0, 0 }, { 0, 1 }, { 7, 1 }, { 3, 0 }, { 6, 1 },
+            { 1, 1 },
+            { 5, 1 }, { 2, 0 }, { 4, 0 }, { 3, 1 }, { 4, 1 }
+        };
+        auto guidOf = [&log](uint8 isTarget) -> uint64
+        {
+            return isTarget ? log.targetGuid : log.attackerGuid;
+        };
+
+        for (size_t i = 0; i < 5; ++i)
+        {
+            out.WriteBit(GuidByte(guidOf(mask[i][1]), mask[i][0]) != 0);
+        }
+        out.WriteBit(false);
+        for (size_t i = 5; i < 10; ++i)
+        {
+            out.WriteBit(GuidByte(guidOf(mask[i][1]), mask[i][0]) != 0);
+        }
+        out.WriteBit(false);
+        out.WriteBit(false);                                // has power data
+        out.WriteBit(GuidByte(guidOf(mask[10][1]), mask[10][0]) != 0);
+        out.WriteBit(false);                                // has floats
+        for (size_t i = 11; i < 16; ++i)
+        {
+            out.WriteBit(GuidByte(guidOf(mask[i][1]), mask[i][0]) != 0);
+        }
+        out.FlushBits();
+
+        uint8 const bytesA[][2] = { { 1, 0 } };
+        uint8 const bytesB[][2] = { { 3, 1 }, { 0, 0 }, { 6, 1 }, { 4, 1 }, { 7, 0 } };
+        uint8 const bytesC[][2] = {
+            { 5, 0 }, { 5, 1 }, { 3, 0 }, { 2, 0 },
+            { 2, 1 }, { 6, 0 }, { 0, 1 }, { 4, 0 }
+        };
+        uint8 const bytesD[][2] = { { 7, 1 } };
+        uint8 const bytesE[][2] = { { 1, 1 } };
+        auto writeBytes = [&out, &guidOf](uint8 const (*table)[2], size_t count)
+        {
+            for (size_t i = 0; i < count; ++i)
+            {
+                out.WriteByteSeq(GuidByte(guidOf(table[i][1]), table[i][0]));
+            }
+        };
+
+        out << uint32(log.blocked);
+        writeBytes(bytesA, 1);
+        out << uint32(log.overkill);
+        writeBytes(bytesB, 5);
+        out << uint32(log.resist);
+        out << uint32(log.absorb);
+        writeBytes(bytesC, 8);
+        out << uint32(log.damage);
+        out << uint8(log.schoolMask);
+        writeBytes(bytesD, 1);
+        out << uint32(log.hitInfo);
+        writeBytes(bytesE, 1);
+        out << uint32(log.spellId);
     }
 
     inline void BuildSpellDamageShieldLog(WorldPacket& out, SpellDamageShieldLog const& log)

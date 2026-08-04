@@ -2366,22 +2366,31 @@ void Unit::DeMorph()
 void Unit::SendSpellNonMeleeDamageLog(SpellNonMeleeDamage* log)
 {
     uint32 targetHealth = log->target->GetHealth();
-    uint32 overkill = log->damage > targetHealth ? log->damage - targetHealth : 0;
+    // Retail writes -1, not 0, when the blow is not lethal: both sampled 18414
+    // captures carry FF FF FF FF here (capture-000075 seq 1746844 and
+    // capture-000625 seq 35331, at payload offset 8). Zero is a different
+    // statement -- it claims a kill that overshot by exactly nothing -- so an
+    // exact kill still reports 0 and only a non-lethal hit reports -1.
+    uint32 overkill = log->damage >= targetHealth ?
+        log->damage - targetHealth : uint32(-1);
 
-    WorldPacket data(SMSG_SPELLNONMELEEDAMAGELOG, (16 + 4 + 4 + 4 + 1 + 4 + 4 + 1 + 1 + 4 + 4 + 1)); // we guess size
-    data << log->target->GetPackGUID();
-    data << log->attacker->GetPackGUID();
-    data << uint32(log->SpellID);
-    data << uint32(log->damage);                            // damage amount
-    data << uint32(overkill);                               // overkill
-    data << uint8(log->schoolMask);                         // damage school
-    data << uint32(log->absorb);                            // AbsorbedDamage
-    data << uint32(log->resist);                            // resist
-    data << uint8(log->physicalLog);                        // if 1, then client show spell name (example: %s's ranged shot hit %s for %u school or %s suffers %u school damage from %s's spell_name
-    data << uint8(log->unused);                             // unused
-    data << uint32(log->blocked);                           // blocked
-    data << uint32(log->HitInfo);
-    data << uint8(0);                                       // flag to use extend data
+    // The 18414 body carries no physicalLog, unused or extend-data byte: the
+    // client reader has no field for any of them. They are dropped rather than
+    // translated.
+    MopCombatLogPackets::SpellNonMeleeDamageLog packet = {};
+    packet.attackerGuid = log->attacker->GetObjectGuid().GetRawValue();
+    packet.targetGuid = log->target->GetObjectGuid().GetRawValue();
+    packet.spellId = log->SpellID;
+    packet.damage = log->damage;
+    packet.overkill = overkill;
+    packet.schoolMask = log->schoolMask;
+    packet.absorb = log->absorb;
+    packet.resist = log->resist;
+    packet.blocked = log->blocked;
+    packet.hitInfo = log->HitInfo;
+
+    WorldPacket data(SMSG_SPELLNONMELEEDAMAGELOG, 48);
+    MopCombatLogPackets::BuildSpellNonMeleeDamageLog(data, packet);
     SendMessageToSet(&data, true);
 }
 

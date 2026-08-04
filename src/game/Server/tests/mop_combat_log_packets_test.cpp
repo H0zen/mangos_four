@@ -255,10 +255,111 @@ static void test_spell_damage_shield_log()
 
 
 
+// Byte-exact fixture against REAL captured retail traffic, not against a
+// reimplementation of our own writer. Source packet: build 18414,
+// capture-000075 sequence 1746844, the 38-byte corpus minimum for
+// SMSG_SPELLNONMELEEDAMAGELOG (opcode 0x1450, 5,272,845 packets observed).
+// Corpus generation 2BE10C899585BAECD237705AC13BBF9262D81B6BDC085B462808C6869CE88752.
+//
+// Field values were recovered by decoding those bytes through the client reader
+// at Wow.exe sub_C75861. Both GUIDs are equal in this sample, which is simply
+// what the capture contains.
+static void test_spell_non_melee_damage_log_matches_capture()
+{
+    static uint8 const captured[] = {
+        0xD0, 0x84, 0x80,                               // packed GUID presence mask
+        0x00, 0x00, 0x00, 0x00,                         // blocked = 0
+        0xA1,                                           // attacker[1] = 0xA0 ^ 1
+        0xFF, 0xFF, 0xFF, 0xFF,                         // overkill = -1, not lethal
+        0x05,                                           // attacker[7] = 0x04 ^ 1
+        0x00, 0x00, 0x00, 0x00,                         // resist = 0
+        0x00, 0x00, 0x00, 0x00,                         // absorb = 0
+        0x97,                                           // attacker[2] = 0x96 ^ 1
+        0x97,                                           // target[2]   = 0x96 ^ 1
+        0x1E, 0x0F, 0x02, 0x00,                         // damage = 134942
+        0x04,                                           // schoolMask = 4
+        0x05,                                           // target[7] = 0x04 ^ 1
+        0x04, 0x00, 0x00, 0x00,                         // hitInfo = 4
+        0xA1,                                           // target[1] = 0xA0 ^ 1
+        0x4B, 0x34, 0x02, 0x00                          // spellId = 144459
+    };
+
+    MopCombatLogPackets::SpellNonMeleeDamageLog log = {};
+    log.attackerGuid = 0x040000000096A000ull;
+    log.targetGuid = 0x040000000096A000ull;
+    log.spellId = 144459u;
+    log.damage = 134942u;
+    log.overkill = uint32(-1);
+    log.schoolMask = 4u;
+    log.absorb = 0u;
+    log.resist = 0u;
+    log.blocked = 0u;
+    log.hitInfo = 4u;
+
+    WorldPacket packet(SMSG_SPELLNONMELEEDAMAGELOG, 48);
+    MopCombatLogPackets::BuildSpellNonMeleeDamageLog(packet, log);
+
+    CHECK(packet.GetOpcode() == SMSG_SPELLNONMELEEDAMAGELOG);
+    CHECK(packet.size() == sizeof(captured));
+    if (packet.size() == sizeof(captured))
+    {
+        CHECK(std::memcmp(packet.contents(), captured, sizeof(captured)) == 0);
+    }
+}
+
+// Second real-traffic fixture, and the load-bearing one: capture-000625
+// sequence 35331, the 48-byte corpus maximum, in which ALL sixteen GUID bytes
+// are present with distinct values. The 38-byte sample above happens to carry
+// equal attacker and target GUIDs, so it cannot catch a swapped GUID or a
+// transposed byte index; this one can. Both GUIDs decode to a 0xF1.. high part,
+// which is what an 18414 unit GUID should look like.
+static void test_spell_non_melee_damage_log_matches_dense_capture()
+{
+    static uint8 const captured[] = {
+        0xFB, 0xE5, 0xF0,                               // mask: all sixteen present
+        0x00, 0x00, 0x00, 0x00,                         // blocked = 0
+        0x98,                                           // attacker[1] = 0x99 ^ 1
+        0xFF, 0xFF, 0xFF, 0xFF,                         // overkill = -1
+        0xC0, 0x5C, 0x40, 0xBB, 0xF0,                   // target[3] attacker[0] target[6] target[4] attacker[7]
+        0x00, 0x00, 0x00, 0x00,                         // resist = 0
+        0x00, 0x00, 0x00, 0x00,                         // absorb = 0
+        0x0C, 0xED, 0x81, 0x03, 0x03, 0x43, 0x28, 0x53, // attacker[5] target[5] attacker[3] attacker[2] target[2] attacker[6] target[0] attacker[4]
+        0x0B, 0x63, 0x00, 0x00,                         // damage = 25355
+        0x20,                                           // schoolMask = 0x20
+        0xF0,                                           // target[7] = 0xF1 ^ 1
+        0x07, 0x00, 0x00, 0x00,                         // hitInfo = 7
+        0x9B,                                           // target[1] = 0x9A ^ 1
+        0x24, 0xC4, 0x01, 0x00                          // spellId = 115748
+    };
+
+    MopCombatLogPackets::SpellNonMeleeDamageLog log = {};
+    log.attackerGuid = 0xF1420D528002995Dull;
+    log.targetGuid = 0xF141ECBAC1029A29ull;
+    log.spellId = 115748u;
+    log.damage = 25355u;
+    log.overkill = uint32(-1);
+    log.schoolMask = 0x20u;
+    log.absorb = 0u;
+    log.resist = 0u;
+    log.blocked = 0u;
+    log.hitInfo = 7u;
+
+    WorldPacket packet(SMSG_SPELLNONMELEEDAMAGELOG, 48);
+    MopCombatLogPackets::BuildSpellNonMeleeDamageLog(packet, log);
+
+    CHECK(packet.size() == sizeof(captured));
+    if (packet.size() == sizeof(captured))
+    {
+        CHECK(std::memcmp(packet.contents(), captured, sizeof(captured)) == 0);
+    }
+}
+
 int main(int, char**)
 {
     test_spell_instakill_log();
     test_spell_damage_shield_log();
+    test_spell_non_melee_damage_log_matches_capture();
+    test_spell_non_melee_damage_log_matches_dense_capture();
     if (g_fail) return 1;
     std::printf("mop_combat_log_packets: all checks passed\n");
     return 0;

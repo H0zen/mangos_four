@@ -192,8 +192,14 @@ void Spell::TakePower()
     // health as power used
     if (m_spellInfo->GetPowerType() == POWER_HEALTH)
     {
-        m_caster->ModifyHealth(-(int32)m_powerCost);
+        // Log first, deduct second. SendSpellNonMeleeDamageLog samples the
+        // target's CURRENT health to compute overkill, so removing the health
+        // beforehand makes a survivable power cost look like a killing blow --
+        // the cost always equals or exceeds the health that is left once it has
+        // been taken. Harmless while the packet was dropped by the send gate;
+        // now that it is admitted the client would render the false kill.
         m_caster->SendSpellNonMeleeDamageLog(m_caster, m_spellInfo->ID, m_powerCost, GetSpellSchoolMask(m_spellInfo), 0, 0, false, 0, false);
+        m_caster->ModifyHealth(-(int32)m_powerCost);
         return;
     }
 
