@@ -222,12 +222,12 @@ class SqlConnection
          * @brief
          *
          */
-        // Recursive, as the previous connection mutex was, and for the reason
-        // the design requires: SqlTransaction::Execute holds this across the
-        // whole BEGIN..COMMIT so nothing interleaves, then runs each queued
-        // SqlOperation, and every one of those takes it again because each
-        // must also work standalone from the delay queue.
-        typedef std::recursive_mutex LOCK_TYPE;
+        // PLAIN, and it can be: SqlTransaction holds this across the whole BEGIN..COMMIT so
+        // nothing interleaves, then runs each queued statement through ExecuteLocked(), which
+        // does not take it again. It used to be recursive precisely because each operation
+        // re-locked -- and a recursive mutex admits every other accidental re-entry too,
+        // silently, instead of deadlocking where the mistake is. See SqlOperation.
+        typedef std::mutex LOCK_TYPE;
         LOCK_TYPE m_mutex; /**< TODO */
 
         /**

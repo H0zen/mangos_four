@@ -135,6 +135,27 @@ else()
     endif()
 endif()
 
+# =============================================================================
+# Runtime library search path (RPATH)
+#
+# Eluna's Lua runtime is built as a SHARED library and installed to <prefix>/lib,
+# while the servers land in <prefix>/bin. Nothing recorded a search path for that,
+# so an installed mangosd cannot find liblua at start-up -- it only ever worked
+# from the build tree, where CMake writes a build-tree RPATH of its own. FreeBSD
+# surfaces this first because it has no /etc/ld.so.conf.d convention quietly
+# covering <prefix>/lib.
+#
+# $ORIGIN (and @loader_path on macOS) resolves relative to the binary itself, so
+# the install tree stays relocatable: move it anywhere and it still resolves.
+# =============================================================================
+if(APPLE)
+    set(CMAKE_INSTALL_RPATH "@loader_path/../lib")
+    set(CMAKE_INSTALL_RPATH_USE_LINK_PATH TRUE)
+elseif(UNIX)
+    set(CMAKE_INSTALL_RPATH "$ORIGIN/../lib")
+    set(CMAKE_INSTALL_RPATH_USE_LINK_PATH TRUE)
+endif()
+
 if(NOT WITHOUT_GIT)
   find_package(Git QUIET)
 endif()

@@ -51,13 +51,27 @@ class SqlOperation
          *
          */
         virtual void OnRemove() { delete this; }
+
         /**
-         * @brief
+         * @brief Run this operation, taking the connection's lock.
          *
-         * @param conn
-         * @return bool
+         * Entry point for a STANDALONE operation -- from the delay queue, or from a direct
+         * commit. Not virtual: taking the lock is not a decision a subclass gets to make.
          */
-        virtual bool Execute(SqlConnection* conn) = 0;
+        bool Execute(SqlConnection* conn);
+
+        /**
+         * @brief Run this operation with the connection's lock ALREADY held.
+         *
+         * SqlTransaction takes the lock once for the whole BEGIN..COMMIT and then runs each
+         * queued statement through here. That split is what lets the connection use a plain
+         * mutex: before it, the transaction locked the connection and then every statement
+         * inside it locked the same connection again, which only worked because the mutex was
+         * recursive -- and a recursive mutex admits every OTHER accidental re-entry too,
+         * silently, instead of deadlocking where the mistake is.
+         */
+        virtual bool ExecuteLocked(SqlConnection* conn) = 0;
+
         /**
          * @brief
          *
@@ -93,7 +107,7 @@ class SqlPlainRequest : public SqlOperation
          * @param conn
          * @return bool
          */
-        bool Execute(SqlConnection* conn) override;
+        bool ExecuteLocked(SqlConnection* conn) override;
 };
 
 /**
@@ -130,7 +144,7 @@ class SqlTransaction : public SqlOperation
          * @param conn
          * @return bool
          */
-        bool Execute(SqlConnection* conn) override;
+        bool ExecuteLocked(SqlConnection* conn) override;
 };
 
 /**
@@ -159,7 +173,7 @@ class SqlPreparedRequest : public SqlOperation
          * @param conn
          * @return bool
          */
-        bool Execute(SqlConnection* conn) override;
+        bool ExecuteLocked(SqlConnection* conn) override;
 
     private:
         const int m_nIndex; /**< TODO */
@@ -224,7 +238,7 @@ class SqlQuery : public SqlOperation
          * @param conn
          * @return bool
          */
-        bool Execute(SqlConnection* conn) override;
+        bool ExecuteLocked(SqlConnection* conn) override;
 };
 
 /**
@@ -325,6 +339,6 @@ class SqlQueryHolderEx : public SqlOperation
          * @param conn
          * @return bool
          */
-        bool Execute(SqlConnection* conn) override;
+        bool ExecuteLocked(SqlConnection* conn) override;
 };
 #endif                                                      //__SQLOPERATIONS_H

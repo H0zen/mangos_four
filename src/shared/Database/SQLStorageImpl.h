@@ -30,6 +30,9 @@
 #include "Log/Log.h"
 #include "DataStores/DBCFileLoader.h"
 
+#include <cassert>
+#include <cstring>
+
 template<class DerivedLoader, class StorageClass>
 template<class S, class D>
 /**
