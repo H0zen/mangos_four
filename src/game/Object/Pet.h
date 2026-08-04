@@ -336,8 +336,6 @@ class Pet : public Creature
         bool LoadPetFromDB(Player* owner, uint32 petentry = 0, uint32 petnumber = 0, bool current = false, int32 slot = -1);
         void SavePetToDB(PetSaveMode mode);
         void Unsummon(PetSaveMode mode, Unit* owner = NULL);
-        Transport* GetTransport() const { return m_transport; }
-        bool MoveTransportFollow(Unit* target, float offset, float angle, bool walking, bool& moved);
 
         /// Active-roster slot this pet currently occupies in
         /// `character_pet.slot` (0..PET_SLOT_LAST_ACTIVE_SLOT for Cata
@@ -515,10 +513,6 @@ class Pet : public Creature
         DeclinedName* m_declinedname;
 
     private:
-        void UpdateTransport(Player* owner);
-        void SendSplineAnchor(ObjectGuid transportGuid, float x, float y, float z, float orientation);
-
-        Transport* m_transport;
         PetModeFlags m_petModeFlags;
 
         void SaveToDB(uint32, uint8, uint32) override       // overwrite of Creature::SaveToDB     - don't must be called

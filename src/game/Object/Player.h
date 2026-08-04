@@ -5829,6 +5829,21 @@ class Player : public Unit
         // Set the transport for the player
         void SetTransport(Transport* t) { m_transport = t; }
 
+        /**
+         * @brief THE MAP ID THE CLIENT BELIEVES IT IS ON -- what every packet must be stamped
+         *        with, and not always GetMapId().
+         *
+         * 18414's SMSG_UPDATE_OBJECT leads with a uint16 map id. Aboard a vessel the server
+         * holds the player on the hull's own map, an id the client was never told and has no
+         * terrain for; what it is rendering is the world map the ship sails. Stamping the hull's
+         * id would hand the client a map it cannot resolve.
+         */
+        uint32 GetClientMapId() const;
+
+        /// The map a player must be ADDED to, which aboard is the hull rather than the world map
+        /// the transfer packet named. Never NULL for a player with a map.
+        Map* BoardingMap() const;
+
         // Get the X offset of the player's position on the transport
         float GetTransOffsetX() const { return m_movementInfo.GetTransportPos()->x; }
 

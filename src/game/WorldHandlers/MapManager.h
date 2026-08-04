@@ -135,8 +135,10 @@ class MapManager : public MaNGOS::Singleton<MapManager>
         typedef std::set<Transport*> TransportSet;
         TransportSet m_Transports;
 
-        typedef std::map<uint32, TransportSet> TransportMap;
-        TransportMap m_TransportsByMap;
+        // Named for what it holds, not for what it is: `TransportMap` is now a class -- the
+        // map a vessel IS -- and a typedef of the same name would shadow it everywhere.
+        typedef std::map<uint32, TransportSet> TransportsByMapType;
+        TransportsByMapType m_TransportsByMap;
 
         void InitializeVisibilityDistanceInfo();
 

@@ -26,6 +26,8 @@
 #include "Player.h"
 #include "Language.h"
 #include "Database/DatabaseEnv.h"
+
+#include <cmath>
 #include "Log.h"
 #include "Opcodes.h"
 #include "SpellMgr.h"
@@ -311,15 +313,16 @@ bool Player::LoadFromDB(ObjectGuid guid, SqlQueryHolder* holder)
     {
         m_movementInfo.SetTransportData(ObjectGuid(HIGHGUID_MO_TRANSPORT, transGUID), fields[27].GetFloat(), fields[28].GetFloat(), fields[29].GetFloat(), fields[30].GetFloat(), 0, -1);
 
-        if (!MaNGOS::IsValidMapCoord(
-                    GetPositionX() + m_movementInfo.GetTransportPos()->x, GetPositionY() + m_movementInfo.GetTransportPos()->y,
-                    GetPositionZ() + m_movementInfo.GetTransportPos()->z, GetOrientation() + m_movementInfo.GetTransportPos()->o) ||
-                // transport size limited
-                m_movementInfo.GetTransportPos()->x > 50 || m_movementInfo.GetTransportPos()->y > 50 || m_movementInfo.GetTransportPos()->z > 50)
+        // The saved pair is a position ON THE HULL, so it is judged against the hull -- not
+        // composed with a world position to make a point that means nothing. The old bound of
+        // 50 yards and a one-sided comparison rejected the stern of any long ship and let every
+        // negative offset through.
+        Position const* deck = m_movementInfo.GetTransportPos();
+        if (std::fabs(deck->x) > MAX_DECK_EXTENT || std::fabs(deck->y) > MAX_DECK_EXTENT ||
+            std::fabs(deck->z) > MAX_DECK_EXTENT)
         {
             sLog.outError("%s have invalid transport coordinates (X: %f Y: %f Z: %f O: %f). Teleport to default race/class locations.",
-                          guid.GetString().c_str(), GetPositionX() + m_movementInfo.GetTransportPos()->x, GetPositionY() + m_movementInfo.GetTransportPos()->y,
-                          GetPositionZ() + m_movementInfo.GetTransportPos()->z, GetOrientation() + m_movementInfo.GetTransportPos()->o);
+                          guid.GetString().c_str(), deck->x, deck->y, deck->z, deck->o);
 
             RelocateToHomebind();
 
@@ -344,8 +347,15 @@ bool Player::LoadFromDB(ObjectGuid guid, SqlQueryHolder* holder)
                 }
 
                 m_transport = *iter;
-                m_transport->AddPassenger(this);
+
+                // He logs in on the map the ship SAILS, at her waypoint estimate, because that
+                // is the only thing the client can be told: it has no terrain for her own map.
+                // This world position is coarse and temporary -- it names the right grid and
+                // nothing more. He is moved aboard once he is in the world and holds the
+                // vessel, by BoardingMap()->Add.
                 SetLocationMapId(m_transport->GetMapId());
+                Relocate(m_transport->GetPositionX(), m_transport->GetPositionY(),
+                         m_transport->GetPositionZ(), m_transport->GetOrientation());
                 break;
             }
         }

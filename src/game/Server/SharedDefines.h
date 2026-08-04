@@ -3258,6 +3258,22 @@ enum CreatureTypeFlags
     CREATURE_TYPEFLAGS_QUEST_BOSS       = 0x80000000,       // Lua_UnitIsQuestBoss
 };
 
+/**
+ * @brief A CREATURE CARRYING BOTH OF THESE MAY NOT SAIL.
+ *
+ * UNK21 and UNK23 above. Set together they kill every client that can see the creature the
+ * moment the transport it stands on gets under way, in the client's own render path; a
+ * transport's attachments are only walked while it moves, so stationary nothing happens.
+ * BOTH bits are required -- either alone sailed with no complaint.
+ *
+ * Proven on 1.12 and 3.3.5a. NOT re-proven on 18414: the flags reach the client the same way
+ * (SMSG_CREATURE_QUERY_RESPONSE, cached per entry, so it cannot be papered over per spawn)
+ * and the render path is the same lineage, but that is inference. The refusal is kept because
+ * it costs one template and the failure mode is a client crash. See TransportMap::EnlistCrew.
+ */
+#define CREATURE_TYPEFLAGS_TRANSPORT_FORBIDDEN \
+    (CREATURE_TYPEFLAGS_UNK21 | CREATURE_TYPEFLAGS_UNK23)
+
 enum CreatureEliteType
 {
     CREATURE_ELITE_NORMAL          = 0,

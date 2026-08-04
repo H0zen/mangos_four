@@ -1111,7 +1111,9 @@ void WorldSession::HandlePlayerLogin(LoginQueryHolder* holder)
     }
 
     /* This code is run if we can not add the player to the map for some reason */
-    if (lockStatus != AREA_LOCKSTATUS_OK || !pCurrChar->GetMap()->Add(pCurrChar))
+    // Logging in aboard, this is HER map: he was loaded onto the water she sails, which is what
+    // his client can render, and BoardingMap puts him where he actually stands.
+    if (lockStatus != AREA_LOCKSTATUS_OK || !pCurrChar->BoardingMap()->Add(pCurrChar))
     {
         pCurrChar->SetCinematicFlyover(nullptr);
         /* Attempt to find an areatrigger to teleport the player for us */

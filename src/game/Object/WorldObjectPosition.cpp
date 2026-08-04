@@ -40,6 +40,7 @@
 #include "MapManager.h"
 #include "Log.h"
 #include "Transports.h"
+#include "TransportMap.h"
 #include "TargetedMovementGenerator.h"
 #include "WaypointMovementGenerator.h"
 #include "CellImpl.h"
@@ -396,6 +397,85 @@ bool WorldObject::_IsWithinDist(WorldObject const* obj, float dist2compare, bool
     float maxdist = dist2compare + sizefactor;
 
     return distsq < maxdist * maxdist;
+}
+
+bool WorldObject::SharesClientWorld(WorldObject const* viewer) const
+{
+    if (!viewer || !IsInWorld() || !viewer->IsInWorld() || !InSamePhase(viewer))
+    {
+        return false;
+    }
+
+    if (FindMap() == viewer->FindMap())
+    {
+        return true;
+    }
+
+    // Across a vessel's boundary: the shore sees the deck of any ship on its own water, and
+    // everyone aboard sees that water back.
+    if (Transport* aboard = Transport::VesselOf(*this))
+    {
+        if (aboard->GetMap() == viewer->GetMap() || aboard == viewer)
+        {
+            return true;
+        }
+    }
+
+    if (Transport* watching = Transport::VesselOf(*viewer))
+    {
+        if (watching->GetMap() == GetMap() || watching == this)
+        {
+            return true;
+        }
+    }
+
+    return false;
+}
+
+bool WorldObject::IsSeenWithin(WorldObject const* viewer, float dist2compare, bool is3D) const
+{
+    if (!SharesClientWorld(viewer))
+    {
+        return false;
+    }
+
+    // One frame -- the world's, or one deck's. Exact, so measure it and be done.
+    if (FindMap() == viewer->FindMap())
+    {
+        return _IsWithinDist(viewer, dist2compare, is3D);
+    }
+
+    // The object a proximity question must be asked FROM. A passenger has no pose the shore can
+    // measure against, so the vessel answers for him and its hull radius is added as slack,
+    // because he may be standing anywhere on it.
+    float slack = 0.0f;
+    WorldObject const* a = this;
+    WorldObject const* b = viewer;
+
+    if (TransportMap const* hull = FindMap() ? FindMap()->AsTransport() : NULL)
+    {
+        slack += hull->HullRadius();
+        a = hull->Vessel();
+    }
+
+    if (TransportMap const* hull = viewer->FindMap() ? viewer->FindMap()->AsTransport() : NULL)
+    {
+        slack += hull->HullRadius();
+        b = hull->Vessel();
+    }
+
+    if (!a || !b)
+    {
+        return false;
+    }
+
+    // One of them IS the anchor: he is standing on the very thing he is looking at.
+    if (a == b)
+    {
+        return true;
+    }
+
+    return a->_IsWithinDist(b, dist2compare + slack, is3D);
 }
 
 /**

@@ -60,6 +60,16 @@
 
 #define MAX_STEALTH_DETECT_RANGE    45.0f
 
+// How far a deck map extends from its origin. A deck map IS the hull, so its bounds are the
+// hull's. Used where the vessel cannot be resolved and its real extent read; the job is to
+// reject the absolute continent coordinates a leaving zeppelin sometimes reports, not to
+// second-guess the length of a ship.
+#define MAX_DECK_EXTENT             250.0f
+
+// Slack added to a hull's own extent when deciding whether a world point the client reported
+// is a step ashore or the meaningless pair a passenger echoes back.
+#define DECK_EDGE_MARGIN            10.0f
+
 /**
  * @brief Temporary spawn type enumeration
  *
@@ -815,6 +825,25 @@ class WorldObject : public Object
         {
             return obj && IsInMap(obj) && _IsWithinDist(obj, dist2compare, is3D);
         }
+
+        /**
+         * @brief CAN `viewer` BE SHOWN THIS OBJECT AT ALL -- a wider question than IsInMap.
+         *
+         * Wider because a thing may be drawn without being reachable: a ship and the pier she
+         * is passing are two maps, and each has to see the other. IsInMap stays the REACH
+         * question -- melee, spells and threat all demand one frame -- and is deliberately not
+         * widened, because nobody swings at the shore from a deck.
+         */
+        bool SharesClientWorld(WorldObject const* viewer) const;
+
+        /**
+         * @brief IsWithinDistInMap's companion for the visibility question.
+         *
+         * In one frame it is an exact distance. Across a vessel's boundary whatever is aboard
+         * answers with its hull instead: a passenger has no pose the shore can measure against,
+         * so the vessel stands in for him and its extent is added as slack.
+         */
+        bool IsSeenWithin(WorldObject const* viewer, float dist2compare, bool is3D = true) const;
         bool IsWithinLOS(float x, float y, float z, world::terrain::ModelIgnoreFlags ignoreFlags = world::terrain::ModelIgnoreFlags::Nothing) const;
         bool IsWithinLOSInMap(const WorldObject* obj, world::terrain::ModelIgnoreFlags ignoreFlags = world::terrain::ModelIgnoreFlags::Nothing) const;
         bool GetDistanceOrder(WorldObject const* obj1, WorldObject const* obj2, bool is3D = true) const;
@@ -869,6 +898,10 @@ class WorldObject : public Object
 
         void SetMap(Map* map);
         Map* GetMap() const { MANGOS_ASSERT(m_currMap); return m_currMap; }
+        /// The map, or NULL. For code that legitimately runs on an object between maps -- a
+        /// passenger mid-crossing, a character being saved at logout -- where GetMap()'s assert
+        /// is the wrong answer to a question that has one.
+        Map* FindMap() const { return m_currMap; }
         // used to check all object's GetMap() calls when object is not in world!
         void ResetMap();
 

@@ -40,6 +40,8 @@
 #include "Channel.h"
 #include "ChannelMgr.h"
 #include "MapManager.h"
+#include "Transports.h"
+#include "TransportMap.h"
 #include "MapPersistentStateMgr.h"
 #include "InstanceData.h"
 #include "GridNotifiers.h"
@@ -159,12 +161,43 @@ void Player::SaveToDB()
 
     if (!IsBeingTeleported())
     {
-        uberInsert.addUInt32(GetMapId());
+        // What goes in this row is what the client will be handed at the next login, so it is
+        // the map the ship SAILS and a point on it -- never the deck map, which the client
+        // cannot load. Where he actually stands is the deck position saved in the transport
+        // columns below, and that is the one that survives the voyage intact.
+        //
+        // The vessel is taken from the boarding relationship when it is intact, and from the
+        // map otherwise: a GM `.tele` onto a hull puts him there with no transport at all.
+        // Written once, a deck map id in this column is unloadable for ever and the character
+        // is stuck at the loading screen with no way back in.
+        uint32 savedMap = GetMapId();
+        float savedX = GetPositionX(), savedY = GetPositionY();
+        float savedZ = GetPositionZ(), savedO = GetOrientation();
+
+        Transport* vessel = m_transport;
+        if (!vessel && FindMap())
+        {
+            if (TransportMap* hull = FindMap()->AsTransport())
+            {
+                vessel = hull->Vessel();
+            }
+        }
+
+        if (vessel)
+        {
+            savedMap = vessel->GetMapId();
+            savedX = vessel->GetPositionX();
+            savedY = vessel->GetPositionY();
+            savedZ = vessel->GetPositionZ();
+            savedO = vessel->GetOrientation();
+        }
+
+        uberInsert.addUInt32(savedMap);
         uberInsert.addUInt32(uint32(GetDungeonDifficulty()));
-        uberInsert.addFloat(finiteAlways(GetPositionX()));
-        uberInsert.addFloat(finiteAlways(GetPositionY()));
-        uberInsert.addFloat(finiteAlways(GetPositionZ()));
-        uberInsert.addFloat(finiteAlways(GetOrientation()));
+        uberInsert.addFloat(finiteAlways(savedX));
+        uberInsert.addFloat(finiteAlways(savedY));
+        uberInsert.addFloat(finiteAlways(savedZ));
+        uberInsert.addFloat(finiteAlways(savedO));
     }
     else
     {
@@ -201,10 +234,18 @@ void Player::SaveToDB()
     }
     uberInsert.addString(ss);
 
-    uberInsert.addFloat(finiteAlways(m_movementInfo.GetTransportPos()->x));
-    uberInsert.addFloat(finiteAlways(m_movementInfo.GetTransportPos()->y));
-    uberInsert.addFloat(finiteAlways(m_movementInfo.GetTransportPos()->z));
-    uberInsert.addFloat(finiteAlways(m_movementInfo.GetTransportPos()->o));
+    // WHERE HE ACTUALLY STANDS. Aboard, that is his position on the deck map -- the offset in
+    // his last movement packet is a copy of it that can be a tick stale, or absent at logout.
+    Position deck = *m_movementInfo.GetTransportPos();
+    if (FindMap() && FindMap()->AsTransport())
+    {
+        deck = Position(GetPositionX(), GetPositionY(), GetPositionZ(), GetOrientation());
+    }
+
+    uberInsert.addFloat(finiteAlways(deck.x));
+    uberInsert.addFloat(finiteAlways(deck.y));
+    uberInsert.addFloat(finiteAlways(deck.z));
+    uberInsert.addFloat(finiteAlways(deck.o));
     if (m_transport)
     {
         uberInsert.addUInt32(m_transport->GetGUIDLow());

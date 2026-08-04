@@ -41,6 +41,7 @@
 #include "Log.h"
 #include "LootMgr.h"
 #include "MapManager.h"
+#include "TransportMap.h"
 #include "CreatureAI.h"
 #include "CreatureAISelector.h"
 #include "InstanceData.h"
@@ -276,6 +277,14 @@ void Creature::AddToWorld()
 
     Unit::AddToWorld();
 
+    // Aboard a vessel: index it, and announce it to a shore that is already watching. This is
+    // the one place both the grid loader and Map::Add pass through.
+    if (TransportMap* hull = FindMap() ? FindMap()->AsTransport() : NULL)
+    {
+        hull->EnlistCrew(this);
+        hull->SendCrewMemberCreate(this);
+    }
+
     // Make active if required
     if (sWorld.isForceLoadMap(GetMapId()) ||
         (GetCreatureInfo()->ExtraFlags & CREATURE_FLAG_EXTRA_ACTIVE) ||
@@ -319,6 +328,11 @@ void Creature::RemoveFromWorld()
     if (IsInWorld() && GetObjectGuid().IsCreatureOrVehicle())
     {
         GetMap()->GetObjectsStore().erase<Creature>(GetObjectGuid(), (Creature*)NULL);
+
+        if (TransportMap* hull = GetMap()->AsTransport())
+        {
+            hull->DelistCrew(this);
+        }
     }
 
     Unit::RemoveFromWorld();

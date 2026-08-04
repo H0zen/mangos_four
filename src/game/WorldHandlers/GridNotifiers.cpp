@@ -77,29 +77,28 @@ void VisibleNotifier::Notify()
 {
     Player& player = *i_camera.GetOwner();
     // at this moment i_clientGUIDs have guids that not iterate at grid level checks
-    // but exist one case when this possible and object not out of range: transports
-    if (Transport* transport = player.GetTransport())
+    // but exist one case when this possible and object not out of range: shipmates. A deck is
+    // small enough that everyone on it is always in reach, and its cells are not the ones this
+    // sweep walked when the viewer's own grid is elsewhere.
+    if (player.GetMap()->AsTransport())
     {
-        for (Transport::UnitSet::const_iterator itr = transport->GetPassengers().begin(); itr != transport->GetPassengers().end(); ++itr)
+        Map::PlayerList const& aboard = player.GetMap()->GetPlayers();
+        for (Map::PlayerList::const_iterator itr = aboard.begin(); itr != aboard.end(); ++itr)
         {
-            Unit* passenger = *itr;
-            if (!passenger || i_clientGUIDs.find(passenger->GetObjectGuid()) == i_clientGUIDs.end())
+            Player* mate = itr->getSource();
+            if (mate && i_clientGUIDs.find(mate->GetObjectGuid()) != i_clientGUIDs.end())
             {
-                continue;
+                mate->UpdateVisibilityOf(mate, &player);
+                player.UpdateVisibilityOf(&player, mate, i_data, i_visibleNow);
+                i_clientGUIDs.erase(mate->GetObjectGuid());
             }
-
-            // Players require reciprocal visibility. Other unit passengers are
-            // already known to the client and only need the transport exception
-            // below; re-running normal distance visibility can unsummon a pet
-            // whose world position is temporarily outside the active grid.
-            if (Player* otherPlayer = passenger->ToPlayer())
-            {
-                otherPlayer->UpdateVisibilityOf(otherPlayer, &player);
-                player.UpdateVisibilityOf(&player, otherPlayer, i_data, i_visibleNow);
-            }
-            i_clientGUIDs.erase(passenger->GetObjectGuid());
         }
     }
+
+    // Nothing here about the shore, or about a deck seen from it. Both arrive as ordinary
+    // candidates from the extra cell sources the camera swept, so they are already erased from
+    // the leftovers below by having been re-found -- which is what makes their out-of-range
+    // correct with nobody keeping a list.
 
     // generate outOfRange for not iterate objects
     i_data.AddOutOfRangeGUID(i_clientGUIDs);

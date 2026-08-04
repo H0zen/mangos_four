@@ -186,26 +186,13 @@ inline void BeforeVisibilityDestroy<Creature>(Creature* t, Player* p)
     }
 }
 
+/// Two things on the same DECK, which is the same map -- so this asks the map and not a
+/// passenger roster. A creature summoned straight onto a hull is aboard by exactly the same
+/// test as a player who walked up the gangplank, with nothing to keep in step.
 static bool SharesTransportWithPlayer(Player* player, WorldObject* target)
 {
-    Transport* transport = player ? player->GetTransport() : NULL;
-    if (!transport || !target)
-    {
-        return false;
-    }
-
-    if (target->GetTypeId() == TYPEID_PLAYER)
-    {
-        return static_cast<Player*>(target)->GetTransport() == transport;
-    }
-
-    if (target->GetTypeId() == TYPEID_UNIT)
-    {
-        Creature* creature = static_cast<Creature*>(target);
-        return creature->IsPet() && static_cast<Pet*>(creature)->GetTransport() == transport;
-    }
-
-    return false;
+    return player && target && player->GetMap() &&
+           player->GetMap()->AsTransport() && target->GetMap() == player->GetMap();
 }
 
 /**

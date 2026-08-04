@@ -109,27 +109,10 @@ void TargetedMovementGeneratorMedium<T, D>::_setTargetLocation(T& owner, bool up
     bool forceDest = (owner.GetTypeId() == TYPEID_UNIT && ((Creature*)&owner)->IsPet()
                       && owner.hasUnitState(UNIT_STAT_FOLLOW));
 
-    // Legacy MO_TRANSPORT passengers use MovementInfo's transport-local
-    // position rather than the vehicle TransportInfo system. Follow the owner
-    // in that local space instead of generating a world-space path that stays
-    // behind when the hull moves.
-    if (forceDest)
-    {
-        Pet* pet = static_cast<Pet*>((Creature*)&owner);
-        bool moved = false;
-        if (pet->MoveTransportFollow(i_target.getTarget(), i_offset, i_angle,
-            ((D*)this)->EnableWalking(), moved))
-        {
-            if (moved)
-            {
-                D::_addUnitStateMove(owner);
-                i_targetReached = false;
-                m_speedChanged = false;
-            }
-            return;
-        }
-    }
-
+    // A pet aboard a vessel needs no special case: it stands on the ship's own map, so the
+    // destination it is pathing to is already in the hull's frame and the ordinary path is the
+    // right one. The composed world-space follow this replaced was a deck-local target rotated
+    // by the ship's waypoint estimate, which is exactly the pose the client disagrees with.
     i_path->calculate(x, y, z, forceDest);
     if (i_path->getPathType() & PATHFIND_NOPATH)
     {

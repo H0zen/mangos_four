@@ -51,6 +51,7 @@
 #include "Database/DatabaseEnv.h"
 #include "Log.h"
 #include "Transports.h"
+#include "TransportMap.h"
 #include "GridDefines.h"
 #include "World.h"
 #include "CellImpl.h"
@@ -71,6 +72,13 @@ MapManager::MapManager()
 
 MapManager::~MapManager()
 {
+    // BEFORE the maps go. A vessel is in no cell, so no grid unload reaches it, and ~Object
+    // asserts on an object still flagged in-world -- against a map that would already be freed.
+    for (TransportSet::iterator i = m_Transports.begin(); i != m_Transports.end(); ++i)
+    {
+        (*i)->WithdrawFromWorld();
+    }
+
     for (MapMapType::iterator iter = i_maps.begin(); iter != i_maps.end(); ++iter)
     {
         delete iter->second;
@@ -187,7 +195,27 @@ Map* MapManager::CreateMap(uint32 id, const WorldObject* obj)
         m = FindMapLocked(id, 0);
         if (m == NULL)
         {
-            m = new WorldMap(id, i_gridCleanUpDelay);
+            // A HULL IS NOT A WORLD MAP. It is created only for the vessel that owns it, is
+            // never scheduled, never unloaded, and is looked up by the same id like any other
+            // map so that GetMap()/FindMap keep working aboard.
+            if (Transport::IsVesselMapId(id))
+            {
+                GameObject const* go = obj && obj->GetTypeId() == TYPEID_GAMEOBJECT ?
+                    static_cast<GameObject const*>(obj) : NULL;
+                if (!go || go->GetGoType() != GAMEOBJECT_TYPE_MO_TRANSPORT)
+                {
+                    sLog.outError("MapManager::CreateMap: map %u is a vessel hull and can only "
+                                  "be created for its own transport.", id);
+                    return NULL;
+                }
+                m = new TransportMap(id, i_gridCleanUpDelay,
+                                     const_cast<Transport*>(static_cast<Transport const*>(go)));
+            }
+            else
+            {
+                m = new WorldMap(id, i_gridCleanUpDelay);
+            }
+
             // add map into container
             i_maps[MapID(id)] = m;
 
@@ -296,8 +324,18 @@ void MapManager::Update(uint32 diff)
         return;
     }
 
+    // The world's maps, in parallel. A vessel's deck is NOT among them: it belongs to the
+    // vessel, which runs it nested inside the tick of the map it sails, once that map has
+    // finished with its own containers. Nor are the vessels themselves ticked here -- they
+    // are active objects of the map they sail, so the ship advances on that map's thread and
+    // whatever it sends can go straight out.
     for (MapMapType::iterator iter = i_maps.begin(); iter != i_maps.end(); ++iter)
     {
+        if (iter->second->AsTransport())
+        {
+            continue;
+        }
+
         if (m_updater.activated())
         {
             m_updater.schedule_update(*iter->second, (uint32)i_timer.GetCurrent());
@@ -313,10 +351,16 @@ void MapManager::Update(uint32 diff)
         m_updater.wait();
     }
 
+    // PAST THE BARRIER, WHERE NO MAP IS RUNNING. A vessel that reached the end of one world
+    // map decided so on that map's thread and could go no further there: arriving writes into
+    // the destination's active list, object store and player list, and the destination may
+    // have been updating on another core at that very moment.
     for (TransportSet::iterator iter = m_Transports.begin(); iter != m_Transports.end(); ++iter)
     {
-        WorldObject::UpdateHelper helper((*iter));
-        helper.Update((uint32)i_timer.GetCurrent());
+        if ((*iter)->IsCrossing())
+        {
+            (*iter)->CompleteCrossing();
+        }
     }
 
     // remove all maps which can be unloaded
@@ -324,6 +368,15 @@ void MapManager::Update(uint32 diff)
     while (iter != i_maps.end())
     {
         Map* pMap = iter->second;
+
+        // A deck outlives every voyage: loaded once and never unloaded, because no player
+        // ever "enters" it to keep it awake and its crew have nowhere else to be.
+        if (pMap->AsTransport())
+        {
+            ++iter;
+            continue;
+        }
+
         // check if map can be unloaded
         if (pMap->CanUnload((uint32)i_timer.GetCurrent()))
         {
@@ -388,6 +441,14 @@ bool MapManager::IsValidMAP(uint32 mapid)
  */
 void MapManager::UnloadAll()
 {
+    // While the maps are still alive: the vessel needs its map to take itself off the active
+    // list, and its own deck map needs to drop the crew index before those creatures are
+    // destroyed with the map that owns them.
+    for (TransportSet::iterator i = m_Transports.begin(); i != m_Transports.end(); ++i)
+    {
+        (*i)->WithdrawFromWorld();
+    }
+
     for (MapMapType::iterator iter = i_maps.begin(); iter != i_maps.end(); ++iter)
     {
         iter->second->UnloadAll(true);

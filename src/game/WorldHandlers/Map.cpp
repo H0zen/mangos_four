@@ -55,6 +55,7 @@
 #include "InstanceData.h"
 #include "GridNotifiersImpl.h"
 #include "Transports.h"
+#include "TransportMap.h"
 #include "ObjectAccessor.h"
 #include "ObjectMgr.h"
 #include "World.h"
@@ -1090,6 +1091,26 @@ void Map::Update(const uint32& t_diff)
     }
 
     m_weatherSystem->UpdateWeathers(t_diff);
+
+    // LAST: the vessels sailing this map, and inside each of them its own deck map. They must
+    // not run until this map has finished walking its own containers.
+    //
+    // Not through the grid's ObjectUpdater, though a vessel is a world object: a game object
+    // never relocates its cell in this core, so a ship would advance once, drift out of the
+    // cell it was filed in and never be visited again.
+    MapManager::TransportsByMapType::const_iterator sailing =
+        sMapMgr.m_TransportsByMap.find(GetId());
+    if (sailing != sMapMgr.m_TransportsByMap.end())
+    {
+        for (Transport* vessel : sailing->second)
+        {
+            if (vessel->GetMap() == this)
+            {
+                WorldObject::UpdateHelper helper(vessel);
+                helper.Update(t_diff);
+            }
+        }
+    }
 }
 
 /**
@@ -1880,7 +1901,7 @@ void Map::SendInitSelf(Player* player)
     //
     MopUpdateObject::SelfPlayer sp{};
     sp.guid = player->GetObjectGuid().GetRawValue();
-    sp.mapId = uint16(player->GetMapId());
+    sp.mapId = uint16(player->GetClientMapId());
     sp.x = player->GetPositionX();
     sp.y = player->GetPositionY();
     sp.z = player->GetPositionZ();
@@ -1895,7 +1916,19 @@ void Map::SendInitSelf(Player* player)
     sp.speedFlightBack = player->GetSpeed(MOVE_FLIGHT_BACK);
     sp.speedTurn = player->GetSpeed(MOVE_TURN_RATE);
     sp.speedPitch = player->GetSpeed(MOVE_PITCH_RATE);
-    if (player->GetTransport())
+    // Aboard, the deck position IS the offset and the map he stands on is the authority; his
+    // last movement packet may be a tick behind it, and on login there is none at all.
+    if (Transport* vessel = Transport::VesselOf(*player))
+    {
+        sp.transportGuid = vessel->GetObjectGuid().GetRawValue();
+        sp.transportX = player->GetPositionX();
+        sp.transportY = player->GetPositionY();
+        sp.transportZ = player->GetPositionZ();
+        sp.transportO = player->GetOrientation();
+        sp.transportTime = vessel->GetPathProgress();
+        sp.transportSeat = -1;
+    }
+    else if (player->GetTransport())
     {
         MovementInfo const& movement = player->m_movementInfo;
         Position const* transportPosition = movement.GetTransportPos();
@@ -1953,13 +1986,20 @@ void Map::SendInitSelf(Player* player)
     // Player's existing traversal emits top-level items/bags, while Bag's
     // override recursively emits its contents. A current transport is emitted
     // before those objects because the self movement block references its GUID.
-    UpdateData inventoryData(player->GetMapId());
+    UpdateData inventoryData(player->GetClientMapId());
     if (Transport* transport = player->GetTransport())
     {
         // The client must know the hull before the self movement block names it
         // as a parent. MO_TRANSPORT motion is then interpolated client-side
         // from its route clock while the player retains these local offsets.
         transport->BuildCreateUpdateBlockForPlayer(&inventoryData, player);
+
+        // And her crew, whom no sweep of his can reach: they stand on her map, and he is on
+        // the world map she sails until he actually steps aboard.
+        if (TransportMap* hull = transport->AsMap())
+        {
+            hull->AppendCrewCreateBlocks(inventoryData, player);
+        }
     }
     player->BuildCreateUpdateBlockForPlayer(&inventoryData, player);
 
@@ -2107,43 +2147,37 @@ void Map::SendInitSelf(Player* player)
  */
 void Map::SendInitTransports(Player* player)
 {
-    // Hack to send out transports
-    MapManager::TransportMap& tmap = sMapMgr.m_TransportsByMap;
+    // A player joining a map takes possession of every vessel on it -- one of the events that
+    // carry transport visibility. No distance, no grid: you share her map, you have her. The
+    // client sails her into view from the path itself.
+    //
+    // ON A DECK the only vessel that matters is the one this map IS. Vessels are filed under
+    // the WORLD map they sail, so the lookup below finds nothing here.
+    if (TransportMap* hull = AsTransport())
+    {
+        TransportMap::AnnounceVessel(hull->Vessel(), player);
+        return;
+    }
+
+    MapManager::TransportsByMapType& tmap = sMapMgr.m_TransportsByMap;
 
     // no transports at map
-    if (tmap.find(player->GetMapId()) == tmap.end())
+    if (tmap.find(i_id) == tmap.end())
     {
         return;
     }
 
-    UpdateData transData(player->GetMapId());
-
-    MapManager::TransportSet& tset = tmap[player->GetMapId()];
+    MapManager::TransportSet& tset = tmap[i_id];
 
     for (MapManager::TransportSet::const_iterator i = tset.begin(); i != tset.end(); ++i)
     {
-        // send data for current transport in other place
+        // Our own vessel came from SendInitSelf, ahead of our own body, so we already stand on
+        // something by the time our block lands. Skip it here.
         if ((*i) != player->GetTransport() && (*i)->GetMapId() == i_id)
         {
-            (*i)->BuildCreateUpdateBlockForPlayer(&transData, player);
+            TransportMap::AnnounceVessel(*i, player);
         }
     }
-
-    if (!transData.HasData())
-    {
-        return;
-    }
-
-    WorldPacket packet;
-    transData.BuildPacket(&packet);
-
-    // Prevent sending transport maps in player update object
-    if (packet.ReadUInt16() != player->GetMapId())
-    {
-        return;
-    }
-
-    player->GetSession()->SendPacket(&packet);
 }
 
 /**
@@ -2153,36 +2187,24 @@ void Map::SendInitTransports(Player* player)
  */
 void Map::SendRemoveTransports(Player* player)
 {
-    // Hack to send out transports
-    MapManager::TransportMap& tmap = sMapMgr.m_TransportsByMap;
+    MapManager::TransportsByMapType& tmap = sMapMgr.m_TransportsByMap;
 
     // no transports at map
-    if (tmap.find(player->GetMapId()) == tmap.end())
+    if (tmap.find(i_id) == tmap.end())
     {
         return;
     }
 
-    UpdateData transData(player->GetMapId());
-
-    MapManager::TransportSet& tset = tmap[player->GetMapId()];
+    MapManager::TransportSet& tset = tmap[i_id];
 
     // except used transport
     for (MapManager::TransportSet::const_iterator i = tset.begin(); i != tset.end(); ++i)
+    {
         if ((*i) != player->GetTransport() && (*i)->GetMapId() != i_id)
         {
-            (*i)->BuildOutOfRangeUpdateBlock(&transData);
+            TransportMap::RetractVessel(*i, player);
         }
-
-    WorldPacket packet;
-    transData.BuildPacket(&packet);
-
-    // Prevent sending transport maps in player update object
-    if (packet.ReadUInt16() != player->GetMapId())
-    {
-        return;
     }
-
-    player->GetSession()->SendPacket(&packet);
 }
 
 /**

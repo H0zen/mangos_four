@@ -64,6 +64,7 @@
 #include "SpellAuras.h"
 #include "MapManager.h"
 #include "Transports.h"
+#include "TransportMap.h"
 #include "BattleGround/BattleGround.h"
 #include "WaypointMovementGenerator.h"
 #include "MapPersistentStateMgr.h"
@@ -245,10 +246,25 @@ void WorldSession::HandleMoveWorldportAckOpcode()
     GetPlayer()->SetMap(map);
     GetPlayer()->Relocate(loc.coord_x, loc.coord_y, loc.coord_z, loc.orientation);
 
+    // And the movement state, which is what the packets on the far side are written from.
+    // Without it the client arrives on the new map holding the pose it had on the old one.
+    GetPlayer()->m_movementInfo.ChangePosition(loc.coord_x, loc.coord_y, loc.coord_z,
+                                               loc.orientation);
+
+    // The client threw away every object it had when it left the old map, so the set of "things
+    // he already has" is now a lie in the one direction that hurts: anything still listed here
+    // will be skipped by UpdateVisibilityOf and never sent again. That includes the vessel he is
+    // standing on, which exists on both sides of the seam and so keeps its guid across it.
+    GetPlayer()->m_clientGUIDs.clear();
+
     GetPlayer()->SendInitialPacketsBeforeAddToMap();
     // the CanEnter checks are done in TeleporTo but conditions may change
     // while the player is in transit, for example the map may get full
-    if (!GetPlayer()->GetMap()->Add(GetPlayer()))
+    //
+    // Aboard, this is HER map, not the one just named in SMSG_NEW_WORLD -- see
+    // Player::BoardingMap. The client is loading the world map she sails and never learns the
+    // other one exists.
+    if (!GetPlayer()->BoardingMap()->Add(GetPlayer()))
     {
         // if player wasn't added to map, reset his map pointer!
         GetPlayer()->ResetMap();
@@ -882,15 +898,13 @@ bool WorldSession::VerifyMovementInfo(MovementInfo const& movementInfo) const
 
     if (movementInfo.GetTransportGuid())
     {
-        // transports size limited
-        // (also received at zeppelin/lift leave by some reason with t_* as absolute in continent coordinates, can be safely skipped)
-        if (movementInfo.GetTransportPos()->x > 50 || movementInfo.GetTransportPos()->y > 50 || movementInfo.GetTransportPos()->z > 100)
-        {
-            return false;
-        }
-
-        if (!MaNGOS::IsValidMapCoord(movementInfo.GetPos()->x + movementInfo.GetTransportPos()->x, movementInfo.GetPos()->y + movementInfo.GetTransportPos()->y,
-                                     movementInfo.GetPos()->z + movementInfo.GetTransportPos()->z, movementInfo.GetPos()->o + movementInfo.GetTransportPos()->o))
+        // A position ON A HULL, judged against the hull. Also received at zeppelin/lift leave
+        // with t_* as absolute continent coordinates, which is what this rejects. The old bound
+        // compared one side only, so every negative offset passed unchecked while the stern of
+        // a long ship was refused.
+        Position const* deck = movementInfo.GetTransportPos();
+        if (std::fabs(deck->x) > MAX_DECK_EXTENT || std::fabs(deck->y) > MAX_DECK_EXTENT ||
+            std::fabs(deck->z) > MAX_DECK_EXTENT)
         {
             return false;
         }
@@ -917,17 +931,33 @@ void WorldSession::HandleMoverRelocation(MovementInfo& movementInfo)
 
     if (Player* plMover = mover->GetTypeId() == TYPEID_PLAYER ? (Player*)mover : NULL)
     {
+        // BEFORE the transport branch, and the ordering is the whole of it. TransportMap::Add
+        // reads the passenger's OWN m_movementInfo for his deck offset; assigning it below the
+        // branch made Add read the PREVIOUS packet -- which carries no transport data -- and
+        // stand him on the hull origin.
+        plMover->m_movementInfo = movementInfo;
+
+        // 18414 has no MOVEFLAG_ONTRANSPORT: the movement block carries a `hasTransport` bit
+        // and the parent guid, so the presence of that guid is the boarding signal.
         if (movementInfo.GetTransportGuid())
         {
             if (!plMover->m_transport)
             {
-                // elevators also cause the client to send transport guid - just unmount if the guid can be found in the transport list
+                // Lifts and elevators name a transport guid too; only an MO_TRANSPORT in the
+                // global list is a vessel, and only a vessel has a map to step onto.
                 for (MapManager::TransportSet::const_iterator iter = sMapMgr.m_Transports.begin(); iter != sMapMgr.m_Transports.end(); ++iter)
                 {
                     if ((*iter)->GetObjectGuid() == movementInfo.GetTransportGuid())
                     {
                         plMover->m_transport = (*iter);
-                        (*iter)->AddPassenger(plMover);
+
+                        // He walked aboard, so his client already has the vessel and is
+                        // rendering the map she sails; moving him onto her own map is safe at
+                        // once. Nothing tells the client -- it never learns that id.
+                        if (TransportMap* hull = (*iter)->AsMap())
+                        {
+                            hull->Embark(plMover);
+                        }
                         break;
                     }
                 }
@@ -935,7 +965,32 @@ void WorldSession::HandleMoverRelocation(MovementInfo& movementInfo)
         }
         else if (plMover->m_transport)               // if we were on a transport, leave
         {
-            plMover->m_transport->RemovePassenger(plMover);
+            // He walked ashore, and his own client just told us where: that world point beats
+            // anything we could derive from a hull whose pose we only estimate.
+            //
+            // BUT ONLY IF IT IS NEXT TO THE SHIP. Nobody steps off a vessel onto another
+            // continent, and the number in this field is not always his -- while he is aboard
+            // his world position is meaningless, and a client that drops the transport bit for
+            // one packet echoes that meaningless pair straight back.
+            if (TransportMap* hull = plMover->m_transport->AsMap())
+            {
+                Transport* vessel = plMover->m_transport;
+                const float reach = hull->HullRadius() + vessel->NodeSlack() + DECK_EDGE_MARGIN;
+
+                if (vessel->IsWithinDist3d(movementInfo.GetPos()->x, movementInfo.GetPos()->y,
+                                           movementInfo.GetPos()->z, reach))
+                {
+                    hull->Disembark(plMover, movementInfo.GetPos()->x, movementInfo.GetPos()->y,
+                                    movementInfo.GetPos()->z, movementInfo.GetPos()->o);
+                }
+                else
+                {
+                    // Not a step ashore at all. Put him down on the ship's own coarse pose:
+                    // wrong by a hull's length at worst, instead of by a continent.
+                    hull->Disembark(plMover, vessel->GetPositionX(), vessel->GetPositionY(),
+                                    vessel->GetPositionZ(), vessel->GetOrientation());
+                }
+            }
             plMover->m_transport = NULL;
             movementInfo.ClearTransportData();
         }
@@ -946,7 +1001,18 @@ void WorldSession::HandleMoverRelocation(MovementInfo& movementInfo)
             plMover->SetInWater(!plMover->IsInWater() || plMover->GetTerrain()->IsUnderWater(movementInfo.GetPos()->x, movementInfo.GetPos()->y, movementInfo.GetPos()->z));
         }
 
-        plMover->SetPosition(movementInfo.GetPos()->x, movementInfo.GetPos()->y, movementInfo.GetPos()->z, movementInfo.GetPos()->o);
+        // Aboard, the deck offset IS his position: it is what the client computed against the
+        // hull it is drawing, and the world pair in the same packet describes a place on a map
+        // he is no longer filed under. Ashore, the two are the same packet field.
+        if (plMover->m_transport && plMover->GetMap()->AsTransport())
+        {
+            Position const* offset = movementInfo.GetTransportPos();
+            plMover->SetPosition(offset->x, offset->y, offset->z, offset->o);
+        }
+        else
+        {
+            plMover->SetPosition(movementInfo.GetPos()->x, movementInfo.GetPos()->y, movementInfo.GetPos()->z, movementInfo.GetPos()->o);
+        }
         plMover->m_movementInfo = movementInfo;
 
         /* Movement should cancel looting */

@@ -277,7 +277,7 @@ bool DynamicObject::IsVisibleForInState(Player const* u, WorldObject const* view
     }
 
     // normal case
-    return IsWithinDistInMap(viewPoint, GetMap()->GetVisibilityDistance() + (inVisibleList ? World::GetVisibleObjectGreyDistance() : 0.0f), false);
+    return IsSeenWithin(viewPoint, GetMap()->GetVisibilityDistance() + (inVisibleList ? World::GetVisibleObjectGreyDistance() : 0.0f), false);
 }
 
 /**

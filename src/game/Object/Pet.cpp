@@ -34,6 +34,7 @@
 #include "CreatureAI.h"
 #include "Player.h"
 #include "Transports.h"
+#include "TransportMap.h"
 #include "Unit.h"
 #include "Util.h"
 #include "movement/MoveSpline.h"
@@ -50,7 +51,7 @@ Pet::Pet(PetType type) :
     m_resetTalentsCost(0), m_resetTalentsTime(0), m_usedTalentCount(0),
     m_removed(false),  m_petType(type), m_duration(0),
     m_bonusdamage(0), m_petSlot(-1), m_auraUpdateMask(0), m_loading(false),
-    m_declinedname(NULL), m_transport(NULL), m_petModeFlags(PET_MODE_DEFAULT), m_retreating(false),
+    m_declinedname(NULL), m_petModeFlags(PET_MODE_DEFAULT), m_retreating(false),
     m_stayPosSet(false), m_stayPosX(0), m_stayPosY(0), m_stayPosZ(0), m_stayPosO(0),
     m_opener(0), m_openerMinRange(0), m_openerMaxRange(0)
 {
@@ -87,6 +88,15 @@ void Pet::AddToWorld()
     }
 
     Unit::AddToWorld();
+
+    // Not reached through Creature::AddToWorld -- this override goes straight to Unit -- so the
+    // deck's minion index has to be told here too, or a pet aboard is never reconciled and stays
+    // on the ship after its master walks off.
+    if (TransportMap* hull = FindMap() ? FindMap()->AsTransport() : NULL)
+    {
+        hull->EnlistCrew(this);
+        hull->SendCrewMemberCreate(this);
+    }
 }
 
 /**
@@ -94,17 +104,15 @@ void Pet::AddToWorld()
  */
 void Pet::RemoveFromWorld()
 {
-    if (m_transport)
-    {
-        m_transport->RemovePassenger(this);
-        m_transport = NULL;
-        m_movementInfo.ClearTransportData();
-    }
-
     ///- Remove the pet from the accessor
     if (IsInWorld())
     {
         GetMap()->GetObjectsStore().erase<Pet>(GetObjectGuid(), (Pet*)NULL);
+
+        if (TransportMap* hull = GetMap()->AsTransport())
+        {
+            hull->DelistCrew(this);
+        }
     }
 
     ///- Don't call the function for Creature, normal mobs + totems go in a different storage
@@ -173,11 +181,18 @@ void Pet::Update(uint32 update_diff, uint32 diff)
         {
             // unsummon pet that lost owner
             Unit* owner = GetOwner();
-            Player* playerOwner = owner ? owner->ToPlayer() : NULL;
-            bool const sharesOwnerTransport = m_transport && playerOwner &&
-                playerOwner->GetTransport() == m_transport;
+
+            // A minion whose master is on ANOTHER MAP is mid-crossing, not off its leash.
+            // Stepping on or off a deck leaves the two on different maps for the one tick
+            // before TransportMap's reconciler draws it across, and IsWithinDistInMap fails
+            // closed on that. Unsummoning on that answer is how a pet vanished the instant its
+            // master went ashore.
+            bool const crossingDeck = owner && owner->FindMap() != FindMap() &&
+                                      ((FindMap() && FindMap()->AsTransport()) ||
+                                       (owner->FindMap() && owner->FindMap()->AsTransport()));
+
             if (!owner ||
-                (!sharesOwnerTransport && !IsWithinDistInMap(owner, GetMap()->GetVisibilityDistance()) &&
+                (!crossingDeck && !IsWithinDistInMap(owner, GetMap()->GetVisibilityDistance()) &&
                     (owner->GetCharmGuid() && (owner->GetCharmGuid() != GetObjectGuid()))) ||
                 (isControlled() && !owner->GetPetGuid()))
             {
@@ -192,11 +207,6 @@ void Pet::Update(uint32 update_diff, uint32 diff)
                     Unsummon(getPetType() == HUNTER_PET ? PET_SAVE_AS_DELETED : PET_SAVE_NOT_IN_SLOT, owner);
                     return;
                 }
-            }
-
-            if (playerOwner)
-            {
-                UpdateTransport(playerOwner);
             }
 
             if (m_duration > 0)
@@ -220,135 +230,6 @@ void Pet::Update(uint32 update_diff, uint32 diff)
     Creature::Update(update_diff, diff);
 }
 
-void Pet::UpdateTransport(Player* owner)
-{
-    Transport* ownerTransport = owner ? owner->GetTransport() : NULL;
-
-    if (m_transport && m_transport != ownerTransport)
-    {
-        m_transport->RemovePassenger(this);
-        m_transport = NULL;
-        m_movementInfo.ClearTransportData();
-        DisableSpline();
-        GetMotionMaster()->Clear(false);
-        NearTeleportTo(owner->GetPositionX(), owner->GetPositionY(), owner->GetPositionZ(), owner->GetOrientation());
-        SendSplineAnchor(ObjectGuid(), owner->GetPositionX(), owner->GetPositionY(),
-            owner->GetPositionZ(), owner->GetOrientation());
-        return;
-    }
-
-    if (m_transport || !ownerTransport || !IsWithinDistInMap(owner, 8.0f))
-    {
-        return;
-    }
-
-    Position const* ownerLocal = owner->m_movementInfo.GetTransportPos();
-    float const localOrientation = ownerLocal->o;
-    float const localX = ownerLocal->x + std::cos(localOrientation + PET_FOLLOW_ANGLE) * PET_FOLLOW_DIST;
-    float const localY = ownerLocal->y + std::sin(localOrientation + PET_FOLLOW_ANGLE) * PET_FOLLOW_DIST;
-    DisableSpline();
-    GetMotionMaster()->Clear(false);
-    m_movementInfo.SetTransportData(ownerTransport->GetObjectGuid(), localX, localY,
-        ownerLocal->z, localOrientation, owner->m_movementInfo.GetTransportTime(), -1);
-    m_transport = ownerTransport;
-    ownerTransport->AddPassenger(this);
-
-    float const worldOrientation = owner->GetOrientation();
-    float const worldX = owner->GetPositionX() + std::cos(worldOrientation + PET_FOLLOW_ANGLE) * PET_FOLLOW_DIST;
-    float const worldY = owner->GetPositionY() + std::sin(worldOrientation + PET_FOLLOW_ANGLE) * PET_FOLLOW_DIST;
-    GetMap()->CreatureRelocation(this, worldX, worldY, owner->GetPositionZ(), worldOrientation);
-
-    // Replace the client's world-space follow spline with the same persistent
-    // transport-local facing anchor used by retail transported creatures. A
-    // zero-duration stop only cancels the old spline; its transport context is
-    // discarded immediately and the pet snaps back to the old world endpoint.
-    SendSplineAnchor(ownerTransport->GetObjectGuid(), localX, localY,
-        ownerLocal->z, localOrientation);
-}
-
-void Pet::SendSplineAnchor(ObjectGuid transportGuid, float x, float y, float z, float orientation)
-{
-    Movement::MonsterMoveData move;
-    move.position = G3D::Vector3(x, y, z);
-    move.splineId = Movement::MoveSplineInit::GenerateSplineId();
-    move.type = Movement::MonsterMoveFacingAngle;
-    move.moverGuid = GetObjectGuid();
-    move.transportGuid = transportGuid;
-    move.transportSeat = -1;
-    move.facingAngle = orientation;
-    move.uncompressedPath.push_back(move.position);
-
-    WorldPacket data(SMSG_MONSTER_MOVE, 64);
-    Movement::PacketBuilder::WriteMonsterMove(move, data);
-    SendMessageToSet(&data, true);
-}
-
-bool Pet::MoveTransportFollow(Unit* target, float offset, float angle, bool walking, bool& moved)
-{
-    moved = false;
-
-    Player* owner = target ? target->ToPlayer() : NULL;
-    Transport* ownerTransport = owner ? owner->GetTransport() : NULL;
-    if (!ownerTransport || ownerTransport != m_transport)
-    {
-        return false;
-    }
-
-    Position const* currentLocal = m_movementInfo.GetTransportPos();
-    Position const* ownerLocal = owner->m_movementInfo.GetTransportPos();
-    float const followDistance = offset + GetObjectBoundingRadius() + owner->GetObjectBoundingRadius();
-    float const followAngle = ownerLocal->o + angle;
-    float const destinationX = ownerLocal->x + std::cos(followAngle) * followDistance;
-    float const destinationY = ownerLocal->y + std::sin(followAngle) * followDistance;
-    float const destinationZ = ownerLocal->z;
-    float const deltaX = destinationX - currentLocal->x;
-    float const deltaY = destinationY - currentLocal->y;
-    float const deltaZ = destinationZ - currentLocal->z;
-    float const distance = std::sqrt(deltaX * deltaX + deltaY * deltaY + deltaZ * deltaZ);
-    if (distance < 0.5f)
-    {
-        return true;
-    }
-
-    float const speed = GetSpeed(walking ? MOVE_WALK : MOVE_RUN);
-    if (speed <= 0.0f)
-    {
-        return true;
-    }
-
-    float const localOrientation = std::atan2(deltaY, deltaX);
-    uint32 const duration = uint32(distance / speed * 1000.0f);
-    G3D::Vector3 const start(currentLocal->x, currentLocal->y, currentLocal->z);
-    G3D::Vector3 const destination(destinationX, destinationY, destinationZ);
-
-    m_movementInfo.SetTransportData(ownerTransport->GetObjectGuid(), destinationX, destinationY,
-        destinationZ, localOrientation, owner->m_movementInfo.GetTransportTime(), -1);
-
-    float const transportOrientation = ownerTransport->GetOrientation();
-    float const cosOrientation = std::cos(transportOrientation);
-    float const sinOrientation = std::sin(transportOrientation);
-    float const worldX = ownerTransport->GetPositionX() + cosOrientation * destinationX - sinOrientation * destinationY;
-    float const worldY = ownerTransport->GetPositionY() + sinOrientation * destinationX + cosOrientation * destinationY;
-    float const worldZ = ownerTransport->GetPositionZ() + destinationZ;
-    GetMap()->CreatureRelocation(this, worldX, worldY, worldZ,
-        NormalizeOrientation(transportOrientation + localOrientation));
-
-    Movement::MonsterMoveData move;
-    move.position = start;
-    move.splineId = Movement::MoveSplineInit::GenerateSplineId();
-    move.type = Movement::MonsterMoveNormal;
-    move.moverGuid = GetObjectGuid();
-    move.transportGuid = ownerTransport->GetObjectGuid();
-    move.transportSeat = -1;
-    move.duration = duration;
-    move.uncompressedPath.push_back(destination);
-
-    WorldPacket data(SMSG_MONSTER_MOVE, 80);
-    Movement::PacketBuilder::WriteMonsterMove(move, data);
-    SendMessageToSet(&data, true);
-    moved = true;
-    return true;
-}
 
 /**
  * @brief Regenerates pet health, power, happiness, and loyalty timers.
@@ -522,13 +403,6 @@ void Pet::Unsummon(PetSaveMode mode, Unit* owner /*= NULL*/)
                 }
                 break;
         }
-    }
-
-    if (m_transport)
-    {
-        m_transport->RemovePassenger(this);
-        m_transport = NULL;
-        m_movementInfo.ClearTransportData();
     }
 
     SavePetToDB(mode);

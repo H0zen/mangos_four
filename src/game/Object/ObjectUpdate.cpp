@@ -41,6 +41,7 @@
 #include "MapManager.h"
 #include "Log.h"
 #include "Transports.h"
+#include "TransportMap.h"
 #include "TargetedMovementGenerator.h"
 #include "WaypointMovementGenerator.h"
 #include "CellImpl.h"
@@ -539,7 +540,22 @@ void Object::BuildCreateUpdateBlockForPlayer(UpdateData* data, Player* target) c
         movement.self = false;
 
         MovementInfo const& movementInfo = unit->m_movementInfo;
-        if (!movementInfo.GetTransportGuid().IsEmpty())
+
+        // ABOARD A VESSEL, THE PARENT IS DERIVED HERE and not read from movement state. A
+        // creature has no client to speak for it, and a player's last packet can be a tick
+        // stale; the map the unit is standing on cannot be either. Its position on a deck map
+        // ALREADY IS the offset -- nothing is composed, nothing is rotated.
+        if (Transport* vessel = Transport::VesselOf(*unit))
+        {
+            movement.transportGuid = vessel->GetObjectGuid().GetRawValue();
+            movement.transportX = unit->GetPositionX();
+            movement.transportY = unit->GetPositionY();
+            movement.transportZ = unit->GetPositionZ();
+            movement.transportO = unit->GetOrientation();
+            movement.transportTime = vessel->GetPathProgress();
+            movement.transportSeat = -1;
+        }
+        else if (!movementInfo.GetTransportGuid().IsEmpty())
         {
             Position const* transportPosition = movementInfo.GetTransportPos();
             movement.transportGuid = movementInfo.GetTransportGuid().GetRawValue();
@@ -580,7 +596,11 @@ void Object::BuildCreateUpdateBlockForPlayer(UpdateData* data, Player* target) c
         movement.y = isMoTransport ? 0.0f : gameObject->GetPositionY();
         movement.z = isMoTransport ? 0.0f : gameObject->GetPositionZ();
         movement.o = gameObject->GetOrientation();
-        movement.transportTime = isMoTransport ? GameTime::GetGameTimeMS() : 0;
+        // THE ROUTE CLOCK, not a wall clock. The client interpolates the hull from this value
+        // and the taxi path; the server picks its waypoint from the same number, so both sides
+        // agree on where the ship is. Sending raw uptime made the two disagree after a restart.
+        movement.transportTime = isMoTransport ?
+            static_cast<Transport const*>(gameObject)->GetPathProgress() : 0;
         movement.rotation = uint64(gameObject->GetPackedWorldRotation());
         movement.isTransport = isMoTransport;
 
@@ -634,10 +654,10 @@ bool Object::CanBuildMopCreateUpdate() const
     }
 
     Unit const* unit = static_cast<Unit const*>(this);
-    if (GetTypeId() == TYPEID_PLAYER && static_cast<Player const*>(this)->GetTransport() != NULL)
-    {
-        return false;
-    }
+    // A player standing on an MO_TRANSPORT used to be refused here, which made every passenger
+    // invisible to everyone including himself. AppendSimpleLivingMovement carries the optional
+    // unit-transport block for a player exactly as it does for a creature, and the parent is
+    // now derived from the map he is on, so there is nothing left that cannot be encoded.
     MovementInfo const& movement = unit->m_movementInfo;
     MovementInfo::StatusInfo const& status = movement.GetStatusInfo();
     MopUpdateObject::SimpleUnitEligibility eligibility{};
@@ -965,7 +985,7 @@ void Object::BuildValuesUpdateBlockForPlayer(UpdateData* data, Player* target) c
         fields.reserve(20);
         GameObject const* gameObject = static_cast<GameObject const*>(this);
         uint32 const transportTime = gameObject->GetGoType() == GAMEOBJECT_TYPE_MO_TRANSPORT ?
-            GameTime::GetGameTimeMS() : 0;
+            static_cast<Transport const*>(gameObject)->GetPathProgress() : 0;
         BuildMopGameObjectStaticFields(*this, target, transportTime, fields);
     }
     MopUpdateObject::AppendValuesBlock(data->GetBuffer(), GetObjectGuid().GetRawValue(),

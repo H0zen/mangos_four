@@ -56,6 +56,7 @@
 #include "Pet.h"
 #include "Util.h"
 #include "Transports.h"
+#include "TransportMap.h"
 #include "Weather.h"
 #include "BattleGround/BattleGround.h"
 #include "BattleGround/BattleGroundMgr.h"
@@ -578,12 +579,6 @@ Player::~Player()
 
     // Delete the player's talk class
     delete PlayerTalkClass;
-
-    // Remove the player from any transport they are on
-    if (m_transport)
-    {
-        m_transport->RemovePassenger(this);
-    }
 
     // Delete all item set effects
     for (size_t x = 0; x < ItemSetEff.size(); ++x)
@@ -1336,12 +1331,16 @@ void Player::Update(uint32 update_diff, uint32 p_time)
 
     // Handle pet unsummoning if out of range
     Pet* pet = GetPet();
-    // A cross-map transport relocates the hull before the player's delayed
-    // teleport is executed at the end of this update.  Passenger-local pets
-    // are therefore briefly far away in world coordinates even though they
-    // still share the owner's transport.  Preserve them for TeleportTo's
-    // temporary-unsummon path instead of deleting them as ordinary strays.
-    if (pet && (!GetTransport() || pet->GetTransport() != GetTransport()) &&
+    // A minion on a DIFFERENT MAP from its master, when either of those maps is a deck, is
+    // mid-crossing rather than a stray: stepping on or off a hull leaves the two apart for the
+    // one tick before TransportMap's reconciler draws it across, and IsWithinDistInMap fails
+    // closed on that. The old test compared transport pointers, which no longer exist on a pet
+    // -- being aboard is the map it stands on.
+    bool const petCrossingDeck = pet && pet->FindMap() != FindMap() &&
+                                 ((FindMap() && FindMap()->AsTransport()) ||
+                                  (pet->FindMap() && pet->FindMap()->AsTransport()));
+
+    if (pet && !petCrossingDeck &&
         !pet->IsWithinDistInMap(this, GetMap()->GetVisibilityDistance()) &&
         (GetCharmGuid() && (pet->GetObjectGuid() != GetCharmGuid())))
     {
@@ -1734,10 +1733,11 @@ bool Player::TeleportTo(uint32 mapid, float x, float y, float z, float orientati
         grp->SetPlayerMap(GetObjectGuid(), mapid);
     }
 
-    // if we were on a transport, leave
+    // If we were on a transport, leave. Only the binding is dropped here; the map move is the
+    // far-teleport path's own -- it removes him from the deck map and BoardingMap() then hands
+    // him to the destination world map instead of back aboard.
     if (!(options & TELE_TO_NOT_LEAVE_TRANSPORT) && m_transport)
     {
-        m_transport->RemovePassenger(this);
         m_transport = NULL;
         m_movementInfo.ClearTransportData();
     }
@@ -1756,7 +1756,11 @@ bool Player::TeleportTo(uint32 mapid, float x, float y, float z, float orientati
     m_movementInfo.ClearFallData();
     DisableSpline();
 
-    if ((GetMapId() == mapid) && (!m_transport))            // TODO the !m_transport might have unexpected effects when teleporting from transport to other place on same map
+    // Same map is a near teleport. Aboard, "same map" means the HULL's id -- a blink or a
+    // knockback on a deck names it, and taking the far branch there would run a whole world
+    // transfer for a two-yard hop. The old `!m_transport` guard predates the vessel being a map
+    // of its own, when a passenger's map id was the water she was crossing.
+    if ((GetMapId() == mapid) && (!m_transport || GetMap()->AsTransport()))
     {
         // lets reset far teleport flag if it wasn't reset during chained teleports
         SetSemaphoreTeleportFar(false);
@@ -1888,7 +1892,9 @@ bool Player::TeleportTo(uint32 mapid, float x, float y, float z, float orientati
                 if (m_transport)
                 {
                     data.WriteBit(1);   // has transport
-                    data << uint32(GetMapId());
+                    // The map the CLIENT is leaving, which aboard is the water the ship is
+                    // crossing -- never the hull's own map id, which it has never been told.
+                    data << uint32(GetClientMapId());
                     data << uint32(m_transport->GetEntry());
                 }
                 else
@@ -5814,6 +5820,33 @@ void Player::_LoadSkills(QueryResult* result)
             SetSkill(SKILL_UNARMED, base_skill, base_skill);
         }
     }
+}
+
+uint32 Player::GetClientMapId() const
+{
+    if (TransportMap const* hull = FindMap() ? FindMap()->AsTransport() : NULL)
+    {
+        Transport* vessel = hull->Vessel();
+        if (vessel && vessel->FindMap())
+        {
+            return vessel->FindMap()->GetId();
+        }
+    }
+
+    return GetMapId();
+}
+
+Map* Player::BoardingMap() const
+{
+    // ABOARD, THIS IS HER MAP. The client was sent to the world map she sails and is loading
+    // that terrain; it never learns the hull's id, and the player never leaves it.
+    TransportMap* hull = m_transport ? m_transport->AsMap() : NULL;
+    if (hull && hull->IsCommissioned())
+    {
+        return hull;
+    }
+
+    return GetMap();
 }
 
 uint32 Player::GetPhaseMaskForSpawn() const

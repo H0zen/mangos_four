@@ -79,7 +79,9 @@
  */
 bool Unit::IsVisibleForOrDetect(Unit const* u, WorldObject const* viewPoint, bool detect, bool inVisibleList, bool is3dDistance) const
 {
-    if (!u || !IsInMap(u))
+    // Not IsInMap: that is the REACH question and stays narrow. Being seen across a vessel's
+    // boundary is what makes a ship and the pier she passes visible to each other.
+    if (!u || !SharesClientWorld(u))
     {
         return false;
     }
@@ -139,7 +141,7 @@ bool Unit::IsVisibleForOrDetect(Unit const* u, WorldObject const* viewPoint, boo
     if (u->IsTaxiFlying())                                  // what see player in flight
     {
         // use object grey distance for all (only see objects any way)
-        if (!IsWithinDistInMap(viewPoint, World::GetMaxVisibleDistanceInFlight() + (inVisibleList ? World::GetVisibleObjectGreyDistance() : 0.0f), is3dDistance))
+        if (!IsSeenWithin(viewPoint, World::GetMaxVisibleDistanceInFlight() + (inVisibleList ? World::GetVisibleObjectGreyDistance() : 0.0f), is3dDistance))
         {
             return false;
         }
@@ -155,7 +157,7 @@ bool Unit::IsVisibleForOrDetect(Unit const* u, WorldObject const* viewPoint, boo
         }
 
         // Any units far than max visible distance for viewer or not in our map are not visible too
-        if (!IsWithinDistInMap(viewPoint, visibilityDistance + (inVisibleList ? World::GetVisibleUnitGreyDistance() : 0.0f), is3dDistance))
+        if (!IsSeenWithin(viewPoint, visibilityDistance + (inVisibleList ? World::GetVisibleUnitGreyDistance() : 0.0f), is3dDistance))
         {
             return false;
         }

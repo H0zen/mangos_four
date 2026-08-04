@@ -95,6 +95,7 @@ class BattleGround;
 class GridMap;
 class GameObjectModel;
 class WeatherSystem;
+class TransportMap;
 
 // GCC have alternative #pragma pack(N) syntax and old gcc version not support pack(push,N), also any gcc version not support it at some platform
 #if defined( __GNUC__ )
@@ -269,6 +270,26 @@ class Map : public GridRefManager<NGridType>
         bool IsBattleGroundOrArena() const { return i_mapEntry && i_mapEntry->IsBattleGroundOrArena(); }
         bool IsContinent() const { return i_mapEntry && i_mapEntry->IsContinent(); }
 
+        /// This map AS A VESSEL, or NULL. Asked of the map itself rather than of its id, so
+        /// the answer comes from what the map IS and the caller gets the thing it wanted
+        /// rather than a boolean plus a downcast.
+        virtual TransportMap* AsTransport() { return NULL; }
+        virtual TransportMap const* AsTransport() const { return NULL; }
+
+        /**
+         * @brief The players OUTSIDE this map who must nonetheless HEAR what happens on it.
+         *
+         * Only a deck map has them, refreshed by the vessel at the top of its tick. A
+         * BROADCAST channel, not a visibility one: splines, emotes, spell gos. Who can SEE
+         * the deck is decided by each viewer's own sweep, which reaches across the boundary
+         * itself through TransportMap::CollectRelaySources.
+         */
+        std::vector<Player*> const& ExternalObservers() const { return m_externalObservers; }
+        void SetExternalObservers(std::vector<Player*>&& observers)
+        {
+            m_externalObservers = std::move(observers);
+        }
+
         // can't be NULL for loaded map
         MapPersistentState* GetPersistentState() const { return m_persistentState; }
 
@@ -434,13 +455,7 @@ class Map : public GridRefManager<NGridType>
 
         void SetTimer(uint32 t) { i_gridExpiry = t < MIN_GRID_DELAY ? MIN_GRID_DELAY : t; }
 
-        void SendInitSelf(Player* player);
-
-        void SendInitTransports(Player* player);
-        void SendRemoveTransports(Player* player);
-
         bool CreatureCellRelocation(Creature* creature, const Cell &new_cell);
-        void PromoteEnvelopeNeighboursToFull(uint32 gridX, uint32 gridY);
         void MaybePromoteEnvelopeGridForPlayer(uint32 gridX, uint32 gridY);
 
         bool loaded(const GridPair&) const;
@@ -449,12 +464,24 @@ class Map : public GridRefManager<NGridType>
         bool EnsureCellEnvelopeLoaded(const Cell& centerCell);
         void UnloadCell(NGridType* grid, uint32 cellX, uint32 cellY);
         void ProcessPendingCellUnloads();
-        void EnsureGridLoadedAtEnter(Cell const&, Player* player = nullptr);
 
         void buildNGridLinkage(NGridType* pNGridType) { pNGridType->link(this); }
 
         template<class T> void AddType(T* obj);
         template<class T> void RemoveType(T* obj, bool);
+
+    protected:
+        // The grid-entry path a derived map must reuse. TransportMap::Add is not Map::Add and
+        // shares none of its packets, but it puts a player into a cell the same way.
+        void EnsureGridLoadedAtEnter(Cell const&, Player* player = nullptr);
+        void PromoteEnvelopeNeighboursToFull(uint32 gridX, uint32 gridY);
+
+        // The self-create burst, which a deck arrival needs UNCHANGED: it is the only builder of
+        // the 18414 self block, and it already carries the vessel and her crew ahead of the
+        // player's own body when he is aboard.
+        void SendInitSelf(Player* player);
+        void SendInitTransports(Player* player);
+        void SendRemoveTransports(Player* player);
 
         NGridType* getNGrid(uint32 x, uint32 y) const
         {
@@ -463,6 +490,7 @@ class Map : public GridRefManager<NGridType>
             return i_grids[x][y];
         }
 
+    private:
         bool isGridObjectDataLoaded(uint32 x, uint32 y) const { return getNGrid(x, y)->isGridObjectDataLoaded(); }
         void setGridObjectDataLoaded(bool pLoaded, uint32 x, uint32 y) { getNGrid(x, y)->setGridObjectDataLoaded(pLoaded); }
 
@@ -494,6 +522,8 @@ class Map : public GridRefManager<NGridType>
         ActiveNonPlayers m_activeNonPlayers;
         ActiveNonPlayers::iterator m_activeNonPlayersIter;
         MapStoredObjectTypesContainer m_objectsStore;
+
+        std::vector<Player*> m_externalObservers;
 
     private:
         time_t i_gridExpiry;
