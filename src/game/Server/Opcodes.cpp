@@ -1222,6 +1222,21 @@ void InitializeOpcodes()
     // into a single bogus 32-bit loot method.
     DefC(CMSG_LOOT_METHOD, "CMSG_LOOT_METHOD", STATUS_LOGGEDIN, PROCESS_THREADUNSAFE, &WorldSession::HandleLootMethodOpcode);
 
+    // Promotion. Both requests use the same 0x7F marker plus packed GUID family
+    // as uninvite and loot rules, on readers rebuilt from their client writers.
+    // The assistant flag is a NINTH BIT inside the mask, not a trailing byte.
+    //
+    // SMSG_GROUP_SET_LEADER is admitted with them and its body was rebuilt: the
+    // inherited sender wrote a NUL-terminated name, while the client reads a
+    // byte then a SIX-BIT length then the raw name. Three captured bodies whose
+    // second byte is exactly (length << 2) pin it.
+    //
+    // Assistant answers over the already-admitted SMSG_GROUP_LIST, so it needs
+    // no admission of its own.
+    DefC(CMSG_GROUP_SET_LEADER, "CMSG_GROUP_SET_LEADER", STATUS_LOGGEDIN, PROCESS_THREADUNSAFE, &WorldSession::HandleGroupSetLeaderOpcode);
+    DefS(SMSG_GROUP_SET_LEADER, "SMSG_GROUP_SET_LEADER");
+    DefC(CMSG_GROUP_ASSISTANT_LEADER, "CMSG_GROUP_ASSISTANT_LEADER", STATUS_LOGGEDIN, PROCESS_THREADUNSAFE, &WorldSession::HandleGroupAssistantLeaderOpcode);
+
     // Wave 15 stable-pet list request, list response, and operation result.
     DefC(CMSG_REQUEST_STABLED_PETS, "CMSG_REQUEST_STABLED_PETS", STATUS_LOGGEDIN, PROCESS_THREADUNSAFE, &WorldSession::HandleListStabledPetsOpcode);
     DefS(SMSG_PET_STABLE_LIST, "SMSG_PET_STABLE_LIST");

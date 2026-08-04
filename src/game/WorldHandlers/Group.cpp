@@ -455,6 +455,157 @@ bool MopGroupLootMethodPackets::ParseRequest(WorldPacket& in, Request& out)
     return true;
 }
 
+namespace
+{
+    /// Shared shape of the 18414 group-management requests: a 0x7F family
+    /// marker, a bit-packed GUID presence mask, then the present bytes each
+    /// XORed with one. Only the mask and byte orders differ per opcode.
+    bool ReadMarkedGuid(WorldPacket& in, uint8 const (&maskOrder)[8],
+        uint8 const (&byteOrder)[8], ObjectGuid& guid, bool* extraBit,
+        size_t extraBitPosition)
+    {
+        if (in.rpos() != 0 || in.size() - in.rpos() < 2)
+        {
+            return false;
+        }
+
+        uint8 marker = 0;
+        in >> marker;
+        if (marker != 0x7F)
+        {
+            return false;
+        }
+
+        bool present[8] = { false };
+        size_t maskIndex = 0;
+        size_t const total = extraBit ? 9 : 8;
+        for (size_t i = 0; i < total; ++i)
+        {
+            bool const bit = in.ReadBit();
+            if (extraBit && i == extraBitPosition)
+            {
+                *extraBit = bit;
+                continue;
+            }
+            present[maskOrder[maskIndex++]] = bit;
+        }
+        in.ResetBitReader();
+
+        size_t presentCount = 0;
+        for (size_t i = 0; i < 8; ++i)
+        {
+            if (present[i])
+            {
+                ++presentCount;
+            }
+        }
+
+        // Exact tail: the mask is the only thing that may describe the length.
+        if (in.size() - in.rpos() != presentCount)
+        {
+            return false;
+        }
+
+        uint8 bytes[8] = { 0 };
+        for (size_t i = 0; i < 8; ++i)
+        {
+            uint8 const index = byteOrder[i];
+            if (!present[index])
+            {
+                continue;
+            }
+            uint8 raw = 0;
+            in >> raw;
+            // A raw one would decode to zero and contradict its presence bit.
+            if (raw == 1)
+            {
+                return false;
+            }
+            bytes[index] = raw ^ 1;
+        }
+
+        if (in.rpos() != in.size())
+        {
+            return false;
+        }
+
+        uint64 rawGuid = 0;
+        for (size_t i = 0; i < 8; ++i)
+        {
+            rawGuid |= uint64(bytes[i]) << (i * 8);
+        }
+        guid = ObjectGuid(rawGuid);
+        return true;
+    }
+}
+
+bool MopGroupPromotePackets::ParseSetLeader(WorldPacket& in, SetLeaderRequest& out)
+{
+    // Build 18414 writer sub_668775, vtable D63170 slot 1; slot 2 sub_661A93
+    // writes opcode 5563. Marker, mask order 1,7,0,2,5,3,4,6, byte order
+    // 1,5,7,6,0,2,4,3. Verified byte-exact against a captured 7-byte body.
+    static uint8 const maskOrder[8] = { 1, 7, 0, 2, 5, 3, 4, 6 };
+    static uint8 const byteOrder[8] = { 1, 5, 7, 6, 0, 2, 4, 3 };
+
+    SetLeaderRequest parsed;
+    if (!ReadMarkedGuid(in, maskOrder, byteOrder, parsed.targetGuid, nullptr, 0))
+    {
+        in.rfinish();
+        return false;
+    }
+
+    out = parsed;
+    return true;
+}
+
+bool MopGroupPromotePackets::ParseAssistant(WorldPacket& in, AssistantRequest& out)
+{
+    // Build 18414 writer sub_668266, vtable D636FC slot 1; slot 2 sub_661913
+    // writes opcode 6295. Mask order 2,0,6,3,1,[promote],4,5,7 -- the promote
+    // flag is a NINTH BIT at position 5, not a trailing byte. Byte order
+    // 5,1,0,7,3,6,2,4.
+    //
+    // Prior research read the last byte of a captured 8-byte body as the
+    // promote/demote value; it is a GUID byte, which is why the body is 8 bytes
+    // and not 9. Verified byte-exact against that same capture.
+    static uint8 const maskOrder[8] = { 2, 0, 6, 3, 1, 4, 5, 7 };
+    static uint8 const byteOrder[8] = { 5, 1, 0, 7, 3, 6, 2, 4 };
+
+    AssistantRequest parsed;
+    if (!ReadMarkedGuid(in, maskOrder, byteOrder, parsed.targetGuid, &parsed.promote, 5))
+    {
+        in.rfinish();
+        return false;
+    }
+
+    out = parsed;
+    return true;
+}
+
+bool MopGroupPromotePackets::BuildSetLeader(WorldPacket& out, SetLeaderBroadcast const& broadcast)
+{
+    // The 18414 body is a plain byte then a SIX-BIT name length then the raw
+    // name, NOT the NUL-terminated string the inherited sender wrote. Recovered
+    // from three captured bodies whose second byte is exactly (length << 2):
+    //
+    //   0x20 -> 8  "Jazharka"        (10 B)
+    //   0x18 -> 6  "Shaoli"          ( 8 B)
+    //   0x5C -> 23 "Réést????-Darksorrow" (25 B)
+    //
+    // Exact size is 2 + nameLength, which reproduces all three.
+    if (broadcast.leaderName.empty() || broadcast.leaderName.size() >= (size_t(1) << 6))
+    {
+        return false;
+    }
+
+    out.Initialize(SMSG_GROUP_SET_LEADER, 2 + broadcast.leaderName.size());
+    out << uint8(broadcast.partyIndex);
+    out.WriteBits(uint32(broadcast.leaderName.size()), 6);
+    out.FlushBits();
+    out.append(broadcast.leaderName.data(), broadcast.leaderName.size());
+    return true;
+}
+
 bool MopGroupInvitePackets::BuildInvite(WorldPacket& out, Invite const& invite)
 {
     // Build 18414 popup grammar, recovered from the client reader and proved
@@ -1071,9 +1222,14 @@ uint32 Group::RemoveMember(ObjectGuid guid, uint8 removeMethod)
 
         if (leaderChanged)
         {
-            WorldPacket data(SMSG_GROUP_SET_LEADER, (m_memberSlots.front().name.size() + 1));
-            data << m_memberSlots.front().name;
-            BroadcastPacket(&data, true);
+            MopGroupPromotePackets::SetLeaderBroadcast broadcast;
+            broadcast.leaderName = m_memberSlots.front().name;
+
+            WorldPacket data;
+            if (MopGroupPromotePackets::BuildSetLeader(data, broadcast))
+            {
+                BroadcastPacket(&data, true);
+            }
         }
 
         SendUpdate();
@@ -1118,9 +1274,14 @@ void Group::ChangeLeader(ObjectGuid guid)
 
     _setLeader(guid);
 
-    WorldPacket data(SMSG_GROUP_SET_LEADER, slot->name.size() + 1);
-    data << slot->name;
-    BroadcastPacket(&data, true);
+    MopGroupPromotePackets::SetLeaderBroadcast broadcast;
+    broadcast.leaderName = slot->name;
+
+    WorldPacket data;
+    if (MopGroupPromotePackets::BuildSetLeader(data, broadcast))
+    {
+        BroadcastPacket(&data, true);
+    }
     SendUpdate();
 }
 

@@ -421,61 +421,6 @@ void WorldSession::HandleGroupUninviteGuidOpcode(WorldPacket& recv_data)
     SendPartyResult(PARTY_OP_LEAVE, "", ERR_TARGET_NOT_IN_GROUP_S);
 }
 
-/**
- * @brief Uninvites a group member or invitee by player name.
- *
- * @param recv_data The received opcode packet.
- */
-void WorldSession::HandleGroupUninviteOpcode(WorldPacket& recv_data)
-{
-    std::string membername;
-    recv_data >> membername;
-
-    // Unlike the invite request, this packet carries no separate realm field,
-    // so a name that came from a click rather than the keyboard arrives as
-    // "Name-Realm" and must be stripped before the lookup.
-    StripHomeRealmSuffix(membername);
-
-    // player not found
-    if (!normalizePlayerName(membername))
-    {
-        return;
-    }
-
-    // can't uninvite yourself
-    if (GetPlayer()->GetName() == membername)
-    {
-        sLog.outError("WorldSession::HandleGroupUninviteOpcode: leader %s tried to uninvite himself from the group.", GetPlayer()->GetGuidStr().c_str());
-        return;
-    }
-
-    PartyResult res = GetPlayer()->CanUninviteFromGroup();
-    if (res != ERR_PARTY_RESULT_OK)
-    {
-        SendPartyResult(PARTY_OP_LEAVE, "", res);
-        return;
-    }
-
-    Group* grp = GetPlayer()->GetGroup();
-    if (!grp)
-    {
-        return;
-    }
-
-    if (ObjectGuid guid = grp->GetMemberGuid(membername))
-    {
-        Player::RemoveFromGroup(grp, guid);
-        return;
-    }
-
-    if (Player* plr = grp->GetInvited(membername))
-    {
-        plr->UninviteFromGroup();
-        return;
-    }
-
-    SendPartyResult(PARTY_OP_LEAVE, membername, ERR_TARGET_NOT_IN_GROUP_S);
-}
 
 /**
  * @brief Changes the leader of the current group.
@@ -484,8 +429,13 @@ void WorldSession::HandleGroupUninviteOpcode(WorldPacket& recv_data)
  */
 void WorldSession::HandleGroupSetLeaderOpcode(WorldPacket& recv_data)
 {
-    ObjectGuid guid;
-    recv_data >> guid;
+    MopGroupPromotePackets::SetLeaderRequest request;
+    if (!MopGroupPromotePackets::ParseSetLeader(recv_data, request))
+    {
+        return;
+    }
+
+    ObjectGuid const guid = request.targetGuid;
 
     Group* group = GetPlayer()->GetGroup();
     if (!group)
@@ -808,10 +758,11 @@ void WorldSession::HandleGroupChangeSubGroupOpcode(WorldPacket& recv_data)
  */
 void WorldSession::HandleGroupAssistantLeaderOpcode(WorldPacket& recv_data)
 {
-    ObjectGuid guid;
-    uint8 flag;
-    recv_data >> guid;
-    recv_data >> flag;
+    MopGroupPromotePackets::AssistantRequest request;
+    if (!MopGroupPromotePackets::ParseAssistant(recv_data, request))
+    {
+        return;
+    }
 
     Group* group = GetPlayer()->GetGroup();
     if (!group)
@@ -824,10 +775,17 @@ void WorldSession::HandleGroupAssistantLeaderOpcode(WorldPacket& recv_data)
     {
         return;
     }
+
+    // Assistant is a raid concept, and the target must actually be in the
+    // group -- otherwise an arbitrary GUID would be stored against a raid slot.
+    if (!group->isRaidGroup() || !group->IsMember(request.targetGuid))
+    {
+        return;
+    }
     /********************/
 
     // everything is fine, do it
-    group->SetAssistant(guid, (flag == 0 ? false : true));
+    group->SetAssistant(request.targetGuid, request.promote);
 }
 
 /**

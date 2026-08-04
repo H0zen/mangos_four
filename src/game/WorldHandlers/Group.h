@@ -253,6 +253,35 @@ namespace MopGroupLootMethodPackets
     bool ParseRequest(WorldPacket& in, Request& out);
 }
 
+namespace MopGroupPromotePackets
+{
+    /// A parsed CMSG_GROUP_SET_LEADER body.
+    struct SetLeaderRequest
+    {
+        ObjectGuid targetGuid;
+    };
+
+    /// A parsed CMSG_GROUP_ASSISTANT_LEADER body.
+    ///
+    /// `promote` is a BIT inside the presence mask, not a trailing byte.
+    struct AssistantRequest
+    {
+        ObjectGuid targetGuid;
+        bool promote = false;
+    };
+
+    /// SMSG_GROUP_SET_LEADER: the broadcast naming the new leader.
+    struct SetLeaderBroadcast
+    {
+        std::string leaderName;
+        uint8 partyIndex = 1;                               // 1 in every observed body
+    };
+
+    bool ParseSetLeader(WorldPacket& in, SetLeaderRequest& out);
+    bool ParseAssistant(WorldPacket& in, AssistantRequest& out);
+    bool BuildSetLeader(WorldPacket& out, SetLeaderBroadcast const& broadcast);
+}
+
 namespace MopGroupMarkerPackets
 {
     struct MinimapPingRequest
