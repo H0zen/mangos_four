@@ -93,28 +93,25 @@ void WorldSession::SendPartyResult(PartyOperation operation, const std::string& 
 
 void WorldSession::SendGroupInvite(Player* player, bool alreadyInGroup /*= false*/)
 {
-    WorldPacket data(SMSG_GROUP_INVITE, 21);                // guess size
-    data.WriteBit(0);
-    data.WriteGuidMask<0, 3, 2>(player->GetObjectGuid());
-    data.WriteBit(!alreadyInGroup);
-    data.WriteGuidMask<6, 5>(player->GetObjectGuid());
-    data.WriteBits(0, 9);                                   // realm name length
-    data.WriteGuidMask<4>(player->GetObjectGuid());
-    data.WriteBits(strlen(player->GetName()), 7);
-    data.WriteBits(0, 24);                                  // count
-    data.WriteBit(0);
-    data.WriteGuidMask<1, 7>(player->GetObjectGuid());
+    // Every field beyond the inviter's name and GUID is deliberately left at
+    // its default. FrameXML UIParent.lua:800 picks the dialog from these:
+    // any role bit shows the LFG invite popup, and the cross-realm flag shows
+    // PARTY_INVITE_XREALM. One realm means neither applies, so an ordinary
+    // invite must clear both or the invitee sees the wrong dialog. The two
+    // realm strings and the three identity scalars serve the cross-realm route
+    // and stay empty/zero here; the ordinary popup reads only the name.
+    MopGroupInvitePackets::Invite invite;
+    invite.inviterGuid = player->GetObjectGuid();
+    invite.inviterName = player->GetName();
+    invite.notAlreadyInGroup = !alreadyInGroup;
 
-    data.WriteGuidBytes<1, 4>(player->GetObjectGuid());
-    data << uint32(GameTime::GetGameTimeMS());
-    data << uint32(0) << uint32(0);
-    data.WriteGuidBytes<6, 0, 2, 3>(player->GetObjectGuid());
-    // for(int i = 0; i < count; ++i)
-    //    data << uint32(0);
-    data.WriteGuidBytes<5>(player->GetObjectGuid());
-    data.WriteGuidBytes<7>(player->GetObjectGuid());
-    data.append(player->GetName(), strlen(player->GetName()));
-    data << uint32(0);
+    WorldPacket data;
+    if (!MopGroupInvitePackets::BuildInvite(data, invite))
+    {
+        sLog.outError("SendGroupInvite: refusing to send a malformed 18414 invite popup for %s",
+                      player->GetGuidStr().c_str());
+        return;
+    }
 
     SendPacket(&data);
 }

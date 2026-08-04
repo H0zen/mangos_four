@@ -187,8 +187,37 @@ namespace MopGroupInvitePackets
         std::string targetName;
     };
 
+    /// The popup an invitee receives: SMSG_GROUP_INVITE.
+    ///
+    /// `inviterName` is the ONLY field the ordinary popup shows. FrameXML
+    /// `UIParent.lua:800` switches on the others and picks a DIFFERENT dialog:
+    /// any role bit routes to the LFG invite popup, and `crossRealmName` routes
+    /// to PARTY_INVITE_XREALM. A single-realm server must therefore leave both
+    /// clear, or an ordinary friend invite renders as the wrong dialog.
+    ///
+    /// The two realm strings and the three identity scalars exist for the
+    /// cross-realm route only. Their widths and positions are wire fact; the
+    /// names are semantic inference, and the client's ordinary path does not
+    /// surface them as Lua arguments at all.
+    struct Invite
+    {
+        ObjectGuid inviterGuid;
+        std::string inviterName;
+        std::string compactRealmName;                       // empty on one realm
+        std::string displayRealmName;                       // empty on one realm
+        uint64 accountId = 0;
+        uint32 virtualRealmAddress = 0;
+        uint32 realmId = 0;
+        bool notAlreadyInGroup = true;
+        bool crossRealmName = false;
+        bool realmTransferWarning = false;
+        bool flagA = false;
+        bool flagB = false;
+    };
+
     bool ParseResponse(WorldPacket& in, Response& out);
     bool ParseRequest(WorldPacket& in, Request& out);
+    bool BuildInvite(WorldPacket& out, Invite const& invite);
 }
 
 namespace MopGroupMarkerPackets

@@ -233,6 +233,110 @@ bool MopGroupInvitePackets::ParseRequest(WorldPacket& in, Request& out)
     return true;
 }
 
+bool MopGroupInvitePackets::BuildInvite(WorldPacket& out, Invite const& invite)
+{
+    // Build 18414 popup grammar, recovered from the client reader and proved
+    // byte-exact against real captured bodies (58 B capture-000033/196326 and
+    // 76 B capture-000033/63033, plus 62 B and 102 B in the derivation brief).
+    //
+    // MSB-first packed header, then a byte-aligned tail. Exact size is
+    //   32 + compactRealmLen + displayRealmLen + inviterNameLen + popcount(GUID)
+    // which reproduces all four observed lengths and pins the field boundaries
+    // independently of what the scalars are called.
+    //
+    // The inherited builder this replaces came from mangosthree in 2012. It was
+    // not repairable: it wrote ONE realm length at nine bits where the client
+    // reads TWO at eight, a seven-bit name length where the client reads six, a
+    // 24-bit count where the client reads 22, and omitted the uint64 and four
+    // uint32 scalars entirely. Its ceiling was 43 bytes against an observed
+    // minimum of 56 over 134 packets.
+    //
+    // A reference fork writes the second realm length as zero and omits the
+    // second string; retail bodies refute that, so it is not followed here.
+    //
+    // ONE POSITION IS NOT PROVEN BY CAPTURED TRAFFIC. GUID byte [4] is written
+    // before the display realm string here, on the derivation's client-reader
+    // provenance. A packet parser recovered from a neighbouring build places it
+    // after that string instead. Every observed body -- all four fixtures and
+    // both extremes of the 56..102 range -- has byte [4] absent, so the two
+    // orderings emit identical bytes and no capture can separate them. It is
+    // unobservable for ordinary player GUIDs, whose byte [4] is zero, but if a
+    // body ever appears with [4] present, that sample decides it and this is the
+    // line to revisit.
+    if (invite.inviterName.size() >= (size_t(1) << 6) ||
+        invite.compactRealmName.size() >= (size_t(1) << 8) ||
+        invite.displayRealmName.size() >= (size_t(1) << 8))
+    {
+        return false;
+    }
+
+    uint64 const rawGuid = invite.inviterGuid.GetRawValue();
+    auto guidByte = [rawGuid](uint8 index)
+    {
+        return uint8((rawGuid >> (index * 8)) & 0xFF);
+    };
+
+    out.Initialize(SMSG_GROUP_INVITE);
+
+    out.WriteBits(uint32(invite.compactRealmName.size()), 8);
+    out.WriteBits(uint32(invite.displayRealmName.size()), 8);
+    out.WriteBit(guidByte(2) != 0);
+    out.WriteBit(invite.flagA);
+    out.WriteBits(uint32(invite.inviterName.size()), 6);
+    out.WriteBit(guidByte(7) != 0);
+    out.WriteBit(guidByte(5) != 0);
+    out.WriteBit(invite.notAlreadyInGroup);
+    out.WriteBit(invite.flagB);
+    out.WriteBit(guidByte(1) != 0);
+    out.WriteBit(invite.crossRealmName);
+    out.WriteBit(invite.realmTransferWarning);
+    out.WriteBits(0, 22);                                   // extraCount
+    out.WriteBit(guidByte(3) != 0);
+    out.WriteBit(guidByte(0) != 0);
+    out.WriteBit(guidByte(4) != 0);
+    out.WriteBit(guidByte(6) != 0);
+    out.FlushBits();
+
+    // WriteByteSeq emits (value ^ 1) and writes nothing for a zero byte, which
+    // is what makes the presence bits above load-bearing.
+    auto writeGuidByte = [&out, &guidByte](uint8 index)
+    {
+        uint8 const value = guidByte(index);
+        if (value != 0)
+        {
+            out << uint8(value ^ 1);
+        }
+    };
+
+    writeGuidByte(6);
+    if (!invite.compactRealmName.empty())
+    {
+        out.append(invite.compactRealmName.data(), invite.compactRealmName.size());
+    }
+    writeGuidByte(7);
+    writeGuidByte(2);
+    writeGuidByte(0);
+    out << uint64(invite.accountId);
+    out << uint32(invite.virtualRealmAddress);
+    out << uint32(invite.realmId);
+    writeGuidByte(1);
+    writeGuidByte(5);
+    writeGuidByte(4);
+    if (!invite.displayRealmName.empty())
+    {
+        out.append(invite.displayRealmName.data(), invite.displayRealmName.size());
+    }
+    out << uint32(0);                                       // reserved, zero in every observed body
+    if (!invite.inviterName.empty())
+    {
+        out.append(invite.inviterName.data(), invite.inviterName.size());
+    }
+    writeGuidByte(3);
+    out << uint32(0);                                       // reserved, zero in every observed body
+
+    return true;
+}
+
 //===================================================
 //============== Roll ===============================
 //===================================================

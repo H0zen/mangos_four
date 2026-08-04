@@ -614,6 +614,7 @@ static bool IsEnterWorldConverted(uint16 opcode)
         case SMSG_RESPEC_WIPE_CONFIRM:        // MopRespecPackets::BuildRespecWipeConfirm
         case SMSG_PARTY_MEMBER_STATS:         // MopPartyStatsPackets::BuildResponse
         case SMSG_GROUP_LIST:                 // MopPartyUpdatePackets::BuildPartyUpdate
+        case SMSG_GROUP_INVITE:               // MopGroupInvitePackets::BuildInvite
         case SMSG_PET_STABLE_LIST:            // MopStablePackets::BuildStableList
         case SMSG_STABLE_RESULT:              // MopStablePackets::BuildStableResult
         case SMSG_RAID_READY_CHECK:           // MopReadyCheckPackets::BuildStarted

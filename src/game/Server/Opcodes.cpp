@@ -1142,6 +1142,26 @@ void InitializeOpcodes()
     DefS(SMSG_GROUP_LIST, "SMSG_GROUP_LIST");
     DefC(CMSG_GROUP_INVITE_RESPONSE, "CMSG_GROUP_INVITE_RESPONSE", STATUS_LOGGEDIN, PROCESS_THREADUNSAFE, &WorldSession::HandleGroupInviteResponseOpcode);
 
+    // The invite request and its popup are promoted TOGETHER, which is the whole
+    // point of the pairing rule: the request is the only path by which a group
+    // can be created at all, and it is worthless unless the invitee's client can
+    // be told about it. Until now the response half was registered while the ask
+    // half was not, so an invite was dropped before reaching its handler and the
+    // invitee saw nothing.
+    //
+    // SMSG_GROUP_INVITE is admitted in IsEnterWorldConverted alongside this, on
+    // a body rebuilt from the client reader and proved byte-exact against real
+    // captured popups. The inherited builder it replaces could not have been
+    // admitted safely -- its ceiling was 43 bytes against an observed minimum
+    // of 56.
+    //
+    // Known gap, deliberately not hidden: SMSG_PARTY_COMMAND_RESULT is still
+    // unadmitted, so a REFUSED invite ("no such player", "already in a group")
+    // produces no message to the inviter. A successful invite is unaffected.
+    // That reply is the next pair in this wave.
+    DefC(CMSG_GROUP_INVITE, "CMSG_GROUP_INVITE", STATUS_LOGGEDIN, PROCESS_THREADUNSAFE, &WorldSession::HandleGroupInviteOpcode);
+    DefS(SMSG_GROUP_INVITE, "SMSG_GROUP_INVITE");
+
     // Wave 15 stable-pet list request, list response, and operation result.
     DefC(CMSG_REQUEST_STABLED_PETS, "CMSG_REQUEST_STABLED_PETS", STATUS_LOGGEDIN, PROCESS_THREADUNSAFE, &WorldSession::HandleListStabledPetsOpcode);
     DefS(SMSG_PET_STABLE_LIST, "SMSG_PET_STABLE_LIST");
