@@ -7,6 +7,7 @@
 
 #include "terrain/Terrain.hpp"
 
+#include <algorithm>
 #include <cstdint>
 #include <limits>
 #include <optional>
@@ -68,6 +69,17 @@ namespace world::terrain
             }
 
             void Clear() { m_surfaces.clear(); }
+
+            /// Drops surfaces the caller must not be answered with. WHICH those are is a
+            /// server rule, so the engine offers the cut and never makes the choice.
+            template <typename Pred>
+            void DropIf(Pred pred)
+            {
+                m_surfaces.erase(
+                    std::remove_if(m_surfaces.begin(), m_surfaces.end(), pred),
+                    m_surfaces.end());
+            }
+
             bool Empty() const { return m_surfaces.empty(); }
             const std::vector<Surface>& Surfaces() const { return m_surfaces; }
 

@@ -110,6 +110,14 @@ namespace world::terrain
 
         void ReadMcnk(const uint8_t* mcnk, uint32_t mcnkSize, AdtData& out)
         {
+            // Every field below is read from the 128-byte header, and the caller has only
+            // proved that the record's DECLARED size fits the file. A record shorter than
+            // its own header reads past the end of the last chunk in the archive.
+            if (mcnkSize < MCNK_HEADER)
+            {
+                return;
+            }
+
             const uint8_t* h = mcnk + 8;
             const uint32_t flags = RdU32(h + MCNK_FLAGS);
             const uint32_t ix = RdU32(h + MCNK_INDEX_X);
@@ -334,10 +342,18 @@ namespace world::terrain
                                 }
                                 const int cx = ix * CELL + xOfs + x;
                                 const size_t idx = size_t(cy) * ADT_GRID + cx;
+
+                                // Indexed over the CHUNK's own 8x8 cells, not over this
+                                // instance's rectangle. A shore where only the outer cells
+                                // fatigue carries some bits set and some clear, so testing
+                                // the mask as a boolean drowns the shallows with it.
+                                const int deepBit = (yOfs + y) * CELL + (xOfs + x);
+
                                 out.liquidShow[idx] = 1;
                                 out.liquidEntry[idx] = entry;
                                 out.liquidDark[idx] = 0;
-                                out.liquidDeepAttr[idx] = (deepBits != 0) ? 1 : 0;
+                                out.liquidDeepAttr[idx] =
+                                    uint8_t((deepBits >> deepBit) & 1ull);
                             }
                         }
 

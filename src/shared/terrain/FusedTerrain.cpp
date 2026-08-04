@@ -9,7 +9,6 @@
 
 #include <algorithm>
 #include <cmath>
-#include <fstream>
 #include <limits>
 #include <utility>
 
@@ -31,7 +30,7 @@ namespace world::terrain
             const Vec3 seg = b - a;
             if (dot(seg, seg) < 1e-6f)
             {
-                return 2.0f;
+                return NO_HIT_FRACTION;
             }
 
             auto inv = [](float d) { return std::fabs(d) > 1e-9f ? 1.0f / d : 1e30f; };
@@ -40,7 +39,7 @@ namespace world::terrain
             const bool skipMeshes =
                 (ignore & ModelIgnoreFlags::M2) != ModelIgnoreFlags::Nothing;
 
-            float best = 2.0f;
+            float best = NO_HIT_FRACTION;
             for (const StaticInstance* inst : instances)
             {
                 if (!inst->model || inst->model->Empty() ||
@@ -78,14 +77,15 @@ namespace world::terrain
         {
             return false;
         }
-        if (std::ifstream(g_tileDir + "/" + TileFileName(mapId, tx, ty),
-                          std::ios::binary).good())
+        // READS the tile, does not merely open it: a truncated or stale-format file opens
+        // fine and then fails ReadTile at query time, which is a server that starts and
+        // answers nothing. Only the startup probe asks, never a query path.
+        if (ReadTile(g_tileDir + "/" + TileFileName(mapId, tx, ty)))
         {
             return true;
         }
         // A map built from one global WMO carries no ADT grid tiles at all.
-        return std::ifstream(g_tileDir + "/" + GlobalWmoFileName(mapId),
-                             std::ios::binary).good();
+        return ReadTile(g_tileDir + "/" + GlobalWmoFileName(mapId)) != nullptr;
     }
 
     FusedTerrain::TilePtr FusedTerrain::LoadCell(int tx, int ty) const
@@ -471,9 +471,11 @@ namespace world::terrain
                 {
                     continue;
                 }
+                // Vertically inside the box too: a WMO whose roof is below the querier is
+                // a building being FLOWN OVER, and taking its area reports a player in
+                // open air as indoors. MAX_DROP bounds the ray, not what counts as inside.
                 const Aabb& wb = inst.worldBounds;
-                if (!wb.coversColumn(x, y) || wb.hi.z < ceiling - MAX_DROP ||
-                    wb.lo.z > ceiling + 0.1f)
+                if (!wb.coversColumn(x, y) || wb.hi.z < z || wb.lo.z > ceiling + 0.1f)
                 {
                     continue;
                 }

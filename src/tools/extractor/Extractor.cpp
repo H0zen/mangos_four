@@ -571,13 +571,18 @@ namespace
 
     // One map's tiles. A map is either an ADT grid or a single global WMO; both end up
     // as the same payload, so the runtime has nothing to reconcile.
-    void BakeMap(MpqTileSource& source, uint32_t mapId, const std::string& name,
-                 const std::string& dest)
+    // Answers with the number of tiles that could NOT be baked, because that number has to
+    // reach the exit code: getmangos.sh deletes the installed data BEFORE running this, so
+    // a partial bake reported as success leaves a world with holes in it and nothing left
+    // to restore. A map with no WDT at all is not a failure -- Map.dbc lists identities
+    // that never had terrain.
+    int BakeMap(MpqTileSource& source, uint32_t mapId, const std::string& name,
+                const std::string& dest)
     {
         const WdtData* wdt = source.Wdt(mapId);
         if (!wdt)
         {
-            return;
+            return 0;
         }
 
         if (!wdt->HasAnyAdt())
@@ -591,8 +596,9 @@ namespace
                 std::snprintf(msg, sizeof(msg), "  map %4u %-24s global WMO %s", mapId,
                               name.c_str(), ok ? "ok" : "FAILED");
                 if (ok) { g_console.Detail(msg); } else { g_console.Error(msg); }
+                return ok ? 0 : 1;
             }
-            return;
+            return 0;
         }
 
         size_t expected = 0;
@@ -635,6 +641,7 @@ namespace
         std::snprintf(msg, sizeof(msg), "  map %4u %-24s %5d tiles%s", mapId,
                       name.c_str(), written, failed ? " (SOME FAILED)" : "");
         if (failed) { g_console.Warn(msg); } else { g_console.Detail(msg); }
+        return failed;
     }
 }
 
@@ -710,13 +717,16 @@ int main(int argc, char** argv)
         {
             opt.mapFilter = choice.mapFilter;
         }
+        // Normalised HERE as well as above: the pass before the menu only ever saw the
+        // command line's paths, so anything typed into the menu kept whatever separators
+        // it was typed with.
         if (!choice.src.empty())
         {
-            opt.src = choice.src;
+            opt.src = ExtractorConsole::ToUnixPath(choice.src);
         }
         if (!choice.dest.empty())
         {
-            opt.dest = choice.dest;
+            opt.dest = ExtractorConsole::ToUnixPath(choice.dest);
         }
     }
     else if (!opt.named)
@@ -917,13 +927,27 @@ int main(int argc, char** argv)
     MpqTileSource source(mpq, &maps, &liquids, &liquidObjects);
     g_console.Log("tiles -> " + tileDir);
 
+    int failedTiles = 0;
     for (const auto& entry : maps.All())
     {
         if (opt.mapFilter >= 0 && uint32_t(opt.mapFilter) != entry.first)
         {
             continue;
         }
-        BakeMap(source, entry.first, entry.second, tileDir);
+        failedTiles += BakeMap(source, entry.first, entry.second, tileDir);
+    }
+
+    // The navmesh is deliberately NOT built over a tile set known to be incomplete: it
+    // would come out looking finished, with holes exactly where the terrain is missing.
+    if (failedTiles)
+    {
+        char msg[256];
+        std::snprintf(msg, sizeof(msg),
+                      "tiles: %d could not be baked -- the cache under %s is INCOMPLETE",
+                      failedTiles, tileDir.c_str());
+        g_console.Error(msg);
+        g_console.Stop();
+        return 1;
     }
 
     if (!BakeNav(opt, tileDir))

@@ -484,6 +484,64 @@ TEST(AdtMh2oDeepAttributeMarksChunkDeep)
     CHECK_EQ(d.liquidDeepAttr[0], uint8_t(0));
 }
 
+// A PARTIALLY set mask is the whole point of the bitmap, and the case an all-ones
+// fixture cannot fail on: a shore fatigues in its outer cells and not in the ones
+// against the beach. Reading the mask as a boolean drowns the shallows with it.
+TEST(AdtMh2oDeepAttributeIsPerCell)
+{
+    float mcvt[145];
+    FillRamp(mcvt, 0.f);
+
+    Mh2oLayer l;
+    l.withAttributes = true;
+    l.deepBits = 0xFFull;               // the chunk's first cell row, and nothing else
+
+    Blob adt;
+    PutChunk(adt, "MCNK", MakeMcnk(1, 1, 0.f, 0, 0, mcvt));
+    PutChunk(adt, "MH2O", MakeMh2o(1, 1, l));
+
+    AdtData d;
+    REQUIRE(ParseAdt(adt.b, d));
+    for (int x = 0; x < 8; ++x)
+    {
+        CHECK_EQ(d.liquidDeepAttr[size_t(8) * ADT_GRID + (8 + x)], uint8_t(1));
+    }
+    for (int y = 1; y < 8; ++y)
+    {
+        for (int x = 0; x < 8; ++x)
+        {
+            CHECK_EQ(d.liquidDeepAttr[size_t(8 + y) * ADT_GRID + (8 + x)], uint8_t(0));
+        }
+    }
+}
+
+// The mask is indexed over the CHUNK's 8x8 cells, never over the instance's own
+// rectangle: an instance that covers a corner has to offset into it, or it reads
+// another cell's bit and fatigues the wrong water.
+TEST(AdtMh2oDeepAttributeIsIndexedOverTheChunk)
+{
+    float mcvt[145];
+    FillRamp(mcvt, 0.f);
+
+    Mh2oLayer l;
+    l.xOfs = 4;
+    l.yOfs = 4;
+    l.w = 4;
+    l.h = 4;
+    l.withAttributes = true;
+    l.deepBits = 1ull << (4 * 8 + 4);   // chunk cell (4,4): the instance's FIRST cell
+
+    Blob adt;
+    PutChunk(adt, "MCNK", MakeMcnk(1, 1, 0.f, 0, 0, mcvt));
+    PutChunk(adt, "MH2O", MakeMh2o(1, 1, l));
+
+    AdtData d;
+    REQUIRE(ParseAdt(adt.b, d));
+    CHECK_EQ(d.liquidDeepAttr[size_t(8 + 4) * ADT_GRID + (8 + 4)], uint8_t(1));
+    CHECK_EQ(d.liquidDeepAttr[size_t(8 + 4) * ADT_GRID + (8 + 5)], uint8_t(0));
+    CHECK_EQ(d.liquidDeepAttr[size_t(8 + 5) * ADT_GRID + (8 + 4)], uint8_t(0));
+}
+
 // The fishable bitmap sits ahead of the deep one; reading the wrong half would
 // flag shallow fishing water as fatiguing ocean.
 TEST(AdtMh2oFishableAttributeIsNotDeep)

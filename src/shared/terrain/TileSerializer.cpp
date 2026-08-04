@@ -122,6 +122,16 @@ namespace world::terrain
                      RPod(f, g.liquid.corner) && RPod(f, g.liquid.entry) &&
                      RPod(f, g.liquid.kind) && RVec(f, g.liquid.heights) &&
                      RVec(f, g.liquid.flags);
+
+                // The corner grid is indexed at a stride of tilesX+1 by every reader, so
+                // a count that disagrees with the dimensions is not a smaller surface --
+                // it is a read off the end of the vector on the first query over it.
+                const size_t corners =
+                    (size_t(g.liquid.tilesX) + 1) * (size_t(g.liquid.tilesY) + 1);
+                if (ok && g.liquid.heights.size() != corners)
+                {
+                    return false;
+                }
             }
             return ok;
         }

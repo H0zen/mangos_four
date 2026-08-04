@@ -273,7 +273,13 @@ namespace world::terrain
             const uint64_t vbytes = uint64_t(xverts) * yverts * 8;
             const uint64_t fbytes = uint64_t(xtiles) * ytiles;
 
-            if (xverts && yverts && xtiles && ytiles && 30 + vbytes + fbytes <= mliqSize)
+            // MLIQ's vertex grid is the tile grid's corners, and every reader indexes it
+            // at a stride of tilesX+1. A file that disagrees would bake a height array
+            // the runtime then walks off the end of, so its liquid is dropped instead.
+            const bool cornersMatchTiles = (xverts == xtiles + 1) && (yverts == ytiles + 1);
+
+            if (xverts && yverts && xtiles && ytiles && cornersMatchTiles &&
+                30 + vbytes + fbytes <= mliqSize)
             {
                 const uint8_t* verts = mliq + 30;
                 const uint8_t* tileFlags = verts + vbytes;

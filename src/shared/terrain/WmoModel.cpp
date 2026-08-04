@@ -2,6 +2,7 @@
 #include "terrain/WmoModel.hpp"
 
 #include <algorithm>
+#include <cmath>
 
 namespace world::terrain
 {
@@ -69,6 +70,22 @@ namespace world::terrain
 
     std::optional<ICollisionModel::LocalLiquid> WmoModel::LiquidLocal(const Vec3& p) const
     {
+        // A pool on an upper floor and a flooded room below it are two groups over the
+        // same footprint, and serialized order says nothing about which one the query
+        // point is in. The enclosing surface wins: the lowest at or above p.z, else the
+        // highest below it. Taking the first group found reports the wrong water in the
+        // wrong room, and makes the second pool disappear entirely.
+        std::optional<LocalLiquid> best;
+        auto better = [&p](float cand, float cur)
+        {
+            const bool candAbove = cand >= p.z;
+            if (candAbove != (cur >= p.z))
+            {
+                return candAbove;
+            }
+            return std::fabs(cand - p.z) < std::fabs(cur - p.z);
+        };
+
         for (const Group& g : m_groups)
         {
             if (!g.hasLiquid)
@@ -113,12 +130,17 @@ namespace world::terrain
                 z = H(tx, ty) + dx * sx + dy * sy;
             }
 
+            if (best && !better(z, best->z))
+            {
+                continue;
+            }
+
             LocalLiquid out;
             out.z = z;
             out.entry = lq.entry;
             out.kind = lq.kind;
-            return out;
+            best = out;
         }
-        return std::nullopt;
+        return best;
     }
 }
