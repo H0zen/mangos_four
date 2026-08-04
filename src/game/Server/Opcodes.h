@@ -1102,7 +1102,15 @@ enum OpcodesList
     SMSG_PET_LEARNED_SPELL                       = 0x0282, // 5.4.8 18414 (reader sub_6B0AD9; handler sub_7B8F82; name reference-consensus)
     SMSG_PET_REMOVED_SPELL                       = 0x1CAE, // 5.4.8 18414 (reader sub_6B0AD9; handler sub_7B906D; name reference-consensus)
     CMSG_CHANGE_SEATS_ON_CONTROLLED_VEHICLE      = 0x08F8, // 5.4.8 18414 (Wow.exe binary)
-    CMSG_HEARTH_AND_RESURRECT                    = 0x0360, // 5.4.8 18414 (Wow.exe binary)
+    // Corrected from 0x0360 (which is CMSG_SELF_RES) on binary evidence: Lua
+    // HearthAndResurrectFromArea -> sub_91064C -> class sub_6868A5 -> vtable
+    // off_D64914 slot 2 = sub_6865BD, which writes 835 = 0x0343.
+    // NOTE: Opcodes_reference.h, the inert clean-room enumeration, lists 0x0343
+    // as CMSG_BATTLEFIELD_MGR_EXIT_REQUEST. That row is stale and the conflict
+    // predates this correction: the compiled header already gives that opcode
+    // 0x08B3 with its own binary provenance, so the two disagreed beforehand.
+    // The reference header is not #included and cannot affect the build.
+    CMSG_HEARTH_AND_RESURRECT                    = 0x0343, // 5.4.8 18414 (Wow.exe binary)
     SMSG_ON_CANCEL_EXPECTED_RIDE_VEHICLE_AURA    = 0x1A2A,    // 5.4.8 18414 (Wow.exe leaf; name reference-consensus)
     SMSG_CRITERIA_DELETED                        = 0x1C33,    // 5.4.8 18414 (Wow.exe leaf; name reference-consensus)
     SMSG_ACHIEVEMENT_DELETED                     = 0x1A2F,    // 5.4.8 18414 (Wow.exe leaf; name reference-consensus)

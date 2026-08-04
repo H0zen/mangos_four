@@ -816,6 +816,16 @@ void WorldSession::HandleSelfResOpcode(WorldPacket& /*recv_data*/)
 {
     DEBUG_FILTER_LOG(LOG_FILTER_SPELL_CAST, "WORLD: CMSG_SELF_RES");                  // empty opcode
 
+    // Only a corpse that has not yet released may self-resurrect, matching
+    // HandleRepopRequestOpcode and HandleSpiritHealerActivateOpcode. Without
+    // this a living client could send the opcode and burn its self-res spell
+    // while alive. That was unreachable until the opcode was registered, so the
+    // guard arrives with the registration rather than before it.
+    if (_player->IsAlive() || _player->HasFlag(PLAYER_FLAGS, PLAYER_FLAGS_GHOST))
+    {
+        return;
+    }
+
     if (_player->HasAuraType(SPELL_AURA_PREVENT_RESURRECTION))
     {
         return;

@@ -864,17 +864,30 @@ void InitializeOpcodes()
     DefS(SMSG_SPIRIT_HEALER_CONFIRM, "SMSG_SPIRIT_HEALER_CONFIRM");
     DefC(CMSG_SPIRIT_HEALER_ACTIVATE, "CMSG_SPIRIT_HEALER_ACTIVATE", STATUS_LOGGEDIN, PROCESS_THREADUNSAFE, &WorldSession::HandleSpiritHealerActivateOpcode);
 
-    // Two members of this flow are deliberately left dormant.
+    // The 0x0360 collision is settled. Both names claimed that value with
+    // binary provenance, and CMSG_SELF_RES was the correct one:
     //
-    // CMSG_SELF_RES and CMSG_HEARTH_AND_RESURRECT are both recorded as 0x0360
-    // with binary provenance, so one of those names is wrong. Registering
-    // either would claim a slot that may belong to the other, which is the
-    // mistake that put MSG_MOVE_WORLDPORT_ACK on top of CMSG_CHAR_ENUM and hung
-    // every client on the character list. HandleSelfResOpcode is written and
-    // waiting; it needs the value settled first.
+    //   Lua UseSoulstone               -> sub_CCB17C -> packet class sub_686F88
+    //     -> vtable off_D64B1C slot 2 = sub_686A4C, which writes opcode 864 = 0x0360
+    //   Lua HearthAndResurrectFromArea -> sub_91064C -> packet class sub_6868A5
+    //     -> vtable off_D64914 slot 2 = sub_6865BD, which writes opcode 835 = 0x0343
     //
-    // SMSG_RESURRECT_FAILED (0x1253) carries no client leaf, so its value is
-    // inherited rather than confirmed. Same reason.
+    // CMSG_HEARTH_AND_RESURRECT is therefore 0x0343, and its 0x0360 entry in
+    // Opcodes.h has been corrected. Note the sniff catalogue NAMES 0x0360 as
+    // CMSG_HEARTH_AND_RESURRECT; that name is shipped-map metadata rather than
+    // wire truth, and the binary overrules it.
+    //
+    // Both packets share body writer nullsub_2, i.e. no body at all, which is
+    // why HandleSelfResOpcode ignores recv_data and why the 13 observed 0x0360
+    // packets in the corpus all carry a zero-length payload.
+    DefC(CMSG_SELF_RES, "CMSG_SELF_RES", STATUS_LOGGEDIN, PROCESS_THREADUNSAFE, &WorldSession::HandleSelfResOpcode);
+
+    // Still dormant: SMSG_RESURRECT_FAILED (0x1253) carries no client leaf, so
+    // its value is inherited rather than confirmed, and it has no reader to
+    // admit it to. CMSG_HEARTH_AND_RESURRECT now has a settled value AND a
+    // handler (WorldSession::HandleHearthandResurrect), but is left unregistered
+    // here deliberately: it is its own opcode and deserves its own change with
+    // its own gates, rather than riding along on this one.
     DefC(CMSG_CORPSE_MAP_POSITION_QUERY, "CMSG_CORPSE_MAP_POSITION_QUERY", STATUS_LOGGEDIN, PROCESS_THREADUNSAFE, &WorldSession::HandleCorpseMapPositionQueryOpcode);
     DefS(SMSG_CORPSE_MAP_POSITION_QUERY_RESPONSE, "SMSG_CORPSE_MAP_POSITION_QUERY_RESPONSE");
 

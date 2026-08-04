@@ -175,9 +175,9 @@
  *   TOTAL SMSG rows                   925
  *
  * SUBSYSTEM CONFIDENCE: high=365, low=221, medium=182, none=157
- * STATUS TOTALS: ACTIVE=553, DOC=432, DORMANT=535
- *   SMSG: ACTIVE=323, DOC=270, DORMANT=332
- *   CMSG: ACTIVE=230, DOC=162, DORMANT=203
+ * STATUS TOTALS: ACTIVE=556, DOC=431, DORMANT=533
+ *   SMSG: ACTIVE=324, DOC=270, DORMANT=331
+ *   CMSG: ACTIVE=232, DOC=161, DORMANT=202
  */
 
 // CAVEATS -- read before trusting any single row:
@@ -1233,7 +1233,7 @@ typedef uint16_t uint16;
  *   SMSG_UNKNOWN_0x10C0                            0x10C0  DOC      [unattributed]  handler never installed in this build
  *   MSG_MOVE_SET_TURN_RATE_CHEAT                   0x10D8  DORMANT  [unattributed]  handler never installed in this build
  *   SMSG_FORCE_RUN_SPEED_CHANGE                    0x10E3  DORMANT  [unattributed]  handler never installed in this build
- *   SMSG_ITEM_TEXT_QUERY_RESPONSE                  0x1134  DORMANT  [unattributed]  dynamic slot 540 installed by 0x60113B
+ *   SMSG_ITEM_TEXT_QUERY_RESPONSE                  0x1134  ACTIVE   [unattributed]  dynamic slot 540 installed by 0x60113B
  *   SMSG_SERVER_BUCK_DATA                          0x1142  DORMANT  [unattributed]  handler never installed in this build
  *   SMSG_UNKNOWN_0x1148                            0x1148  DOC      [unattributed]  special-control (ingress)
  *   SMSG_CONNECT_TO                                0x1149  DORMANT  [unattributed]  special-control (ingress)
@@ -1339,7 +1339,7 @@ typedef uint16_t uint16;
  *   CMSG_UNKNOWN_0x00E3                            0x00E3  ACTIVE   server-binding=CMSG_LFG_LFR_LEAVE
  *   CMSG_UNKNOWN_0x00F0                            0x00F0  DOC
  *   CMSG_MOVE_KNOCK_BACK_ACK                       0x00F2  ACTIVE
- *   CMSG_ITEM_TEXT_QUERY                           0x0123  DORMANT
+ *   CMSG_ITEM_TEXT_QUERY                           0x0123  ACTIVE
  *   CMSG_OPENING_CINEMATIC                         0x0130  DORMANT
  *   CMSG_QUERY_VOID_STORAGE                        0x0140  DOC
  *   CMSG_REQUEST_VEHICLE_NEXT_SEAT                 0x0141  DORMANT
@@ -1426,13 +1426,13 @@ typedef uint16_t uint16;
  *   CMSG_LFG_GET_STATUS                            0x032D  ACTIVE
  *   CMSG_GM_RESPONSE_RESOLVE                       0x033D  DOC
  *   CMSG_SPIRIT_HEALER_ACTIVATE                    0x0340  ACTIVE
- *   CMSG_BATTLEFIELD_MGR_EXIT_REQUEST              0x0343  DOC
+ *   CMSG_BATTLEFIELD_MGR_EXIT_REQUEST              0x0343  DORMANT
  *   CMSG_ATTACKSTOP                                0x0345  ACTIVE
  *   CMSG_TRAINER_LIST                              0x034B  DORMANT
  *   CMSG_TRAINER_BUY_SPELL                         0x0352  DORMANT
  *   CMSG_AUTOSTORE_LOOT_ITEM                       0x0354  ACTIVE
  *   CMSG_SWAP_ITEM                                 0x035D  ACTIVE
- *   CMSG_SELF_RES                                  0x0360  DORMANT
+ *   CMSG_SELF_RES                                  0x0360  ACTIVE
  *   CMSG_AUCTION_LIST_OWNER_ITEMS                  0x0361  DORMANT
  *   CMSG_REQUEST_CONQUEST_FORMULA_CONSTANTS        0x0365  ACTIVE
  *   CMSG_QUESTGIVER_STATUS_QUERY                   0x036A  ACTIVE
