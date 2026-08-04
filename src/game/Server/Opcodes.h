@@ -850,7 +850,7 @@ enum OpcodesList
     SMSG_LFG_ROLE_CHECK_UPDATE                   = 0x12BB,    // 5.4.8 18414 (Wow.exe leaf; name single-source fork)
     SMSG_LFG_JOIN_RESULT                         = 0x18E3,    // 5.4.8 18414 (Wow.exe leaf; name reference-consensus)
     SMSG_LFG_QUEUE_STATUS                        = 0x1006,    // 5.4.8 18414 (Wow.exe binary; handler retains LFG_QUEUE_STATUS literal)
-    CMSG_SET_LFG_COMMENT                         = 0x0530, // 4.3.4 15595 — NYI in 5.4.8 refs (unverified)
+    CMSG_SET_LFG_COMMENT                         = 0x0AB2,    // 5.4.8 18414 (Wow.exe binary: sub_661542 writes 2738; 0x0530 was the 4.3.4 value and is never sent)
     SMSG_LFG_UPDATE_SEARCH                       = 0x1161,    // 5.4.8 18414 (Wow.exe leaf; name single-source fork)
     CMSG_LFG_SET_ROLES                           = 0x08A2, // 5.4.8 18414 (Wow.exe binary)
     CMSG_LFG_BOOT_PLAYER_VOTE                    = 0x17BE, // 5.4.8 18414 (Wow.exe binary, via CMSG_LFG_SET_BOOT_VOTE)

@@ -48,7 +48,9 @@ void LFGMgr::JoinLFG(uint32 roles, std::set<uint32> dungeons, std::string commen
     //       - look into splitting this into 2 fns- one for player case, one for group
     Group* pGroup = plr->GetGroup();
     ObjectGuid guid = (pGroup) ? pGroup->GetObjectGuid() : plr->GetObjectGuid();
-    uint32 randomDungeonID; // used later if random dungeon has been chosen
+    // Assigned only on the random-dungeon branch, but read unconditionally
+    // further down, so it must not start indeterminate.
+    uint32 randomDungeonID = 0; // used later if random dungeon has been chosen
 
     LFGPlayers* currentInfo = GetPlayerOrPartyData(guid);
 
@@ -91,6 +93,15 @@ void LFGMgr::JoinLFG(uint32 roles, std::set<uint32> dungeons, std::string commen
         for (std::set<uint32>::iterator it = dungeons.begin(); it != dungeons.end(); ++it)
         {
             LfgDungeonsEntry const* dungeon = sLfgDungeonsStore.LookupEntry(*it);
+            // The dungeon ids arrive from the client. LookupEntry returns NULL
+            // for an unknown one, so dereferencing it unchecked is a remote
+            // crash the moment this path is wired to CMSG_LFG_JOIN.
+            if (!dungeon)
+            {
+                result = ERR_LFG_INVALID_SLOT;
+                break;
+            }
+
             switch (dungeon->TypeID)
             {
                 case LFG_TYPE_RANDOM_DUNGEON:
