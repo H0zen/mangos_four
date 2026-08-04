@@ -378,9 +378,13 @@ void WorldSession::HandleGroupInviteResponseOpcode(WorldPacket& recv_data)
  */
 void WorldSession::HandleGroupUninviteGuidOpcode(WorldPacket& recv_data)
 {
-    ObjectGuid guid;
-    recv_data >> guid;
-    recv_data.read_skip<std::string>();                     // reason
+    MopGroupUninvitePackets::Request request;
+    if (!MopGroupUninvitePackets::ParseRequest(recv_data, request))
+    {
+        return;
+    }
+
+    ObjectGuid const guid = request.targetGuid;
 
     // can't uninvite yourself
     if (guid == GetPlayer()->GetObjectGuid())

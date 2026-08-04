@@ -233,6 +233,114 @@ bool MopGroupInvitePackets::ParseRequest(WorldPacket& in, Request& out)
     return true;
 }
 
+bool MopGroupUninvitePackets::ParseRequest(WorldPacket& in, Request& out)
+{
+    // Build 18414 writer sub_66A7CE, reached through vtable D636E8 slot 1;
+    // slot 2 sub_66238A writes opcode 3297. Layout:
+    //
+    //   uint8  0x7F marker, raw, BEFORE the bit stream
+    //   bits   GUID presence in order 6,4,3,2,0,1,7,5
+    //          reason length, 8 bits (sub_665185 takes a uint8)
+    //          FlushBits
+    //   bytes  reason string, not NUL terminated
+    //          GUID bytes in order 5,6,1,4,3,2,7,0, each ^1, omitted when zero
+    //
+    // Verified byte-exact against three real bodies. Two from one capture
+    // decode to the SAME GUID, one of them carrying reason "afk", which checks
+    // the byte order semantically rather than only self-consistently.
+    //
+    // The legacy reader took a RAW ObjectGuid and skipped a std::string, with no
+    // marker, so it could not decode even the ordinary 8-byte body.
+    auto fail = [&in]()
+    {
+        in.rfinish();
+        return false;
+    };
+
+    // marker + mask + length
+    if (in.rpos() != 0 || in.size() - in.rpos() < 3)
+    {
+        return fail();
+    }
+
+    uint8 marker = 0;
+    in >> marker;
+    if (marker != 0x7F)
+    {
+        return fail();
+    }
+
+    static uint8 const maskOrder[8] = { 6, 4, 3, 2, 0, 1, 7, 5 };
+    static uint8 const byteOrder[8] = { 5, 6, 1, 4, 3, 2, 7, 0 };
+
+    bool present[8] = { false };
+    for (size_t i = 0; i < 8; ++i)
+    {
+        present[maskOrder[i]] = in.ReadBit();
+    }
+    uint32 const reasonLength = in.ReadBits(8);
+    in.ResetBitReader();
+
+    size_t presentCount = 0;
+    for (size_t i = 0; i < 8; ++i)
+    {
+        if (present[i])
+        {
+            ++presentCount;
+        }
+    }
+
+    // Exact tail, so a declared length cannot over-read.
+    if (in.size() - in.rpos() != reasonLength + presentCount)
+    {
+        return fail();
+    }
+
+    Request parsed;
+    parsed.reason = in.ReadString(reasonLength);
+
+    uint8 bytes[8] = { 0 };
+    bool canonical = true;
+    for (size_t i = 0; i < 8; ++i)
+    {
+        uint8 const index = byteOrder[i];
+        if (!present[index])
+        {
+            continue;
+        }
+        uint8 raw = 0;
+        in >> raw;
+        // WriteByteSeq emits (value ^ 1) for a present byte, so a raw one would
+        // decode to zero and contradict its own presence bit.
+        if (raw == 1)
+        {
+            canonical = false;
+        }
+        bytes[index] = raw ^ 1;
+    }
+
+    if (!canonical || in.rpos() != in.size())
+    {
+        return fail();
+    }
+
+    // An embedded NUL would truncate every downstream comparison.
+    if (parsed.reason.find('\0') != std::string::npos)
+    {
+        return fail();
+    }
+
+    uint64 rawGuid = 0;
+    for (size_t i = 0; i < 8; ++i)
+    {
+        rawGuid |= uint64(bytes[i]) << (i * 8);
+    }
+    parsed.targetGuid = ObjectGuid(rawGuid);
+
+    out = parsed;
+    return true;
+}
+
 bool MopGroupInvitePackets::BuildInvite(WorldPacket& out, Invite const& invite)
 {
     // Build 18414 popup grammar, recovered from the client reader and proved

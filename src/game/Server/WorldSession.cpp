@@ -617,6 +617,7 @@ static bool IsEnterWorldConverted(uint16 opcode)
         case SMSG_GROUP_INVITE:               // MopGroupInvitePackets::BuildInvite
         case SMSG_GROUP_DESTROYED:            // empty body, Group.cpp Initialize(..., 0)
         case SMSG_PARTY_COMMAND_RESULT:       // flat 18414 body, WorldSession::SendPartyResult
+        case SMSG_GROUP_UNINVITE:             // empty body, Group.cpp Initialize(..., 0)
         case SMSG_PET_STABLE_LIST:            // MopStablePackets::BuildStableList
         case SMSG_STABLE_RESULT:              // MopStablePackets::BuildStableResult
         case SMSG_RAID_READY_CHECK:           // MopReadyCheckPackets::BuildStarted

@@ -220,6 +220,22 @@ namespace MopGroupInvitePackets
     bool BuildInvite(WorldPacket& out, Invite const& invite);
 }
 
+namespace MopGroupUninvitePackets
+{
+    /// A parsed CMSG_GROUP_UNINVITE_GUID body.
+    ///
+    /// `reason` is free text the client collects for the vote-kick flow. It is
+    /// NOT authority: the target is chosen by `targetGuid`, and the caller must
+    /// still verify it is actually in the group.
+    struct Request
+    {
+        ObjectGuid targetGuid;
+        std::string reason;
+    };
+
+    bool ParseRequest(WorldPacket& in, Request& out);
+}
+
 namespace MopGroupMarkerPackets
 {
     struct MinimapPingRequest

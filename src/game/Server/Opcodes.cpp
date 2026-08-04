@@ -1196,6 +1196,18 @@ void InitializeOpcodes()
     // a packed body, because the client reads it flat.
     DefS(SMSG_PARTY_COMMAND_RESULT, "SMSG_PARTY_COMMAND_RESULT");
 
+    // Removing a member. The 18414 client sends 0x0CE1 -- observed live -- and
+    // NOT CMSG_GROUP_UNINVITE 0x1076, which is a stale pre-18414 enum the client
+    // never emits. Its reply SMSG_GROUP_UNINVITE 0x1313 is an empty body,
+    // confirmed by the corpus at min = max = 0 over 86 packets.
+    //
+    // The reader was rebuilt for this: the legacy one took a RAW ObjectGuid and
+    // skipped a std::string, while the real body is a 0x7F marker, a bit-packed
+    // GUID and an 8-bit-length reason string. Registering it against the old
+    // reader would have misparsed rather than failed.
+    DefC(CMSG_GROUP_UNINVITE_GUID, "CMSG_GROUP_UNINVITE_GUID", STATUS_LOGGEDIN, PROCESS_THREADUNSAFE, &WorldSession::HandleGroupUninviteGuidOpcode);
+    DefS(SMSG_GROUP_UNINVITE, "SMSG_GROUP_UNINVITE");
+
     // Wave 15 stable-pet list request, list response, and operation result.
     DefC(CMSG_REQUEST_STABLED_PETS, "CMSG_REQUEST_STABLED_PETS", STATUS_LOGGEDIN, PROCESS_THREADUNSAFE, &WorldSession::HandleListStabledPetsOpcode);
     DefS(SMSG_PET_STABLE_LIST, "SMSG_PET_STABLE_LIST");
