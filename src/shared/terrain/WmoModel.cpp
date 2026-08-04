@@ -2,12 +2,18 @@
 #include "terrain/WmoModel.hpp"
 
 #include <algorithm>
+#include <cmath>
 
 namespace world::terrain
 {
     namespace
     {
         constexpr float LIQUID_TILE_SIZE = 533.333f / 128.f;
+
+        // How far down to look for the floor that says which room the point is in. Longer
+        // than any storey and shorter than a WMO's full height, so a point in an open
+        // shaft does not adopt the room at the bottom of it.
+        constexpr float FLOOR_SEARCH = 60.f;
     }
 
     WmoModel::WmoModel(TriSoup soup, std::vector<uint16_t> triGroup,
@@ -67,58 +73,88 @@ namespace world::terrain
         return AreaResult{m_groups[gi].groupWmoId, m_groups[gi].mogpFlags, *t};
     }
 
+    std::optional<ICollisionModel::LocalLiquid> WmoModel::GroupLiquidAt(const Group& g,
+                                                                        const Vec3& p) const
+    {
+        if (!g.hasLiquid)
+        {
+            return std::nullopt;
+        }
+        const Liquid& lq = g.liquid;
+        if (!lq.tilesX || !lq.tilesY || lq.heights.empty())
+        {
+            return std::nullopt;
+        }
+
+        const float txf = (p.x - lq.corner.x) / LIQUID_TILE_SIZE;
+        const float tyf = (p.y - lq.corner.y) / LIQUID_TILE_SIZE;
+        const int tx = int(txf), ty = int(tyf);
+        if (txf < 0.f || tyf < 0.f || tx >= int(lq.tilesX) || ty >= int(lq.tilesY))
+        {
+            return std::nullopt;
+        }
+
+        const size_t fi = size_t(tx) + size_t(ty) * lq.tilesX;
+        if (fi < lq.flags.size() && (lq.flags[fi] & 0x0F) == 0x0F)
+        {
+            return std::nullopt;
+        }
+
+        const float dx = txf - tx, dy = tyf - ty;
+        const uint32_t row = lq.tilesX + 1;
+        auto H = [&](int a, int b) { return lq.heights[size_t(a) + size_t(b) * row]; };
+
+        LocalLiquid out;
+        if (dx > dy)
+        {
+            const float sx = H(tx + 1, ty) - H(tx, ty);
+            const float sy = H(tx + 1, ty + 1) - H(tx + 1, ty);
+            out.z = H(tx, ty) + dx * sx + dy * sy;
+        }
+        else
+        {
+            const float sx = H(tx + 1, ty + 1) - H(tx, ty + 1);
+            const float sy = H(tx, ty + 1) - H(tx, ty);
+            out.z = H(tx, ty) + dx * sx + dy * sy;
+        }
+        out.entry = lq.entry;
+        out.kind = lq.kind;
+        return out;
+    }
+
     std::optional<ICollisionModel::LocalLiquid> WmoModel::LiquidLocal(const Vec3& p) const
     {
+        // WHICH ROOM the point is in decides which water it is in, and the model already
+        // answers that: the group owning the surface directly beneath it, by the same
+        // downward cast AreaInfo uses. Deciding by how NEAR a surface is instead reports a
+        // player standing between two floors as swimming in the pool one storey up -- and
+        // preferring the surface ABOVE, as this first did, gets that case wrong every time.
+        uint32_t tri = 0;
+        const Vec3 down{0.f, 0.f, -1.f};
+        if (m_bvh.Raycast(m_soup, p, down, FLOOR_SEARCH, &tri) && tri < m_triGroup.size())
+        {
+            const uint16_t gi = m_triGroup[tri];
+            if (gi < m_groups.size())
+            {
+                if (auto own = GroupLiquidAt(m_groups[gi], p))
+                {
+                    return own;
+                }
+            }
+        }
+
+        // No floor under the point -- outside the geometry, or a group that carries water
+        // and no collidable floor of its own. Nearest surface then, in either direction:
+        // it is a guess, but an unbiased one, where "above wins" was a wrong answer.
+        std::optional<LocalLiquid> best;
         for (const Group& g : m_groups)
         {
-            if (!g.hasLiquid)
+            const auto cur = GroupLiquidAt(g, p);
+            if (cur && (!best || std::fabs(cur->z - p.z) < std::fabs(best->z - p.z)))
             {
-                continue;
+                best = cur;
             }
-            const Liquid& lq = g.liquid;
-            if (!lq.tilesX || !lq.tilesY || lq.heights.empty())
-            {
-                continue;
-            }
-
-            const float txf = (p.x - lq.corner.x) / LIQUID_TILE_SIZE;
-            const float tyf = (p.y - lq.corner.y) / LIQUID_TILE_SIZE;
-            const int tx = int(txf), ty = int(tyf);
-            if (txf < 0.f || tyf < 0.f || tx >= int(lq.tilesX) || ty >= int(lq.tilesY))
-            {
-                continue;
-            }
-
-            const size_t fi = size_t(tx) + size_t(ty) * lq.tilesX;
-            if (fi < lq.flags.size() && (lq.flags[fi] & 0x0F) == 0x0F)
-            {
-                continue;
-            }
-
-            const float dx = txf - tx, dy = tyf - ty;
-            const uint32_t row = lq.tilesX + 1;
-            auto H = [&](int a, int b) { return lq.heights[size_t(a) + size_t(b) * row]; };
-
-            float z;
-            if (dx > dy)
-            {
-                const float sx = H(tx + 1, ty) - H(tx, ty);
-                const float sy = H(tx + 1, ty + 1) - H(tx + 1, ty);
-                z = H(tx, ty) + dx * sx + dy * sy;
-            }
-            else
-            {
-                const float sx = H(tx + 1, ty + 1) - H(tx, ty + 1);
-                const float sy = H(tx, ty + 1) - H(tx, ty);
-                z = H(tx, ty) + dx * sx + dy * sy;
-            }
-
-            LocalLiquid out;
-            out.z = z;
-            out.entry = lq.entry;
-            out.kind = lq.kind;
-            return out;
         }
-        return std::nullopt;
+        return best;
     }
 }

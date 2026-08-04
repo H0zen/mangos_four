@@ -175,7 +175,10 @@ class CountingOperation final : public SqlOperation
             : executions(executions), destructions(destructions) {}
 
         ~CountingOperation() override { ++destructions; }
-        bool Execute(SqlConnection*) override
+
+        // ExecuteLocked is the work; Execute is the non-virtual entry that takes the
+        // connection's lock around it.
+        bool ExecuteLocked(SqlConnection*) override
         {
             ++executions;
             return true;

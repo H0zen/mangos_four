@@ -290,6 +290,43 @@ TEST(WmoLiquidRejectsPointsOutsideTheFootprint)
     CHECK(!m.LiquidLocal(Vec3{1000.f, 1.f, 0.f}).has_value());
 }
 
+// Two groups over the same footprint at different heights -- a pool on an upper floor
+// above a flooded room -- and serialized order says nothing about which one the query
+// is in. Answering with the first found reports the wrong water in the wrong room, and
+// makes the second pool disappear from the model entirely.
+TEST(WmoLiquidPicksTheSurfaceEnclosingTheQuery)
+{
+    std::vector<WmoModel::Group> groups;
+    groups.push_back(FlatLiquidGroup(2, 2, 40.f, 0, 13, uint8_t(LiquidKind::Water)));
+    groups.push_back(FlatLiquidGroup(2, 2, 5.f, 0, 41, uint8_t(LiquidKind::Slime)));
+
+    WmoModel m(TriSoup{}, {}, std::move(groups), 0);
+
+    const auto lower = m.LiquidLocal(Vec3{1.f, 1.f, 2.f});
+    REQUIRE(lower.has_value());
+    CHECK_EQ(lower->z, 5.f);
+    CHECK_EQ(lower->entry, uint16_t(41));
+
+    const auto upper = m.LiquidLocal(Vec3{1.f, 1.f, 38.f});
+    REQUIRE(upper.has_value());
+    CHECK_EQ(upper->z, 40.f);
+    CHECK_EQ(upper->entry, uint16_t(13));
+
+    // THE CASE BETWEEN THEM, which is the one an "above wins" rule gets wrong and the one
+    // a fixture that only probes below-both and above-both never asks: standing on the
+    // lower floor, well clear of both surfaces. Answering with the upper pool puts a
+    // player who is dry on the ground floor underwater in the storey above.
+    const auto between = m.LiquidLocal(Vec3{1.f, 1.f, 20.f});
+    REQUIRE(between.has_value());
+    CHECK_EQ(between->z, 5.f);
+    CHECK_EQ(between->entry, uint16_t(41));
+
+    // Above both: the highest below is the one being stood over.
+    const auto above = m.LiquidLocal(Vec3{1.f, 1.f, 100.f});
+    REQUIRE(above.has_value());
+    CHECK_EQ(above->z, 40.f);
+}
+
 TEST(WmoLiquidHonoursTheDryTileNibble)
 {
     std::vector<WmoModel::Group> groups;

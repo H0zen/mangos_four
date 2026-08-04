@@ -562,3 +562,38 @@ TEST(FusedTerrainSweepDropsUnpinnedTilesAndKeepsPinnedOnes)
     std::remove(b.c_str());
     FusedTerrain::SetTileDir(std::string());
 }
+
+// Existence is not readability, and this is the probe the server's startup check runs on
+// the starting areas. A tile truncated by a full disk, or left behind by an older format,
+// opens perfectly well: accepting it starts a server whose every height, liquid and
+// collision query answers nothing, on a map that reported itself present.
+TEST(FusedTerrainRejectsATileItCannotRead)
+{
+    const std::string dir = TempPath("staledir");
+    std::error_code ec;
+    std::filesystem::create_directories(dir, ec);
+    FusedTerrain::SetTileDir(dir);
+
+    const std::string stale = dir + "/" + TileFileName(7777, 32, 32);
+    const std::string empty = dir + "/" + TileFileName(7777, 33, 32);
+
+    // Right magic, a version this build does not read, and nothing after it.
+    if (std::FILE* f = std::fopen(stale.c_str(), "wb"))
+    {
+        const uint32_t magic = 0x34474E4D, version = 0xFFFFFFFFu;
+        std::fwrite(&magic, sizeof(magic), 1, f);
+        std::fwrite(&version, sizeof(version), 1, f);
+        std::fclose(f);
+    }
+    if (std::FILE* f = std::fopen(empty.c_str(), "wb"))
+    {
+        std::fclose(f);
+    }
+
+    CHECK(!FusedTerrain::HasTile(7777, 32, 32));
+    CHECK(!FusedTerrain::HasTile(7777, 33, 32));
+
+    std::remove(stale.c_str());
+    std::remove(empty.c_str());
+    FusedTerrain::SetTileDir(std::string());
+}

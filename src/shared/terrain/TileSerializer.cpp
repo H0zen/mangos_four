@@ -122,6 +122,16 @@ namespace world::terrain
                      RPod(f, g.liquid.corner) && RPod(f, g.liquid.entry) &&
                      RPod(f, g.liquid.kind) && RVec(f, g.liquid.heights) &&
                      RVec(f, g.liquid.flags);
+
+                // The corner grid is indexed at a stride of tilesX+1 by every reader, so
+                // a count that disagrees with the dimensions is not a smaller surface --
+                // it is a read off the end of the vector on the first query over it.
+                const size_t corners =
+                    (size_t(g.liquid.tilesX) + 1) * (size_t(g.liquid.tilesY) + 1);
+                if (ok && g.liquid.heights.size() != corners)
+                {
+                    return false;
+                }
             }
             return ok;
         }
@@ -256,6 +266,18 @@ namespace world::terrain
         tile->hasTerrain = hasTerrain != 0;
         tile->isGlobalWmo = globalWmo != 0;
         tile->hasLiquid = hasLiquid != 0;
+
+        // EVERY grid is fixed-size, and the readers index them as such: TerrainHeight
+        // walks v9 at a stride of V9_SIDE and only guards against empty. A count that
+        // merely fits in the file is not a smaller grid, it is an out-of-bounds read on
+        // the first query -- so a present grid must be exactly the size it is indexed at.
+        constexpr size_t CORNERS = size_t(V9_SIDE) * V9_SIDE;
+        constexpr size_t CELLS = size_t(GRID_PER_TILE) * GRID_PER_TILE;
+        auto sized = [](const auto& v, size_t n) { return v.empty() || v.size() == n; };
+        ok = ok && sized(tile->v9, CORNERS) && sized(tile->v8, CELLS) &&
+             sized(tile->liquidHeight, CORNERS) && sized(tile->liquidShow, CELLS) &&
+             sized(tile->liquidKind, CELLS) && sized(tile->liquidEntry, CELLS) &&
+             sized(tile->liquidDeep, CELLS);
 
         uint32_t nModels = 0;
         ok = ok && RPod(f, nModels) && nModels <= MAX_MODELS;

@@ -891,15 +891,18 @@ namespace world::nav
                 return false;
             }
 
-            // Every walkable poly must carry a flag or the query filter rejects all of
-            // them; the area id is what the server's filter then reads.
+            // dtQueryFilter tests poly->FLAGS, never the area -- the area only prices a
+            // polygon. So the NAV_* bit has to be carried into the flags verbatim:
+            // collapsing it to 1 stamps NAV_GROUND onto water, magma and slime, which
+            // both bars a swim-only creature from its own water and walks land creatures
+            // across lava.
             for (int i = 0; i < merged->npolys; ++i)
             {
                 if (merged->areas[i] == RC_WALKABLE_AREA)
                 {
                     merged->areas[i] = NAV_GROUND;
                 }
-                merged->flags[i] = merged->areas[i] ? 1 : 0;
+                merged->flags[i] = merged->areas[i];
             }
 
             const std::vector<OffMeshLink> links =

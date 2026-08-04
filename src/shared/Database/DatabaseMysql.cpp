@@ -221,14 +221,13 @@ bool MySQLConnection::Initialize(const char* infoString)
 
     mysql_options(mysqlInit, MYSQL_SET_CHARSET_NAME, "utf8");
 
-    // Auto-reconnect is deprecated from client 8.0.34 on, and asking for it makes the library
-    // print a warning of its own to stderr at every connect -- past our logging, so it cannot
-    // be filtered or levelled like anything else we emit. We do not need it either: a dropped
-    // connection silently reconnecting mid-transaction is how a transaction ends up half
-    // applied. Only ask for it where it is neither deprecated nor noisy.
-#if !defined(MYSQL_VERSION_ID) || MYSQL_VERSION_ID < 80034
+    // DELIBERATELY UNCONDITIONAL, though the client deprecates this from 8.0.34 on and
+    // prints its own warning for it. Nothing else here recovers a dropped connection:
+    // Ping() throws its result away and Execute/Query log mysql_error and return false,
+    // so removing this leaves every connection dead after a wait_timeout or a database
+    // restart until the process is restarted. Silence the warning by handling
+    // CR_SERVER_GONE_ERROR here first; do not simply drop the option.
     mysql_options(mysqlInit, MYSQL_OPT_RECONNECT, "1");
-#endif
 #ifdef WIN32
     if (host == ".")                                        // named pipe use option (Windows)
     {
