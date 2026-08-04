@@ -158,7 +158,16 @@ void Spell::EffectEnvironmentalDMG(SpellEffectEntry const* effect)
     m_caster->SendSpellNonMeleeDamageLog(m_caster, m_spellInfo->ID, damage, GetSpellSchoolMask(m_spellInfo), absorb, resist, false, 0, false);
     if (m_caster->GetTypeId() == TYPEID_PLAYER)
     {
-        ((Player*)m_caster)->EnvironmentalDamage(DAMAGE_FIRE, damage);
+        // Pass the MITIGATED amount. The absorb and resist computed above were
+        // reported to the client but never applied: EnvironmentalDamage only
+        // runs its own mitigation for DAMAGE_LAVA and DAMAGE_SLIME, so a fire
+        // spell dealt the full raw damage. The spell log one line above already
+        // subtracts them internally, so passing the raw value here also made the
+        // two logs disagree about the same hit -- harmless while the
+        // environmental log was dropped by the send gate, visible now that it
+        // is admitted.
+        uint32 const mitigated = damage > absorb + resist ? damage - absorb - resist : 0;
+        ((Player*)m_caster)->EnvironmentalDamage(DAMAGE_FIRE, mitigated);
     }
 }
 

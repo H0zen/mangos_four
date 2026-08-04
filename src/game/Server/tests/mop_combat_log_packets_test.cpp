@@ -354,12 +354,78 @@ static void test_spell_non_melee_damage_log_matches_dense_capture()
     }
 }
 
+// Real-traffic fixtures for SMSG_ENVIRONMENTALDAMAGELOG (0x0DF1), which reaches
+// the client through combat-log dispatcher index 249 and reader sub_C76E44.
+// One GUID, so predicted size is 15 + <present GUID bytes>.
+// Corpus generation 2BE10C899585BAECD237705AC13BBF9262D81B6BDC085B462808C6869CE88752.
+static void test_environmental_damage_log_matches_captures()
+{
+    // capture-000006 seq 76048 - 20 bytes, five GUID bytes present.
+    static uint8 const sparse[] = {
+        0x6C, 0x80,                                     // mask
+        0x00, 0x00, 0x00, 0x00,                         // absorb = 0
+        0xE9, 0x05,                                     // guid[0] = 0xE8^1, guid[7] = 0x04^1
+        0x02,                                           // damage type 2 = fall
+        0x04,                                           // guid[3] = 0x05^1  (guid[6], guid[5] absent)
+        0x00, 0x00, 0x00, 0x00,                         // resist = 0
+        0xC9, 0x3D,                                     // guid[1] = 0xC8^1, guid[2] = 0x3C^1 (guid[4] absent)
+        0x6C, 0xA7, 0x01, 0x00                          // damage = 108396
+    };
+
+    MopCombatLogPackets::EnvironmentalDamageLog fall = {};
+    fall.victimGuid = 0x04000000053CC8E8ull;
+    fall.damage = 108396u;
+    fall.absorb = 0u;
+    fall.resist = 0u;
+    fall.damageType = 2u;
+
+    WorldPacket sparsePacket(SMSG_ENVIRONMENTALDAMAGELOG, 23);
+    MopCombatLogPackets::BuildEnvironmentalDamageLog(sparsePacket, fall);
+    CHECK(sparsePacket.GetOpcode() == SMSG_ENVIRONMENTALDAMAGELOG);
+    CHECK(sparsePacket.size() == sizeof(sparse));
+    if (sparsePacket.size() == sizeof(sparse))
+    {
+        CHECK(std::memcmp(sparsePacket.contents(), sparse, sizeof(sparse)) == 0);
+    }
+
+    // capture-000009 seq 54879 - 22 bytes, seven GUID bytes present (only
+    // guid[3] absent), so the two samples exercise different presence patterns.
+    // This GUID has a 0xF130 high part, i.e. a creature taking environmental
+    // damage rather than a player.
+    static uint8 const dense[] = {
+        0xFD, 0x00,                                     // mask
+        0x00, 0x00, 0x00, 0x00,                         // absorb = 0
+        0xFC, 0xF0,                                     // guid[0] = 0xFD^1, guid[7] = 0xF1^1
+        0x02,                                           // damage type 2 = fall
+        0x31, 0x6C,                                     // guid[6] = 0x30^1, guid[5] = 0x6D^1 (guid[3] absent)
+        0x00, 0x00, 0x00, 0x00,                         // resist = 0
+        0xDD, 0x45, 0x7C,                               // guid[1], guid[2], guid[4]
+        0x64, 0x25, 0x00, 0x00                          // damage = 9572
+    };
+
+    MopCombatLogPackets::EnvironmentalDamageLog creature = {};
+    creature.victimGuid = 0xF1306D7D0044DCFDull;
+    creature.damage = 9572u;
+    creature.absorb = 0u;
+    creature.resist = 0u;
+    creature.damageType = 2u;
+
+    WorldPacket densePacket(SMSG_ENVIRONMENTALDAMAGELOG, 23);
+    MopCombatLogPackets::BuildEnvironmentalDamageLog(densePacket, creature);
+    CHECK(densePacket.size() == sizeof(dense));
+    if (densePacket.size() == sizeof(dense))
+    {
+        CHECK(std::memcmp(densePacket.contents(), dense, sizeof(dense)) == 0);
+    }
+}
+
 int main(int, char**)
 {
     test_spell_instakill_log();
     test_spell_damage_shield_log();
     test_spell_non_melee_damage_log_matches_capture();
     test_spell_non_melee_damage_log_matches_dense_capture();
+    test_environmental_damage_log_matches_captures();
     if (g_fail) return 1;
     std::printf("mop_combat_log_packets: all checks passed\n");
     return 0;

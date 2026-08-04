@@ -1571,6 +1571,15 @@ namespace MopCombatLogPackets
         uint32 resist;
     };
 
+    struct EnvironmentalDamageLog
+    {
+        uint64 victimGuid;
+        uint32 damage;
+        uint32 absorb;
+        uint32 resist;
+        uint8 damageType;
+    };
+
     struct SpellNonMeleeDamageLog
     {
         uint64 attackerGuid;
@@ -1704,6 +1713,47 @@ namespace MopCombatLogPackets
         };
         for (auto const& byte : bytes)
             out.WriteByteSeq(GuidByte(byte[1] ? log.targetGuid : log.casterGuid, byte[0]));
+    }
+
+    /**
+     * Inverse of the complete 18414 reader at Wow.exe sub_C76E44, reached from
+     * the combat-log dispatcher sub_C6763F. SMSG_ENVIRONMENTALDAMAGELOG (0x0DF1)
+     * compacts to dispatcher index 249 -> sub_C78534 -> this reader. See
+     * BuildSpellNonMeleeDamageLog below for how that compaction works.
+     *
+     * One GUID only, held at reader object offsets 64..71, giving eight packed
+     * presence bits. They are NOT contiguous: the reader takes six of them, then
+     * a has-power-data flag, then the remaining two. That flag guards a
+     * variable-length block the server does not populate, so it is written
+     * false, which is what every observed packet carries.
+     *
+     * Byte-reconciled against real captured traffic: capture-000006 seq 76048,
+     * 20 bytes, five GUID bytes present. Predicted size is
+     * 2 mask + 4 absorb + <present GUID bytes> + 1 type + 4 resist + 4 damage,
+     * so 15 + 5 = 20. That sample decodes to absorb 0, type 2 (fall damage),
+     * resist 0, damage 108396 -- absorb and resist zero being exactly right for
+     * a fall.
+     */
+    inline void BuildEnvironmentalDamageLog(WorldPacket& out, EnvironmentalDamageLog const& log)
+    {
+        uint8 const maskA[] = { 5, 7, 1, 4, 2, 0 };
+        uint8 const maskB[] = { 6, 3 };
+        WriteGuidMask(out, log.victimGuid, maskA);
+        out.WriteBit(false);                            // has power data
+        WriteGuidMask(out, log.victimGuid, maskB);
+        out.FlushBits();
+
+        uint8 const bytesA[] = { 0, 7 };
+        uint8 const bytesB[] = { 6, 3, 5 };
+        uint8 const bytesC[] = { 1, 2, 4 };
+
+        out << uint32(log.absorb);
+        WriteGuidBytes(out, log.victimGuid, bytesA);
+        out << uint8(log.damageType);
+        WriteGuidBytes(out, log.victimGuid, bytesB);
+        out << uint32(log.resist);
+        WriteGuidBytes(out, log.victimGuid, bytesC);
+        out << uint32(log.damage);
     }
 
     /**

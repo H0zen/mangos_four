@@ -148,12 +148,17 @@ uint32 Player::EnvironmentalDamage(EnviromentalDamage type, uint32 damage)
 
     DealDamageMods(this, damage, &absorb);
 
-    WorldPacket data(SMSG_ENVIRONMENTALDAMAGELOG, (21));
-    data << GetObjectGuid();
-    data << uint8(type != DAMAGE_FALL_TO_VOID ? type : DAMAGE_FALL);
-    data << uint32(damage);
-    data << uint32(absorb);
-    data << uint32(resist);
+    // DAMAGE_FALL_TO_VOID is ours, not the client's: it exists only to skip the
+    // durability loss below, so it must still go out on the wire as a fall.
+    MopCombatLogPackets::EnvironmentalDamageLog envLog = {};
+    envLog.victimGuid = GetObjectGuid().GetRawValue();
+    envLog.damage = damage;
+    envLog.absorb = absorb;
+    envLog.resist = resist;
+    envLog.damageType = uint8(type != DAMAGE_FALL_TO_VOID ? type : DAMAGE_FALL);
+
+    WorldPacket data(SMSG_ENVIRONMENTALDAMAGELOG, 23);
+    MopCombatLogPackets::BuildEnvironmentalDamageLog(data, envLog);
     SendMessageToSet(&data, true);
 
     DamageEffectType damageType = SELF_DAMAGE;
