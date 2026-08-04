@@ -123,15 +123,19 @@ if(NOT CMAKE_CONFIGURATION_TYPES)
   endif()
 endif()
 
+# ABSOLUTE, and inside the prefix. install(DESTINATION) resolves a RELATIVE path against
+# CMAKE_INSTALL_PREFIX, not against BIN_DIR -- so the previous "../etc" was read as
+# <prefix>/../etc and dropped the configs one level ABOVE the prefix that was asked for,
+# where several servers then shared one etc. Whoever wrote it meant bin/../etc.
 if(UNIX)
     set(BIN_DIR ${CMAKE_INSTALL_PREFIX}/bin)
     if (NOT CONF_INSTALL_DIR)
-        set(CONF_INSTALL_DIR ../etc)
+        set(CONF_INSTALL_DIR ${CMAKE_INSTALL_PREFIX}/etc)
     endif()
 else()
     set(BIN_DIR ${CMAKE_INSTALL_PREFIX})
     if (NOT CONF_INSTALL_DIR)
-        set(CONF_INSTALL_DIR .)
+        set(CONF_INSTALL_DIR ${CMAKE_INSTALL_PREFIX})
     endif()
 endif()
 
