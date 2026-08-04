@@ -565,6 +565,7 @@ static bool IsEnterWorldConverted(uint16 opcode)
         case SMSG_CREATURE_QUERY_RESPONSE:   // MopQueryPackets::BuildCreatureQueryResponse
         case SMSG_GAMEOBJECT_QUERY_RESPONSE: // MopQueryPackets::BuildGameObjectQueryResponse
         case SMSG_PAGE_TEXT_QUERY_RESPONSE:  // MopQueryPackets::BuildPageTextQueryResponse
+        case SMSG_ITEM_TEXT_QUERY_RESPONSE:  // WorldSession::HandleItemTextQuery; uint8 found, raw uint64 guid, cstring
         case SMSG_CORPSE_QUERY_RESPONSE:     // MopQueryPackets::BuildCorpseQueryResponse
         case SMSG_CORPSE_MAP_POSITION_QUERY_RESPONSE: // MopQueryPackets::BuildCorpseMapPositionQueryResponse
         case SMSG_DEATH_RELEASE_LOC:         // MopDeathPackets::BuildDeathReleaseLocation

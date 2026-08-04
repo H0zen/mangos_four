@@ -833,6 +833,16 @@ void InitializeOpcodes()
     DefC(CMSG_PAGE_TEXT_QUERY, "CMSG_PAGE_TEXT_QUERY", STATUS_LOGGEDIN, PROCESS_THREADUNSAFE, &WorldSession::HandlePageTextQueryOpcode);
     DefS(SMSG_PAGE_TEXT_QUERY_RESPONSE, "SMSG_PAGE_TEXT_QUERY_RESPONSE");
 
+    // Reading a mail letter. The 18414 request writer (sub_600693, the
+    // itemtextcache.wdb cache-miss callback) emits a RAW little-endian uint64
+    // item GUID - no packed mask, no XOR - and the reply reader immediately
+    // after it takes uint8 found (0 = has text), then the same raw uint64,
+    // then a null-terminated string. HandleItemTextQuery already builds
+    // exactly that; only the registration and admission were missing, so
+    // right-clicking a letter did nothing at all.
+    DefC(CMSG_ITEM_TEXT_QUERY, "CMSG_ITEM_TEXT_QUERY", STATUS_LOGGEDIN, PROCESS_THREADUNSAFE, &WorldSession::HandleItemTextQuery);
+    DefS(SMSG_ITEM_TEXT_QUERY_RESPONSE, "SMSG_ITEM_TEXT_QUERY_RESPONSE");
+
     // Wave 34 corpse location and transport map-position queries.
     DefC(CMSG_CORPSE_QUERY, "CMSG_CORPSE_QUERY", STATUS_LOGGEDIN, PROCESS_THREADUNSAFE, &WorldSession::HandleCorpseQueryOpcode);
     DefS(SMSG_CORPSE_QUERY_RESPONSE, "SMSG_CORPSE_QUERY_RESPONSE");
