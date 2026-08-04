@@ -1162,6 +1162,40 @@ void InitializeOpcodes()
     DefC(CMSG_GROUP_INVITE, "CMSG_GROUP_INVITE", STATUS_LOGGEDIN, PROCESS_THREADUNSAFE, &WorldSession::HandleGroupInviteOpcode);
     DefS(SMSG_GROUP_INVITE, "SMSG_GROUP_INVITE");
 
+    // Leaving a group. The 18414 client sends 0x1798 for "Leave Party" --
+    // observed live, logged as an unhandled opcode -- and its reply
+    // SMSG_GROUP_DESTROYED 0x1B27 is an EMPTY body, which the corpus confirms
+    // at min = max = 0 bytes over 100 packets. Group.cpp already initialises it
+    // to zero length, so there is no layout to derive and nothing to misparse.
+    //
+    // The request body is likewise not a risk: HandleGroupDisbandOpcode ignores
+    // it entirely, so the single byte the client sends cannot be misread. The
+    // corpus records exactly 1 byte across 393 packets.
+    //
+    // Registration and admission are paired here for the same reason as the
+    // invite: leaving is worthless if the client is never told the group is
+    // gone, and it would sit in a party frame it no longer belongs to.
+    DefC(CMSG_GROUP_DISBAND, "CMSG_GROUP_DISBAND", STATUS_LOGGEDIN, PROCESS_THREADUNSAFE, &WorldSession::HandleGroupDisbandOpcode);
+    DefS(SMSG_GROUP_DESTROYED, "SMSG_GROUP_DESTROYED");
+
+    // The shared result message for EVERY group operation -- invite, uninvite,
+    // leader change, disband. Until now it was built and dropped, so a refused
+    // operation told the player nothing.
+    //
+    // Unusually, its inherited flat body is already correct at 18414: this
+    // opcode never went bit-packed. Verified against two captured bodies,
+    //
+    //   21 B  01 00 00 00 | 00 | 1A 00 00 00 | 00000000 | 8x00
+    //         op=1, name="", result=26
+    //   29 B  02 00 00 00 | "Jazharka" 00 | 00 00 00 00 | 00000000 | 8x00
+    //         op=2, name="Jazharka", result=0
+    //
+    // which is exactly uint32 operation, NUL-terminated name, uint32 result,
+    // uint32 LFD cooldown, ObjectGuid -- the layout SendPartyResult already
+    // writes, sizes included. It is admitted unchanged; do NOT "convert" it to
+    // a packed body, because the client reads it flat.
+    DefS(SMSG_PARTY_COMMAND_RESULT, "SMSG_PARTY_COMMAND_RESULT");
+
     // Wave 15 stable-pet list request, list response, and operation result.
     DefC(CMSG_REQUEST_STABLED_PETS, "CMSG_REQUEST_STABLED_PETS", STATUS_LOGGEDIN, PROCESS_THREADUNSAFE, &WorldSession::HandleListStabledPetsOpcode);
     DefS(SMSG_PET_STABLE_LIST, "SMSG_PET_STABLE_LIST");
