@@ -726,6 +726,14 @@ void WorldSession::HandleGroupRaidConvertOpcode(WorldPacket& recv_data)
         return;
     }
 
+    // A dungeon-finder group is owned by the LFG state machine, which tracks
+    // its own composition; converting it out from under that would leave the
+    // two disagreeing.
+    if (group->isLFGGroup())
+    {
+        return;
+    }
+
     /** error handling **/
     if (!group->IsLeader(GetPlayer()->GetObjectGuid()) || group->GetMembersCount() < 2)
     {
@@ -852,13 +860,15 @@ void WorldSession::HandleGroupAssistantLeaderOpcode(WorldPacket& recv_data)
  */
 void WorldSession::HandlePartyAssignmentOpcode(WorldPacket& recv_data)
 {
-    uint8 role;
-    uint8 apply;
-    ObjectGuid guid;
-    recv_data >> role >> apply;                             // role 0 = Main Tank, 1 = Main Assistant
-    recv_data >> guid;
+    MopGroupPromotePackets::PartyAssignmentRequest request;
+    if (!MopGroupPromotePackets::ParsePartyAssignment(recv_data, request))
+    {
+        return;
+    }
 
-    DEBUG_LOG("MSG_PARTY_ASSIGNMENT");
+    uint8 const role = request.assignment;                  // 0 = Main Tank, 1 = Main Assistant
+    bool const apply = request.apply;
+    ObjectGuid const guid = request.targetGuid;
 
     Group* group = GetPlayer()->GetGroup();
     if (!group)
@@ -867,7 +877,17 @@ void WorldSession::HandlePartyAssignmentOpcode(WorldPacket& recv_data)
     }
 
     /** error handling **/
-    if (!group->IsLeader(GetPlayer()->GetObjectGuid()))
+    // Assistants may set these too, matching the client, which shows the menu
+    // entries for leader and assistant alike.
+    if (!group->IsLeader(GetPlayer()->GetObjectGuid()) &&
+        !group->IsAssistant(GetPlayer()->GetObjectGuid()))
+    {
+        return;
+    }
+
+    // Main tank and main assist are raid roles, and an arbitrary GUID would be
+    // stored against a slot nothing can later clear.
+    if (!group->isRaidGroup() || !group->IsMember(guid))
     {
         return;
     }

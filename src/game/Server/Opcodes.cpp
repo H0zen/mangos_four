@@ -1266,6 +1266,16 @@ void InitializeOpcodes()
     // SMSG_PARTY_COMMAND_RESULT.
     DefC(CMSG_GROUP_RAID_CONVERT, "CMSG_GROUP_RAID_CONVERT", STATUS_LOGGEDIN, PROCESS_THREADUNSAFE, &WorldSession::HandleGroupRaidConvertOpcode);
 
+    // Main tank and main assist. The value we had, MSG_PARTY_ASSIGNMENT 0x0424,
+    // is a 4.3.4 carry-over the 18414 client never sends -- the third stale
+    // value found in this surface, after CMSG_GROUP_UNINVITE and
+    // MSG_RANDOM_ROLL. The real one is CMSG_SET_PARTY_ASSIGNMENT 0x1802.
+    //
+    // Reader rebuilt: the apply flag is a ninth mask bit, not the second byte,
+    // which the legacy reader took it for before failing to find the GUID at
+    // all. Answers over the already-admitted SMSG_GROUP_LIST.
+    DefC(CMSG_SET_PARTY_ASSIGNMENT, "CMSG_SET_PARTY_ASSIGNMENT", STATUS_LOGGEDIN, PROCESS_THREADUNSAFE, &WorldSession::HandlePartyAssignmentOpcode);
+
     // NOT registered, deliberately: CMSG_SET_DUNGEON_DIFFICULTY 0x1A36 and
     // CMSG_SET_RAID_DIFFICULTY 0x0591. Both values are binary-proved and both
     // handlers exist with their reply SMSGs already admitted, so they look ready.

@@ -287,6 +287,18 @@ namespace MopGroupPromotePackets
         uint8 subGroup = 0;
     };
 
+    /// A parsed CMSG_SET_PARTY_ASSIGNMENT body: main tank / main assist.
+    ///
+    /// `apply` is the ninth mask bit. `assignment` is 0 for main tank and 1 for
+    /// main assist; anything else is refused during parsing.
+    struct PartyAssignmentRequest
+    {
+        ObjectGuid targetGuid;
+        uint8 assignment = 0;
+        bool apply = false;
+    };
+
+    bool ParsePartyAssignment(WorldPacket& in, PartyAssignmentRequest& out);
     bool ParseSetLeader(WorldPacket& in, SetLeaderRequest& out);
     bool ParseAssistant(WorldPacket& in, AssistantRequest& out);
     bool ParseChangeSubGroup(WorldPacket& in, ChangeSubGroupRequest& out);

@@ -591,6 +591,50 @@ bool MopGroupPromotePackets::ParseAssistant(WorldPacket& in, AssistantRequest& o
     return true;
 }
 
+bool MopGroupPromotePackets::ParsePartyAssignment(WorldPacket& in, PartyAssignmentRequest& out)
+{
+    // Build 18414 writer sub_665D70, vtable D63430 slot 1; slot 2 sub_66105D
+    // writes opcode 6146. Layout:
+    //
+    //   uint8  assignment, 0 main tank / 1 main assist
+    //   uint8  0x7F marker
+    //   bits   mask 5,6,2,3,1,0,4,7 then the APPLY flag as a ninth bit,
+    //          then FlushBits
+    //   bytes  guid 2,5,1,0,6,3,4,7, each ^1, omitted when zero
+    //
+    // Verified byte-exact against 00 7F 3D 00 34 27 59 04 05 -- assignment 0,
+    // apply clear, five present GUID bytes.
+    //
+    // A reference fork names the second byte "partyindex"; the captured body
+    // shows 0x7F, the same family marker as the rest of these requests.
+    //
+    // The legacy reader took uint8 + uint8 + raw ObjectGuid, so it read the
+    // marker as the apply flag and never found the GUID at all.
+    static uint8 const maskOrder[8] = { 5, 6, 2, 3, 1, 0, 4, 7 };
+    static uint8 const byteOrder[8] = { 2, 5, 1, 0, 6, 3, 4, 7 };
+
+    PartyAssignmentRequest parsed;
+    uint8 assignment = 0;
+    bool apply = false;
+    if (!ReadMarkedGuid(in, maskOrder, byteOrder, parsed.targetGuid, &apply, 8, &assignment))
+    {
+        in.rfinish();
+        return false;
+    }
+
+    // Only main tank and main assist exist; the handler switches on this.
+    if (assignment > 1)
+    {
+        in.rfinish();
+        return false;
+    }
+
+    parsed.assignment = assignment;
+    parsed.apply = apply;
+    out = parsed;
+    return true;
+}
+
 bool MopGroupPromotePackets::ParseChangeSubGroup(WorldPacket& in, ChangeSubGroupRequest& out)
 {
     // Build 18414 writer sub_66920A, vtable D63250 slot 1; slot 2 sub_661D90
