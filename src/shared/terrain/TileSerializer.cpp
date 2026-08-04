@@ -267,17 +267,25 @@ namespace world::terrain
         tile->isGlobalWmo = globalWmo != 0;
         tile->hasLiquid = hasLiquid != 0;
 
-        // EVERY grid is fixed-size, and the readers index them as such: TerrainHeight
-        // walks v9 at a stride of V9_SIDE and only guards against empty. A count that
-        // merely fits in the file is not a smaller grid, it is an out-of-bounds read on
-        // the first query -- so a present grid must be exactly the size it is indexed at.
+        // A grid is present EXACTLY when its flag says so, and when present it is exactly
+        // the size every reader indexes it at -- TerrainHeight walks v9 at a stride of
+        // V9_SIDE and guards only against empty. "Fits in the remaining file" was a
+        // truncation check, never a shape one; and accepting empty unconditionally, as
+        // the first attempt at that shape check did, let a tile DECLARE terrain and carry
+        // none, pass the startup probe, then answer every height query with nothing.
         constexpr size_t CORNERS = size_t(V9_SIDE) * V9_SIDE;
         constexpr size_t CELLS = size_t(GRID_PER_TILE) * GRID_PER_TILE;
-        auto sized = [](const auto& v, size_t n) { return v.empty() || v.size() == n; };
-        ok = ok && sized(tile->v9, CORNERS) && sized(tile->v8, CELLS) &&
-             sized(tile->liquidHeight, CORNERS) && sized(tile->liquidShow, CELLS) &&
-             sized(tile->liquidKind, CELLS) && sized(tile->liquidEntry, CELLS) &&
-             sized(tile->liquidDeep, CELLS);
+        auto grid = [](const auto& v, bool present, size_t n)
+        {
+            return v.size() == (present ? n : size_t(0));
+        };
+        ok = ok && grid(tile->v9, tile->hasTerrain, CORNERS) &&
+             grid(tile->v8, tile->hasTerrain, CELLS) &&
+             grid(tile->liquidHeight, tile->hasLiquid, CORNERS) &&
+             grid(tile->liquidShow, tile->hasLiquid, CELLS) &&
+             grid(tile->liquidKind, tile->hasLiquid, CELLS) &&
+             grid(tile->liquidEntry, tile->hasLiquid, CELLS) &&
+             grid(tile->liquidDeep, tile->hasLiquid, CELLS);
 
         uint32_t nModels = 0;
         ok = ok && RPod(f, nModels) && nModels <= MAX_MODELS;

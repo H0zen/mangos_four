@@ -111,6 +111,31 @@ namespace
         return body;
     }
 
+    /// The other 255 chunks a tile has to have. ParseAdt requires every one of the 16x16
+    /// to supply heights -- the grid is zero-filled before the walk, so a gap is not a
+    /// hole in the tile but a block of flat ground at 0.0 -- so a fixture exercising ONE
+    /// chunk still has to be a whole tile around it.
+    ///
+    /// EMIT THIS BEFORE THE CHUNK UNDER TEST. V9 is 129x129 walked at a stride of 8, so
+    /// neighbouring chunks SHARE their border row of corners: chunk (x, 1) and chunk
+    /// (x, 2) both write row 16. Real neighbours store the same heights there and the
+    /// order cannot matter; flat padding does not, and written last it flattens the row
+    /// the test is about.
+    void PadTile(Blob& adt, uint32_t skipIx, uint32_t skipIy)
+    {
+        float flat[145] = {};
+        for (uint32_t iy = 0; iy < uint32_t(ADT_CHUNKS); ++iy)
+        {
+            for (uint32_t ix = 0; ix < uint32_t(ADT_CHUNKS); ++ix)
+            {
+                if (ix != skipIx || iy != skipIy)
+                {
+                    PutChunk(adt, "MCNK", MakeMcnk(ix, iy, 0.f, 0, 0, flat));
+                }
+            }
+        }
+    }
+
     Blob MakeMclq(float surfaceZ, const uint8_t cellFlags[64])
     {
         Blob lq;
@@ -299,6 +324,7 @@ TEST(AdtHeightGridIsNotTransposed)
     FillRamp(mcvt, 0.f);
 
     Blob adt;
+    PadTile(adt, 1, 2);
     PutChunk(adt, "MCNK", MakeMcnk(/*ix*/ 1, /*iy*/ 2, /*baseZ*/ 100.f, 0, 0, mcvt));
 
     AdtData d;
@@ -328,6 +354,7 @@ TEST(AdtHolesAndAreaId)
     FillRamp(mcvt, 0.f);
 
     Blob adt;
+    PadTile(adt, 3, 4);
     PutChunk(adt, "MCNK", MakeMcnk(3, 4, 0.f, 0x0021, 1519, mcvt));
 
     AdtData d;
@@ -369,6 +396,7 @@ TEST(AdtMcvtFoundWhenHeaderOffsetIsGarbage)
     mcnk.PatchU32(0x18, 0xFFFFFFFFu);
 
     Blob adt;
+    PadTile(adt, 2, 3);
     PutChunk(adt, "MCNK", mcnk);
 
     AdtData d;
@@ -395,6 +423,7 @@ TEST(AdtHighResHoleMapIsReadWhenFlagged)
     mcnk.PatchU32(0x18, uint32_t(fine >> 32));
 
     Blob adt;
+    PadTile(adt, 1, 1);
     PutChunk(adt, "MCNK", mcnk);
 
     AdtData d;
@@ -419,6 +448,7 @@ TEST(AdtMh2oFlatLayerFillsWholeChunk)
     l.minHeight = 42.5f;
 
     Blob adt;
+    PadTile(adt, 1, 1);
     PutChunk(adt, "MCNK", MakeMcnk(1, 1, 0.f, 0, 0, mcvt));
     PutChunk(adt, "MH2O", MakeMh2o(1, 1, l));
 
@@ -451,6 +481,7 @@ TEST(AdtMh2oAbsentAttributesAreNotDeep)
     Mh2oLayer l;
 
     Blob adt;
+    PadTile(adt, 1, 1);
     PutChunk(adt, "MCNK", MakeMcnk(1, 1, 0.f, 0, 0, mcvt));
     PutChunk(adt, "MH2O", MakeMh2o(1, 1, l));
 
@@ -469,6 +500,7 @@ TEST(AdtMh2oDeepAttributeMarksChunkDeep)
     l.deepBits = ~uint64_t(0);
 
     Blob adt;
+    PadTile(adt, 1, 1);
     PutChunk(adt, "MCNK", MakeMcnk(1, 1, 0.f, 0, 0, mcvt));
     PutChunk(adt, "MH2O", MakeMh2o(1, 1, l));
 
@@ -497,6 +529,7 @@ TEST(AdtMh2oDeepAttributeIsPerCell)
     l.deepBits = 0xFFull;               // the chunk's first cell row, and nothing else
 
     Blob adt;
+    PadTile(adt, 1, 1);
     PutChunk(adt, "MCNK", MakeMcnk(1, 1, 0.f, 0, 0, mcvt));
     PutChunk(adt, "MH2O", MakeMh2o(1, 1, l));
 
@@ -532,6 +565,7 @@ TEST(AdtMh2oDeepAttributeIsIndexedOverTheChunk)
     l.deepBits = 1ull << (4 * 8 + 4);   // chunk cell (4,4): the instance's FIRST cell
 
     Blob adt;
+    PadTile(adt, 1, 1);
     PutChunk(adt, "MCNK", MakeMcnk(1, 1, 0.f, 0, 0, mcvt));
     PutChunk(adt, "MH2O", MakeMh2o(1, 1, l));
 
@@ -555,6 +589,7 @@ TEST(AdtMh2oFishableAttributeIsNotDeep)
     l.deepBits = 0;
 
     Blob adt;
+    PadTile(adt, 1, 1);
     PutChunk(adt, "MCNK", MakeMcnk(1, 1, 0.f, 0, 0, mcvt));
     PutChunk(adt, "MH2O", MakeMh2o(1, 1, l));
 
@@ -576,6 +611,7 @@ TEST(AdtMh2oOutOfRangeAttributesOffsetIsNotDeep)
     l.forceAttributesOfs = 0x00FFFFFF;
 
     Blob adt;
+    PadTile(adt, 1, 1);
     PutChunk(adt, "MCNK", MakeMcnk(1, 1, 0.f, 0, 0, mcvt));
     PutChunk(adt, "MH2O", MakeMh2o(1, 1, l));
 
@@ -598,6 +634,7 @@ TEST(AdtMh2oHonoursSubRectAndExistsBitmap)
     l.existsBits = 0x1;  // only cell (y=0,x=0) of the sub-rect exists
 
     Blob adt;
+    PadTile(adt, 0, 0);
     PutChunk(adt, "MCNK", MakeMcnk(0, 0, 0.f, 0, 0, mcvt));
     PutChunk(adt, "MH2O", MakeMh2o(0, 0, l));
 
@@ -623,6 +660,7 @@ TEST(AdtMh2oReadsPerVertexHeights)
     l.heightBias = 1000.f;
 
     Blob adt;
+    PadTile(adt, 0, 0);
     PutChunk(adt, "MCNK", MakeMcnk(0, 0, 0.f, 0, 0, mcvt));
     PutChunk(adt, "MH2O", MakeMh2o(0, 0, l));
 
@@ -649,6 +687,7 @@ TEST(AdtMh2oDepthOnlyLayerUsesMinHeight)
     l.withHeights = true;
 
     Blob adt;
+    PadTile(adt, 0, 0);
     PutChunk(adt, "MCNK", MakeMcnk(0, 0, 0.f, 0, 0, mcvt));
     PutChunk(adt, "MH2O", MakeMh2o(0, 0, l));
 
@@ -672,6 +711,7 @@ TEST(AdtMh2oOceanLiquidObjectIsDepthOnly)
     l.withDepths = true;
 
     Blob adt;
+    PadTile(adt, 0, 0);
     PutChunk(adt, "MCNK", MakeMcnk(0, 0, 0.f, 0, 0, mcvt));
     PutChunk(adt, "MH2O", MakeMh2o(0, 0, l));
 
@@ -706,6 +746,7 @@ TEST(AdtMh2oNonOceanLiquidObjectKeepsHeights)
     l.heightBias = 55.f;
 
     Blob adt;
+    PadTile(adt, 0, 0);
     PutChunk(adt, "MCNK", MakeMcnk(0, 0, 0.f, 0, 0, mcvt));
     PutChunk(adt, "MH2O", MakeMh2o(0, 0, l));
 
@@ -734,6 +775,7 @@ TEST(AdtMh2oLiquidObjectCoversTheWholeChunkWhateverTheRectSays)
     l.h = 2;
 
     Blob adt;
+    PadTile(adt, 0, 0);
     PutChunk(adt, "MCNK", MakeMcnk(0, 0, 0.f, 0, 0, mcvt));
     PutChunk(adt, "MH2O", MakeMh2o(0, 0, l));
 
@@ -758,6 +800,7 @@ TEST(AdtMh2oRejectsOutOfRangeInstance)
     body.PatchU32(4, 1);
 
     Blob adt;
+    PadTile(adt, 0, 0);
     PutChunk(adt, "MCNK", MakeMcnk(0, 0, 0.f, 0, 0, mcvt));
     PutChunk(adt, "MH2O", body);
 
@@ -776,6 +819,7 @@ TEST(AdtMh2oRejectsSubRectLeavingTheChunk)
     l.w = 8;  // 6 + 8 > 8
 
     Blob adt;
+    PadTile(adt, 0, 0);
     PutChunk(adt, "MCNK", MakeMcnk(0, 0, 0.f, 0, 0, mcvt));
     PutChunk(adt, "MH2O", MakeMh2o(0, 0, l));
 
@@ -799,6 +843,7 @@ TEST(AdtMclqFallbackTypesAndDarkWater)
 
     Blob mclq = MakeMclq(55.f, cells);
     Blob adt;
+    PadTile(adt, 0, 0);
     PutChunk(adt, "MCNK", MakeMcnk(0, 0, 0.f, 0, 0, mcvt, &mclq, 1u << 5));
 
     AdtData d;
@@ -813,6 +858,37 @@ TEST(AdtMclqFallbackTypesAndDarkWater)
     CHECK_EQ(d.liquidDark[size_t(1) * ADT_GRID + 1], uint8_t(1));
     CHECK_EQ(d.liquidShow[size_t(0) * ADT_GRID + 1], uint8_t(0));
     CHECK_EQ(d.liquidHeight[0], 55.f);
+}
+
+TEST(AdtChunkWithoutMcvtFailsTheParse)
+{
+    // MCVT is the chunk's whole contribution to the heightmap, and the grid is
+    // zero-filled before the walk -- so a chunk without one is not a gap in the tile,
+    // it is 9x9 corners of flat ground at 0.0 that nothing downstream can tell from
+    // real terrain at sea level. Skipping the chunk baked it and counted it a success.
+    Blob bare;
+    bare.Pad(128);
+    bare.PatchU32(0x04, 5);
+    bare.PatchU32(0x08, 6);
+
+    Blob adt;
+    PadTile(adt, 5, 6);
+    PutChunk(adt, "MCNK", bare);
+
+    AdtData d;
+    CHECK(!ParseAdt(adt.b, d));
+}
+
+TEST(AdtMissingOneChunkFailsTheParse)
+{
+    // 255 of the 256. The absent chunk's 9x9 block stays at 0.0 in an otherwise real
+    // tile, and hasTerrain used to be set by having SEEN a chunk tag rather than by
+    // having read the grid, so the hole travelled all the way to a written tile.
+    Blob adt;
+    PadTile(adt, 7, 9);
+
+    AdtData d;
+    CHECK(!ParseAdt(adt.b, d));
 }
 
 TEST(AdtStopsOnTruncatedChunk)

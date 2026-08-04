@@ -26,6 +26,7 @@
 #include "TestHarness.h"
 
 #include "terrain/CollisionModel.hpp"
+#include "terrain/Column.hpp"
 #include "terrain/Terrain.hpp"
 #include "terrain/WmoModel.hpp"
 
@@ -271,6 +272,16 @@ TEST(TransformPreservesTheRayParameter)
     CHECK((back - hitWorld).magnitude() < 1e-2f);
 }
 
+namespace
+{
+    std::vector<ICollisionModel::LocalLiquid> Liquids(const WmoModel& m, const Vec3& p)
+    {
+        std::vector<ICollisionModel::LocalLiquid> out;
+        m.LiquidsLocal(p, out);
+        return out;
+    }
+}
+
 TEST(WmoLiquidRejectsPointsOutsideTheFootprint)
 {
     std::vector<WmoModel::Group> groups;
@@ -278,23 +289,25 @@ TEST(WmoLiquidRejectsPointsOutsideTheFootprint)
 
     WmoModel m(TriSoup{}, {}, std::move(groups), 0);
 
-    const auto inside = m.LiquidLocal(Vec3{1.f, 1.f, 0.f});
-    REQUIRE(inside.has_value());
-    CHECK_EQ(inside->z, 12.f);
-    CHECK_EQ(inside->entry, uint16_t(13));
+    const auto inside = Liquids(m, Vec3{1.f, 1.f, 0.f});
+    REQUIRE(inside.size() == size_t(1));
+    CHECK_EQ(inside[0].z, 12.f);
+    CHECK_EQ(inside[0].entry, uint16_t(13));
 
     // Truncating a negative offset to int yields 0, so a point up to one tile outside
     // the low corner used to land on tile (0,0) and report liquid that is not there.
-    CHECK(!m.LiquidLocal(Vec3{-1.f, 1.f, 0.f}).has_value());
-    CHECK(!m.LiquidLocal(Vec3{1.f, -1.f, 0.f}).has_value());
-    CHECK(!m.LiquidLocal(Vec3{1000.f, 1.f, 0.f}).has_value());
+    CHECK(Liquids(m, Vec3{-1.f, 1.f, 0.f}).empty());
+    CHECK(Liquids(m, Vec3{1.f, -1.f, 0.f}).empty());
+    CHECK(Liquids(m, Vec3{1000.f, 1.f, 0.f}).empty());
 }
 
 // Two groups over the same footprint at different heights -- a pool on an upper floor
-// above a flooded room -- and serialized order says nothing about which one the query
-// is in. Answering with the first found reports the wrong water in the wrong room, and
-// makes the second pool disappear from the model entirely.
-TEST(WmoLiquidPicksTheSurfaceEnclosingTheQuery)
+// above a flooded room. WHICH one a query is in is not answerable here: the model is
+// handed a point on the sweep column, not the queried position. Both previous attempts
+// to answer it anyway were wrong, the second one silently -- its fixture had no floors,
+// so it only ever exercised the fallback. The model reports every surface, and nothing
+// about the answer may depend on the Z it was probed at.
+TEST(WmoLiquidReportsEverySurfaceOverTheColumn)
 {
     std::vector<WmoModel::Group> groups;
     groups.push_back(FlatLiquidGroup(2, 2, 40.f, 0, 13, uint8_t(LiquidKind::Water)));
@@ -302,29 +315,73 @@ TEST(WmoLiquidPicksTheSurfaceEnclosingTheQuery)
 
     WmoModel m(TriSoup{}, {}, std::move(groups), 0);
 
-    const auto lower = m.LiquidLocal(Vec3{1.f, 1.f, 2.f});
-    REQUIRE(lower.has_value());
-    CHECK_EQ(lower->z, 5.f);
-    CHECK_EQ(lower->entry, uint16_t(41));
+    for (const float z : {2.f, 20.f, 38.f, 100.f})
+    {
+        const auto all = Liquids(m, Vec3{1.f, 1.f, z});
+        REQUIRE(all.size() == size_t(2));
+        CHECK_EQ(all[0].z, 40.f);
+        CHECK_EQ(all[0].entry, uint16_t(13));
+        CHECK_EQ(all[1].z, 5.f);
+        CHECK_EQ(all[1].entry, uint16_t(41));
+    }
+}
 
-    const auto upper = m.LiquidLocal(Vec3{1.f, 1.f, 38.f});
-    REQUIRE(upper.has_value());
-    CHECK_EQ(upper->z, 40.f);
-    CHECK_EQ(upper->entry, uint16_t(13));
+// The selection the model must not make, made where the queried Z actually is. Every
+// RaycastAll hit enters the column as a Static surface, so the floors and ceilings
+// between the two pools are already here.
+TEST(ColumnLiquidIsTheOneInTheSameRoom)
+{
+    Column c;
+    c.AddSolid(0.f, SurfaceKind::Static);
+    c.AddSolid(30.f, SurfaceKind::Static);
 
-    // THE CASE BETWEEN THEM, which is the one an "above wins" rule gets wrong and the one
-    // a fixture that only probes below-both and above-both never asks: standing on the
-    // lower floor, well clear of both surfaces. Answering with the upper pool puts a
-    // player who is dry on the ground floor underwater in the storey above.
-    const auto between = m.LiquidLocal(Vec3{1.f, 1.f, 20.f});
-    REQUIRE(between.has_value());
-    CHECK_EQ(between->z, 5.f);
-    CHECK_EQ(between->entry, uint16_t(41));
+    LiquidInfo lower;
+    lower.level = 5.f;
+    lower.kind = LiquidKind::Slime;
+    lower.entry = 41;
+    c.AddLiquid(lower);
 
-    // Above both: the highest below is the one being stood over.
-    const auto above = m.LiquidLocal(Vec3{1.f, 1.f, 100.f});
-    REQUIRE(above.has_value());
-    CHECK_EQ(above->z, 40.f);
+    LiquidInfo upper;
+    upper.level = 40.f;
+    upper.kind = LiquidKind::Water;
+    upper.entry = 13;
+    c.AddLiquid(upper);
+
+    // Standing dry on the ground floor. The pool upstairs is the highest in the column
+    // and is through a slab, which is exactly what HighestLiquid cannot express.
+    const auto here = c.LiquidAt(20.f);
+    REQUIRE(here.has_value());
+    CHECK_EQ(here->z, 5.f);
+    CHECK_EQ(here->liquidEntry, uint16_t(41));
+
+    const auto up = c.LiquidAt(35.f);
+    REQUIRE(up.has_value());
+    CHECK_EQ(up->z, 40.f);
+    CHECK_EQ(up->liquidEntry, uint16_t(13));
+
+    REQUIRE(c.HighestLiquid().has_value());
+    CHECK_EQ(c.HighestLiquid()->z, 40.f);
+}
+
+// Standing on a bridge is not standing in the river it crosses.
+TEST(ColumnLiquidIsCutOffByTheSurfaceStoodOn)
+{
+    Column c;
+    c.AddSolid(0.f, SurfaceKind::Terrain);
+    c.AddSolid(20.f, SurfaceKind::Static);
+
+    LiquidInfo river;
+    river.level = 15.f;
+    river.kind = LiquidKind::Water;
+    river.entry = 2;
+    c.AddLiquid(river, true);
+
+    CHECK(!c.LiquidAt(20.1f).has_value());
+
+    // Swimming under it, the same river is the answer again.
+    const auto under = c.LiquidAt(12.f);
+    REQUIRE(under.has_value());
+    CHECK_EQ(under->z, 15.f);
 }
 
 TEST(WmoLiquidHonoursTheDryTileNibble)
@@ -333,7 +390,7 @@ TEST(WmoLiquidHonoursTheDryTileNibble)
     groups.push_back(FlatLiquidGroup(2, 2, 12.f, 0x0F, 13, uint8_t(LiquidKind::Water)));
 
     WmoModel m(TriSoup{}, {}, std::move(groups), 0);
-    CHECK(!m.LiquidLocal(Vec3{1.f, 1.f, 0.f}).has_value());
+    CHECK(Liquids(m, Vec3{1.f, 1.f, 0.f}).empty());
 }
 
 TEST(WmoLiquidOnlyGroupIsNotEmpty)

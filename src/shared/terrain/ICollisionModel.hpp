@@ -64,10 +64,15 @@ namespace world::terrain
             bool deep = false;
         };
 
-        virtual std::optional<LocalLiquid> LiquidLocal(const Vec3& pModel) const
+        // EVERY surface over the point, appended, never one chosen from among them. A
+        // model cannot tell which of its stacked rooms the query is in -- it is handed a
+        // point on the sweep column, not the queried position -- and choosing here once
+        // put a player dry on the ground floor into the pool one storey above. Which
+        // surface a question means is a selection over the whole gather, made by Column.
+        virtual void LiquidsLocal(const Vec3& pModel, std::vector<LocalLiquid>& out) const
         {
             (void)pModel;
-            return std::nullopt;
+            (void)out;
         }
     };
 }
