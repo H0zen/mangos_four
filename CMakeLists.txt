@@ -22,7 +22,7 @@ cmake_minimum_required(VERSION 3.18 FATAL_ERROR)
 
 list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/cmake")
 
-project(MaNGOS VERSION 0.22.0 LANGUAGES C CXX)
+project(MaNGOS VERSION 0.23.0 LANGUAGES C CXX)
 
 # Build artefacts never land in the source tree. This is a test, not hygiene:
 # sources here still carry relative includes like "../../dep/foo.h", and an
@@ -57,7 +57,7 @@ set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 # Define available cmake options below
 option(BUILD_MANGOSD        "Build the main server"                         ON)
 option(BUILD_REALMD         "Build the login server"                        ON)
-option(BUILD_TOOLS          "Build the map/vmap/mmap extractors"            ON)
+option(BUILD_TOOLS          "Build the client-data extractor"               ON)
 option(SCRIPT_LIB_ELUNA     "Compile with support for Eluna scripts"        ON)
 option(SCRIPT_LIB_SD3       "Compile with support for ScriptDev3 scripts"   ON)
 option(PLAYERBOTS           "Enable Player Bots"                            OFF)
@@ -70,6 +70,10 @@ option(WITHOUT_GIT          "Disable Git revision detection"                OFF)
 # code they cover. The name matches MangosTwo, and the realmd submodule already
 # keys off WITH_TESTS, so this single switch covers the core and realmd suites.
 option(WITH_TESTS           "Build the unit tests"                          OFF)
+# DECLARED because it is USED -- the guard further down reads it, and CI passes
+# -DWITH_NET_TESTS=0. CMake takes an undeclared -D almost silently, so an option
+# that only exists at the point of use is one nobody can discover or default.
+option(WITH_NET_TESTS       "Build the socket tests (slow; never in CI)"    OFF)
 #==================================================================================
 message("")
 message(
@@ -84,6 +88,10 @@ message(
     PCH                     Enable use of precompiled headers
     WITH_IO_URING           Use the io_uring network backend instead of epoll (Linux only,
                             requires liburing headers; falls back to epoll if absent)
+    WITH_TESTS              Build the unit tests (target: mangos_tests)
+    WITH_NET_TESTS          Build the socket tests as well. Disjoint from WITH_TESTS,
+                            off by default, and deliberately not run in CI: they bind
+                            real sockets and dominate the suite's wall-clock time.
     DEBUG                   Debug build, only for systems without IDE (Linux, *BSD)
    Scripting engines:
     SCRIPT_LIB_ELUNA        Compile with support for Eluna scripts
@@ -98,9 +106,10 @@ message(
 message("")
 #==================================================================================#
 
-project(MaNGOS VERSION 0.22.0)
-
-enable_testing()
+# The project is declared ONCE, at the top, with its languages. A second project()
+# here re-entered compiler detection with no LANGUAGES and reset what the first call
+# established; enable_testing() likewise belongs with the test switch further down,
+# not unconditionally, or ctest registers a suite nobody asked to build.
 
 if(CMAKE_INSTALL_PREFIX_INITIALIZED_TO_DEFAULT)
   set(CMAKE_INSTALL_PREFIX ${CMAKE_BINARY_DIR}/install CACHE PATH "Default install directory" FORCE)
