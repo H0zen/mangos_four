@@ -325,6 +325,7 @@ TEST(AdtHeightGridIsNotTransposed)
 
     Blob adt;
     PadTile(adt, 1, 2);
+    PadTile(adt, 1, 2);
     PutChunk(adt, "MCNK", MakeMcnk(/*ix*/ 1, /*iy*/ 2, /*baseZ*/ 100.f, 0, 0, mcvt));
 
     AdtData d;
@@ -354,6 +355,7 @@ TEST(AdtHolesAndAreaId)
     FillRamp(mcvt, 0.f);
 
     Blob adt;
+    PadTile(adt, 3, 4);
     PadTile(adt, 3, 4);
     PutChunk(adt, "MCNK", MakeMcnk(3, 4, 0.f, 0x0021, 1519, mcvt));
 
@@ -449,6 +451,7 @@ TEST(AdtMh2oFlatLayerFillsWholeChunk)
 
     Blob adt;
     PadTile(adt, 1, 1);
+    PadTile(adt, 1, 1);
     PutChunk(adt, "MCNK", MakeMcnk(1, 1, 0.f, 0, 0, mcvt));
     PutChunk(adt, "MH2O", MakeMh2o(1, 1, l));
 
@@ -482,6 +485,7 @@ TEST(AdtMh2oAbsentAttributesAreNotDeep)
 
     Blob adt;
     PadTile(adt, 1, 1);
+    PadTile(adt, 1, 1);
     PutChunk(adt, "MCNK", MakeMcnk(1, 1, 0.f, 0, 0, mcvt));
     PutChunk(adt, "MH2O", MakeMh2o(1, 1, l));
 
@@ -500,6 +504,7 @@ TEST(AdtMh2oDeepAttributeMarksChunkDeep)
     l.deepBits = ~uint64_t(0);
 
     Blob adt;
+    PadTile(adt, 1, 1);
     PadTile(adt, 1, 1);
     PutChunk(adt, "MCNK", MakeMcnk(1, 1, 0.f, 0, 0, mcvt));
     PutChunk(adt, "MH2O", MakeMh2o(1, 1, l));
@@ -529,6 +534,7 @@ TEST(AdtMh2oDeepAttributeIsPerCell)
     l.deepBits = 0xFFull;               // the chunk's first cell row, and nothing else
 
     Blob adt;
+    PadTile(adt, 1, 1);
     PadTile(adt, 1, 1);
     PutChunk(adt, "MCNK", MakeMcnk(1, 1, 0.f, 0, 0, mcvt));
     PutChunk(adt, "MH2O", MakeMh2o(1, 1, l));
@@ -566,6 +572,7 @@ TEST(AdtMh2oDeepAttributeIsIndexedOverTheChunk)
 
     Blob adt;
     PadTile(adt, 1, 1);
+    PadTile(adt, 1, 1);
     PutChunk(adt, "MCNK", MakeMcnk(1, 1, 0.f, 0, 0, mcvt));
     PutChunk(adt, "MH2O", MakeMh2o(1, 1, l));
 
@@ -590,6 +597,7 @@ TEST(AdtMh2oFishableAttributeIsNotDeep)
 
     Blob adt;
     PadTile(adt, 1, 1);
+    PadTile(adt, 1, 1);
     PutChunk(adt, "MCNK", MakeMcnk(1, 1, 0.f, 0, 0, mcvt));
     PutChunk(adt, "MH2O", MakeMh2o(1, 1, l));
 
@@ -611,6 +619,7 @@ TEST(AdtMh2oOutOfRangeAttributesOffsetIsNotDeep)
     l.forceAttributesOfs = 0x00FFFFFF;
 
     Blob adt;
+    PadTile(adt, 1, 1);
     PadTile(adt, 1, 1);
     PutChunk(adt, "MCNK", MakeMcnk(1, 1, 0.f, 0, 0, mcvt));
     PutChunk(adt, "MH2O", MakeMh2o(1, 1, l));
@@ -634,6 +643,7 @@ TEST(AdtMh2oHonoursSubRectAndExistsBitmap)
     l.existsBits = 0x1;  // only cell (y=0,x=0) of the sub-rect exists
 
     Blob adt;
+    PadTile(adt, 0, 0);
     PadTile(adt, 0, 0);
     PutChunk(adt, "MCNK", MakeMcnk(0, 0, 0.f, 0, 0, mcvt));
     PutChunk(adt, "MH2O", MakeMh2o(0, 0, l));
@@ -660,6 +670,7 @@ TEST(AdtMh2oReadsPerVertexHeights)
     l.heightBias = 1000.f;
 
     Blob adt;
+    PadTile(adt, 0, 0);
     PadTile(adt, 0, 0);
     PutChunk(adt, "MCNK", MakeMcnk(0, 0, 0.f, 0, 0, mcvt));
     PutChunk(adt, "MH2O", MakeMh2o(0, 0, l));
@@ -688,6 +699,7 @@ TEST(AdtMh2oDepthOnlyLayerUsesMinHeight)
 
     Blob adt;
     PadTile(adt, 0, 0);
+    PadTile(adt, 0, 0);
     PutChunk(adt, "MCNK", MakeMcnk(0, 0, 0.f, 0, 0, mcvt));
     PutChunk(adt, "MH2O", MakeMh2o(0, 0, l));
 
@@ -711,6 +723,7 @@ TEST(AdtMh2oOceanLiquidObjectIsDepthOnly)
     l.withDepths = true;
 
     Blob adt;
+    PadTile(adt, 0, 0);
     PadTile(adt, 0, 0);
     PutChunk(adt, "MCNK", MakeMcnk(0, 0, 0.f, 0, 0, mcvt));
     PutChunk(adt, "MH2O", MakeMh2o(0, 0, l));
@@ -747,6 +760,7 @@ TEST(AdtMh2oNonOceanLiquidObjectKeepsHeights)
 
     Blob adt;
     PadTile(adt, 0, 0);
+    PadTile(adt, 0, 0);
     PutChunk(adt, "MCNK", MakeMcnk(0, 0, 0.f, 0, 0, mcvt));
     PutChunk(adt, "MH2O", MakeMh2o(0, 0, l));
 
@@ -776,6 +790,7 @@ TEST(AdtMh2oLiquidObjectCoversTheWholeChunkWhateverTheRectSays)
 
     Blob adt;
     PadTile(adt, 0, 0);
+    PadTile(adt, 0, 0);
     PutChunk(adt, "MCNK", MakeMcnk(0, 0, 0.f, 0, 0, mcvt));
     PutChunk(adt, "MH2O", MakeMh2o(0, 0, l));
 
@@ -801,6 +816,7 @@ TEST(AdtMh2oRejectsOutOfRangeInstance)
 
     Blob adt;
     PadTile(adt, 0, 0);
+    PadTile(adt, 0, 0);
     PutChunk(adt, "MCNK", MakeMcnk(0, 0, 0.f, 0, 0, mcvt));
     PutChunk(adt, "MH2O", body);
 
@@ -819,6 +835,7 @@ TEST(AdtMh2oRejectsSubRectLeavingTheChunk)
     l.w = 8;  // 6 + 8 > 8
 
     Blob adt;
+    PadTile(adt, 0, 0);
     PadTile(adt, 0, 0);
     PutChunk(adt, "MCNK", MakeMcnk(0, 0, 0.f, 0, 0, mcvt));
     PutChunk(adt, "MH2O", MakeMh2o(0, 0, l));
@@ -843,6 +860,7 @@ TEST(AdtMclqFallbackTypesAndDarkWater)
 
     Blob mclq = MakeMclq(55.f, cells);
     Blob adt;
+    PadTile(adt, 0, 0);
     PadTile(adt, 0, 0);
     PutChunk(adt, "MCNK", MakeMcnk(0, 0, 0.f, 0, 0, mcvt, &mclq, 1u << 5));
 
@@ -993,6 +1011,79 @@ TEST(WdtGridAndGlobalWmo)
     CHECK(d.globalWmoName == name);
     REQUIRE(d.globalWmoPlacement.has_value());
     CHECK_EQ(d.globalWmoPlacement->pos.y, 18.f);
+}
+
+// A WDT cut inside MAIN recorded no grid entries and still answered true, so Wdt()
+// cached it as a legitimate no-terrain map and BakeMap passed over it -- a full
+// extraction omitting that map's whole tile and nav cache, at exit 0.
+TEST(WdtTruncatedInsideMainFailsTheParse)
+{
+    Blob mphd;
+    mphd.U32(0);
+    mphd.Pad(28);
+
+    Blob wdt;
+    PutChunk(wdt, "MPHD", mphd);
+    wdt.U8('N'); wdt.U8('I'); wdt.U8('A'); wdt.U8('M');
+    wdt.U32(64 * 64 * 8);               // declares the full grid
+    wdt.Pad(128);                       // and carries almost none of it
+
+    WdtData d;
+    CHECK(!ParseWdt(wdt.b, d));
+}
+
+// The overrun flag is only set once a COMPLETE 8-byte header has been read, so a file
+// cut 1-7 bytes into the next header leaves the loop by its own condition with nothing
+// flagged. Chunks tile a WDT exactly; anything left over is a cut file.
+TEST(WdtWithAPartialTrailingHeaderFailsTheParse)
+{
+    Blob mphd;
+    mphd.U32(0);
+    mphd.Pad(28);
+
+    Blob wdt;
+    PutChunk(wdt, "MPHD", mphd);
+    wdt.U8('N'); wdt.U8('I'); wdt.U8('A');   // three bytes of a tag, no size
+
+    WdtData d;
+    CHECK(!ParseWdt(wdt.b, d));
+}
+
+TEST(AdtWithAPartialTrailingHeaderFailsTheParse)
+{
+    float mcvt[145];
+    FillRamp(mcvt, 0.f);
+
+    Blob adt;
+    PadTile(adt, 1, 1);
+    PutChunk(adt, "MCNK", MakeMcnk(1, 1, 0.f, 0, 0, mcvt));
+    adt.U8('O'); adt.U8('2'); adt.U8('H');   // a partial tag, no size
+
+    AdtData d;
+    CHECK(!ParseAdt(adt.b, d));
+}
+
+TEST(WmoGroupWithAPartialTrailingHeaderIsMalformed)
+{
+    Blob nested;
+    Blob group = MakeMogpGroup(0, 15, 0, nested);
+    group.U8('Y'); group.U8('P'); group.U8('O');   // a partial tag, no size
+
+    WmoGroupData g;
+    CHECK(ParseWmoGroup(group.b, 0, g) == WmoGroupParse::Malformed);
+}
+
+TEST(WmoRootWithAPartialTrailingHeaderIsRejected)
+{
+    Blob mohd;
+    mohd.Pad(64);
+
+    Blob root;
+    PutChunk(root, "MOHD", mohd);
+    root.U8('N'); root.U8('D'); root.U8('O');      // a partial tag, no size
+
+    WmoRootData r;
+    CHECK(!ParseWmoRoot(root.b, r));
 }
 
 namespace

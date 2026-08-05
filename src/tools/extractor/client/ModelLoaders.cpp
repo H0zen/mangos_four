@@ -162,8 +162,16 @@ namespace world::terrain
             return nullptr;
         }
 
+        // A present file that is not an MD20, or is shorter than its own header, is a
+        // broken client -- not a doodad without collision. Ignoring the result cached an
+        // empty model as loaded, and every ADT placement, WMO doodad and game-object
+        // display using that file was then skipped at exit 0.
         M2Data parsed;
-        ParseM2(bytes, parsed);
+        if (!ParseM2(bytes, parsed))
+        {
+            m_cache.emplace(key, nullptr);
+            return nullptr;
+        }
 
         TriSoup soup;
         soup.verts = std::move(parsed.verts);

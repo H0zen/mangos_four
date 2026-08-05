@@ -497,7 +497,12 @@ namespace world::terrain
         // missing, so a split `_obj0` cut inside MODF or MDDF returned true with the
         // remaining placements silently absent -- and LoadAdt then hands back a tile that
         // BakeMap counts as written, with the WMO and M2 collision simply not in it.
-        if (truncated)
+        //
+        // `pos != size` is the same defect one step earlier: the overrun flag is only set
+        // after a COMPLETE 8-byte header has been read, so a file cut 1-7 bytes into the
+        // next header leaves the loop by its `pos + 8 <= size` condition with truncated
+        // still false. Chunks tile the file exactly, so anything left over is a cut file.
+        if (truncated || pos != size)
         {
             return false;
         }
