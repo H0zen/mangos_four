@@ -327,6 +327,14 @@ namespace world::terrain
             return tile;
         }
 
+        // NO TILE-BOUNDS FILTER, deliberately. The client lists a placement in EVERY ADT
+        // its footprint touches, so a building that straddles a tile line is already in
+        // both tiles' object halves and the runtime finds it from either side. Measured
+        // on map 0 of the 5.4.8 client: 454 of 2,724 distinct placements are listed from
+        // more than one ADT, one Vashj'ir dome from sixteen. Filtering to "placed in this
+        // tile" is what would create the overhang hole, not what closes it. The cost is
+        // that the same model is attached several times; MODF's uniqueId is what a
+        // deduplicating baker would key on.
         auto attach = [&](const Placement& p,
                           const std::shared_ptr<const ICollisionModel>& model)
         {

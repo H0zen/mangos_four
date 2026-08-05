@@ -103,8 +103,11 @@ namespace world::terrain
 
     FusedTerrain::TilePtr FusedTerrain::TileAt(float x, float y) const
     {
-        const int tx = TileIndex(x);
-        const int ty = TileIndex(y);
+        return TileAtIndex(TileIndex(x), TileIndex(y));
+    }
+
+    FusedTerrain::TilePtr FusedTerrain::TileAtIndex(int tx, int ty) const
+    {
         if (tx < 0 || tx >= GRID_COUNT || ty < 0 || ty >= GRID_COUNT)
         {
             return nullptr;
@@ -165,9 +168,10 @@ namespace world::terrain
 
     void FusedTerrain::EvictTile(int tx, int ty) const
     {
-        // m_loaded goes back to 0 so the next query re-probes. The absent-tile memo is
-        // not kept here: its whole value is recording that the file is missing, and this
-        // tile plainly exists.
+        // m_loaded goes back to 0 so the next query re-probes. That applies to the
+        // absent-tile memo as much as to a resident tile: the memo saves a failed open
+        // per query, which is worth having, but never expiring it means a file that
+        // appears later is invisible for the life of the process.
         m_tiles[tx][ty].reset();
         m_loaded[tx][ty] = 0;
         m_tileLastUse[tx][ty].store(0, std::memory_order_relaxed);
@@ -193,7 +197,16 @@ namespace world::terrain
         {
             for (int ty = 0; ty < GRID_COUNT; ++ty)
             {
-                if (!m_tiles[tx][ty] || m_cellRef[tx][ty] > 0)
+                if (m_cellRef[tx][ty] > 0)
+                {
+                    continue;
+                }
+
+                // A null-but-probed entry is swept too, not just a resident tile. It is
+                // only a memo saying "no such file", and keeping it forever means a tile
+                // that appears after start -- a re-bake, a mount that came up late --
+                // is never looked for again for the life of the process.
+                if (!m_tiles[tx][ty] && !m_loaded[tx][ty])
                 {
                     continue;
                 }
@@ -215,7 +228,10 @@ namespace world::terrain
             return;
         }
         std::lock_guard<std::mutex> lock(m_cellRefMutex);
-        ++m_cellRef[tx][ty];
+        if (m_cellRef[tx][ty] != std::numeric_limits<uint32_t>::max())
+        {
+            ++m_cellRef[tx][ty];
+        }
     }
 
     void FusedTerrain::UnpinCell(int tx, int ty)
@@ -376,10 +392,6 @@ namespace world::terrain
         const float minx = std::min(a.x, b.x), maxx = std::max(a.x, b.x);
         const float miny = std::min(a.y, b.y), maxy = std::max(a.y, b.y);
 
-        const float dx = b.x - a.x, dy = b.y - a.y;
-        const float lengthXY = std::sqrt(dx * dx + dy * dy);
-        const int samples = std::max(2, int(lengthXY / (TILE_SIZE * 0.5f)) + 2);
-
         auto gather = [&](const TilePtr& tile)
         {
             if (!tile)
@@ -398,24 +410,67 @@ namespace world::terrain
             }
         };
 
-        int lastTx = 0, lastTy = 0;
-        bool seen = false;
-        for (int i = 0; i < samples; ++i)
+        // EVERY tile the segment crosses, by grid traversal rather than by sampling the
+        // line at fixed steps. Stepping half a tile at a time misses any tile the segment
+        // only clips a corner of, and a model living solely on that tile then does not
+        // exist for this ray: sight straight through a building, or a fall through a
+        // bridge. Tile indices grow as the coordinate SHRINKS, which is what the
+        // MAP_CENTER minus term below is.
+        const float u0 = MAP_CENTER - a.x / TILE_SIZE, v0 = MAP_CENTER - a.y / TILE_SIZE;
+        const float u1 = MAP_CENTER - b.x / TILE_SIZE, v1 = MAP_CENTER - b.y / TILE_SIZE;
+        if (!::Geometry::isFinite(u0) || !::Geometry::isFinite(v0) ||
+            !::Geometry::isFinite(u1) || !::Geometry::isFinite(v1))
         {
-            const float f = float(i) / float(samples - 1);
-            const float px = a.x + dx * f, py = a.y + dy * f;
-            const int tx = TileIndex(px), ty = TileIndex(py);
-            if (seen && tx == lastTx && ty == lastTy)
-            {
-                continue;
-            }
-            seen = true;
-            lastTx = tx;
-            lastTy = ty;
+            gather(GlobalWmo());
+            return;
+        }
+
+        auto visit = [&](int tx, int ty)
+        {
+            // The far edge lands exactly on the count, the same closed upper bound
+            // TileIndex folds; anything further out is genuinely off the map.
+            tx = tx == GRID_COUNT ? GRID_COUNT - 1 : tx;
+            ty = ty == GRID_COUNT ? GRID_COUNT - 1 : ty;
             if (tx >= 0 && tx < GRID_COUNT && ty >= 0 && ty < GRID_COUNT)
             {
-                gather(TileAt(px, py));
+                gather(TileAtIndex(tx, ty));
             }
+        };
+
+        int tx = int(std::floor(u0)), ty = int(std::floor(v0));
+        const int txEnd = int(std::floor(u1)), tyEnd = int(std::floor(v1));
+        const float du = u1 - u0, dv = v1 - v0;
+        const int stepX = du > 0.f ? 1 : (du < 0.f ? -1 : 0);
+        const int stepY = dv > 0.f ? 1 : (dv < 0.f ? -1 : 0);
+
+        constexpr float FAR_OFF = std::numeric_limits<float>::max();
+        float tMaxX = FAR_OFF, tMaxY = FAR_OFF, tDeltaX = FAR_OFF, tDeltaY = FAR_OFF;
+        if (stepX != 0)
+        {
+            tMaxX = ((stepX > 0 ? float(tx + 1) : float(tx)) - u0) / du;
+            tDeltaX = std::fabs(1.f / du);
+        }
+        if (stepY != 0)
+        {
+            tMaxY = ((stepY > 0 ? float(ty + 1) : float(ty)) - v0) / dv;
+            tDeltaY = std::fabs(1.f / dv);
+        }
+
+        visit(tx, ty);
+        for (int guard = 0; (tx != txEnd || ty != tyEnd) && guard < 4 * GRID_COUNT;
+             ++guard)
+        {
+            if (tMaxX < tMaxY)
+            {
+                tx += stepX;
+                tMaxX += tDeltaX;
+            }
+            else
+            {
+                ty += stepY;
+                tMaxY += tDeltaY;
+            }
+            visit(tx, ty);
         }
 
         gather(GlobalWmo());
@@ -435,6 +490,10 @@ namespace world::terrain
     bool FusedTerrain::IsInLineOfSight(float x1, float y1, float z1, float x2, float y2,
                                        float z2, ModelIgnoreFlags ignore) const
     {
+        // A hit AT the far end blocks: the fraction has to be strictly past 1. Callers
+        // lift the endpoint off the target for exactly this reason, and
+        // DynamicCollision::IsInLineOfSight uses the same comparison -- the two must not
+        // drift apart, or static and dynamic geometry answer the same segment differently.
         return NearestHitFraction(x1, y1, z1, x2, y2, z2, ignore) > 1.0f;
     }
 

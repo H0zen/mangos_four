@@ -22,6 +22,36 @@ namespace world::terrain
         constexpr uint32_t MAX_MODELS = 1u << 20;
         constexpr uint32_t MAX_INSTANCES = 1u << 22;
 
+        /// Every triangle indexes the soup's own vertices. TriSoup::At does no checking,
+        /// by design -- it is the innermost thing in a raycast -- so the file has to be
+        /// proved right here instead.
+        bool SoupIndicesInRange(const TriSoup& soup)
+        {
+            const uint32_t n = uint32_t(soup.verts.size());
+            for (const auto& t : soup.tris)
+            {
+                if (t[0] >= n || t[1] >= n || t[2] >= n)
+                {
+                    return false;
+                }
+            }
+            return true;
+        }
+
+        bool Finite(const Vec3& v) { return v.isFinite(); }
+
+        bool Finite(const Mat3& m)
+        {
+            for (const float f : m.m)
+            {
+                if (!::Geometry::isFinite(f))
+                {
+                    return false;
+                }
+            }
+            return true;
+        }
+
         // A count is only believable if the file still holds that many elements. A fixed
         // ceiling is not enough: it still lets a corrupt header reserve hundreds of
         // megabytes before the short read is noticed, and on an overcommitting kernel
@@ -129,6 +159,16 @@ namespace world::terrain
                 const size_t corners =
                     (size_t(g.liquid.tilesX) + 1) * (size_t(g.liquid.tilesY) + 1);
                 if (ok && g.liquid.heights.size() != corners)
+                {
+                    return false;
+                }
+
+                // The flags grid decides which tiles are DRY. GroupLiquidAt reads it as
+                // `fi < flags.size() && ...`, so a short or empty array does not fail --
+                // it silently answers "not dry" for every cell past the end and floods
+                // rooms that the client marks as having no water in them.
+                const size_t cells = size_t(g.liquid.tilesX) * g.liquid.tilesY;
+                if (ok && g.liquid.flags.size() != cells)
                 {
                     return false;
                 }
@@ -319,13 +359,13 @@ namespace world::terrain
                 }
 
                 std::vector<uint16_t> triGroup;
+                Bvh bvh;
                 ok = ok && RVec(f, soup.verts) && RVec(f, soup.tris) &&
                      RVec(f, triGroup) && RVec(f, nodes) &&
-                     triGroup.size() == soup.tris.size();
+                     triGroup.size() == soup.tris.size() && SoupIndicesInRange(soup) &&
+                     bvh.Adopt(std::move(nodes), soup.tris.size());
                 if (ok)
                 {
-                    Bvh bvh;
-                    bvh.Adopt(std::move(nodes));
                     models[i] = std::make_shared<WmoModel>(std::move(soup),
                                                            std::move(triGroup),
                                                            std::move(groups), rootId,
@@ -334,11 +374,12 @@ namespace world::terrain
             }
             else if (kind == uint8_t(ModelKind::Mesh))
             {
-                ok = RVec(f, soup.verts) && RVec(f, soup.tris) && RVec(f, nodes);
+                Bvh bvh;
+                ok = RVec(f, soup.verts) && RVec(f, soup.tris) && RVec(f, nodes) &&
+                     SoupIndicesInRange(soup) &&
+                     bvh.Adopt(std::move(nodes), soup.tris.size());
                 if (ok)
                 {
-                    Bvh bvh;
-                    bvh.Adopt(std::move(nodes));
                     models[i] = std::make_shared<CollisionModel>(std::move(soup),
                                                                  std::move(bvh));
                 }
@@ -360,6 +401,22 @@ namespace world::terrain
                  RPod(f, inst.worldBounds.hi) && RPod(f, idx) && RPod(f, inst.adtId);
             if (ok)
             {
+                // THE POSE ARRIVES AS RAW PODS, which walks straight past the Transform
+                // constructor whose whole purpose is this clamp -- so the baker clamping
+                // a zero or non-finite scale fixes only half of it. worldToLocal divides
+                // by scale, and every comparison against the resulting NaN is false, so
+                // the model is silently never hit rather than failing.
+                if (!(inst.xf.scale > 0.f) || !::Geometry::isFinite(inst.xf.scale))
+                {
+                    inst.xf.scale = 1.f;
+                }
+                if (!Finite(inst.xf.pos) || !Finite(inst.xf.rot) ||
+                    !Finite(inst.worldBounds.lo) || !Finite(inst.worldBounds.hi))
+                {
+                    ok = false;
+                    break;
+                }
+
                 if (idx < models.size())
                 {
                     inst.model = models[idx];
