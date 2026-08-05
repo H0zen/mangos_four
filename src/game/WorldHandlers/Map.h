@@ -169,7 +169,16 @@ class Map : public GridRefManager<NGridType>
             return false;
         }
 
-        virtual bool Add(Player*);
+        /**
+         * @brief Put a player on this map.
+         *
+         * `introduce` is FALSE when the client is not entering any world -- it is already in
+         * one, rendering it, and only the map the SERVER files him under is changing. That is
+         * the gangway in both directions. His own create block is the login packet; re-sent to
+         * a client that never left, it runs the enter-world path and he gets the login loading
+         * screen on the map he is already standing on.
+         */
+        virtual bool Add(Player*, bool introduce = true);
         virtual void Remove(Player*, bool);
         template<class T> void Add(T*);
         template<class T> void Remove(T*, bool);
@@ -600,7 +609,7 @@ class DungeonMap : public Map
     public:
         DungeonMap(uint32 id, time_t, uint32 InstanceId, uint8 SpawnMode);
         ~DungeonMap();
-        bool Add(Player*) override;
+        bool Add(Player*, bool introduce = true) override;
         void Remove(Player*, bool) override;
         void Update(const uint32&) override;
         bool Reset(InstanceResetMethod method);
@@ -629,7 +638,7 @@ class BattleGroundMap : public Map
         ~BattleGroundMap();
 
         void Update(const uint32&) override;
-        bool Add(Player*) override;
+        bool Add(Player*, bool introduce = true) override;
         void Remove(Player*, bool) override;
         bool CanEnter(Player* player) override;
         void SetUnload();

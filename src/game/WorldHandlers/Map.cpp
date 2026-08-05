@@ -715,7 +715,7 @@ void Map::LoadGrid(const Cell& cell, bool no_unload)
  * @param player The player entering the map.
  * @return Always true after the player has been added.
  */
-bool Map::Add(Player* player)
+bool Map::Add(Player* player, bool introduce)
 {
     player->GetMapRef().link(this, player);
     player->SetMap(this);
@@ -732,7 +732,13 @@ bool Map::Add(Player* player)
     PromoteEnvelopeNeighboursToFull(cell.GridX(), cell.GridY());
     player->AddToWorld();
 
-    SendInitSelf(player);
+    if (introduce)
+    {
+        SendInitSelf(player);
+    }
+
+    // Always: stepping ashore is the one case where the ship he just left is a vessel his
+    // client holds only through the deck map it is losing.
     SendInitTransports(player);
 
     NGridType* grid = getNGrid(cell.GridX(), cell.GridY());
@@ -1901,7 +1907,7 @@ void Map::SendInitSelf(Player* player)
     //
     MopUpdateObject::SelfPlayer sp{};
     sp.guid = player->GetObjectGuid().GetRawValue();
-    sp.mapId = uint16(player->GetClientMapId());
+    sp.mapId = static_cast<uint16>(player->GetClientMapId());
     sp.x = player->GetPositionX();
     sp.y = player->GetPositionY();
     sp.z = player->GetPositionZ();
@@ -1986,7 +1992,7 @@ void Map::SendInitSelf(Player* player)
     // Player's existing traversal emits top-level items/bags, while Bag's
     // override recursively emits its contents. A current transport is emitted
     // before those objects because the self movement block references its GUID.
-    UpdateData inventoryData(player->GetClientMapId());
+    UpdateData inventoryData(static_cast<uint16>(player->GetClientMapId()));
     if (Transport* transport = player->GetTransport())
     {
         // The client must know the hull before the self movement block names it
@@ -2730,7 +2736,7 @@ void DungeonMap::InitVisibilityDistance()
 /*
     Do map specific checks and add the player to the map if successful.
 */
-bool DungeonMap::Add(Player* player)
+bool DungeonMap::Add(Player* player, bool introduce)
 {
     // TODO: Not sure about checking player level: already done in HandleAreaTriggerOpcode
     // GMs still can teleport player in instance.
@@ -2852,7 +2858,7 @@ bool DungeonMap::Add(Player* player)
     m_unloadWhenEmpty = false;
 
     // this will acquire the same mutex so it can not be in the previous block
-    Map::Add(player);
+    Map::Add(player, introduce);
 
     return true;
 }
@@ -3101,7 +3107,7 @@ bool BattleGroundMap::CanEnter(Player* player)
  * @param player The player entering the battleground.
  * @return true if the player was added; otherwise false.
  */
-bool BattleGroundMap::Add(Player* player)
+bool BattleGroundMap::Add(Player* player, bool introduce)
 {
     if (!CanEnter(player))
     {
@@ -3111,7 +3117,7 @@ bool BattleGroundMap::Add(Player* player)
     // reset instance validity, battleground maps do not homebind
     player->m_InstanceValid = true;
 
-    return Map::Add(player);
+    return Map::Add(player, introduce);
 }
 
 /**

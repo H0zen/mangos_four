@@ -91,8 +91,13 @@ class TransportMap : public Map
          * other map, and then himself. In that order, and the order is load-bearing: his own
          * block names her guid, and a client that does not hold her yet has nothing to compose
          * him against.
+         *
+         * None of that on the GANGWAY (`introduce` false). He walked up it, so his client is
+         * already in the world and already holds the ship and her crew: it took possession of
+         * them the moment he shared the map she sails. Re-sending his own create block there is
+         * re-sending the login packet, and the client answers it with the login loading screen.
          */
-        bool Add(Player* passenger) override;
+        bool Add(Player* passenger, bool introduce = true) override;
 
         // Declaring Add(Player*) hides Map's Add<T> template; crew and minions are added to a
         // deck by exactly the ordinary path and must keep reaching it.

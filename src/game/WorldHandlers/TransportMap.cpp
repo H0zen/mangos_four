@@ -327,7 +327,7 @@ std::optional<Position> TransportMap::FreeSpotNear(WorldObject const& master, fl
 
 /* ******************************** Who is aboard ************************************** */
 
-bool TransportMap::Add(Player* passenger)
+bool TransportMap::Add(Player* passenger, bool introduce)
 {
     // WHERE HE REALLY STANDS. The wire calls it an offset; the moment it is ours it is a
     // position on this map, composed with nothing.
@@ -352,24 +352,30 @@ bool TransportMap::Add(Player* passenger)
     // Nothing else is sent: there is no new world to introduce and no map id he could be told.
     // The vessel is not stamped into his client set either -- possession of her is map
     // membership, and the elimination sweep must never learn she exists.
-    SendInitSelf(passenger);
-
-    // And the OTHER ships on the water she is crossing. His client is drawing that map, so they
-    // are his to see, and no sweep of his will ever reach them: he is not on it.
     //
-    // Never while she is between two maps: she would name the one she is leaving, and he would
-    // be handed a continent's worth of ships that are not on the water he can see.
-    if (Map* sailed = m_vessel->IsCrossing() ? NULL : m_vessel->GetMap())
+    // ALL OF IT ONLY WHEN HIS CLIENT IS ENTERING A WORLD. Off the gangway it already holds every
+    // one of these -- itself, the ship, her crew, her neighbours -- and would only be told twice.
+    if (introduce)
     {
-        MapManager::TransportsByMapType::const_iterator vessels =
-            sMapMgr.m_TransportsByMap.find(sailed->GetId());
-        if (vessels != sMapMgr.m_TransportsByMap.end())
+        SendInitSelf(passenger);
+
+        // And the OTHER ships on the water she is crossing. His client is drawing that map, so
+        // they are his to see, and no sweep of his will ever reach them: he is not on it.
+        //
+        // Never while she is between two maps: she would name the one she is leaving, and he
+        // would be handed a continent's worth of ships that are not on the water he can see.
+        if (Map* sailed = m_vessel->IsCrossing() ? NULL : m_vessel->GetMap())
         {
-            for (Transport* other : vessels->second)
+            MapManager::TransportsByMapType::const_iterator vessels =
+                sMapMgr.m_TransportsByMap.find(sailed->GetId());
+            if (vessels != sMapMgr.m_TransportsByMap.end())
             {
-                if (other != m_vessel && other->GetMap() == sailed)
+                for (Transport* other : vessels->second)
                 {
-                    AnnounceVessel(other, passenger);
+                    if (other != m_vessel && other->GetMap() == sailed)
+                    {
+                        AnnounceVessel(other, passenger);
+                    }
                 }
             }
         }
@@ -393,7 +399,7 @@ void TransportMap::Embark(Player* passenger)
     // Login and the far side of a seam do not come through here -- they never touch the world's
     // grid at all, they are added straight to this map.
     passenger->GetMap()->Remove(passenger, false);
-    Add(passenger);
+    Add(passenger, false);
 
     // His minions come with him, NOW. UpdateMinions reconciles this once per tick and is the
     // safety net for the half-dozen other ways one arrives -- but a pet that waits a tick is a
@@ -424,7 +430,7 @@ void TransportMap::Disembark(Player* passenger, float x, float y, float z, float
     passenger->SetTransport(NULL);
     passenger->m_movementInfo.ClearTransportData();
 
-    sailed->Add(passenger);
+    sailed->Add(passenger, false);
 
     // And they follow him ashore in the same tick, for the same reason.
     DrawMinionsTo(passenger, sailed);
