@@ -182,8 +182,13 @@ namespace world::terrain
             // MCLQ is the pre-WotLK liquid chunk and is absent from 3.3.5a client data;
             // it is read only so an older or hand-made tile is not silently dry. MH2O,
             // parsed after every MCNK, overrides whatever this writes.
-            constexpr uint32_t MCLQ_BYTES = 8 + 81 * 8 + 64;
-            if (!offsMclq || sizeMclq <= 8 || offsMclq + 8 + MCLQ_BYTES > span)
+            // Summed in 64 bits: offsMclq comes straight off the file, and a value near
+            // UINT32_MAX makes the 32-bit sum WRAP BELOW span, so the guard passes and
+            // mcnk + offsMclq reads outside the buffer. MCVT and MH2O widen for the same
+            // reason; this one did not.
+            constexpr uint64_t MCLQ_BYTES = 8 + 81 * 8 + 64;
+            if (!offsMclq || sizeMclq <= 8 ||
+                uint64_t(offsMclq) + 8 + MCLQ_BYTES > uint64_t(span))
             {
                 return true;      // no MCLQ is the 5.4.8 norm, and the heights are read
             }

@@ -59,12 +59,23 @@ namespace world::terrain
 
         for (uint32_t g = 0; g < root.nGroups; ++g)
         {
+            // The root DECLARES its group count, so a group file the archive does not
+            // have is an incomplete client, not a group with nothing in it. Skipping it
+            // returns a model that is non-empty and therefore looks loaded, missing that
+            // wing's collision.
             std::vector<uint8_t> groupBytes;
             if (!m_archive.Read(WmoGroupPath(rootPath, g), groupBytes))
             {
-                continue;
+                m_cache.emplace(rootPath, nullptr);
+                return nullptr;
             }
 
+            // FALSE IS NOT A PARSE FAILURE HERE. It means the group carries neither
+            // collidable geometry nor liquid, which is the majority of every WMO --
+            // render-only groups the baker deliberately does not carry. Failing the
+            // model on it drops 11 game-object models and all of map 576 on retail
+            // 5.4.8 data, where 56 groups answer false and not one group file is
+            // missing. Skipping is the design.
             WmoGroupData parsed;
             if (!ParseWmoGroup(groupBytes, root.flags, parsed))
             {

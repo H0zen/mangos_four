@@ -1064,9 +1064,13 @@ namespace world::nav
 
         char name[32];
         std::snprintf(name, sizeof(name), "%04u.mmap", mapId);
+        // NEGATIVE, not zero: BakeAll treats zero as a map that legitimately produced no
+        // tiles and keeps going, so returning it here finishes a nav bake with exit 0 and
+        // no .mmap for the map -- the server then has no navmesh at all for it.
         if (!WriteFile(m_outDir + "/" + name, &params, sizeof(params), nullptr, 0))
         {
-            return 0;
+            std::fprintf(stderr, "nav: map %u failed: cannot write %s\n", mapId, name);
+            return -1;
         }
 
         MapBake mb;

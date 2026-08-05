@@ -236,6 +236,10 @@ namespace
         return true;
     }
 
+    // Answers with the number of databases that could NOT be written, the same way
+    // BakeMap answers with the tiles it could not bake and for the same reason: the
+    // installer deletes the old data before running this, so a run that copies half the
+    // DBCs and exits 0 leaves a server that starts and is wrong.
     int ExtractDbc(StormLibArchive& mpq, const std::string& dest,
                    const std::string& locale)
     {
@@ -251,12 +255,13 @@ namespace
             names.push_back(db2);
         }
 
-        int written = 0;
+        int written = 0, failed = 0;
         for (const std::string& name : names)
         {
             std::vector<uint8_t> bytes;
             if (!mpq.Read(name, bytes))
             {
+                ++failed;
                 continue;
             }
             const size_t slash = name.find_last_of('\\');
@@ -270,12 +275,14 @@ namespace
             std::FILE* f = std::fopen((dest + "/" + leaf).c_str(), "wb");
             if (!f)
             {
+                ++failed;
                 continue;
             }
             const bool ok = bytes.empty() ||
                             std::fwrite(bytes.data(), 1, bytes.size(), f) == bytes.size();
             std::fclose(f);
             written += ok ? 1 : 0;
+            failed += ok ? 0 : 1;
         }
         // The build stamp. The server reads it to check the DBCs came from a client it
         // supports -- extract from the wrong expansion and the column layouts differ
@@ -335,7 +342,15 @@ namespace
             g_console.Warn("  no component.wow-<locale>.txt in the client; the server "
                            "cannot check the DBC build");
         }
-        return written;
+
+        // Writing nothing at all is a failure with no failed file behind it -- an empty
+        // DBFilesClient glob, or a destination that could not be created.
+        if (!written)
+        {
+            g_console.Error("dbc: nothing written to " + dest);
+            ++failed;
+        }
+        return failed;
     }
 
     // Every collidable game-object model, keyed by GameObjectDisplayInfo id: doors,
@@ -832,10 +847,11 @@ int main(int argc, char** argv)
         g_console.Log(msg);
     }
 
+    int dbcFailed = 0;
     if (opt.dbc)
     {
         g_console.SetStage("dbc");
-        ExtractDbc(mpq, opt.dest + "/dbc", opt.locale);
+        dbcFailed += ExtractDbc(mpq, opt.dest + "/dbc", opt.locale);
     }
 
     // EVERY OTHER LANGUAGE THE CLIENT CARRIES. Only the DBC set is locale-dependent, so
@@ -863,9 +879,20 @@ int main(int argc, char** argv)
             }
 
             g_console.SetLocale(loc);
-            ExtractDbc(other, opt.dest + "/dbc/" + loc, loc);
+            dbcFailed += ExtractDbc(other, opt.dest + "/dbc/" + loc, loc);
         }
         g_console.SetLocale(opt.locale);
+    }
+
+    if (dbcFailed)
+    {
+        char msg[256];
+        std::snprintf(msg, sizeof(msg),
+                      "dbc: %d database(s) could not be written -- the install is "
+                      "INCOMPLETE", dbcFailed);
+        g_console.Error(msg);
+        g_console.Stop();
+        return 1;
     }
 
 
@@ -915,7 +942,13 @@ int main(int argc, char** argv)
         }
         else
         {
-            g_console.Error("GameObjectDisplayInfo.dbc could not be read");
+            // Nothing below this reads the stage's result, so falling through left
+            // gomodels/ empty behind a clean exit 0 -- and every door, lift and bridge
+            // in the world is a gomodel.
+            g_console.Error("GameObjectDisplayInfo.dbc could not be read -- no game "
+                            "object models can be baked");
+            g_console.Stop();
+            return 1;
         }
     }
 

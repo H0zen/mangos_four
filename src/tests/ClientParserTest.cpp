@@ -860,6 +860,29 @@ TEST(AdtMclqFallbackTypesAndDarkWater)
     CHECK_EQ(d.liquidHeight[0], 55.f);
 }
 
+TEST(AdtMclqOffsetNearUint32MaxIsRejected)
+{
+    // offsMclq comes straight off the file. Summed in 32 bits, a value near UINT32_MAX
+    // wraps BELOW span, so the bounds guard passes and `mcnk + offsMclq` is a wild
+    // pointer -- read, not just computed. Widened to 64 bits the guard rejects it and
+    // the chunk is simply dry, which is the 5.4.8 norm anyway.
+    float mcvt[145];
+    FillRamp(mcvt, 0.f);
+
+    Blob mcnk = MakeMcnk(4, 4, 0.f, 0, 0, mcvt);
+    mcnk.PatchU32(0x60, 0xFFFFFFF0u);   // ofsMCLQ
+    mcnk.PatchU32(0x64, 100u);          // sizeMCLQ, past the <= 8 guard
+
+    Blob adt;
+    PadTile(adt, 4, 4);
+    PutChunk(adt, "MCNK", mcnk);
+
+    AdtData d;
+    REQUIRE(ParseAdt(adt.b, d));
+    CHECK(!d.hasLiquid);
+    CHECK(d.hasTerrain);
+}
+
 TEST(AdtChunkWithoutMcvtFailsTheParse)
 {
     // MCVT is the chunk's whole contribution to the heightmap, and the grid is

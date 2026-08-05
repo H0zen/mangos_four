@@ -222,7 +222,14 @@ namespace world::terrain
             {
                 return nullptr;
             }
-            ParseAdt(objBytes, adt, AdtParts::Objects, lvfOf);
+            // The objects half decides EVERY placement on the tile. Dropping its result
+            // gives back a tile with correct ground and no buildings -- the exact quiet
+            // failure the comment above warns about -- which BakeMap then counts as a
+            // success, because it only ever looks at hasTerrain.
+            if (!ParseAdt(objBytes, adt, AdtParts::Objects, lvfOf))
+            {
+                return nullptr;
+            }
         }
         else if (!ParseAdt(bytes, adt, AdtParts::Both, lvfOf))
         {
