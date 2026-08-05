@@ -59,6 +59,7 @@
 #include "movement/MoveSpline.h"
 #include "movement/packet_builder.h"
 #include "CreatureLinkingMgr.h"
+#include "Transports.h"
 #include "GameTime.h"
 #ifdef ENABLE_ELUNA
 #include "LuaEngine.h"
@@ -6307,8 +6308,14 @@ void Unit::SendCurrentSplineTo(Player* viewer)
         return;
     }
 
+    // WITH ITS PARENT. This fires on every visibility gain, so a crew member re-created at the
+    // seam was handed its deck-local spline as a world one the instant the observer saw it --
+    // it snapped onto the deck and walked straight back off.
+    Transport* vessel = Transport::VesselOf(*this);
+
     WorldPacket data;
-    Movement::PacketBuilder::WriteMonsterMove(*movespline, data, GetObjectGuid());
+    Movement::PacketBuilder::WriteMonsterMove(*movespline, data, GetObjectGuid(),
+        vessel ? vessel->GetObjectGuid() : ObjectGuid());
     viewer->GetSession()->SendPacket(&data);
 }
 

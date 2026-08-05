@@ -28,6 +28,7 @@
 #include "packet_builder.h"
 #include "Unit.h"
 #include "TransportSystem.h"
+#include "Transports.h"
 #include <atomic>
 
 namespace Movement
@@ -81,7 +82,15 @@ namespace Movement
     int32 MoveSplineInit::Launch()
     {
         MoveSpline& move_spline = *unit.movespline;
-        TransportInfo* transportInfo = unit.GetTransportInfo();
+
+        // ABOARD A VESSEL THE PARENT IS THE MAP, never a passenger roster: TransportInfo is the
+        // vehicle system's, and nothing files a deck creature on one. Derived here exactly as
+        // the create block derives it, or the spline goes out with NO parent and the client
+        // reads this map's coordinates as world ones. A five-yard wander on the deck then
+        // becomes a walk to a point near the world origin, thousands of yards off, and the crew
+        // leaves in a straight line -- moored or under way, it makes no difference.
+        Transport* vessel = Transport::VesselOf(unit);
+        TransportInfo* transportInfo = vessel ? NULL : unit.GetTransportInfo();
 
         Location real_position(unit.GetPositionX(), unit.GetPositionY(), unit.GetPositionZ(), unit.GetOrientation());
 
@@ -93,6 +102,9 @@ namespace Movement
 
         // there is a big chance that current position is unknown if current state is not finalized, need compute it
         // this also allows calculate spline position and update map position in much greater intervals
+        //
+        // A deck takes this branch like any other map: its coordinates ALREADY ARE the offset,
+        // so the spline is computed in them and nothing is converted.
         if (!move_spline.Finalized() && !transportInfo)
         {
             real_position = move_spline.ComputePosition();
@@ -134,7 +146,8 @@ namespace Movement
         move_spline.Initialize(args);
 
         WorldPacket data(SMSG_MONSTER_MOVE, 64);
-        ObjectGuid const transportGuid = transportInfo ? transportInfo->GetTransportGuid() : ObjectGuid();
+        ObjectGuid const transportGuid = vessel ? vessel->GetObjectGuid()
+            : (transportInfo ? transportInfo->GetTransportGuid() : ObjectGuid());
         int8 const transportSeat = transportInfo ? int8(transportInfo->GetTransportSeat()) : int8(-1);
         PacketBuilder::WriteMonsterMove(move_spline, data, unit.GetObjectGuid(), transportGuid, transportSeat);
         unit.SendMessageToSet(&data, true);
@@ -155,7 +168,10 @@ namespace Movement
             return;
         }
 
-        TransportInfo* transportInfo = unit.GetTransportInfo();
+        // Same derivation as Launch: the stop packet names a parent too, and a stop that names
+        // none plants the unit at this map's coordinates read as world ones.
+        Transport* vessel = Transport::VesselOf(unit);
+        TransportInfo* transportInfo = vessel ? NULL : unit.GetTransportInfo();
 
         Location real_position(unit.GetPositionX(), unit.GetPositionY(), unit.GetPositionZ(), unit.GetOrientation());
 
@@ -186,7 +202,8 @@ namespace Movement
         move_spline.Initialize(args);
 
         WorldPacket data(SMSG_MONSTER_MOVE, 64);
-        ObjectGuid const transportGuid = transportInfo ? transportInfo->GetTransportGuid() : ObjectGuid();
+        ObjectGuid const transportGuid = vessel ? vessel->GetObjectGuid()
+            : (transportInfo ? transportInfo->GetTransportGuid() : ObjectGuid());
         int8 const transportSeat = transportInfo ? int8(transportInfo->GetTransportSeat()) : int8(-1);
         PacketBuilder::WriteStopMovement(real_position, move_spline.GetId(), data,
             unit.GetObjectGuid(), transportGuid, transportSeat);
