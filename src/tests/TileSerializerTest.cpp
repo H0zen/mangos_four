@@ -552,6 +552,60 @@ TEST(FusedTerrainServesTheBakedTile)
     FusedTerrain::SetTileDir(std::string());
 }
 
+TEST(SegmentGathersATileItOnlyClipsTheCornerOf)
+{
+    // A segment that crosses a tile for a fraction of its length. Stepping the line at
+    // half-tile samples steps straight over it, and a wall living only on that tile then
+    // does not exist for the ray -- sight through a building. Grid traversal enters
+    // every tile the segment touches, however briefly.
+    //
+    // Tile index grows as the coordinate shrinks: u = 32 - x / TILE_SIZE, tile = floor(u).
+    // The path below runs four tiles along x while y crosses one boundary in the middle,
+    // so tile (31, 32) is occupied for about half a percent of the segment.
+    const std::string dir = TempPath("ddadir");
+    std::error_code ec;
+    std::filesystem::create_directories(dir, ec);
+
+    const auto worldOf = [](float u) { return (32.f - u) * TILE_SIZE; };
+
+    // x runs four tiles while y crosses its boundary at t = 0.6, and x leaves tile 31 at
+    // t = 0.625 -- so tile (31, 32) owns 2.5% of the segment, about a tenth of a tile.
+    // The old sampler took ten samples at t = i/9, and none of them lands in that gap.
+    const float ax = worldOf(33.5f), ay = worldOf(33.24f);
+    const float bx = worldOf(29.5f), by = worldOf(32.84f);
+
+    // A wall across the segment, standing in the sliver: x is fixed at the point the
+    // segment is inside tile (31, 32), and it is wide and tall enough that only the
+    // TILE being gathered is in question, never whether the ray geometry lines up.
+    const float wallX = worldOf(31.06f);
+    TriSoup wall;
+    wall.verts = {{wallX, -560.f, -100.f},
+                  {wallX, -500.f, -100.f},
+                  {wallX, -500.f, 100.f},
+                  {wallX, -560.f, 100.f}};
+    wall.tris = {{0, 1, 2}, {0, 2, 3}};
+
+    TerrainTile tile;
+    tile.tx = 31;
+    tile.ty = 32;
+
+    StaticInstance inst;
+    inst.model = std::make_shared<CollisionModel>(std::move(wall));
+    inst.worldBounds.expand({wallX, -560.f, -100.f});
+    inst.worldBounds.expand({wallX, -500.f, 100.f});
+    tile.instances.push_back(std::move(inst));
+
+    const std::string path = dir + "/" + TileFileName(9997, 31, 32);
+    REQUIRE(WriteTile(tile, path));
+
+    FusedTerrain::SetTileDir(dir);
+    FusedTerrain terrain(9997);
+    CHECK(!terrain.IsInLineOfSight(ax, ay, 0.f, bx, by, 0.f, ModelIgnoreFlags::Nothing));
+
+    std::remove(path.c_str());
+    FusedTerrain::SetTileDir(std::string());
+}
+
 TEST(FusedTerrainSweepDropsUnpinnedTilesAndKeepsPinnedOnes)
 {
     const std::string dir = TempPath("sweepdir");

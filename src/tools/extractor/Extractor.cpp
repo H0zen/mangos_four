@@ -237,6 +237,10 @@ namespace
         return true;
     }
 
+    // Answers with the number of databases that could NOT be written, the same way
+    // BakeMap answers with the tiles it could not bake and for the same reason: the
+    // installer deletes the old data before running this, so a run that copies half the
+    // DBCs and exits 0 leaves a server that starts and is wrong.
     int ExtractDbc(StormLibArchive& mpq, const std::string& dest,
                    const std::string& locale)
     {
@@ -252,12 +256,13 @@ namespace
             names.push_back(db2);
         }
 
-        int written = 0;
+        int written = 0, failed = 0;
         for (const std::string& name : names)
         {
             std::vector<uint8_t> bytes;
             if (!mpq.Read(name, bytes))
             {
+                ++failed;
                 continue;
             }
             const size_t slash = name.find_last_of('\\');
@@ -271,12 +276,14 @@ namespace
             std::FILE* f = std::fopen((dest + "/" + leaf).c_str(), "wb");
             if (!f)
             {
+                ++failed;
                 continue;
             }
             const bool ok = bytes.empty() ||
                             std::fwrite(bytes.data(), 1, bytes.size(), f) == bytes.size();
             std::fclose(f);
             written += ok ? 1 : 0;
+            failed += ok ? 0 : 1;
         }
         // The build stamp. The server reads it to check the DBCs came from a client it
         // supports -- extract from the wrong expansion and the column layouts differ
@@ -336,7 +343,15 @@ namespace
             g_console.Warn("  no component.wow-<locale>.txt in the client; the server "
                            "cannot check the DBC build");
         }
-        return written;
+
+        // Writing nothing at all is a failure with no failed file behind it -- an empty
+        // DBFilesClient glob, or a destination that could not be created.
+        if (!written)
+        {
+            g_console.Error("dbc: nothing written to " + dest);
+            ++failed;
+        }
+        return failed;
     }
 
     // Every collidable game-object model, keyed by GameObjectDisplayInfo id: doors,
@@ -495,10 +510,11 @@ namespace
     //
     // The instance keeps its identity placement. Model space IS the deck, and there is no
     // world pose to compose with.
+    // Answers with the hulls it could NOT write, like every other stage here.
     int BakeVesselMaps(const std::string& goDir, const std::string& tileDir,
                        const std::vector<VesselMap>& vessels)
     {
-        int written = 0;
+        int written = 0, failed = 0;
         for (const VesselMap& v : vessels)
         {
             auto tile = ReadTile(goDir + "/" + GoModelFileName(v.displayId));
@@ -509,6 +525,7 @@ namespace
                               "vessels: no baked collision for display id %u",
                               v.displayId);
                 g_console.Error(msg);
+                ++failed;
                 continue;
             }
 
@@ -527,6 +544,7 @@ namespace
                 std::snprintf(msg, sizeof(msg),
                               "vessels: could not write map %u", v.mapId);
                 g_console.Error(msg);
+                ++failed;
             }
             Tick();
         }
@@ -535,7 +553,7 @@ namespace
         std::snprintf(msg, sizeof(msg), "vessels: %d hull maps -> %s", written,
                       tileDir.c_str());
         g_console.Success(msg);
-        return written;
+        return failed;
     }
 
     bool BakeNav(const Options& opt, const std::string& tileDir,
@@ -801,17 +819,28 @@ int main(int argc, char** argv)
     {
         if (!opt.vessels)
         {
-            return;
+            return true;
         }
         std::error_code ec;
         std::filesystem::create_directories(tileDir, ec);
         g_console.SetStage("vessels");
-        BakeVesselMaps(opt.dest + "/gomodels", tileDir, ReadVesselMaps(opt.vesselList));
+
+        // An empty list is not an error -- `all` turns this stage on and the shipped
+        // list may legitimately name nothing yet -- but a hull that was ASKED for and
+        // could not be written is, and the result used to be dropped on the floor.
+        const std::vector<VesselMap> list = ReadVesselMaps(opt.vesselList);
+        if (list.empty())
+        {
+            g_console.Warn("vessels: " + opt.vesselList +
+                           " names no hulls -- no vessel maps written");
+            return true;
+        }
+        return BakeVesselMaps(opt.dest + "/gomodels", tileDir, list) == 0;
     };
 
     if (!opt.dbc && !opt.tiles && !opt.goModels)
     {
-        BakeVessels();
+        const bool vesselsOk = BakeVessels();
 
         // ASKED FOR THE SHIPS, GETS THE SHIPS. Nothing that feeds the world's tiles was
         // named, so a navmesh here can only have been meant for the decks trans just wrote
@@ -826,7 +855,7 @@ int main(int argc, char** argv)
             }
         }
 
-        const bool ok = BakeNav(opt, tileDir, vesselMaps);
+        const bool ok = vesselsOk && BakeNav(opt, tileDir, vesselMaps);
         g_console.SetStage("done");
         g_console.Progress(-1);
         g_console.Stop();
@@ -850,10 +879,11 @@ int main(int argc, char** argv)
         g_console.Log(msg);
     }
 
+    int dbcFailed = 0;
     if (opt.dbc)
     {
         g_console.SetStage("dbc");
-        ExtractDbc(mpq, opt.dest + "/dbc", opt.locale);
+        dbcFailed += ExtractDbc(mpq, opt.dest + "/dbc", opt.locale);
     }
 
     // EVERY OTHER LANGUAGE THE CLIENT CARRIES. Only the DBC set is locale-dependent, so
@@ -881,16 +911,26 @@ int main(int argc, char** argv)
             }
 
             g_console.SetLocale(loc);
-            ExtractDbc(other, opt.dest + "/dbc/" + loc, loc);
+            dbcFailed += ExtractDbc(other, opt.dest + "/dbc/" + loc, loc);
         }
         g_console.SetLocale(opt.locale);
+    }
+
+    if (dbcFailed)
+    {
+        char msg[256];
+        std::snprintf(msg, sizeof(msg),
+                      "dbc: %d database(s) could not be written -- the install is "
+                      "INCOMPLETE", dbcFailed);
+        g_console.Error(msg);
+        g_console.Stop();
+        return 1;
     }
 
 
     if (!opt.tiles && !opt.goModels)
     {
-        BakeVessels();
-        const bool ok = BakeNav(opt, tileDir);
+        const bool ok = BakeVessels() && BakeNav(opt, tileDir);
         g_console.SetStage("done");
         g_console.Progress(-1);
         g_console.Stop();
@@ -933,19 +973,31 @@ int main(int argc, char** argv)
         }
         else
         {
-            g_console.Error("GameObjectDisplayInfo.dbc could not be read");
+            // Nothing below this reads the stage's result, so falling through left
+            // gomodels/ empty behind a clean exit 0 -- and every door, lift and bridge
+            // in the world is a gomodel.
+            g_console.Error("GameObjectDisplayInfo.dbc could not be read -- no game "
+                            "object models can be baked");
+            g_console.Stop();
+            return 1;
         }
     }
 
-    BakeVessels();
+    const bool vesselsOk = BakeVessels();
 
     if (!opt.tiles)
     {
-        const bool ok = BakeNav(opt, tileDir);
+        const bool ok = vesselsOk && BakeNav(opt, tileDir);
         g_console.SetStage("done");
         g_console.Progress(-1);
         g_console.Stop();
         return ok ? 0 : 1;
+    }
+
+    if (!vesselsOk)
+    {
+        g_console.Stop();
+        return 1;
     }
 
     g_console.SetStage("tiles");

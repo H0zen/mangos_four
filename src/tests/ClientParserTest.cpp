@@ -860,6 +860,29 @@ TEST(AdtMclqFallbackTypesAndDarkWater)
     CHECK_EQ(d.liquidHeight[0], 55.f);
 }
 
+TEST(AdtMclqOffsetNearUint32MaxIsRejected)
+{
+    // offsMclq comes straight off the file. Summed in 32 bits, a value near UINT32_MAX
+    // wraps BELOW span, so the bounds guard passes and `mcnk + offsMclq` is a wild
+    // pointer -- read, not just computed. Widened to 64 bits the guard rejects it and
+    // the chunk is simply dry, which is the 5.4.8 norm anyway.
+    float mcvt[145];
+    FillRamp(mcvt, 0.f);
+
+    Blob mcnk = MakeMcnk(4, 4, 0.f, 0, 0, mcvt);
+    mcnk.PatchU32(0x60, 0xFFFFFFF0u);   // ofsMCLQ
+    mcnk.PatchU32(0x64, 100u);          // sizeMCLQ, past the <= 8 guard
+
+    Blob adt;
+    PadTile(adt, 4, 4);
+    PutChunk(adt, "MCNK", mcnk);
+
+    AdtData d;
+    REQUIRE(ParseAdt(adt.b, d));
+    CHECK(!d.hasLiquid);
+    CHECK(d.hasTerrain);
+}
+
 TEST(AdtChunkWithoutMcvtFailsTheParse)
 {
     // MCVT is the chunk's whole contribution to the heightmap, and the grid is
@@ -1065,7 +1088,7 @@ TEST(WmoGroupKeepsDetailFacesThatAlsoCollide)
     Blob group = MakeMogpGroup(0, 15, 4242, nested);
 
     WmoGroupData g;
-    REQUIRE(ParseWmoGroup(group.b, 0, g));
+    REQUIRE(ParseWmoGroup(group.b, 0, g) == WmoGroupParse::Loaded);
     CHECK_EQ(g.groupWmoId, uint32_t(4242));
     CHECK_EQ(g.verts.size(), size_t(4));
     CHECK_EQ(g.tris.size(), size_t(2));
@@ -1096,7 +1119,7 @@ TEST(WmoGroupLiquidUsesWotlkRows)
         Blob group = MakeMogpGroup(e.mogpFlags, e.groupLiquid, 0, nested);
 
         WmoGroupData g;
-        REQUIRE(ParseWmoGroup(group.b, 0, g));
+        REQUIRE(ParseWmoGroup(group.b, 0, g) == WmoGroupParse::Loaded);
         REQUIRE(g.hasLiquid);
         CHECK_EQ(g.liquid.entry, e.entry);
         CHECK_EQ(g.liquid.tilesX, uint32_t(2));
@@ -1112,7 +1135,7 @@ TEST(WmoGroupLiquidTakesRawDbcIdWhenRootSaysSo)
     Blob group = MakeMogpGroup(0, 41, 0, nested);
 
     WmoGroupData g;
-    REQUIRE(ParseWmoGroup(group.b, 0x4, g));
+    REQUIRE(ParseWmoGroup(group.b, 0x4, g) == WmoGroupParse::Loaded);
     REQUIRE(g.hasLiquid);
     CHECK_EQ(g.liquid.entry, uint16_t(41));
 }
@@ -1124,18 +1147,49 @@ TEST(WmoGroupLiquidFallsBackToTileNibble)
     Blob group = MakeMogpGroup(0, 15, 0, nested);
 
     WmoGroupData g;
-    REQUIRE(ParseWmoGroup(group.b, 0, g));
+    REQUIRE(ParseWmoGroup(group.b, 0, g) == WmoGroupParse::Loaded);
     REQUIRE(g.hasLiquid);
     CHECK_EQ(g.liquid.entry, uint16_t(19));
 }
 
-TEST(WmoGroupWithoutGeometryOrLiquidIsRejected)
+TEST(WmoGroupWithoutGeometryOrLiquidIsEmptyNotMalformed)
 {
+    // The ordinary render-only, portal or ambient group. It is skipped, and the
+    // building it belongs to still loads -- which is the whole point of the
+    // distinction: 56 groups across retail 5.4.8 land here.
     Blob nested;
     Blob group = MakeMogpGroup(0, 15, 0, nested);
 
     WmoGroupData g;
-    CHECK(!ParseWmoGroup(group.b, 0, g));
+    CHECK(ParseWmoGroup(group.b, 0, g) == WmoGroupParse::Empty);
+}
+
+TEST(WmoGroupWithoutMogpIsMalformed)
+{
+    // No MOGP at all: a group file IS a MOGP container, so this is a broken file and
+    // not a group with nothing in it. Answering Empty here bakes the building with a
+    // wing missing and reports it loaded.
+    Blob mopy;
+    mopy.U8(0x04); mopy.U8(0);
+    Blob group;
+    PutChunk(group, "MOPY", mopy);
+
+    WmoGroupData g;
+    CHECK(ParseWmoGroup(group.b, 0, g) == WmoGroupParse::Malformed);
+}
+
+TEST(WmoGroupWithAChunkPastTheEndIsMalformed)
+{
+    // A chunk declaring more bytes than the file holds. The walk used to break out and
+    // answer with whatever it had read so far, which for a truncated download is a
+    // group that looks merely empty.
+    Blob nested;
+    Blob group = MakeMogpGroup(0, 15, 0, nested);
+    group.U8('Y'); group.U8('P'); group.U8('O'); group.U8('M');
+    group.U32(0x7FFFFFFF);
+
+    WmoGroupData g;
+    CHECK(ParseWmoGroup(group.b, 0, g) == WmoGroupParse::Malformed);
 }
 
 TEST(WmoRootReadsHeaderAndDoodadNameOffsets)
