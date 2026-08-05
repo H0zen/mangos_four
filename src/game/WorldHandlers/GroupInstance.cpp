@@ -454,11 +454,34 @@ InstanceGroupBind* Group::GetBoundInstance(uint32 mapid, Player* player)
 
 InstanceGroupBind* Group::GetBoundInstance(Map* aMap, Difficulty difficulty)
 {
-    // some instances only have one difficulty
-    MapDifficultyEntry const* mapDiff = GetMapDifficultyData(aMap->GetId(), difficulty);
-    if (!mapDiff)
+    // Some instances only have one difficulty -- fold to it, as the sibling overload and
+    // Player::GetBoundInstance both do. This one returned NULL instead, which made three
+    // comments elsewhere claiming "every bind lookup folds" false.
+    //
+    // Not reachable today, but NOT for the reason an earlier version of this comment gave. It
+    // said MapManager::CreateDungeonMap folds first, so every caller already holds a difficulty
+    // the map supports. That is false: the fold there is unconditional, and it hands internal 0
+    // to End Time (938), Well of Eternity (939) and Hour of Twilight (940), whose single raw-2
+    // rows give them an internal key of 1 and nothing at 0.
+    //
+    // What actually makes the branch dead is the REGULAR_DIFFICULTY guard below -- for those
+    // three maps the second lookup misses too, so it returns NULL exactly as before. The sole
+    // caller repo-wide is Map.cpp's group-bind check inside DungeonMap::Add, and the only
+    // construction site is MapManager.cpp, so nothing else can reach it.
+    //
+    // It is closed anyway because the inconsistency is the hazard: this overload answering
+    // differently from its sibling and from Player::GetBoundInstance is what made three comments
+    // elsewhere false, and a future DungeonMap built at an unsupported tier would miss the group
+    // bind and could bind a player to a second instance of a raid they are already locked to.
+    if (!GetMapDifficultyData(aMap->GetId(), difficulty))
     {
-        return NULL;
+        if (difficulty == REGULAR_DIFFICULTY ||
+            !GetMapDifficultyData(aMap->GetId(), REGULAR_DIFFICULTY))
+        {
+            return NULL;
+        }
+
+        difficulty = REGULAR_DIFFICULTY;
     }
 
     BoundInstancesMap::iterator itr = m_boundInstances[difficulty].find(aMap->GetId());

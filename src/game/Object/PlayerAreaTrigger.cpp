@@ -117,13 +117,25 @@ void Player::SendTransferAbortedByLockStatus(MapEntry const* mapEntry, AreaLockS
             }
             // No break here!
             [[fallthrough]];
+        // TRANSFER_ABORT_DIFFICULTY's argument is a RAW client DifficultyID -- the client keys it
+        // into Difficulty.dbc to name the tier in the refusal message. Both arms sent the internal
+        // mode, so the message named the wrong tier: internal 0 on a raid reads as "5 Player".
+        // Map-aware, because the packet carries the map id alongside it.
         case AREA_LOCKSTATUS_MISSING_ITEM:
-            GetSession()->SendTransferAborted(mapEntry->ID, TRANSFER_ABORT_DIFFICULTY, GetDifficulty(mapEntry->IsRaid()));
+            GetSession()->SendTransferAborted(mapEntry->ID, TRANSFER_ABORT_DIFFICULTY,
+                ToClientDifficultyForMap(mapEntry->ID, GetDifficulty(mapEntry->IsRaid()), mapEntry->IsRaid()));
             break;
         case AREA_LOCKSTATUS_MISSING_DIFFICULTY:
         {
+            // The clamp stays on the INTERNAL value, where RAID_DIFFICULTY_10MAN_HEROIC is a
+            // meaningful ceiling; converting first would compare across key spaces.
             Difficulty difficulty = GetDifficulty(mapEntry->IsRaid());
-            GetSession()->SendTransferAborted(mapEntry->ID, TRANSFER_ABORT_DIFFICULTY, difficulty > RAID_DIFFICULTY_10MAN_HEROIC ? RAID_DIFFICULTY_10MAN_HEROIC : difficulty);
+            if (difficulty > RAID_DIFFICULTY_10MAN_HEROIC)
+            {
+                difficulty = RAID_DIFFICULTY_10MAN_HEROIC;
+            }
+            GetSession()->SendTransferAborted(mapEntry->ID, TRANSFER_ABORT_DIFFICULTY,
+                ToClientDifficultyForMap(mapEntry->ID, difficulty, mapEntry->IsRaid()));
             break;
         }
         case AREA_LOCKSTATUS_INSUFFICIENT_EXPANSION:
@@ -173,6 +185,46 @@ AreaLockStatus Player::GetAreaTriggerLockStatus(AreaTrigger const* at, Difficult
     bool isRegularTargetMap = !mapEntry->IsDungeon() || GetDifficulty(mapEntry->IsRaid()) == REGULAR_DIFFICULTY;
 
     MapDifficultyEntry const* mapDiff = GetMapDifficultyData(at->target_mapId, difficulty);
+    if (mapEntry->IsDungeon() && !mapDiff && difficulty != REGULAR_DIFFICULTY)
+    {
+        // Some instances only have one difficulty, and the tier a player is set to is not
+        // necessarily one of them. The 25-player-only TBC raids -- Hyjal, Magtheridon, SSC,
+        // The Eye, Black Temple, Gruul and Sunwell -- ship a single MapDifficulty row and
+        // instantiate as REGULAR_DIFFICULTY, so a group left on "25 Player" asks for a tier
+        // that has no row.
+        //
+        // This is not a new rule. MapManager::CreateDungeonMap, Group::GetBoundInstance and
+        // Player::GetBoundInstance all already fold a missing tier back to the regular one;
+        // only this admission gate did not, so it refused entry to maps the paths behind it
+        // would have opened. Folding here makes the gate agree with them.
+        //
+        // Note this deliberately does NOT touch isRegularTargetMap above: that is computed
+        // from the player's own difficulty and drives the heroic key and quest requirements,
+        // which are a separate question from whether the map has a row at all.
+        //
+        // KNOWN GAP, and the shape of it matters because the obvious fix is wrong. This folds
+        // DOWNWARD only. Three five-mans have no regular tier to fold to -- End Time (938),
+        // Well of Eternity (939) and Hour of Twilight (940) each ship a single MapDifficulty
+        // row, raw 2, so their only internal key is 1. Every character sits at internal 0,
+        // because the difficulty setter opcode is still unregistered, so all three stay
+        // unenterable. They were equally unenterable before this branch, along with every
+        // other instance, so nothing regresses -- but they are not fixed either.
+        //
+        // Do NOT fix that by extending BuildMapDifficultyLegacyIndex's widening to dungeons.
+        // Every spawn on those three maps that spawns AT ALL carries spawnMask 2, which is
+        // internal mode 1 alone -- 1447 creatures and 81 gameobjects. The seven exceptions are
+        // creatures carrying spawnMask 0 (five on 939, two on 940), which set no bit and so
+        // appear in no mode, mode 0 included. So giving these maps a mode-0 key would admit the
+        // player to an instance with nothing in it, which is precisely the failure the widening
+        // was just changed from a copy to a move to prevent. (An earlier version of this comment
+        // said "every creature and gameobject", which those seven falsify without changing the
+        // conclusion.) Entering them correctly means resolving
+        // the player to mode 1, which has to drive MapManager::CreateDungeonMap as well as
+        // this gate, and most likely means registering the difficulty setter first. That is
+        // follow-up work, not a fold.
+        mapDiff = GetMapDifficultyData(at->target_mapId, REGULAR_DIFFICULTY);
+    }
+
     if (mapEntry->IsDungeon() && !mapDiff)
     {
         return AREA_LOCKSTATUS_MISSING_DIFFICULTY;

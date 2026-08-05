@@ -189,31 +189,55 @@ DungeonTypes LFGMgr::GetDungeonType(uint32 dungeonId)
     LfgDungeonsEntry const* dungeon = sLfgDungeonsStore.LookupEntry(dungeonId);
     if (dungeon)
     {
+        // DungeonTypes classifies FIVE-MAN dungeons for daily-reward purposes -- see
+        // RegisterPlayerDaily and the reward selection in LFGMgrProposal -- and has no raid member
+        // at all. A raid row must therefore not be classified here.
+        //
+        // That needs saying because translating the difficulty made this newly wrong. Raid rows
+        // carry raw DifficultyID 3 (10-normal) and 4 (25-normal), which translate to internal 0 and
+        // 1, exactly the values the tests below look for. So every TBC and WotLK raid would come out
+        // of here typed DUNGEON_TBC / DUNGEON_WOTLK or their heroic variants -- a 25-man raid counted
+        // as a normal 5-man dungeon for daily rewards. Before the translation, raw 3 and 4 matched
+        // neither constant and fell out as DUNGEON_UNKNOWN by accident.
+        if (dungeon->TypeID == LFG_TYPE_RAID)
+        {
+            return DUNGEON_UNKNOWN;
+        }
+
+        // LfgDungeons.dbc carries a RAW client DifficultyID; the DUNGEON_DIFFICULTY_* constants
+        // are internal modes. Comparing them directly made raw 1 (5-man normal) equal
+        // DUNGEON_DIFFICULTY_HEROIC, which is 1, while raw 2 (5-man heroic) matched neither
+        // constant and fell through to DUNGEON_UNKNOWN -- so every TBC and WotLK dungeon was
+        // typed as heroic or as unknown, never as normal.
+        int32 const mode = ToInternalDifficulty(dungeon->DifficultyID);
+
         switch (dungeon->ExpansionLevel)
         {
             case 0:
                 return DUNGEON_CLASSIC;
             case 1:
             {
-                if (dungeon->DifficultyID == DUNGEON_DIFFICULTY_NORMAL)
+                if (mode == int32(DUNGEON_DIFFICULTY_NORMAL))
                 {
                     return DUNGEON_TBC;
                 }
-                else if (dungeon->DifficultyID == DUNGEON_DIFFICULTY_HEROIC)
+                else if (mode == int32(DUNGEON_DIFFICULTY_HEROIC))
                 {
                     return DUNGEON_TBC_HEROIC;
                 }
+                return DUNGEON_UNKNOWN;                     // was a fall-through into case 2
             }
             case 2:
             {
-                if (dungeon->DifficultyID == DUNGEON_DIFFICULTY_NORMAL)
+                if (mode == int32(DUNGEON_DIFFICULTY_NORMAL))
                 {
                     return DUNGEON_WOTLK;
                 }
-                else if (dungeon->DifficultyID == DUNGEON_DIFFICULTY_HEROIC)
+                else if (mode == int32(DUNGEON_DIFFICULTY_HEROIC))
                 {
                     return DUNGEON_WOTLK_HEROIC;
                 }
+                return DUNGEON_UNKNOWN;                     // was a fall-through into default
             }
             default:
                 return DUNGEON_UNKNOWN;
@@ -309,6 +333,62 @@ dungeonEntries LFGMgr::FindRandomDungeonsForPlayer(uint32 level, uint8 expansion
     return randomDungeons;
 }
 
+/**
+ * @brief The `dungeonfinder_requirements` row for an LfgDungeons entry, or NULL.
+ *
+ * This is the third DBC-to-world-table join that crosses the difficulty key spaces, and it
+ * has to translate for the same reason the other two do.
+ *
+ * LfgDungeons.dbc carries a RAW client DifficultyID; `dungeonfinder_requirements`.`difficulty`
+ * is an INTERNAL 0-based mode. Confirmed against the shipped world data rather than assumed:
+ * every five-man map with two rows carries 0 and 1 -- Opening of the Dark Portal 269, The Forge
+ * of Souls 632, Trial of the Champion 650, Pit of Saron 658 and Halls of Reflection 668 -- and
+ * Icecrown Citadel 631 carries 2 and 3. In the raw space those would be 1/2 and 5/6.
+ *
+ * 269 is the clearest exhibit of the five and was missing from an earlier version of this list:
+ * its difficulty-1 row is the Black Morass heroic attunement, so a table keyed on raw ids would
+ * have had to carry it at 2.
+ *
+ * Passing the raw id shifted every lookup by one tier, in both directions:
+ *
+ *   an LFG NORMAL row (raw 1) fetched the (map, 1) row, which is the HEROIC requirement, so a
+ *   player was held to the heroic item level and attunement quest to queue for normal content.
+ *   Item level and quests specifically: no five-man row in the table carries an achievement --
+ *   the only two that do are Icecrown Citadel's (631, 2) and (631, 3), a raid map that never
+ *   reaches this lookup because LFG_FORBIDDEN_RAID short-circuits above. The live five-man
+ *   gates are min_item_level 180 on 12 rows, 200 on 6 and 219 on 2;
+ *   an LFG HEROIC row (raw 2) asked for (map, 2), which for a five-man is CHALLENGE and has no
+ *   row at all, so the real heroic requirement was skipped entirely.
+ *
+ * Too strict where it should be lenient and absent where it should bite.
+ *
+ * It is PRE-EXISTING, not something this branch caused. An earlier version of this comment
+ * claimed the row-ordinal indexing had made the lookup miss on noise and that correcting the
+ * index turned it systematic. That is false, and measurably so: this function enumerates
+ * 0..GetNumRows()-1 and reads MapID, DifficultyID and TypeID off ONE row pointer, so with 343
+ * rows and no duplicate ids both index modes visit every row exactly once and the same 33 rows
+ * reach the requirements table with the same wrong tier key either way. The claim was carried
+ * over from a genuinely index-sensitive site -- CreateDungeonGroup, which looks a row up by a
+ * client-supplied id -- where it does hold.
+ *
+ * It is fixed here because this is the branch that separates the two key spaces, not because
+ * the branch created it.
+ *
+ * A row whose tier has no internal mode yields NULL, which reads as "no requirement". That is
+ * the pre-existing behaviour for a missing row and is safe here: JoinLFG refuses such a slot
+ * outright at admission, so nothing untranslatable reaches a queue on the strength of it.
+ */
+static DungeonFinderRequirements const* GetDungeonFinderRequirementsFor(LfgDungeonsEntry const* dungeon)
+{
+    int32 const mode = ToInternalDifficulty(dungeon->DifficultyID);
+    if (mode < 0)
+    {
+        return NULL;
+    }
+
+    return sObjectMgr.GetDungeonFinderRequirements(uint32(dungeon->MapID), uint32(mode));
+}
+
 dungeonForbidden LFGMgr::FindRandomDungeonsNotForPlayer(Player* plr)
 {
     uint32 level = plr->getLevel();
@@ -343,7 +423,7 @@ dungeonForbidden LFGMgr::FindRandomDungeonsNotForPlayer(Player* plr)
             {
                 forbiddenReason = (uint32)LFG_FORBIDDEN_NOT_IN_SEASON;
             }
-            else if (DungeonFinderRequirements const* req = sObjectMgr.GetDungeonFinderRequirements((uint32)dungeon->MapID, dungeon->DifficultyID))
+            else if (DungeonFinderRequirements const* req = GetDungeonFinderRequirementsFor(dungeon))
             {
                 if (req->minItemLevel && (plr->GetEquipGearScore(false,false) < req->minItemLevel))
                 {
@@ -412,8 +492,29 @@ void LFGMgr::UpdateNeededRoles(ObjectGuid guid, LFGPlayers* information)
     LfgDungeonsEntry const* dungeon = sLfgDungeonsStore.LookupEntry(*itr);
     if (dungeon)
     {
-        // atm we're just handling DUNGEON_DIFFICULTY_NORMAL
-        if (dungeon->DifficultyID == DUNGEON_DIFFICULTY_NORMAL)
+        // atm we're just handling DUNGEON_DIFFICULTY_NORMAL.
+        //
+        // Same raw-vs-internal confusion as GetDungeonType: LfgDungeons.dbc DifficultyID is a raw
+        // client id, so comparing it to DUNGEON_DIFFICULTY_NORMAL (internal 0) matched only rows
+        // carrying raw 0 -- 60 of them -- and never raw 1, which is what a 5-man normal dungeon
+        // actually is. 60 rather than the 59 given before: the old comparison had no TypeID
+        // filter, so its match set included id 358, 10v10 Rated Battleground, which is raid-typed.
+        // 59 is the non-raid subset, which is not what the code being described matched. The 90 normal-dungeon rows therefore left neededTanks,
+        // neededHealers and neededDps at their default, so the role counts were never initialised
+        // for the one case this branch claims to handle.
+        // ...and only for FIVE-MAN rows. NORMAL_TANK_OR_HEALER_COUNT and NORMAL_DAMAGE_COUNT are 1,
+        // 1 and 3 -- a 5-man composition. Raid rows carry raw DifficultyID 3 (10-normal) and 9
+        // (legacy 40-player), both of which translate to internal 0, so without the TypeID test the
+        // translation would newly hand a 10, 25 or 40-player raid a one-tank/one-healer/three-dps
+        // requirement. Before the translation those rows compared raw 3 and 9 against internal 0 and
+        // missed, so they were excluded by accident.
+        //
+        // LfgDungeons.dbc does supply per-row Count_tank, Count_healer and Count_damage, which is
+        // where raid compositions should eventually come from. Reading them here would change the
+        // 5-man numbers too, so it is left out of this fix; the point of this branch is the key
+        // space, and it must not silently start sizing raid groups.
+        if (dungeon->TypeID != LFG_TYPE_RAID &&
+            ToInternalDifficulty(dungeon->DifficultyID) == int32(DUNGEON_DIFFICULTY_NORMAL))
         {
             information->neededTanks = NORMAL_TANK_OR_HEALER_COUNT - tankCount;
             information->neededHealers = NORMAL_TANK_OR_HEALER_COUNT - healCount;

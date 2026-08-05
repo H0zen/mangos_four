@@ -45,6 +45,7 @@
  */
 
 #include "Common.h"
+#include "DBCStores.h"
 #include "Opcodes.h"
 #include "WorldPacket.h"
 #include "WorldSession.h"
@@ -1162,7 +1163,10 @@ bool Group::LoadGroupFromDB(Field* fields)
     }
 
     uint32 diff = fields[14].GetUInt8();
-    if (diff >= MAX_DUNGEON_DIFFICULTY)
+    // Refuse CHALLENGE here too -- `groups`.`difficulty` was written from the same raw cast
+    // as `characters`.`dungeon_difficulty`, so it carries the same stale key space. See the
+    // matching clamp in Player::LoadFromDB for why internal 2 is not loadable.
+    if (diff > DUNGEON_DIFFICULTY_HEROIC)
     {
         diff = DUNGEON_DIFFICULTY_NORMAL;
     }
@@ -2488,8 +2492,12 @@ void Group::SendUpdateToPlayer(ObjectGuid guid)
     update.leaderGuid = m_leaderGuid.GetRawValue();
     update.looterGuid = m_looterGuid.GetRawValue();
     update.hasInstanceDifficulty = true;
-    update.raidDifficulty = uint32(m_raidDifficulty);
-    update.dungeonDifficulty = uint32(m_dungeonDifficulty);
+    // SMSG_GROUP_LIST reports both tiers to the client, so both are RAW client DifficultyIDs
+    // on the wire. Sending the internal mode made the party frame disagree with the difficulty
+    // the same client had just been told over SMSG_SET_DUNGEON_DIFFICULTY, which does convert:
+    // an internal 1 (heroic) arrived as raw 1, which the client reads as normal.
+    update.raidDifficulty = ToClientDifficulty(m_raidDifficulty, true);
+    update.dungeonDifficulty = ToClientDifficulty(m_dungeonDifficulty, false);
     update.hasLootMode = true;
     update.lootMethod = uint8(m_lootMethod);
     update.lootThreshold = uint8(m_lootThreshold);

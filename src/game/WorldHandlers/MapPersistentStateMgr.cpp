@@ -425,7 +425,9 @@ void DungeonPersistentState::UpdateEncounterState(EncounterCreditType type, uint
     {
         DungeonEncounterEntry const* dbcEntry = iter->second->dbcEntry;
 
-        if (iter->second->creditType == type && Difficulty(dbcEntry->DifficultyID) == GetDifficulty() && dbcEntry->MapID == GetMapId())
+        // DungeonEncounter.dbc holds RAW client DifficultyIDs, so this cannot be a
+        // direct comparison against an internal mode -- see EncounterDifficultyMatches.
+        if (iter->second->creditType == type && EncounterDifficultyMatches(dbcEntry->MapID, dbcEntry->DifficultyID, GetDifficulty()) && dbcEntry->MapID == GetMapId())
         {
             m_completedEncountersMask |= 1 << dbcEntry->Bit;
 
@@ -485,6 +487,320 @@ time_t DungeonResetScheduler::CalculateNextResetTime(MapDifficultyEntry const* m
 }
 
 /**
+ * @brief Reads, migrates and applies the persisted `instance_reset` rows.
+ *
+ * Split out of LoadResetTimes: the key-space migration below is a self-contained concern
+ * carrying a long rationale, and inlining it made that function considerably larger than
+ * anything else in this file.
+ *
+ * @param diff The configured instance reset hour, already converted to seconds.
+ */
+void DungeonResetScheduler::LoadGlobalResetTimes(uint32 diff)
+{
+    QueryResult* result = CharacterDatabase.Query("SELECT `mapid`, `difficulty`, `resettime` FROM `instance_reset`");
+    if (!result)
+    {
+        return;
+    }
+
+    // `instance_reset`.`difficulty` holds an INTERNAL 0-based mode, the same key space as
+    // `instance`.`difficulty`, DungeonPersistentState::GetDifficulty and
+    // m_resetTimeByMapDifficulty. The scheduler below writes it from the legacy index.
+    //
+    // A build that keyed this table on RAW client DifficultyIDs wrote a different key space into
+    // the same column, and the two overlap, so this is a migration and not just validation.
+    // Row-by-row validation is not sufficient, which an earlier revision of this code got wrong:
+    //
+    //   * The old scheduler enumerated the raw map and skipped RaidDuration == 0, so it could
+    //     write 136 rows across 88 maps, with stored values 2, 3, 4, 5, 6 and 9.
+    //   * Read as internal modes, 122 of those are detectable: 4, 5, 6 and 9 exceed
+    //     MAX_DIFFICULTY, and raw 2 resolves to internal 2, which since challenge mode stopped
+    //     being translated has no legacy-index entry at all. (An earlier comment here claimed
+    //     nine raw-2 challenge rows survived and that the RaidDuration test was what caught
+    //     them. Both halves are obsolete -- `!resetDiff` already rejects them.)
+    //   * 14 are NOT detectable. Raw 3 is raid 10-normal; internal 3 is raid 25-heroic. On the
+    //     14 maps carrying both with a global reset, a stale 10-normal timestamp validates
+    //     perfectly as a 25-heroic one, reaches SetResetTimeFor, and then suppresses the fresh
+    //     initialisation the scheduler below would otherwise do -- because that loop only fills
+    //     tiers with no reset time yet. No per-row test can tell those 14 apart from a row we
+    //     wrote ourselves; the value is legal in both key spaces.
+    //
+    // So the table is validated as a WHOLE, but the trigger is narrow, and BOTH halves of that
+    // matter. An earlier revision of this code got each of them wrong in turn.
+    //
+    // The trigger is IsLegacyRawResetKey: the stored (map, value) pair is itself a real,
+    // reset-bearing RAW MapDifficulty tier -- which is precisely what the old raw-keyed
+    // scheduler wrote, and what this build never writes. It is NOT "value >= MAX_DIFFICULTY",
+    // which an earlier revision used and which this comment described for longer than the code
+    // did. That older test was both too broad and too narrow: out-of-range is not evidence of
+    // the raw key space (a hand edit is out of range too), and it missed raw 2 and 3 entirely.
+    //
+    // The first attempt was broader still and condemned the table on ANY invalid row. That is
+    // far too much -- a map dropped from the DBC, or one hand-edited row, would discard every
+    // legitimate reset time, and that is NOT free. The rebuild below computes
+    // `today + period + diff`, so wiping a valid row moves that lockout boundary by up to a full
+    // reset period. Calling this table "just a cache" was wrong. Non-definitive invalid rows are
+    // therefore deleted individually, exactly as before, and leave the rest of the table alone.
+    //
+    // Note the trigger is strong evidence, not proof: a hand-written row that happens to name a
+    // real raw reset-bearing tier would also fire it. That is accepted deliberately. Such a row
+    // is indistinguishable from one the old scheduler wrote, and the cost of acting on it is a
+    // single rebuild of a table this code can regenerate in full.
+    //
+    // When the trigger fires, every row is suspect and all of them go, because the 14 ambiguous
+    // ones cannot be identified. That is sound for a table the old build wrote in full, and it
+    // is measured rather than assumed: re-derived against the shipped MapDifficulty.dbc, the old
+    // scheduler wrote 136 rows across 88 maps, of which 122 fail the internal check and every one
+    // of those trips IsLegacyRawResetKey by construction. The remaining 14 are the ambiguous
+    // raw-3 rows, on 14 maps -- and ZERO of those maps lack a proving row elsewhere in the same
+    // table, so the condemnation reaches all of them.
+    //
+    // Sniffing alone is NOT sufficient, and the durable answer is a version bump rather than
+    // anything in this function. DBC co-occurrence is not TABLE co-occurrence: a legacy table can
+    // hold an ambiguous raw-3 row with its raw-4/5/6 companions already gone -- after a partial
+    // startup, manual cleanup, or one run of an earlier row-by-row version of this very
+    // migration, which deleted exactly those detectable rows one at a time. Such a table passes
+    // everything below, the stale 10-normal timestamp is applied as 25-heroic, and the rebuild is
+    // suppressed. No inspection of row contents can catch it.
+    //
+    // So CHAR_DB_STRUCTURE_NR is bumped to 2, and the matching characters update deletes this
+    // table and advances `db_version`. A version or structure mismatch is FATAL in
+    // Database::CheckDatabaseVersion, so an un-migrated database cannot start -- which is the
+    // point. Bumping CONTENT instead would not do: a content lag is only a warning there, and
+    // the affected database would start silently.
+    //
+    // The detection below is therefore belt-and-braces for a database that reaches this code
+    // anyway, and the log line names the statement to run.
+    std::vector<std::pair<uint32 /*mapid*/, std::pair<uint32 /*difficulty*/, uint64 /*resettime*/> > > resetRows;
+    bool rawKeySpaceProven = false;
+
+    do
+    {
+        Field* fields = result->Fetch();
+
+        uint32 mapid            = fields[0].GetUInt32();
+        uint32 difficulty       = fields[1].GetUInt32();
+        uint64 oldresettime     = fields[2].GetUInt64();
+
+        MapEntry const* mapEntry = sMapStore.LookupEntry(mapid);
+        MapDifficultyEntry const* resetDiff = difficulty < MAX_DIFFICULTY
+            ? GetMapDifficultyData(mapid, Difficulty(difficulty))
+            : NULL;
+
+        if (!mapEntry || !mapEntry->IsDungeon() || !resetDiff || !resetDiff->RaidDuration)
+        {
+            sLog.outError("DungeonResetScheduler::LoadGlobalResetTimes: invalid mapid(%u)/difficulty(%u) pair in instance_reset!", mapid, difficulty);
+
+            if (IsLegacyRawResetKey(mapid, difficulty))
+            {
+                // This row is exactly what the old raw-keyed scheduler wrote: a raw reset-bearing
+                // (map, tier) pair. Flag the table; the row goes with the rest of it below.
+                //
+                // Not `difficulty >= MAX_DIFFICULTY`, which an earlier revision used. Out of
+                // internal range is not evidence of the raw key space -- an arbitrary hand edit
+                // is out of range too, and treating that as proof condemns a whole table of valid
+                // reset times over one junk row, which is the blast radius this trigger exists to
+                // avoid.
+                rawKeySpaceProven = true;
+            }
+            else
+            {
+                // Invalid for some unrelated reason. Drop just this row, as this code always did.
+                CharacterDatabase.DirectPExecute("DELETE FROM `instance_reset` WHERE `mapid` = '%u' AND `difficulty` = '%u'", mapid, difficulty);
+            }
+            continue;
+        }
+
+        resetRows.push_back(std::make_pair(mapid, std::make_pair(difficulty, oldresettime)));
+    }
+    while (result->NextRow());
+    delete result;
+
+    if (rawKeySpaceProven)
+    {
+        // A stored (map, value) pair that is itself a reset-bearing RAW MapDifficulty tier is
+        // what the old raw-keyed scheduler wrote and what this build never writes, so the rows
+        // that DID validate cannot be trusted either -- see above -- and none is applied.
+        sLog.outString("DungeonResetScheduler::LoadGlobalResetTimes: `instance_reset` holds raw client "
+                       "DifficultyIDs; discarding all %u remaining row(s) and rebuilding. Global instance "
+                       "lockout boundaries are recomputed once. If this recurs, run "
+                       "\"DELETE FROM `instance_reset`;\" once against the characters database.",
+                       uint32(resetRows.size()));
+        CharacterDatabase.DirectExecute("DELETE FROM `instance_reset`");
+        resetRows.clear();
+    }
+
+    for (size_t i = 0; i < resetRows.size(); ++i)
+    {
+        uint32 mapid          = resetRows[i].first;
+        uint32 difficulty     = resetRows[i].second.first;
+        uint64 oldresettime   = resetRows[i].second.second;
+
+        // update the reset time if the hour in the configs changes
+        uint64 newresettime = (oldresettime / DAY) * DAY + diff;
+        if (oldresettime != newresettime)
+        {
+            CharacterDatabase.DirectPExecute("UPDATE `instance_reset` SET `resettime` = '" UI64FMTD "' WHERE `mapid` = '%u' AND `difficulty` = '%u'", newresettime, mapid, difficulty);
+        }
+
+        SetResetTimeFor(mapid, Difficulty(difficulty), newresettime);
+    }
+}
+
+/**
+ * @brief Rewrites stale challenge-mode instance rows to heroic, before anything deletes them.
+ *
+ * `instance`.`difficulty` holds an internal mode, but a build predating the key-space split
+ * could put a RAW id there: the old dungeon finder cast an LfgDungeons DifficultyID straight
+ * into Difficulty, Group::SetDungeonDifficulty pushed it to the members, and
+ * MapManager::CreateDungeonMap then created and saved the instance under it. Raw 2 means 5-man
+ * HEROIC, and it was the one value that could get a character into a five-man at all on such a
+ * build, because the old raw-keyed lookup accepted it while the default 0 matched nothing.
+ *
+ * Read as an internal mode, 2 is CHALLENGE, and no ordinary heroic dungeon has a challenge row.
+ * Both validators treat that as a corrupt bind and DELETE it -- Player::_LoadBoundInstances at
+ * login, and the `instance` sweep below at startup. So the upgrade would quietly destroy
+ * `character_instance` rows for exactly the characters that had been able to run dungeons.
+ *
+ * Rewriting to HEROIC is what the value always meant, and it is unconditionally safe rather than
+ * being safe only during an upgrade: challenge mode is unreachable in this core by design --
+ * ToInternalDifficulty refuses raw 8, and both load clamps reject internal 2 -- so a dungeon-map
+ * instance at internal 2 is a value this build cannot produce, whenever it was written.
+ *
+ * Raids are deliberately untouched. Internal 2 there is 10-player heroic, a legitimate tier on
+ * 14 shipped maps, so the same numeric value is real data and must not be rewritten.
+ */
+static void NormalizeStaleChallengeInstances()
+{
+    QueryResult* result = CharacterDatabase.Query(
+        "SELECT `id`, `map` FROM `instance` WHERE `difficulty` = 2");
+    if (!result)
+    {
+        return;
+    }
+
+    std::vector<uint32> stale;
+    do
+    {
+        Field* fields = result->Fetch();
+        uint32 const id = fields[0].GetUInt32();
+        uint32 const mapid = fields[1].GetUInt32();
+
+        MapEntry const* mapEntry = sMapStore.LookupEntry(mapid);
+        if (mapEntry && mapEntry->IsDungeon() && !mapEntry->IsRaid())
+        {
+            stale.push_back(id);
+        }
+    }
+    while (result->NextRow());
+    delete result;
+
+    for (size_t i = 0; i < stale.size(); ++i)
+    {
+        // `resettime` is cleared in the same statement, and leaving it was a real defect.
+        //
+        // DungeonPersistentState::GetResetTimeForDB zeroes the column only for raids and for
+        // DUNGEON_DIFFICULTY_HEROIC, so a five-man save stored at internal 2 -- neither of
+        // those -- was written with a NON-ZERO per-instance reset. Rewriting only the
+        // difficulty would leave (heroic, resettime > 0), a combination this code never
+        // produces: the first query in LoadResetTimes selects `WHERE resettime > 0`, so the
+        // converted save would be scheduled as a RESET_EVENT_NORMAL_DUNGEON and
+        // AddPersistentState would honour that stale per-instance boundary instead of the
+        // heroic global one.
+        //
+        // Zero is what GetResetTimeForDB would have written had the save been stored as heroic
+        // in the first place, which is the state this rewrite is reconstructing.
+        CharacterDatabase.DirectPExecute(
+            "UPDATE `instance` SET `difficulty` = '%u', `resettime` = '0' WHERE `id` = '%u'",
+            uint32(DUNGEON_DIFFICULTY_HEROIC), stale[i]);
+
+        // Bring the BOUND characters and groups up to heroic with it, or the bind is preserved
+        // in a form nothing can reach.
+        //
+        // A bind is stored under the INSTANCE's tier -- Player::BindToInstance indexes
+        // m_boundInstances[state->GetDifficulty()] -- but looked up under the PLAYER's selected
+        // tier, in GetBoundInstanceSaveForSelfOrGroup. The characters update clamps a stale
+        // selection of 2 to 0, so after this rewrite the instance and its bind sit at 1 while
+        // the owner asks at 0. On an ordinary dungeon that has a normal row the lookup succeeds
+        // and does NOT fold, so it searches tier 0 and misses the bind entirely: the character
+        // is treated as having no state, is relocated out of the instance at load, and can then
+        // create a second one for a lockout they already hold.
+        //
+        // Narrow on purpose. The blanket clamp to NORMAL stays right for everyone else, because
+        // a character left at HEROIC cannot enter a normal-only dungeon while the difficulty
+        // setter is unregistered. Only a character actually bound to one of these rewritten
+        // saves needs heroic, and for them it is not a preference but the tier their lockout
+        // lives at.
+        //
+        // Which owners this actually reaches, measured rather than assumed -- two earlier
+        // versions of this comment got the cohort wrong in both directions.
+        //
+        // REACHED: an ungrouped character of level 70 or more, where the value simply survives
+        // login; and a grouped character of 70 or more whose GROUP is bound to the same save,
+        // because the `groups` statement below sets that group to heroic and Player::_LoadGroup
+        // syncs every member of 70+ from it.
+        //
+        // NOT REACHED: a character under LEVELREQUIREMENT_HEROIC (70), whom Player::LoadFromDB
+        // clamps back to NORMAL; and a character of 70+ whose group is NOT bound to this save,
+        // whom _LoadGroup moves to that group's tier instead.
+        //
+        // Neither miss is corruption. `characters`.`dungeon_difficulty` has exactly one
+        // functional reader in the tree -- the clamp itself -- and Player::SaveToDB rewrites the
+        // whole row from the in-memory value, so for a stripped cohort this UPDATE is
+        // unobservable: nothing can read the heroic value before it is overwritten.
+        //
+        // The cohort it DOES reach pays a price worth stating. A rescued owner is pinned at
+        // HEROIC with no way out on their own, because the difficulty setter is unregistered,
+        // and Player::GetAreaTriggerLockStatus derives isRegularTargetMap from the player's own
+        // tier -- the fold does not recompute it -- so its level gate refuses them entry to
+        // five-mans of any expansion whose cap they have not reached. One group join clears it.
+        //
+        // The sub-70 case is a real gap, left open on scope. Be exact about why, because two
+        // earlier versions of this comment were not:
+        //
+        //   Rejoining the group does NOT make the bind reachable. Group::GetBoundInstance keys
+        //   its lookup on the PLAYER's tier, not the group's, so both legs of
+        //   GetBoundInstanceSaveForSelfOrGroup miss for a sub-70 sitting at NORMAL. Neither fold
+        //   rescues it either: 64 five-man maps carry both raw 1 and raw 2, so the NORMAL lookup
+        //   succeeds and no fold fires. MapManager then resolves at the player's tier and
+        //   CREATES at the group's, i.e. a duplicate instance, and DungeonMap::Add re-keys on the
+        //   map's tier and reaches a MANGOS_ASSERT -- which in a Release build is a log line, so
+        //   the player is silently added to the duplicate.
+        //
+        // That is a pre-existing core defect this rescue re-exposes for one upgrade cohort, not
+        // one it invents, and the fix is a one-liner in Group::GetBoundInstance rather than
+        // anything here. It is deferred because it wants a live check first: a sub-70 in a 70+
+        // heroic group must land in the SAME instance id as the group.
+        //
+        // Do NOT "fix" it by teaching the login clamps that a bind-backed difficulty outranks the
+        // level clamp, which an earlier version of this comment proposed. `dungeon_difficulty` is
+        // a single global per-character selector, so raising a sub-70 to HEROIC to reach one
+        // lockout trips that same area-trigger gate on every five-man of the expansion and locks
+        // them out of normal dungeons they can run today. That is a regression, not a fix.
+        CharacterDatabase.DirectPExecute(
+            "UPDATE `characters` SET `dungeon_difficulty` = '%u' WHERE `guid` IN "
+            "(SELECT `guid` FROM `character_instance` WHERE `instance` = '%u')",
+            uint32(DUNGEON_DIFFICULTY_HEROIC), stale[i]);
+
+        // Joined on leaderGuid, NOT groupId: `group_instance` keys on the leader, and
+        // ObjectMgrInstanceData's own loader joins `groups`.`leaderGUID` to
+        // `group_instance`.`leaderGUID`.
+        CharacterDatabase.DirectPExecute(
+            "UPDATE `groups` SET `difficulty` = '%u' WHERE `leaderGuid` IN "
+            "(SELECT `leaderGuid` FROM `group_instance` WHERE `instance` = '%u')",
+            uint32(DUNGEON_DIFFICULTY_HEROIC), stale[i]);
+    }
+
+    if (!stale.empty())
+    {
+        sLog.outString("MapPersistentStateManager: rewrote %u five-man instance save(s) from the "
+                       "unreachable challenge mode to heroic, which is what the stored raw id "
+                       "meant. Their character and group binds are preserved.",
+                       uint32(stale.size()));
+    }
+}
+
+/**
  * @brief Loads and schedules persisted dungeon reset times.
  */
 void DungeonResetScheduler::LoadResetTimes()
@@ -492,6 +808,10 @@ void DungeonResetScheduler::LoadResetTimes()
     time_t now = time(NULL);
     time_t today = (now / DAY) * DAY;
     time_t nextWeek = today + (7 * DAY);
+
+    // Must run before the `instance` sweep below and before any character logs in, because both
+    // validators DELETE a bind whose difficulty has no MapDifficulty row.
+    NormalizeStaleChallengeInstances();
 
     // NOTE: Use DirectPExecute for tables that will be queried later
 
@@ -515,6 +835,8 @@ void DungeonResetScheduler::LoadResetTimes()
 
                 MapEntry const* mapEntry = sMapStore.LookupEntry(mapid);
 
+                // `instance`.`difficulty` holds an internal 0-based mode, not a raw
+                // client id, so this one stays on the internal lookup.
                 if (!mapEntry || !mapEntry->IsDungeon() || !GetMapDifficultyData(mapid, Difficulty(difficulty)))
                 {
                     sMapPersistentStateMgr.DeleteInstanceFromDB(id);
@@ -559,38 +881,7 @@ void DungeonResetScheduler::LoadResetTimes()
 
     // load the global respawn times for raid/heroic instances
     uint32 diff = sWorld.getConfig(CONFIG_UINT32_INSTANCE_RESET_TIME_HOUR) * HOUR;
-    result = CharacterDatabase.Query("SELECT `mapid`, `difficulty`, `resettime` FROM `instance_reset`");
-    if (result)
-    {
-        do
-        {
-            Field* fields = result->Fetch();
-
-            uint32 mapid            = fields[0].GetUInt32();
-            Difficulty difficulty   = Difficulty(fields[1].GetUInt32());
-            uint64 oldresettime     = fields[2].GetUInt64();
-
-            MapEntry const* mapEntry = sMapStore.LookupEntry(mapid);
-
-            if (!mapEntry || !mapEntry->IsDungeon() || !GetMapDifficultyData(mapid, difficulty))
-            {
-                sLog.outError("MapPersistentStateManager::LoadResetTimes: invalid mapid(%u)/difficulty(%u) pair in instance_reset!", mapid, difficulty);
-                CharacterDatabase.DirectPExecute("DELETE FROM `instance_reset` WHERE `mapid` = '%u' AND `difficulty` = '%u'", mapid, difficulty);
-                continue;
-            }
-
-            // update the reset time if the hour in the configs changes
-            uint64 newresettime = (oldresettime / DAY) * DAY + diff;
-            if (oldresettime != newresettime)
-            {
-                CharacterDatabase.DirectPExecute("UPDATE `instance_reset` SET `resettime` = '" UI64FMTD "' WHERE `mapid` = '%u' AND `difficulty` = '%u'", newresettime, mapid, difficulty);
-            }
-
-            SetResetTimeFor(mapid, difficulty, newresettime);
-        }
-        while (result->NextRow());
-        delete result;
-    }
+    LoadGlobalResetTimes(diff);
 
     // clean expired instances, references to them will be deleted in CleanupInstances
     // must be done before calculating new reset times
@@ -598,7 +889,23 @@ void DungeonResetScheduler::LoadResetTimes()
 
     // calculate new global reset times for expired instances and those that have never been reset yet
     // add the global reset times to the priority queue
-    for (MapDifficultyMap::const_iterator itr = sMapDifficultyMap.begin(); itr != sMapDifficultyMap.end(); ++itr)
+    // Iterates the INTERNAL-mode index, not the raw sMapDifficultyMap. Everything this
+    // loop writes -- m_resetTimeByMapDifficulty, `instance_reset` and the scheduled
+    // DungeonResetEvents -- is read back elsewhere with an internal mode: by
+    // AddPersistentState, by MovementHandler's reset warning and by the
+    // DungeonPersistentState::GetDifficulty() comparison in _ResetOrWarnAll. Keying it
+    // on raw client ids made all three wrong, because no raw id except 0 equals its own
+    // internal mode: 122 of the 136 reset-bearing tiers missed the table outright and
+    // the remaining 14 (internal 3 against raw id 3) picked raid 10-normal's row while
+    // claiming to be 25-heroic.
+    //
+    // 136, not the 143 an earlier revision of this comment gave. That count was measured
+    // while BuildMapDifficultyLegacyIndex left the seven 25-player-only TBC raids holding
+    // two keys apiece, so it counted this loop's own duplicate rows as though they were
+    // real tiers. The widening is a move rather than a copy now, and 136 is the number of
+    // physical lockouts that actually exist.
+    MapDifficultyMap const& legacyMap = GetMapDifficultyLegacyMap();
+    for (MapDifficultyMap::const_iterator itr = legacyMap.begin(); itr != legacyMap.end(); ++itr)
     {
         uint32 map_diff_pair = itr->first;
         uint32 mapid = PAIR32_LOPART(map_diff_pair);
@@ -728,6 +1035,9 @@ void DungeonResetScheduler::Update()
             {
                 // re-schedule the next/new global reset/warning
                 // calculate the next reset time
+                // DungeonResetEvent carries an INTERNAL mode, taken from the legacy
+                // index key when the event was scheduled -- and the same key space the
+                // RESET_EVENT_NORMAL_DUNGEON events built in AddPersistentState use.
                 MapDifficultyEntry const* mapDiff = GetMapDifficultyData(event.mapid, event.difficulty);
                 MANGOS_ASSERT(mapDiff);
 
@@ -1171,6 +1481,9 @@ void MapPersistentStateManager::_ResetOrWarnAll(uint32 mapid, Difficulty difficu
 
     if (!warn)
     {
+        // 'difficulty' is an INTERNAL mode, which is also what the
+        // GetDifficulty() comparison below needs: DungeonPersistentState holds
+        // internal modes, so a raw id here matched the wrong tier or none at all.
         MapDifficultyEntry const* mapDiff = GetMapDifficultyData(mapid, difficulty);
         if (!mapDiff || !mapDiff->RaidDuration)
         {

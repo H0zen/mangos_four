@@ -583,7 +583,69 @@ void LFGMgr::CreateDungeonGroup(LFGProposal* proposal)
         return;
     }
 
-    pGroup->SetDungeonDifficulty(Difficulty(dungeon->DifficultyID));
+    // LfgDungeons.dbc carries a RAW client DifficultyID. Casting it straight to
+    // Difficulty made LFG normal (id 1) select internal mode 1 -- HEROIC -- and LFG
+    // heroic (id 2) select mode 2, CHALLENGE. That value does not stay in the session:
+    // Group::SetDungeonDifficulty persists it to `groups`.`difficulty` and, through the
+    // members, to `characters`.`dungeon_difficulty`, so a single LFG run left every
+    // member's saved difficulty wrong.
+    int32 const dungeonMode = ToInternalDifficulty(dungeon->DifficultyID);
+
+    // Raids and dungeons keep their difficulty in DIFFERENT fields, and the two setters do not
+    // persist symmetrically:
+    //   SetDungeonDifficulty -> `groups`.`difficulty` and every member's
+    //                           `characters`.`dungeon_difficulty`
+    //   SetRaidDifficulty    -> `groups`.`raiddifficulty` only, plus in-memory
+    //                           Player::m_raidDifficulty
+    //
+    // There is deliberately no `characters`.`raid_difficulty` claim here: that column does not
+    // exist in the schema. The raid tier reaches a character through Player::_LoadGroup at the
+    // next login, not through a column of its own. An earlier revision of this comment asserted
+    // the symmetric pair and was wrong about half of it.
+    //
+    // Sending a raid through the dungeon setter therefore stores the raid tier in the dungeon slot
+    // and leaves the raid slot untouched. 61 of the 343 LfgDungeons rows are TypeID 2, and the
+    // tiers they carry translate to internal 0..3 -- client 3 and 9 to 0, 4 to 1, 5 to 2, 6 to 3.
+    // Internal 3 is 25-player heroic, which no 5-man tier corresponds to, so a group could end up
+    // holding a dungeon difficulty outside the range dungeon difficulties represent.
+    bool const isRaid = (dungeon->TypeID == LFG_TYPE_RAID);
+
+    if (dungeonMode < 0)
+    {
+        // UNREACHABLE from the queue: JoinLFG refuses any slot whose DifficultyID has no internal
+        // mode with ERR_LFG_INVALID_SLOT, and also filters the random-dungeon group expansion, which
+        // otherwise smuggles 20 scenario rows in behind a valid random selection. Together those are
+        // where an unsupported tier is actually rejected.
+        // By the time execution arrives here the group exists and its members have already been
+        // pulled out of their previous groups, so refusing is no longer an option -- all that is
+        // left is to avoid persisting a mode the core cannot read.
+        //
+        // So this is a safety net, not a policy, and it is deliberately loud: if it ever fires, a
+        // proposal reached here by some path that does not go through JoinLFG's admission check, and
+        // the group is about to be teleported into REGULAR_DIFFICULTY of a map it did not queue for.
+        // LFR (7), 5-man challenge (8), scenarios (11, 12) and flexible (14) have no internal
+        // equivalent; 77 of the 343 LfgDungeons rows are one of those, 4 of them raids.
+        sLog.outError("LFGMgr::CreateDungeonGroup: dungeon %u has client DifficultyID %u with no internal mode. "
+                      "JoinLFG should have refused this slot; falling back to regular difficulty.",
+                      dungeon->ID, dungeon->DifficultyID);
+
+        if (isRaid)
+        {
+            pGroup->SetRaidDifficulty(REGULAR_DIFFICULTY);
+        }
+        else
+        {
+            pGroup->SetDungeonDifficulty(REGULAR_DIFFICULTY);
+        }
+    }
+    else if (isRaid)
+    {
+        pGroup->SetRaidDifficulty(Difficulty(dungeonMode));
+    }
+    else
+    {
+        pGroup->SetDungeonDifficulty(Difficulty(dungeonMode));
+    }
 
     // Add group to our group set and group map, then teleport to the dungeon
     ObjectGuid groupGuid = pGroup->GetObjectGuid();

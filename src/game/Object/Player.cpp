@@ -4464,10 +4464,65 @@ void Player::SendInitialPacketsBeforeAddToMap()
 
     SendTalentsInfoData(false);
 
+    // RAW client DifficultyID, map-aware -- proved from the wire, not inferred from the UI.
+    //
+    // Across 2554 build-18414 PACKETS of this opcode -- spread over 246 of the 263 captures,
+    // not 2554 captures -- the field carries
+    // {0, 1, 2, 3, 4, 5, 7, 8, 9, 11, 12, 14}. The values 7 (LFR), 11 and 12 (scenarios) and
+    // 14 (flexible) are decisive: no internal mode can produce them, because internal modes
+    // stop at 3. 8 and 9 are raw-only too. So the field is the raw client id, and sending
+    // GetMap()->GetDifficulty() put an internal mode where a raw id belongs.
+    //
+    // Be precise about the symptom, because an earlier version of this comment was not.
+    // Difficulty.dbc ships ids {1,2,3,4,5,6,7,8,9,11,12,14} and has NO id 0, so on the seven
+    // 25-player-only TBC raids the old value -- internal 0, where retail sends raw 4 -- resolved
+    // to no row at all: the client got no tier rather than a wrong one. Where it did name a
+    // wrong tier is the tiers that collide, and those are the common case: a heroic five-man
+    // sent internal 1, and raw 1 is instanceType 1 at 5 maxPlayers, i.e. five-man NORMAL, so
+    // heroic dungeons reported themselves as normal. The claim that a 25-man raid read as
+    // "5 Player" was wrong on both halves and is withdrawn.
+    //
+    // The 10/14/18-byte size split in the corpus is optional-field presence, and the offset is
+    // stable across all three shapes -- 14-byte 80 00 10 94 bc 53 | 02 00 00 00 | 05 00 00 00
+    // and 18-byte 90 00 10 09 cf 53 | 07 00 00 00 | 19 00 00 00 80 00 00 00 both put the
+    // difficulty at 6.
+    //
+    // That stability is OBSERVED, not structural, and an earlier version of this comment claimed
+    // the wrong reason for it. The optionals do not all follow the field: sub_6F470B reads the
+    // one gated by read-order bit 1 BEFORE the u8 and both u32s, so a body with that bit set
+    // would shift the difficulty. It is clear in all 2554 samples -- the leading byte is only
+    // 0x00, 0x80 or 0x90 -- so the conclusion holds for everything observed, but a future body
+    // with that bit set would not decode at offset 6.
+    //
+    // ONLY instances convert. Off an instance the map's spawn mode is ALREADY the value retail
+    // sends, and translating it is wrong in both directions:
+    //
+    //   continents and battlegrounds run at spawn mode 0 and retail sends 0, but no map-aware
+    //   row exists for several of them -- Eastern Kingdoms has none at all -- so the conversion
+    //   fell through to the five-man table and sent 1;
+    //
+    //   Tol'Viron Arena, map 980, is the single exception in the whole of PvpDifficulty.dbc:
+    //   one of its 173 rows carries a nonzero Difficulty, (map 980, level 90, Difficulty 1),
+    //   and CreateBattleGroundMap copies that into the map's spawn mode. Retail sends 1 there.
+    //   Forcing non-instanceable maps to 0 would send 0, and converting would send 2.
+    //
+    // So the spawn mode goes out unconverted off an instance, which reproduces every correlated
+    // observation in the corpus: 0 on continents and every other arena and battleground, 1 on
+    // Tol'Viron.
+    //
+    // This is the most reachable outbound difficulty there is -- SendInitialPacketsBeforeAddToMap
+    // runs on every login and every map change -- and it survived two sweeps of the outbound
+    // boundaries because they grepped near packet builders and this passes the value as a bare
+    // argument.
+    Map const* infoMap = GetMap();
+    uint32 const worldServerDifficulty = infoMap->IsDungeon()
+        ? ToClientDifficultyForMap(infoMap->GetId(), infoMap->GetDifficulty(), infoMap->IsRaid())
+        : uint32(infoMap->GetDifficulty());
+
     data.Initialize(SMSG_WORLD_SERVER_INFO, 10);
     MopWorldEntryPackets::BuildWorldServerInfo(data, 0,
         uint32(sWorld.GetNextWeeklyQuestsResetTime() - WEEK),
-        uint32(GetMap()->GetDifficulty()));
+        worldServerDifficulty);
     GetSession()->SendPacket(&data);
 
     SendInitialQuestSetup();

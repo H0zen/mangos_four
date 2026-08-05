@@ -36,6 +36,7 @@
 #include "Util.h"
 
 #include <map>
+#include <set>
 
 typedef std::map<uint16, uint32> AreaFlagByAreaID;
 typedef std::map<uint32, uint32> AreaFlagByMapID;
@@ -156,6 +157,16 @@ DBCStorage <MapEntry> sMapStore(MapEntryfmt);
 
 DBCStorage <MapDifficultyEntry> sMapDifficultyStore(MapDifficultyEntryfmt); // only for loading
 MapDifficultyMap sMapDifficultyMap;
+// (mapId, internal 0-based Difficulty) -> row. Built by BuildMapDifficultyLegacyIndex();
+// see GetMapDifficultyData for why the raw DBC keying above cannot serve both.
+static MapDifficultyMap sMapDifficultyLegacyMap;
+static void BuildMapDifficultyLegacyIndex();
+
+// MAKE_PAIR32(mapId, internal Difficulty) for every map/tier that ships at least one
+// NON-wildcard DungeonEncounter row of its own. Consulted by EncounterDifficultyMatches to
+// decide whether falling back to a lower tier is allowed; see there for why it must be.
+static std::set<uint32> sEncounterExactTiers;
+static void BuildEncounterExactTierIndex();
 
 DBCStorage <MovieEntry> sMovieStore(MovieEntryfmt);
 DBCStorage <MountCapabilityEntry> sMountCapabilityStore(MountCapabilityfmt);
@@ -739,6 +750,12 @@ void LoadDBCStores(const std::string& dataPath)
         {
             sMapDifficultyMap[MAKE_PAIR32(entry->MapID, entry->DifficultyID)] = entry;
         }
+    // Map.dbc is already loaded above, which the 25-player-only raid widening needs.
+    BuildMapDifficultyLegacyIndex();
+
+    // DungeonEncounter.dbc is loaded above; this records which map/tier pairs have their own
+    // rows, so EncounterDifficultyMatches knows when falling back is allowed.
+    BuildEncounterExactTierIndex();
 
     LoadDBC(availableDbcLocales, bar, bad_dbc_files, sMovieStore,               dbcPath, "Movie.dbc");
     LoadDBC(availableDbcLocales,bar,bad_dbc_files, sMountCapabilityStore,     dbcPath,"MountCapability.dbc");
@@ -1660,16 +1677,636 @@ ContentLevels GetContentLevelsForMapAndZone(uint32 mapId, uint32 zoneId)
 }
 
 /**
+ * @brief Translate a raw 5.4.8 client DifficultyID into the core's internal mode.
+ *
+ * MapDifficulty.dbc is keyed on Difficulty.dbc ids, which for instances START AT 1,
+ * while the Difficulty enum is the 0-based WotLK-era one. Stockades (map 34) has
+ * exactly one row, DifficultyID 1, so a request for DUNGEON_DIFFICULTY_NORMAL (0)
+ * found nothing, Player::GetAreaTriggerLockStatus() answered
+ * AREA_LOCKSTATUS_MISSING_DIFFICULTY, and no instance in the game was enterable.
+ * Continents were unaffected because world, battleground and arena maps are the
+ * only ones that carry a 0 row.
+ *
+ * The direction here is client -> internal, which is what building the legacy index
+ * needs. The id mapping is identical to the switch in BuildMapSpawnModeMasks and the
+ * two must be changed together: a tier this function admits but that one drops
+ * resolves at the area trigger and then instantiates with no spawns filed under its
+ * mask, so the instance is entered completely empty. Challenge mode is exactly that
+ * hazard, and the two switches agree by both OMITTING id 8 -- see below.
+ *
+ * Ids with no internal equivalent return -1 and are simply absent from the index:
+ * LFR (7), flexible (14) and scenarios (11, 12). The Difficulty enum has no member
+ * for any of them, so giving them one is a feature, not a mapping fix.
+ *
+ * Challenge mode (8) is deliberately NOT translated, and that is a reversal of an earlier
+ * revision of this branch which mapped it to internal mode 2.
+ *
+ * All nine challenge dungeons ship a DifficultyID 8 row in MapDifficulty.dbc -- 959, 960, 961,
+ * 962, 994, 1001, 1004, 1007 and 1011 -- so translating it puts internal mode 2 in the legacy
+ * index and lets the client enter at that tier. The world database has no spawns to match:
+ *
+ *   maps 959/960/961/962   347/177/433/561 creatures, every one spawnMask 3 (bits 0 and 1)
+ *   maps 994/1001/1004/1007/1011   no creature spawns at all, in any mode
+ *
+ * Nothing on those maps carries bit 2, so the instance instantiates and is completely empty.
+ * That is exactly the divergence this file warns about elsewhere, one layer further down: the
+ * earlier revision checked that ToInternalDifficulty and BuildMapSpawnModeMasks agreed with each
+ * other, but agreeing about a mode the DATA never populates still yields an empty dungeon.
+ * Note BuildMapSpawnModeMasks cannot fix this -- its output is a validation permission mask
+ * (ObjectMgrCreatures.cpp rejects spawns carrying unsupported bits), not a spawn source.
+ *
+ * Refusing entry is better than admitting a player to an empty dungeon, so 8 stays unsupported
+ * until spawn data exists. Re-enable it by returning 2 here once
+ *   SELECT COUNT(*) FROM creature WHERE map IN (959,960,961,962,994,1001,1004,1007,1011)
+ *     AND (spawnMask & 4) <> 0
+ * is non-zero, and test an actual challenge map rather than trusting the mask.
+ */
+/**
+ * @brief Raw client DifficultyID -> internal mode, REJECTING ids from the other key space.
+ *
+ * ToInternalDifficulty is context-free by design: the reset scheduler and the encounter
+ * predicate both need to translate whatever a DBC row happens to carry. An inbound packet
+ * is different. The client tells us which FIELD it is setting by which opcode it uses, so
+ * a raw id belonging to the other space is not a value to translate -- it is a malformed
+ * request.
+ *
+ * Without this, the dungeon setter accepts raid ids: raw 5 is 10-player heroic RAID, which
+ * translates to internal 2, passes a `< MAX_DUNGEON_DIFFICULTY` range test, and sets
+ * DUNGEON_DIFFICULTY_CHALLENGE -- a mode ToInternalDifficulty deliberately refuses to
+ * produce, because no spawn on a challenge map carries bit 2 and admitting it opens an
+ * empty instance. A range check cannot catch that; only knowing which space the id came
+ * from can.
+ *
+ * @return internal mode, or -1 if the id does not belong to the requested space.
+ */
+int32 ToInternalDifficultyChecked(uint32 clientDifficultyId, bool isRaid)
+{
+    if (isRaid)
+    {
+        switch (clientDifficultyId)
+        {
+            case 3:                                         // raid 10 normal
+            case 4:                                         // raid 25 normal
+            case 5:                                         // raid 10 heroic
+            case 6:                                         // raid 25 heroic
+            case 9:                                         // legacy 40-player raids
+                return ToInternalDifficulty(clientDifficultyId);
+            default:
+                return -1;
+        }
+    }
+
+    switch (clientDifficultyId)
+    {
+        case 1:                                             // 5-man normal
+        case 2:                                             // 5-man heroic
+            return ToInternalDifficulty(clientDifficultyId);
+        // Raw 8 (5-man challenge) is absent on purpose, matching ToInternalDifficulty.
+        // Raw 0 is continents/battlegrounds/arenas and is not a dungeon tier a player sets.
+        default:
+            return -1;
+    }
+}
+
+/**
+ * @brief Internal 0-based mode -> the raw client DifficultyID to put on the wire.
+ *
+ * Round-trips through ToInternalDifficulty for every value it returns, which is asserted
+ * by construction below: each arm is the lowest raw id that translates back to the same
+ * internal mode in the requested context.
+ *
+ * Challenge is the asymmetric case. ToInternalDifficulty deliberately refuses raw 8, because
+ * admitting it would let the core instantiate an empty challenge map -- but the client still
+ * uses 8 to DISPLAY challenge mode, and DUNGEON_DIFFICULTY_CHALLENGE exists as an internal
+ * value that other code can set. So the outbound direction maps it and the inbound direction
+ * does not, and that asymmetry is intentional rather than an oversight.
+ */
+uint32 ToClientDifficulty(Difficulty difficulty, bool isRaid)
+{
+    if (isRaid)
+    {
+        switch (difficulty)
+        {
+            case RAID_DIFFICULTY_10MAN_NORMAL: return 3;
+            case RAID_DIFFICULTY_25MAN_NORMAL: return 4;
+            case RAID_DIFFICULTY_10MAN_HEROIC: return 5;
+            case RAID_DIFFICULTY_25MAN_HEROIC: return 6;
+            default:                           return 3;
+        }
+    }
+
+    switch (difficulty)
+    {
+        case DUNGEON_DIFFICULTY_NORMAL:    return 1;
+        case DUNGEON_DIFFICULTY_HEROIC:    return 2;
+        case DUNGEON_DIFFICULTY_CHALLENGE: return 8;
+        default:                           return 1;
+    }
+}
+
+/**
+ * @brief Internal mode -> the raw client DifficultyID for a SPECIFIC map.
+ *
+ * ToClientDifficulty answers from a fixed table, which is right for a tier that belongs to no
+ * particular map -- the difficulty a player or group is set to. It is WRONG for anything that
+ * names a map, because the raid table assumes 10-normal is 3 and 25-normal is 4, and seven
+ * shipped raids break that assumption.
+ *
+ * ELEVEN instanceable maps disagree with the fixed table, not the seven an earlier version of
+ * this comment named:
+ *
+ *   the seven 25-player-only TBC raids -- Hyjal 534, Magtheridon 544, SSC 548, The Eye 550,
+ *   Black Temple 564, Gruul 565 and Sunwell 580 -- each ship a single MapDifficulty row carrying
+ *   raw 4, and BuildMapDifficultyLegacyIndex canonicalises them to internal 0 so they are
+ *   enterable at the tier every character defaults to. The fixed table returns 3 for internal 0,
+ *   announcing a 10-player normal lockout for a raid that has no such tier;
+ *
+ *   and four legacy 40-player raids -- Emerald Dream 169, Molten Core 409, Blackwing Lair 469
+ *   and Ahn'Qiraj Temple 531 -- ship a single row carrying raw 9. Difficulty.dbc row 9 is
+ *   "40 Player", so these now report 9 where the fixed table said 3. That is the map-aware
+ *   answer being MORE right rather than merely different: Molten Core is a live 40-man lockout
+ *   and calling it 10-player normal is wrong in the raid browser and the calendar alike.
+ *
+ * Non-instanceable maps also differ numerically -- their raw rows carry 0 while the dungeon
+ * table starts at 1 -- but every caller names an instance: lockouts, binds, calendar entries,
+ * reset warnings and transfer refusals. SMSG_WORLD_SERVER_INFO briefly broke that rule and is
+ * the reason the guard below exists; it now converts only when the map is an instance and sends
+ * the spawn mode unconverted otherwise, because off an instance the spawn mode already IS the
+ * value retail sends.
+ *
+ * Retail disagrees, and there is a byte-exact fixture for it: the retained 18414
+ * SMSG_CALENDAR_RAID_LOCKOUT_REMOVED bodies in mop_calendar_packets_test.cpp carry difficulty
+ * 4 for map 580, The Sunwell. So the map's own row is the authority, not the table.
+ *
+ * Falls back to the fixed table when the map has no row for the tier, which is the best
+ * available answer for a caller holding a tier the map does not define.
+ *
+ * @param mapId      The map the difficulty is being reported for.
+ * @param difficulty The internal 0-based mode.
+ * @param isRaid     Used only by the fallback.
+ * @return The raw client DifficultyID to put on the wire.
+ */
+uint32 ToClientDifficultyForMap(uint32 mapId, Difficulty difficulty, bool isRaid)
+{
+    if (MapDifficultyEntry const* mapDiff = GetMapDifficultyData(mapId, difficulty))
+    {
+        return mapDiff->DifficultyID;
+    }
+
+    // A map that is not an instance has no tier, and the raw id for that is 0 -- NOT whatever
+    // the dungeon table returns for the internal mode it was handed.
+    //
+    // This matters because the fallback is otherwise reached constantly. Continents mostly do
+    // carry a raw-0 MapDifficulty row, so they answer above -- but Eastern Kingdoms, map 0, has
+    // no row at all, and it is the busiest map in the game. Falling through to the dungeon table
+    // returned 1 there, telling the client Stormwind was a 5-man normal tier on every login and
+    // every map change. Four of the 116 non-instanceable maps have no row, as do 29 of the 34
+    // scenario maps.
+    //
+    // The corpus agrees: 1890 of the 2554 SMSG_WORLD_SERVER_INFO bodies carry 0, which is what
+    // an outdoor map reports.
+    MapEntry const* mapEntry = sMapStore.LookupEntry(mapId);
+    if (!mapEntry || !mapEntry->IsDungeon())
+    {
+        return 0;
+    }
+
+    // A map with NO resolvable tier at all is also 0. The fixed table is only an answer for a
+    // map that HAS tiers but not the one asked for.
+    //
+    // Scenarios are why this is needed, and note IsDungeon() is true for them -- it covers
+    // MAP_INSTANCE, MAP_RAID and MAP_SCENARIO -- so the guard above does not catch them. All 34
+    // scenario maps miss the index: only 5 carry a MapDifficulty row at all, those rows carry
+    // raw 11 and 12, and ToInternalDifficulty has no internal mode for either, so none of them
+    // appears in the internal index at any tier. Without this they fell through to the five-man
+    // table and reported raw 1, i.e. "party, Normal", on a scenario.
+    //
+    // 0 rather than the real scenario id: this core cannot represent a scenario tier at all, so
+    // it has no internal value to convert and would be inventing one. 0 says "no tier", which is
+    // what a map we cannot represent honestly reports. Retail does send 11 and 12 here -- they
+    // are in the corpus for this field -- so if scenarios are ever implemented this becomes a
+    // real conversion rather than a floor.
+    //
+    // Latent today, and not for the reason an earlier version of this comment gave. It said only
+    // an admin teleport reaches a scenario. Nothing does: MapManager::IsValidMAP is false for a
+    // dungeon-type map with no `instance_template` row, and the shipped world data carries 119
+    // such rows and none for any scenario map, so Player::TeleportTo fails its very first check
+    // for a GM as readily as for anyone else. That is a world-DB fact rather than a code
+    // invariant, so it is a reason this is unreachable today, not a guarantee it stays so.
+    //
+    // Scenarios are not the only maps this catches, and an earlier claim that they were is
+    // withdrawn. Swept exhaustively over every map and tier rather than a chosen list: 36 maps
+    // change, the 34 scenarios plus two MAP_INSTANCE maps that ship no MapDifficulty row at all
+    // -- 627 "unused" and 637 "Abyssal Maw Exterior". Both previously reported the fixed table's
+    // 1, 2 or 8 and now report 0, which is the same correction for the same reason: a map with
+    // no tier has no tier to name. Nothing else moves -- Sunwell, Black Temple, Molten Core,
+    // Icecrown, the ordinary five-mans, End Time, the continents and Tol'Viron are all
+    // unchanged.
+    for (uint32 tier = 0; tier < MAX_DIFFICULTY; ++tier)
+    {
+        if (GetMapDifficultyData(mapId, Difficulty(tier)))
+        {
+            return ToClientDifficulty(difficulty, isRaid);
+        }
+    }
+
+    return 0;
+}
+
+int32 ToInternalDifficulty(uint32 clientDifficultyId)
+{
+    switch (clientDifficultyId)
+    {
+        case 0:  return 0;                                  // continents / bg / arena
+        case 1:  return 0;                                  // 5-man normal
+        case 2:  return 1;                                  // 5-man heroic
+        case 3:  return 0;                                  // raid 10 normal
+        case 4:  return 1;                                  // raid 25 normal
+        case 5:  return 2;                                  // raid 10 heroic
+        case 6:  return 3;                                  // raid 25 heroic
+        case 9:  return 0;                                  // legacy 40-player raids
+        // case 8 (5-man challenge) intentionally absent -- see the note above; the world DB has
+        // no bit-2 spawns on any challenge map, so admitting it yields an empty instance.
+        default: return -1;                                 // challenge 8, LFR 7, flexible 14, scenarios 11/12
+    }
+}
+
+/**
+ * @brief Whether a DungeonEncounter.dbc row applies at an internal difficulty.
+ *
+ * DungeonEncounter.dbc keys on raw client DifficultyIDs like everything else in the
+ * 5.4.8 DBCs, and comparing one directly against a Difficulty was wrong in both
+ * directions. Of the 699 shipped rows only the 238 carrying id 0 ever matched, and
+ * they matched for the wrong reason; the 264 rows for 5-man normal (id 1) were tested
+ * against internal mode 1, which is HEROIC, so a normal clear credited nothing while a
+ * heroic clear credited the normal encounter. Ids 5 and 6 (Sinestra, Ra-den) exceed
+ * MAX_DIFFICULTY as raw values and could never match at all.
+ *
+ * Id 0 is a wildcard, not internal mode 0. 41 maps carry nothing but id 0 rows and 36
+ * of those have more than one difficulty tier, so reading it as "normal only" would
+ * stop every heroic run on them from ever crediting an encounter.
+ */
+/**
+ * @brief The tier a client DifficultyID falls back to, mirroring Difficulty.dbc field 1.
+ *
+ * Hardcoded for the same reason ToInternalDifficulty is: Difficulty.dbc is never loaded by this
+ * core, and at twelve static rows for 5.4.8 the table is not worth a store. Values read directly
+ * from the shipped file; 0 means "no fallback", it is not a reference to id 0.
+ *
+ *   2 -> 1        5-man heroic falls back to 5-man normal
+ *   5 -> 3        10-player heroic  -> 10-player normal
+ *   6 -> 4        25-player heroic  -> 25-player normal
+ *   7 -> 4        LFR               -> 25-player normal
+ *   8 -> 2 -> 1   challenge mode    -> heroic -> normal
+ *   11 -> 12      heroic scenario   -> normal scenario
+ *
+ * Ids 1, 3, 4, 9, 12 and 14 terminate.
+ */
+static uint32 ClientDifficultyFallback(uint32 clientDifficultyId)
+{
+    switch (clientDifficultyId)
+    {
+        case 2:  return 1;
+        case 5:  return 3;
+        case 6:  return 4;
+        case 7:  return 4;
+        case 8:  return 2;
+        case 11: return 12;
+        default: return 0;                                  // no fallback
+    }
+}
+
+/**
+ * @brief True when (mapId, clientDifficultyId) is a row the OLD raw-keyed reset scheduler could
+ *        have written into `instance_reset`.
+ *
+ * A migration predicate, and deliberately not an accessor. The general raw lookup
+ * (GetMapDifficultyDataByClientId) is banned tree-wide precisely so a raw row cannot reach runtime
+ * code, and this must not be a way back in -- it answers a yes/no question about a stored key and
+ * hands back no row.
+ *
+ * Needed because "out of internal range" is NOT evidence of the raw key space. An arbitrary
+ * hand-edited value is also out of range, and treating it as proof would condemn a whole table of
+ * valid reset times over one bad row. The old scheduler enumerated the RAW map and skipped
+ * RaidDuration == 0, so a genuine stale row is exactly a raw reset-bearing (map, tier) pair: 136 of
+ * them across 88 maps, values 2, 3, 4, 5, 6 and 9. Anything else out of range is just junk.
+ *
+ * @param mapId              the map the stored row names
+ * @param clientDifficultyId the stored difficulty, read as a RAW client id
+ * @return true if the raw map has this pair with a global reset
+ */
+bool IsLegacyRawResetKey(uint32 mapId, uint32 clientDifficultyId)
+{
+    // Reject anything that cannot be a raw key BEFORE building the pair.
+    //
+    // MAKE_PAIR32 packs the difficulty into the low 16 bits, so a junk value silently
+    // truncates: 65538 becomes 2, which is a real raw DifficultyID. On a map carrying a
+    // legacy raw-2 reset row that hand-edited junk would then be accepted as PROOF the
+    // whole table is raw-keyed, and LoadResetTimes would delete every reset row in it.
+    //
+    // That is precisely the blast radius this predicate exists to avoid -- it was
+    // narrowed once already, from "any invalid row condemns the table" to "only a row
+    // that looks raw-keyed does" -- so the truncation has to be closed or the narrowing
+    // is defeated by the same one junk row.
+    //
+    // The shipped MapDifficulty.dbc uses raw ids 0..14, so 0xFFFF is a generous bound
+    // rather than a tight one; it is chosen to match exactly what MAKE_PAIR32 can carry,
+    // which is the actual failure being prevented.
+    if (clientDifficultyId > 0xFFFF)
+    {
+        return false;
+    }
+
+    MapDifficultyMap::const_iterator itr = sMapDifficultyMap.find(MAKE_PAIR32(mapId, clientDifficultyId));
+    if (itr == sMapDifficultyMap.end())
+    {
+        return false;
+    }
+
+    return itr->second->RaidDuration != 0;
+}
+
+/**
+ * @brief Whether a DungeonEncounter.dbc row applies at an internal difficulty on a given map.
+ *
+ * DungeonEncounter.dbc keys on raw client DifficultyIDs like everything else in the 5.4.8 DBCs,
+ * and comparing one directly against a Difficulty was wrong in both directions. Of the 699
+ * shipped rows only the 238 carrying id 0 ever matched, and they matched for the wrong reason;
+ * the 264 rows for 5-man normal (id 1) were tested against internal mode 1, which is HEROIC, so a
+ * normal clear credited nothing while a heroic clear credited the normal encounter. Ids 5 and 6
+ * (Sinestra, Ra-den) exceed MAX_DIFFICULTY as raw values and could never match at all.
+ *
+ * Id 0 is a wildcard, not internal mode 0. 41 maps carry nothing but id 0 rows and 36 of those
+ * have more than one difficulty tier, so reading it as "normal only" would stop every heroic run
+ * on them from ever crediting an encounter.
+ *
+ * Straight equality was still wrong, though, because Difficulty.dbc defines fallback chains. Some
+ * maps ship a tier whose encounters are tagged only for a LOWER tier, so an equality test credits
+ * nothing at all there. Measured against the shipped DBCs, walking the chain recovers 30 rows
+ * across four map/tier pairs: maps 189, 289, 309 and 598 at heroic, 6, 13, 10 and 1 rows, all
+ * tagged id 1.
+ *
+ * An earlier revision said 32 rows across five pairs, the fifth being map 994 at challenge mode
+ * reached through the full 8 -> 2 -> 1 chain. That gain existed only while ToInternalDifficulty
+ * translated challenge mode; it does not now, so no map tier resolves to challenge and the chain
+ * is never entered from there. ClientDifficultyFallback still records 8 -> 2 because that is what
+ * Difficulty.dbc says, but the link is currently unreachable.
+ *
+ * The fallback is deliberately NOT unconditional. 33 map/tier pairs carry BOTH an exact row and a
+ * fallback-reachable one, and a lower-tier row must not be allowed to answer for a tier that has
+ * its own. sEncounterExactTiers records which map/tier pairs do.
+ *
+ * An earlier revision of this comment justified that guard by saying unconditional fallback would
+ * "credit each boss twice". That is WRONG and was corrected on review:
+ * DungeonPersistentState::UpdateEncounterState returns immediately after the first matching row,
+ * so no kill can ever credit two encounters. The real hazard is narrower -- the FIRST matching row
+ * wins, so without the guard a lower-tier row could answer ahead of the map's own row for that
+ * tier and set the wrong Bit.
+ *
+ * Granularity is per map/tier rather than per encounter, and that is a deliberate simplification
+ * with a measured basis. Reviewed as too coarse, on the argument that a mixed-tier map might carry
+ * an encounter existing ONLY at the lower tier, which this guard would reject. Checked against the
+ * shipped data per encounter Bit: of the 109 fallback-reachable rows the guard blocks across those
+ * 33 pairs, every single one has its Bit already covered by an exact or wildcard row on the same
+ * map and tier. Zero encounters are lost, so per-map-tier and per-encounter agree on all 5.4.8
+ * data. If a future DBC ships a fallback-only encounter on a mixed-tier map this must become
+ * per-Bit; the query above is how to tell.
+ *
+ * Verified against the DBCs, twice and independently: 30 row/tier pairs gained over plain
+ * ToInternalDifficulty equality, 0 rows lost, 0 lower-tier rows admitted where an exact row
+ * exists, and 0 encounters lost to the guard's granularity. (An earlier revision said 32 gained;
+ * every way of counting it -- by row/tier pair, by distinct DBC row Id, and without requiring the
+ * map to offer the tier -- gives 30.)
+ *
+ * Worth being plain about what that measurement means for the guard itself: at boss granularity it
+ * is INERT on shipped 5.4.8.18414 data. Dropping it changes no encounter's creditability, because
+ * each of the 109 rows it blocks has its Bit covered anyway. It is kept because it states what the
+ * predicate means -- an exact row for a tier settles that tier -- and because without it those 109
+ * rows match a tier the DBC assigned elsewhere. It is intent, not a bug fix.
+ *
+ * @param mapId                 the map the encounter belongs to
+ * @param encounterDifficultyId raw DungeonEncounter.dbc DifficultyID
+ * @param difficulty            the internal difficulty the group is running
+ */
+bool EncounterDifficultyMatches(uint32 mapId, uint32 encounterDifficultyId, Difficulty difficulty)
+{
+    if (encounterDifficultyId == 0)
+    {
+        return true;                                        // applies to every tier of the map
+    }
+
+    if (ToInternalDifficulty(encounterDifficultyId) == int32(difficulty))
+    {
+        return true;                                        // the map's own row for this tier
+    }
+
+    // An exact row exists for this tier, so the lower tiers are not this tier's encounters.
+    if (sEncounterExactTiers.find(MAKE_PAIR32(mapId, uint32(difficulty))) != sEncounterExactTiers.end())
+    {
+        return false;
+    }
+
+    // Nothing exact: walk this map's tier down its fallback chain and see if the row sits on it.
+    MapDifficultyEntry const* mapDiff = GetMapDifficultyData(mapId, difficulty);
+    if (!mapDiff)
+    {
+        return false;
+    }
+
+    // Bounded, because an unbounded walk over a hand-maintained table is a startup hang waiting to
+    // happen. The shipped chains are acyclic and at most two links long (8 -> 2 -> 1), and no
+    // future Difficulty.dbc can change that -- the core never loads that file, so the only way to
+    // introduce a cycle is to edit ClientDifficultyFallback itself. The bound is what makes that
+    // edit a wrong answer instead of an infinite loop, and MAX_DIFFICULTY_FALLBACK_DEPTH is well
+    // clear of the longest real chain.
+    uint32 const MAX_DIFFICULTY_FALLBACK_DEPTH = 8;
+    uint32 depth = 0;
+
+    for (uint32 tier = ClientDifficultyFallback(mapDiff->DifficultyID); tier;
+         tier = ClientDifficultyFallback(tier))
+    {
+        if (tier == encounterDifficultyId)
+        {
+            return true;
+        }
+
+        if (++depth >= MAX_DIFFICULTY_FALLBACK_DEPTH)
+        {
+            sLog.outError("EncounterDifficultyMatches: ClientDifficultyFallback chain from raw id %u "
+                          "exceeded %u links -- it has a cycle. Treating map %u tier %u as no match.",
+                          mapDiff->DifficultyID, MAX_DIFFICULTY_FALLBACK_DEPTH, mapId, uint32(difficulty));
+            break;
+        }
+    }
+
+    return false;
+}
+
+/**
+ * @brief Records which map/tier pairs ship a non-wildcard encounter row of their own.
+ *
+ * Must run after DungeonEncounter.dbc is loaded. Wildcard (id 0) rows are excluded on purpose:
+ * they apply everywhere, so a map carrying only wildcards has no tier-specific rows and should
+ * still be allowed to fall back.
+ */
+static void BuildEncounterExactTierIndex()
+{
+    sEncounterExactTiers.clear();
+
+    for (uint32 i = 0; i < sDungeonEncounterStore.GetNumRows(); ++i)
+    {
+        DungeonEncounterEntry const* entry = sDungeonEncounterStore.LookupEntry(i);
+        if (!entry || entry->DifficultyID == 0)
+        {
+            continue;
+        }
+
+        int32 internal = ToInternalDifficulty(entry->DifficultyID);
+        if (internal < 0)
+        {
+            continue;                                       // LFR, flexible, scenarios
+        }
+
+        sEncounterExactTiers.insert(MAKE_PAIR32(entry->MapID, uint32(internal)));
+    }
+}
+
+/**
+ * @brief Builds the legacy-keyed index that GetMapDifficultyData answers from.
+ *
+ * A static per-type translation is not enough. Some raids have no ID 3 row at all:
+ * 25-player-only raids carry only ID 4, and legacy 40-player raids only ID 9. Asking
+ * for the regular tier and translating it to a fixed 3 misses those maps entirely,
+ * so they stay unenterable.
+ *
+ * The widening below serves the same purpose as the one in BuildMapSpawnModeMasks but
+ * is NOT the identical predicate: that one fires only when a raid's mask is exactly
+ * (1 << 1), this one whenever mode 0 is absent and some row maps to mode 1. They agree
+ * on all 253 maps in 5.4.8 -- the seven rows=[4] raids -- and would diverge only on a
+ * hypothetical raid carrying {4,5} or {4,6}. No such map ships.
+ *
+ * Where two rows map to the same internal mode -- a map carrying both ID 3 and ID 9,
+ * say -- the lower client id wins, so the modern row is preferred over the legacy one.
+ */
+static void BuildMapDifficultyLegacyIndex()
+{
+    sMapDifficultyLegacyMap.clear();
+
+    for (MapDifficultyMap::const_iterator itr = sMapDifficultyMap.begin(); itr != sMapDifficultyMap.end(); ++itr)
+    {
+        MapDifficultyEntry const* mapDiff = itr->second;
+        int32 const mode = ToInternalDifficulty(mapDiff->DifficultyID);
+        if (mode < 0 || mode >= MAX_DIFFICULTY)
+        {
+            continue;
+        }
+
+        uint32 const key = MAKE_PAIR32(mapDiff->MapID, uint32(mode));
+        MapDifficultyMap::const_iterator existing = sMapDifficultyLegacyMap.find(key);
+        if (existing == sMapDifficultyLegacyMap.end() ||
+            mapDiff->DifficultyID < existing->second->DifficultyID)
+        {
+            sMapDifficultyLegacyMap[key] = mapDiff;
+        }
+    }
+
+    // 25-player-only raids instantiate as internal mode 0. Without this a regular
+    // lookup on Hyjal, Magtheridon, SSC, The Eye, Black Temple, Gruul or Sunwell
+    // finds nothing and the map is refused at the area trigger.
+    for (MapDifficultyMap::const_iterator itr = sMapDifficultyMap.begin(); itr != sMapDifficultyMap.end(); ++itr)
+    {
+        MapDifficultyEntry const* mapDiff = itr->second;
+        MapEntry const* mapEntry = sMapStore.LookupEntry(mapDiff->MapID);
+        if (!mapEntry || !mapEntry->IsRaid())
+        {
+            continue;
+        }
+
+        uint32 const regular = MAKE_PAIR32(mapDiff->MapID, uint32(REGULAR_DIFFICULTY));
+        if (sMapDifficultyLegacyMap.find(regular) == sMapDifficultyLegacyMap.end() &&
+            ToInternalDifficulty(mapDiff->DifficultyID) == 1)
+        {
+            sMapDifficultyLegacyMap[regular] = mapDiff;
+
+            // MOVE, not copy. Leaving the mode-1 key in place gives one physical lockout two
+            // key spaces, and both halves of that are live on shipped data:
+            //
+            //   * LoadResetTimes iterates this whole index, so each of the seven maps produced
+            //     TWO `instance_reset` rows and TWO scheduled reset events -- 143 reset-bearing
+            //     tiers where there are only 136 -- at every startup, with no player involved.
+            //   * Worse, a group set to "25 Player" resolves mode 1, finds this duplicate,
+            //     passes the area trigger, and instantiates at spawn mode 1. Every creature and
+            //     gameobject on these maps carries spawnMask 1, which is mode 0 ONLY, so the
+            //     group binds itself to a completely empty raid. MapManager::CreateDungeonMap's
+            //     "some instances only have one difficulty" fold cannot save them, because the
+            //     duplicate makes the lookup succeed.
+            //
+            // Erasing it leaves exactly one canonical key at mode 0, which is the mode these
+            // raids are meant to instantiate as -- they ship one MapDifficulty row and one set
+            // of spawns. Player::GetAreaTriggerLockStatus folds a mode-1 request back to
+            // REGULAR_DIFFICULTY so a 25 Player selection still admits, rather than being
+            // refused now that the key is gone.
+            //
+            // Guarded on identity rather than erasing blind: two raw rows can map to the same
+            // internal mode, and only the row that was just promoted should be withdrawn. No
+            // shipped raid carries such a pair -- these seven have exactly one row each -- so
+            // this is future-proofing, not a case being handled.
+            uint32 const promoted = MAKE_PAIR32(mapDiff->MapID, 1u);
+            MapDifficultyMap::const_iterator itrPromoted = sMapDifficultyLegacyMap.find(promoted);
+            if (itrPromoted != sMapDifficultyLegacyMap.end() && itrPromoted->second == mapDiff)
+            {
+                sMapDifficultyLegacyMap.erase(promoted);
+            }
+        }
+    }
+}
+
+/**
  * @brief Looks up the per-difficulty data row for a given map.
  *
+ * MapDifficulty.dbc is keyed on Difficulty.dbc ids, which for instances START AT 1,
+ * while the core's Difficulty enum is the 0-based WotLK-era one. Every instance
+ * lookup therefore missed: Stockades (map 34) has exactly one row, DifficultyID 1,
+ * and a request for DUNGEON_DIFFICULTY_NORMAL (0) found nothing, so
+ * Player::GetAreaTriggerLockStatus answered AREA_LOCKSTATUS_MISSING_DIFFICULTY and
+ * no instance in the game was enterable. Continents were unaffected because
+ * world, battleground and arena maps are the only ones that carry a 0 row.
+ *
  * @param mapId The map id.
- * @param difficulty The map difficulty key.
+ * @param difficulty The map difficulty, in the core's internal 0-based form.
  * @return Pointer to the MapDifficultyEntry, or NULL when no row matches.
+ *
+ * @note Nothing may carry a raw client DifficultyID across a runtime or persistence
+ *       boundary. MapDifficulty.dbc is translated here, at load. Two other DBCs also
+ *       store raw ids and each translates at its own boundary instead:
+ *       LfgDungeons.dbc via ToInternalDifficulty in LFGMgr::CreateDungeonGroup, and
+ *       DungeonEncounter.dbc via EncounterDifficultyMatches at both credit sites.
+ *       Both of those were direct casts and both persisted the result.
  */
 MapDifficultyEntry const* GetMapDifficultyData(uint32 mapId, Difficulty difficulty)
 {
-    MapDifficultyMap::const_iterator itr = sMapDifficultyMap.find(MAKE_PAIR32(mapId, difficulty));
-    return itr != sMapDifficultyMap.end() ? itr->second : NULL;
+    MapDifficultyMap::const_iterator itr = sMapDifficultyLegacyMap.find(MAKE_PAIR32(mapId, difficulty));
+    return itr != sMapDifficultyLegacyMap.end() ? itr->second : NULL;
+}
+
+/**
+ * @brief The internal-mode index itself, for callers that must enumerate tiers.
+ *
+ * Only the reset scheduler needs this: it has to discover every (map, internal mode)
+ * pair that carries a global reset in order to schedule one. Iterating the raw
+ * sMapDifficultyMap instead is what made the reset system incoherent -- it keyed
+ * `instance_reset`, the reset events and m_resetTimeByMapDifficulty on raw client
+ * ids, while AddPersistentState, MovementHandler and DungeonPersistentState all read
+ * those same structures with internal modes. Since no raw id except 0 equals its own
+ * internal mode, 122 of the 136 reset-bearing tiers missed outright and the other 14
+ * silently picked another tier's row.
+ *
+ * 136 rather than the 143 an earlier revision gave: that count was taken while the
+ * widening below still left seven raids double-keyed, so it counted duplicates as tiers.
+ */
+MapDifficultyMap const& GetMapDifficultyLegacyMap()
+{
+    return sMapDifficultyLegacyMap;
 }
 
 /**
@@ -1679,11 +2316,20 @@ MapDifficultyEntry const* GetMapDifficultyData(uint32 mapId, Difficulty difficul
  * modes (0..MAX_DIFFICULTY-1), which is the convention used by the DB
  * spawn data and the runtime (Map::GetSpawnMode): continents (0) -> 0,
  * 5-man normal/heroic (1/2) -> 0/1, raid 10N/25N/10H/25H (3..6) -> 0..3,
- * legacy 40-player raids (9) -> 0. LFR (7), challenge mode (8) and
- * flexible (14) have no DB spawn sets and are ignored. 25-player-only
- * raids (TBC) instantiate as spawn mode 0 internally and are widened
- * accordingly. Map 0 has no MapDifficulty rows in 4.x+ clients and is
- * forced to the regular mask.
+ * legacy 40-player raids (9) -> 0. LFR (7), 5-man challenge (8), scenarios
+ * (11, 12) and flexible (14) are not translated and are ignored -- for
+ * challenge mode that is a deliberate choice rather than a missing enum
+ * value, because no spawn on a challenge map carries bit 2. This switch and
+ * ToInternalDifficulty must keep agreeing on exactly which ids they admit. 25-player-only raids (TBC) instantiate as spawn mode 0
+ * internally and are widened accordingly. Map 0 has no MapDifficulty rows
+ * in 4.x+ clients and is forced to the regular mask.
+ *
+ * The id mapping must stay identical to ToInternalDifficulty. Challenge mode
+ * was dropped here while the difficulty index admitted it, which let a player
+ * at dungeon difficulty 2 pass the area trigger on maps 959/960/961/962/994/
+ * 1001/1004/1007/1011 and then arrive in an instance with no spawns filed
+ * under mask bit 2. The shipped DB has no challenge spawns yet, so nothing
+ * observable changed -- but the contract was wrong.
  *
  * @param spawnMasks Destination: map id -> allowed spawn-mode mask.
  */
@@ -1714,7 +2360,11 @@ void BuildMapSpawnModeMasks(std::map<uint32, uint32>& spawnMasks)
             case 9:                                         // legacy 40-player raids
                 mode = 0;
                 break;
-            default:                                        // LFR (7) / challenge (8) / flexible (14)
+            default:                                        // challenge (8) / LFR (7) / flexible (14) / scenarios (11, 12)
+                // Challenge mode is unsupported here for the same reason as in
+                // ToInternalDifficulty: no challenge map has a bit-2 spawn, so the tier cannot be
+                // populated. These two switches must stay in step -- a mode one admits and the
+                // other drops resolves at the area trigger and then instantiates with no spawns.
                 break;
         }
 

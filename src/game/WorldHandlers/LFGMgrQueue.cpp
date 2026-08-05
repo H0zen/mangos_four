@@ -95,7 +95,10 @@ void LFGMgr::JoinLFG(uint32 roles, std::set<uint32> dungeons, std::string commen
             LfgDungeonsEntry const* dungeon = sLfgDungeonsStore.LookupEntry(*it);
             // The dungeon ids arrive from the client. LookupEntry returns NULL
             // for an unknown one, so dereferencing it unchecked is a remote
-            // crash the moment this path is wired to CMSG_LFG_JOIN.
+            // crash. That became reachable when this branch indexed
+            // LfgDungeons.dbc by id: while it was indexed by row ordinal every
+            // id below the record count found *something*, but the id space is
+            // sparse, running to 774 with 432 holes.
             if (!dungeon)
             {
                 result = ERR_LFG_INVALID_SLOT;
@@ -132,6 +135,22 @@ void LFGMgr::JoinLFG(uint32 roles, std::set<uint32> dungeons, std::string commen
                     result = ERR_LFG_INVALID_SLOT;
                     break;
             }
+
+            // Refuse a slot whose tier this core cannot represent, instead of admitting it and
+            // silently downgrading it later. LfgDungeons.dbc DifficultyID 7 (LFR), 8 (5-man
+            // challenge), 11 and 12 (scenarios) and 14 (flexible) have no internal Difficulty, and
+            // 77 of the 343 rows carry one of them.
+            //
+            // This is the gate that makes ToInternalDifficulty's negative return mean something.
+            // CreateDungeonGroup runs long after the group has been built and its members pulled out
+            // of their previous groups, so it is far too late to refuse there; all it can do is
+            // substitute REGULAR_DIFFICULTY, which for an LFR row means a 25-player queue entering
+            // the 10-normal tier of the same raid. Refusing at admission returns
+            // ERR_LFG_INVALID_SLOT, which the client reports, and nothing is half-formed.
+            if (result == ERR_LFG_OK && ToInternalDifficulty(dungeon->DifficultyID) < 0)
+            {
+                result = ERR_LFG_INVALID_SLOT;
+            }
         }
     }
 
@@ -158,6 +177,49 @@ void LFGMgr::JoinLFG(uint32 roles, std::set<uint32> dungeons, std::string commen
                         {
                             dungeons.insert(dungeonList->ID); // adding to set
                         }
+                    }
+                }
+
+                // Filter the expansion as well, so an untranslatable tier cannot ride into
+                // roleCheck.dungeonList -- that list is handed back to the client and re-read on a
+                // role-check rejoin.
+                //
+                // The numbers that were here before are withdrawn. They claimed Group_ID 0 matches
+                // 273 rows, that 20 of those carry scenario tier 12, and that all 10 admissible
+                // random rows have Group_ID 0. Re-measured against the shipped LfgDungeons.dbc, all
+                // three are wrong: Group_ID 0 matches 79 rows, NONE of them carry tier 12, and no
+                // admissible random row has Group_ID 0 at all -- the ten carry 1, 2, 3, 4, 5, 12,
+                // 13, 33, 36 and 37, one per expansion tier. They were measured through a
+                // LookupEntry that was returning the Nth ROW rather than the row with that ID,
+                // because LfgDungeonsEntryfmt was missing its 'n' index marker, so every row read
+                // belonged to a different dungeon.
+                //
+                // With that corrected, this filter removes nothing for any shipped random: each one
+                // expands to a Group_ID whose members are ordinary dungeons carrying raw tier 1 or
+                // 2, both translatable. It is kept as a guard rather than deleted, because the
+                // expansion is driven by DBC content and a future row could carry a tier this core
+                // cannot represent -- but it is a guard, not a load-bearing filter, and it should
+                // not be cited as one.
+                //
+                // What actually stops an untranslatable tier reaching CreateDungeonGroup is the
+                // admission check above. Both the party and solo paths below replace the expanded
+                // set with randomDungeonID alone before the queued LFGPlayers state is built, and
+                // SendDungeonProposal takes *dungeonList.begin() from that, so the proposal always
+                // carries the random row -- which admission has already validated.
+                //
+                // Dropped, not refused: the expansion is a CANDIDATE list, so removing members this
+                // core cannot run leaves random queueing working. No empty-set check follows,
+                // because the admitted random row is itself translatable and always survives.
+                for (std::set<uint32>::iterator it = dungeons.begin(); it != dungeons.end(); )
+                {
+                    LfgDungeonsEntry const* candidate = sLfgDungeonsStore.LookupEntry(*it);
+                    if (!candidate || ToInternalDifficulty(candidate->DifficultyID) < 0)
+                    {
+                        it = dungeons.erase(it);
+                    }
+                    else
+                    {
+                        ++it;
                     }
                 }
             }

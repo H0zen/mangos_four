@@ -165,6 +165,58 @@ std::string const* GetRandomCharacterName(uint32 race, uint32 sex);
 
 typedef std::map<uint32/*pair32(map,diff)*/, MapDifficultyEntry const*> MapDifficultyMap;
 MapDifficultyEntry const* GetMapDifficultyData(uint32 mapId, Difficulty difficulty);
+// The index GetMapDifficultyData answers from, keyed on INTERNAL 0-based modes.
+// Exposed only so the reset scheduler can enumerate every tier that carries a global
+// reset. It must not be joined against sMapDifficultyMap: that one is keyed on raw
+// client DifficultyIDs, and no raw id except 0 equals its own internal mode.
+MapDifficultyMap const& GetMapDifficultyLegacyMap();
+// Raw client DifficultyID -> internal 0-based mode, or -1 if the id is not translated:
+// LFR (7), 5-man challenge (8), scenarios (11, 12) and flexible (14). Challenge mode is
+// the odd one out -- DUNGEON_DIFFICULTY_CHALLENGE exists, so a mapping to internal 2 is
+// available and is deliberately NOT made, because no spawn on any challenge map carries
+// bit 2 and admitting it would open an empty instance. See the note at the definition.
+int32 ToInternalDifficulty(uint32 clientDifficultyId);
+// Internal 0-based mode -> the RAW client DifficultyID to put ON THE WIRE.
+//
+// The inverse of ToInternalDifficulty is not a function -- several raw ids collapse to the
+// same internal mode -- so the caller must say whether it is talking about a raid tier or a
+// dungeon tier. That is exactly why the client keeps dungeon and raid difficulty in two
+// separate fields with two separate opcodes.
+//
+// Every packet that reports a difficulty to the client MUST go through this. Retail never
+// sends 0 for SMSG_SET_DUNGEON_DIFFICULTY: across 954 build-18414 captures the value set is
+// exactly {1 x512, 2 x424, 8 x18}, and FrameXML/Constants.lua declares DIFFICULTY_DUNGEON_NORMAL = 1,
+// DIFFICULTY_DUNGEON_HEROIC = 2, DIFFICULTY_DUNGEON_CHALLENGE = 8. The raid side is the same
+// key space -- an observed SMSG_SET_RAID_DIFFICULTY body carries 9, which is a legacy
+// 40-player raid and cannot be an internal mode at all, since those stop at 3.
+uint32 ToClientDifficulty(Difficulty difficulty, bool isRaid);
+// Internal mode -> raw client DifficultyID for a SPECIFIC map. Use this, not the fixed table
+// above, for anything that reports a difficulty ALONGSIDE a map id -- raid lockouts, instance
+// binds, calendar entries, reset warnings, transfer refusals. Eleven instanceable maps disagree
+// with the fixed table: the seven 25-player-only TBC raids, canonicalised to internal 0 but
+// shipping raw 4 (retail sends 4, as the SMSG_CALENDAR_RAID_LOCKOUT_REMOVED fixture for map 580
+// pins), and the four legacy 40-player raids 169/409/469/531, which ship raw 9 -- Difficulty.dbc
+// "40 Player" -- where the fixed table would call Molten Core a 10-player normal lockout.
+uint32 ToClientDifficultyForMap(uint32 mapId, Difficulty difficulty, bool isRaid);
+// Raw client DifficultyID -> internal mode, rejecting ids from the OTHER key space.
+// Use this for anything arriving from the client: the opcode says which field is being
+// set, so a raid id in a dungeon request is malformed, not translatable. A plain range
+// check does not catch it -- raw 5 (10-player heroic raid) translates to internal 2 and
+// would pass as DUNGEON_DIFFICULTY_CHALLENGE, which ToInternalDifficulty deliberately
+// never produces.
+int32 ToInternalDifficultyChecked(uint32 clientDifficultyId, bool isRaid);
+// True when (mapId, clientDifficultyId) is a row the OLD raw-keyed reset scheduler could have
+// written into `instance_reset`. A migration PREDICATE, not an accessor -- it returns no row, so it
+// is not a way around the tree-wide ban on raw-keyed lookups. Used to tell a genuine stale raw row
+// from an arbitrary out-of-range hand edit, which must not condemn a whole table.
+bool IsLegacyRawResetKey(uint32 mapId, uint32 clientDifficultyId);
+// True when a DungeonEncounter.dbc row applies at the given INTERNAL difficulty.
+// That table's DifficultyID is a raw client id and must not be compared to a
+// Difficulty directly; 0 there means "every difficulty of this map", not internal
+// mode 0. Both encounter-credit sites must use this so they agree.
+// mapId is required: whether a lower-tier encounter row applies depends on whether THIS map
+// ships one of its own for the tier being asked about. See the definition.
+bool EncounterDifficultyMatches(uint32 mapId, uint32 encounterDifficultyId, Difficulty difficulty);
 void BuildMapSpawnModeMasks(std::map<uint32, uint32>& spawnMasks);
 
 // natural order for difficulties up-down iteration
