@@ -36,12 +36,25 @@ namespace world::terrain
             return cached->second;
         }
 
+        // ABSENT IS NOT BROKEN -- the same distinction Wdt() draws, and null now MEANS
+        // broken to every caller. GameObjectDisplayInfo.dbc ships dead rows naming files
+        // the client never contained: 21 of them in retail 5.4.8, including
+        // `<empty>\KL_OnyxiasLair.wmo`, `aaaaaaaaa\testdonotcommit4.mdx` and two
+        // `TestDoNotCommit` models. There is nothing to bake for those and nothing wrong
+        // with the install, so they answer as a model without collision, exactly as
+        // before. Only a file the archive HAS and cannot serve or parse is a failure.
         std::vector<uint8_t> rootBytes;
         if (!m_archive.Read(rootPath, rootBytes))
         {
-            m_cache.emplace(rootPath, nullptr);
             m_roots.emplace(rootPath, WmoRootData{});
-            return nullptr;
+            if (m_archive.Contains(rootPath))
+            {
+                m_cache.emplace(rootPath, nullptr);
+                return nullptr;
+            }
+            auto absent = std::make_shared<CollisionModel>(TriSoup{});
+            m_cache.emplace(rootPath, absent);
+            return absent;
         }
 
         // No MOHD is not a WMO root. Ignoring that left nGroups at 0, so the loop below
@@ -155,11 +168,19 @@ namespace world::terrain
             return cached->second;
         }
 
+        // Absent is not broken, as in WmoLoader::Load above: a display id naming an .mdx
+        // the client never shipped is a dead DBC row, not an incomplete install.
         std::vector<uint8_t> bytes;
         if (!m_archive.Read(key, bytes))
         {
-            m_cache.emplace(key, nullptr);
-            return nullptr;
+            if (m_archive.Contains(key))
+            {
+                m_cache.emplace(key, nullptr);
+                return nullptr;
+            }
+            auto absent = std::make_shared<CollisionModel>(TriSoup{});
+            m_cache.emplace(key, absent);
+            return absent;
         }
 
         // A present file that is not an MD20, or is shorter than its own header, is a
