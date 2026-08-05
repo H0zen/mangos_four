@@ -196,12 +196,13 @@ namespace world::terrain
         return sawHeader;
     }
 
-    bool ParseWmoGroup(const uint8_t* d, size_t n, uint32_t rootFlags, WmoGroupData& out)
+    WmoGroupParse ParseWmoGroup(const uint8_t* d, size_t n, uint32_t rootFlags,
+                                WmoGroupData& out)
     {
         out = WmoGroupData{};
         if (!d || n < 8)
         {
-            return false;
+            return WmoGroupParse::Malformed;
         }
 
         const uint8_t* mopy = nullptr;
@@ -213,6 +214,7 @@ namespace world::terrain
         const uint8_t* mliq = nullptr;
         uint32_t mliqSize = 0;
         const uint8_t* mogp = nullptr;
+        bool truncated = false;
 
         size_t pos = 0;
         while (pos + 8 <= n)
@@ -250,18 +252,23 @@ namespace world::terrain
 
             if (advance != MOGP_HEADER && pos + 8 + sz > n)
             {
+                truncated = true;
                 break;
             }
             pos += 8 + advance;
         }
 
-        uint32_t groupLiquid = 0;
-        if (mogp && mogp + MOGP_HEADER <= d + n)
+        // A group file IS a MOGP container, so no MOGP -- or one whose header runs past
+        // the end, or a chunk declaring more bytes than the file holds -- is a broken
+        // file, not a group with nothing in it. Everything past here is a real group.
+        if (truncated || !mogp || mogp + MOGP_HEADER > d + n)
         {
-            out.mogpFlags = RdU32(mogp + MOGP_FLAGS);
-            groupLiquid = RdU32(mogp + MOGP_GROUP_LIQUID);
-            out.groupWmoId = RdU32(mogp + MOGP_UNIQUE_ID);
+            return WmoGroupParse::Malformed;
         }
+
+        out.mogpFlags = RdU32(mogp + MOGP_FLAGS);
+        const uint32_t groupLiquid = RdU32(mogp + MOGP_GROUP_LIQUID);
+        out.groupWmoId = RdU32(mogp + MOGP_UNIQUE_ID);
 
         // MLIQ's trailing uint16 is a materialId, NOT the liquid type. Reading it as
         // the type is how WMO lava and slime end up classified as water.
@@ -326,9 +333,10 @@ namespace world::terrain
             }
         }
 
+        // No geometry chunks at all is the ordinary shape of a portal or ambient group.
         if (!movi || !movt)
         {
-            return out.hasLiquid;
+            return out.hasLiquid ? WmoGroupParse::Loaded : WmoGroupParse::Empty;
         }
 
         const uint32_t nVert = movtSize / 12;
@@ -365,6 +373,7 @@ namespace world::terrain
             out.tris.push_back({a, b, c});
         }
 
-        return !out.tris.empty() || out.hasLiquid;
+        return (!out.tris.empty() || out.hasLiquid) ? WmoGroupParse::Loaded
+                                                    : WmoGroupParse::Empty;
     }
 }

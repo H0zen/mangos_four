@@ -975,6 +975,14 @@ namespace world::nav
             const bool ok = WriteFile(mb.outDir + "/" + name, &header, sizeof(header),
                                       navData, size_t(navDataSize));
             dtFree(navData);
+
+            // An I/O failure AFTER the mesh was built is an error, not an empty tile.
+            // Returning false alone puts it in the same bucket as open ocean, which the
+            // worker does not count, so a full disk produced a partial navmesh at exit 0.
+            if (!ok)
+            {
+                tileError = true;
+            }
             return ok;
         }
     }
@@ -1221,22 +1229,30 @@ namespace world::nav
             std::snprintf(label, sizeof(label), "map %u  [%zu/%zu]", mapId, done + 1,
                           mapCount);
 
+            // The map is in this list BECAUSE its w_ tile was found on disk a moment ago,
+            // so failing to read it now means it is truncated or a stale format. Skipping
+            // it quietly dropped the whole map out of the navmesh with nothing to show
+            // for it -- and a global-WMO map is an entire dungeon.
             std::shared_ptr<TerrainTile> tile = world::terrain::ReadTile(
                 m_tileDir + "/" + world::terrain::GlobalWmoFileName(mapId));
-            if (tile)
+            if (!tile)
             {
-                const std::vector<std::pair<int, int>> grids = GlobalWmoGrids(*tile);
-                const int written = BakeMap(mapId, label, grids, tile);
-                if (written < 0)
-                {
-                    return -1;
-                }
-                if (m_mapDone)
-                {
-                    m_mapDone(m_progressContext, mapId, label, written, grids.size());
-                }
-                total += written;
+                std::fprintf(stderr, "nav: map %u failed: %s is unreadable\n", mapId,
+                             world::terrain::GlobalWmoFileName(mapId).c_str());
+                return -1;
             }
+
+            const std::vector<std::pair<int, int>> grids = GlobalWmoGrids(*tile);
+            const int written = BakeMap(mapId, label, grids, tile);
+            if (written < 0)
+            {
+                return -1;
+            }
+            if (m_mapDone)
+            {
+                m_mapDone(m_progressContext, mapId, label, written, grids.size());
+            }
+            total += written;
             ++done;
         }
         return total;

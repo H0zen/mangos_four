@@ -509,10 +509,11 @@ namespace
     //
     // The instance keeps its identity placement. Model space IS the deck, and there is no
     // world pose to compose with.
+    // Answers with the hulls it could NOT write, like every other stage here.
     int BakeVesselMaps(const std::string& goDir, const std::string& tileDir,
                        const std::vector<VesselMap>& vessels)
     {
-        int written = 0;
+        int written = 0, failed = 0;
         for (const VesselMap& v : vessels)
         {
             auto tile = ReadTile(goDir + "/" + GoModelFileName(v.displayId));
@@ -523,6 +524,7 @@ namespace
                               "vessels: no baked collision for display id %u",
                               v.displayId);
                 g_console.Error(msg);
+                ++failed;
                 continue;
             }
 
@@ -541,6 +543,7 @@ namespace
                 std::snprintf(msg, sizeof(msg),
                               "vessels: could not write map %u", v.mapId);
                 g_console.Error(msg);
+                ++failed;
             }
             Tick();
         }
@@ -549,7 +552,7 @@ namespace
         std::snprintf(msg, sizeof(msg), "vessels: %d hull maps -> %s", written,
                       tileDir.c_str());
         g_console.Success(msg);
-        return written;
+        return failed;
     }
 
     bool BakeNav(const Options& opt, const std::string& tileDir)
@@ -812,18 +815,28 @@ int main(int argc, char** argv)
     {
         if (!opt.vessels)
         {
-            return;
+            return true;
         }
         std::error_code ec;
         std::filesystem::create_directories(tileDir, ec);
         g_console.SetStage("vessels");
-        BakeVesselMaps(opt.dest + "/gomodels", tileDir, ReadVesselMaps(opt.vesselList));
+
+        // An empty list is not an error -- `all` turns this stage on and the shipped
+        // list may legitimately name nothing yet -- but a hull that was ASKED for and
+        // could not be written is, and the result used to be dropped on the floor.
+        const std::vector<VesselMap> list = ReadVesselMaps(opt.vesselList);
+        if (list.empty())
+        {
+            g_console.Warn("vessels: " + opt.vesselList +
+                           " names no hulls -- no vessel maps written");
+            return true;
+        }
+        return BakeVesselMaps(opt.dest + "/gomodels", tileDir, list) == 0;
     };
 
     if (!opt.dbc && !opt.tiles && !opt.goModels)
     {
-        BakeVessels();
-        const bool ok = BakeNav(opt, tileDir);
+        const bool ok = BakeVessels() && BakeNav(opt, tileDir);
         g_console.SetStage("done");
         g_console.Progress(-1);
         g_console.Stop();
@@ -898,8 +911,7 @@ int main(int argc, char** argv)
 
     if (!opt.tiles && !opt.goModels)
     {
-        BakeVessels();
-        const bool ok = BakeNav(opt, tileDir);
+        const bool ok = BakeVessels() && BakeNav(opt, tileDir);
         g_console.SetStage("done");
         g_console.Progress(-1);
         g_console.Stop();
@@ -952,15 +964,21 @@ int main(int argc, char** argv)
         }
     }
 
-    BakeVessels();
+    const bool vesselsOk = BakeVessels();
 
     if (!opt.tiles)
     {
-        const bool ok = BakeNav(opt, tileDir);
+        const bool ok = vesselsOk && BakeNav(opt, tileDir);
         g_console.SetStage("done");
         g_console.Progress(-1);
         g_console.Stop();
         return ok ? 0 : 1;
+    }
+
+    if (!vesselsOk)
+    {
+        g_console.Stop();
+        return 1;
     }
 
     g_console.SetStage("tiles");

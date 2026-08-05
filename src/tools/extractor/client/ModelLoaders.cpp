@@ -44,8 +44,16 @@ namespace world::terrain
             return nullptr;
         }
 
+        // No MOHD is not a WMO root. Ignoring that left nGroups at 0, so the loop below
+        // ran zero times and an EMPTY model was cached as loaded -- indistinguishable
+        // downstream from a building that genuinely has no collision.
         WmoRootData root;
-        ParseWmoRoot(rootBytes, root);
+        if (!ParseWmoRoot(rootBytes, root))
+        {
+            m_cache.emplace(rootPath, nullptr);
+            m_roots.emplace(rootPath, WmoRootData{});
+            return nullptr;
+        }
         if (m_roots.find(rootPath) == m_roots.end())
         {
             m_roots.emplace(rootPath, root);
@@ -70,14 +78,19 @@ namespace world::terrain
                 return nullptr;
             }
 
-            // FALSE IS NOT A PARSE FAILURE HERE. It means the group carries neither
-            // collidable geometry nor liquid, which is the majority of every WMO --
-            // render-only groups the baker deliberately does not carry. Failing the
-            // model on it drops 11 game-object models and all of map 576 on retail
-            // 5.4.8 data, where 56 groups answer false and not one group file is
-            // missing. Skipping is the design.
+            // EMPTY IS NOT MALFORMED. A group with neither collidable geometry nor
+            // liquid is the ordinary case -- render-only, portal and ambient groups are
+            // most of any WMO, 56 of them across retail 5.4.8 -- and failing the model
+            // on those drops 11 game-object models and the whole of map 576. A group
+            // that is BROKEN is a missing wing, and the building is not loaded.
             WmoGroupData parsed;
-            if (!ParseWmoGroup(groupBytes, root.flags, parsed))
+            const WmoGroupParse result = ParseWmoGroup(groupBytes, root.flags, parsed);
+            if (result == WmoGroupParse::Malformed)
+            {
+                m_cache.emplace(rootPath, nullptr);
+                return nullptr;
+            }
+            if (result == WmoGroupParse::Empty)
             {
                 continue;
             }

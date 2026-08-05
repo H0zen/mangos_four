@@ -59,7 +59,12 @@ namespace world::terrain
         M2Loader m_m2;
         bool m_loadStatics = true;
 
+        /// Whether this map's ADTs are the Cataclysm-and-later split form, decided once
+        /// from the archive rather than per tile -- see the definition.
+        bool MapUsesSplitAdt(uint32_t mapId);
+
         std::unordered_map<uint32_t, WdtData> m_wdtCache;
         std::unordered_map<uint32_t, std::shared_ptr<TerrainTile>> m_globalWmoCache;
+        std::unordered_map<uint32_t, bool> m_mapSplit;
     };
 }

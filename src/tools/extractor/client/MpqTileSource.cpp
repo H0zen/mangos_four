@@ -33,25 +33,26 @@ namespace world::terrain
 
         // Placement into the same world frame the terrain uses. The 180 degrees added to
         // the Z euler is the diag(-1,-1,1) axis flip, which is exactly a half-turn.
+        // Built through the three-argument constructor, never by assigning to .scale:
+        // that constructor exists to clamp a non-positive or non-finite scale, and MDDF
+        // stores scale as uint16/1024, which is legitimately 0 for a malformed record.
+        // worldToLocal divides by it, so the whole model quietly stops being hit by any
+        // ray instead of failing.
         Transform PlacementTransform(const Placement& p)
         {
-            Transform xf;
-            xf.pos = {MID - p.pos.z, MID - p.pos.x, p.pos.y};
-            xf.rot = Mat3::fromEuler(p.rotDeg.z * DEG2RAD, p.rotDeg.x * DEG2RAD,
-                                     (p.rotDeg.y + 180.0f) * DEG2RAD);
-            xf.scale = p.scale;
-            return xf;
+            return Transform({MID - p.pos.z, MID - p.pos.x, p.pos.y},
+                             Mat3::fromEuler(p.rotDeg.z * DEG2RAD, p.rotDeg.x * DEG2RAD,
+                                             (p.rotDeg.y + 180.0f) * DEG2RAD),
+                             p.scale);
         }
 
         // A WDT global WMO's MODF is already in world coordinates, so no re-centring.
         Transform GlobalWmoTransform(const Placement& p)
         {
-            Transform xf;
-            xf.pos = {p.pos.z, p.pos.x, p.pos.y};
-            xf.rot = Mat3::fromEuler(p.rotDeg.z * DEG2RAD, p.rotDeg.x * DEG2RAD,
-                                     (p.rotDeg.y + 180.0f) * DEG2RAD);
-            xf.scale = p.scale;
-            return xf;
+            return Transform({p.pos.z, p.pos.x, p.pos.y},
+                             Mat3::fromEuler(p.rotDeg.z * DEG2RAD, p.rotDeg.x * DEG2RAD,
+                                             (p.rotDeg.y + 180.0f) * DEG2RAD),
+                             p.scale);
         }
 
         // MODD's quaternion is authored against the M2's RAW model space, but M2Parser
@@ -66,12 +67,45 @@ namespace world::terrain
             r.m[4] = -r.m[4];
             r.m[7] = -r.m[7];
 
-            Transform xf;
-            xf.pos = wmoXf.localToWorld(d.pos);
-            xf.rot = Mat3::mulm(wmoXf.rot, r);
-            xf.scale = wmoXf.scale * d.scale;
-            return xf;
+            // The PRODUCT is what gets clamped: either factor alone can be fine while
+            // the product underflows to zero.
+            return Transform(wmoXf.localToWorld(d.pos), Mat3::mulm(wmoXf.rot, r),
+                             wmoXf.scale * d.scale);
         }
+    }
+
+    // "Is there an _obj0 next to this root" cannot tell a pre-4.x monolithic tile from a
+    // 5.4.8 install that is missing one -- and those need opposite answers, because the
+    // second silently yields a map with correct ground and no buildings at all. Asked of
+    // the MAP instead: if any tile it declares has an object half, the client writes them,
+    // and a tile without one is incomplete. Stops at the first hit, so on split data it is
+    // one lookup.
+    bool MpqTileSource::MapUsesSplitAdt(uint32_t mapId)
+    {
+        auto cached = m_mapSplit.find(mapId);
+        if (cached != m_mapSplit.end())
+        {
+            return cached->second;
+        }
+
+        bool split = false;
+        if (const WdtData* wdt = Wdt(mapId))
+        {
+            for (int ty = 0; ty < 64 && !split; ++ty)
+            {
+                for (int tx = 0; tx < 64 && !split; ++tx)
+                {
+                    if (!wdt->HasAdt(tx, ty))
+                    {
+                        continue;
+                    }
+                    const std::string probe = AdtObjPath(mapId, tx, ty);
+                    split = !probe.empty() && m_archive.Contains(probe);
+                }
+            }
+        }
+        m_mapSplit.emplace(mapId, split);
+        return split;
     }
 
     std::string MpqTileSource::MapDirectory(uint32_t mapId) const
@@ -230,6 +264,14 @@ namespace world::terrain
             {
                 return nullptr;
             }
+        }
+        else if (MapUsesSplitAdt(mapId))
+        {
+            // The map's other tiles have an object half and this one does not, so this
+            // is an incomplete install, not a pre-Cataclysm client. Reading the root as
+            // monolithic would find no MWMO/MMDX/MODF/MDDF and bake perfect ground with
+            // nothing standing on it.
+            return nullptr;
         }
         else if (!ParseAdt(bytes, adt, AdtParts::Both, lvfOf))
         {
