@@ -703,8 +703,10 @@ bool Object::SendCreateUpdateToPlayer(Player* player)
         return false;
     }
 
-    // send create update to player
-    UpdateData upd(player->GetMapId());
+    // THE MAP THE CLIENT IS RENDERING, never the one the server files him under. A passenger
+    // stands on the vessel's own map, whose id his client has never been told and has no terrain
+    // for; stamping that id here kills it outright.
+    UpdateData upd(static_cast<uint16>(player->GetClientMapId()));
     WorldPacket packet;
 
     BuildCreateUpdateBlockForPlayer(&upd, player);

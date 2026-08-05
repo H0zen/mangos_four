@@ -320,7 +320,7 @@ void Player::FlushPendingEmoteRefresh(uint32 diff)
         {
             { 89, emoteState }
         };
-        UpdateData emoteData(uint16(emoter->GetMapId()));
+        UpdateData emoteData(static_cast<uint16>(GetClientMapId()));
         MopUpdateObject::AppendValuesBlock(emoteData.GetBuffer(),
             emoter->GetObjectGuid().GetRawValue(), emoteField, 1);
         emoteData.AddUpdateBlock();
