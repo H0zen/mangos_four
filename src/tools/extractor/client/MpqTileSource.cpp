@@ -458,8 +458,14 @@ namespace world::terrain
         inst.adtId = wdt->globalWmoPlacement->nameSet;
         tile->instances.push_back(std::move(inst));
 
-        // A dungeon IS one big WMO, so all of its furniture is doodads.
-        AttachWmoDoodads(*wdt->globalWmoPlacement, wdt->globalWmoName, xf, *tile);
+        // A dungeon IS one big WMO, so all of its furniture is doodads -- and a doodad that
+        // will not load is the same failure the ADT placement loop reports. Discarding this
+        // answer wrote the map's one tile without that collision and called it ok; the
+        // result is not cached either, so the next call retries rather than serving it.
+        if (!AttachWmoDoodads(*wdt->globalWmoPlacement, wdt->globalWmoName, xf, *tile))
+        {
+            return nullptr;
+        }
 
         m_globalWmoCache[mapId] = tile;
         return tile;

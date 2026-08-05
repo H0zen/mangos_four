@@ -27,7 +27,9 @@
 #include "TestHarness.h"
 
 #include "AdtParser.hpp"
+#include "IMpqArchive.hpp"
 #include "M2Parser.hpp"
+#include "ModelLoaders.hpp"
 #include "WdtParser.hpp"
 #include "WmoParser.hpp"
 
@@ -325,7 +327,6 @@ TEST(AdtHeightGridIsNotTransposed)
 
     Blob adt;
     PadTile(adt, 1, 2);
-    PadTile(adt, 1, 2);
     PutChunk(adt, "MCNK", MakeMcnk(/*ix*/ 1, /*iy*/ 2, /*baseZ*/ 100.f, 0, 0, mcvt));
 
     AdtData d;
@@ -355,7 +356,6 @@ TEST(AdtHolesAndAreaId)
     FillRamp(mcvt, 0.f);
 
     Blob adt;
-    PadTile(adt, 3, 4);
     PadTile(adt, 3, 4);
     PutChunk(adt, "MCNK", MakeMcnk(3, 4, 0.f, 0x0021, 1519, mcvt));
 
@@ -451,7 +451,6 @@ TEST(AdtMh2oFlatLayerFillsWholeChunk)
 
     Blob adt;
     PadTile(adt, 1, 1);
-    PadTile(adt, 1, 1);
     PutChunk(adt, "MCNK", MakeMcnk(1, 1, 0.f, 0, 0, mcvt));
     PutChunk(adt, "MH2O", MakeMh2o(1, 1, l));
 
@@ -485,7 +484,6 @@ TEST(AdtMh2oAbsentAttributesAreNotDeep)
 
     Blob adt;
     PadTile(adt, 1, 1);
-    PadTile(adt, 1, 1);
     PutChunk(adt, "MCNK", MakeMcnk(1, 1, 0.f, 0, 0, mcvt));
     PutChunk(adt, "MH2O", MakeMh2o(1, 1, l));
 
@@ -504,7 +502,6 @@ TEST(AdtMh2oDeepAttributeMarksChunkDeep)
     l.deepBits = ~uint64_t(0);
 
     Blob adt;
-    PadTile(adt, 1, 1);
     PadTile(adt, 1, 1);
     PutChunk(adt, "MCNK", MakeMcnk(1, 1, 0.f, 0, 0, mcvt));
     PutChunk(adt, "MH2O", MakeMh2o(1, 1, l));
@@ -534,7 +531,6 @@ TEST(AdtMh2oDeepAttributeIsPerCell)
     l.deepBits = 0xFFull;               // the chunk's first cell row, and nothing else
 
     Blob adt;
-    PadTile(adt, 1, 1);
     PadTile(adt, 1, 1);
     PutChunk(adt, "MCNK", MakeMcnk(1, 1, 0.f, 0, 0, mcvt));
     PutChunk(adt, "MH2O", MakeMh2o(1, 1, l));
@@ -572,7 +568,6 @@ TEST(AdtMh2oDeepAttributeIsIndexedOverTheChunk)
 
     Blob adt;
     PadTile(adt, 1, 1);
-    PadTile(adt, 1, 1);
     PutChunk(adt, "MCNK", MakeMcnk(1, 1, 0.f, 0, 0, mcvt));
     PutChunk(adt, "MH2O", MakeMh2o(1, 1, l));
 
@@ -597,7 +592,6 @@ TEST(AdtMh2oFishableAttributeIsNotDeep)
 
     Blob adt;
     PadTile(adt, 1, 1);
-    PadTile(adt, 1, 1);
     PutChunk(adt, "MCNK", MakeMcnk(1, 1, 0.f, 0, 0, mcvt));
     PutChunk(adt, "MH2O", MakeMh2o(1, 1, l));
 
@@ -619,7 +613,6 @@ TEST(AdtMh2oOutOfRangeAttributesOffsetIsNotDeep)
     l.forceAttributesOfs = 0x00FFFFFF;
 
     Blob adt;
-    PadTile(adt, 1, 1);
     PadTile(adt, 1, 1);
     PutChunk(adt, "MCNK", MakeMcnk(1, 1, 0.f, 0, 0, mcvt));
     PutChunk(adt, "MH2O", MakeMh2o(1, 1, l));
@@ -643,7 +636,6 @@ TEST(AdtMh2oHonoursSubRectAndExistsBitmap)
     l.existsBits = 0x1;  // only cell (y=0,x=0) of the sub-rect exists
 
     Blob adt;
-    PadTile(adt, 0, 0);
     PadTile(adt, 0, 0);
     PutChunk(adt, "MCNK", MakeMcnk(0, 0, 0.f, 0, 0, mcvt));
     PutChunk(adt, "MH2O", MakeMh2o(0, 0, l));
@@ -670,7 +662,6 @@ TEST(AdtMh2oReadsPerVertexHeights)
     l.heightBias = 1000.f;
 
     Blob adt;
-    PadTile(adt, 0, 0);
     PadTile(adt, 0, 0);
     PutChunk(adt, "MCNK", MakeMcnk(0, 0, 0.f, 0, 0, mcvt));
     PutChunk(adt, "MH2O", MakeMh2o(0, 0, l));
@@ -699,7 +690,6 @@ TEST(AdtMh2oDepthOnlyLayerUsesMinHeight)
 
     Blob adt;
     PadTile(adt, 0, 0);
-    PadTile(adt, 0, 0);
     PutChunk(adt, "MCNK", MakeMcnk(0, 0, 0.f, 0, 0, mcvt));
     PutChunk(adt, "MH2O", MakeMh2o(0, 0, l));
 
@@ -723,7 +713,6 @@ TEST(AdtMh2oOceanLiquidObjectIsDepthOnly)
     l.withDepths = true;
 
     Blob adt;
-    PadTile(adt, 0, 0);
     PadTile(adt, 0, 0);
     PutChunk(adt, "MCNK", MakeMcnk(0, 0, 0.f, 0, 0, mcvt));
     PutChunk(adt, "MH2O", MakeMh2o(0, 0, l));
@@ -760,7 +749,6 @@ TEST(AdtMh2oNonOceanLiquidObjectKeepsHeights)
 
     Blob adt;
     PadTile(adt, 0, 0);
-    PadTile(adt, 0, 0);
     PutChunk(adt, "MCNK", MakeMcnk(0, 0, 0.f, 0, 0, mcvt));
     PutChunk(adt, "MH2O", MakeMh2o(0, 0, l));
 
@@ -790,7 +778,6 @@ TEST(AdtMh2oLiquidObjectCoversTheWholeChunkWhateverTheRectSays)
 
     Blob adt;
     PadTile(adt, 0, 0);
-    PadTile(adt, 0, 0);
     PutChunk(adt, "MCNK", MakeMcnk(0, 0, 0.f, 0, 0, mcvt));
     PutChunk(adt, "MH2O", MakeMh2o(0, 0, l));
 
@@ -816,7 +803,6 @@ TEST(AdtMh2oRejectsOutOfRangeInstance)
 
     Blob adt;
     PadTile(adt, 0, 0);
-    PadTile(adt, 0, 0);
     PutChunk(adt, "MCNK", MakeMcnk(0, 0, 0.f, 0, 0, mcvt));
     PutChunk(adt, "MH2O", body);
 
@@ -835,7 +821,6 @@ TEST(AdtMh2oRejectsSubRectLeavingTheChunk)
     l.w = 8;  // 6 + 8 > 8
 
     Blob adt;
-    PadTile(adt, 0, 0);
     PadTile(adt, 0, 0);
     PutChunk(adt, "MCNK", MakeMcnk(0, 0, 0.f, 0, 0, mcvt));
     PutChunk(adt, "MH2O", MakeMh2o(0, 0, l));
@@ -860,7 +845,6 @@ TEST(AdtMclqFallbackTypesAndDarkWater)
 
     Blob mclq = MakeMclq(55.f, cells);
     Blob adt;
-    PadTile(adt, 0, 0);
     PadTile(adt, 0, 0);
     PutChunk(adt, "MCNK", MakeMcnk(0, 0, 0.f, 0, 0, mcvt, &mclq, 1u << 5));
 
@@ -1417,4 +1401,54 @@ TEST(M2PathRewritesModelExtension)
     CHECK(M2PathOf("a\\b.MDX") == "a\\b.m2");
     CHECK(M2PathOf("a\\b.mdl") == "a\\b.m2");
     CHECK(M2PathOf("a\\b.m2") == "a\\b.m2");
+}
+
+// ABSENT IS NOT BROKEN, and null is what the loaders now mean by broken. Every caller
+// -- the ADT placement loop, the WMO doodad attach, BakeGoModels -- reads null as a
+// failed extraction, so a display id naming a file the client never shipped must not
+// answer null. GameObjectDisplayInfo.dbc carries such dead rows: a full 5.4.8 bake
+// failed 21 of them before this distinction existed, all four cases below untested.
+
+TEST(M2LoaderAnswersAModelWithoutCollisionForAnAbsentFile)
+{
+    MemoryArchive archive;
+    M2Loader loader(archive);
+
+    auto model = loader.Load("aaaaaaaaa\\testdonotcommit4.mdx");
+    REQUIRE(model != nullptr);
+    CHECK(model->Empty());
+}
+
+TEST(M2LoaderAnswersNullForAPresentFileThatIsNotAnM2)
+{
+    MemoryArchive archive;
+    archive.Put("World\\junk.m2", {'N', 'O', 'T', 'M', 'D', '2', '0', 0});
+    M2Loader loader(archive);
+
+    CHECK(loader.Load("World\\junk.m2") == nullptr);
+}
+
+TEST(WmoLoaderAnswersAModelWithoutCollisionForAnAbsentRoot)
+{
+    MemoryArchive archive;
+    WmoLoader loader(archive, nullptr);
+
+    auto model = loader.Load("<empty>\\KL_OnyxiasLair.wmo");
+    REQUIRE(model != nullptr);
+    CHECK(model->Empty());
+}
+
+TEST(WmoLoaderAnswersNullForAPresentRootWithNoHeader)
+{
+    Blob mover;
+    mover.Pad(12);
+
+    Blob root;
+    PutChunk(root, "MOVR", mover);          // a chunk, but never the MOHD
+
+    MemoryArchive archive;
+    archive.Put("World\\wmo\\Broken.wmo", root.b);
+    WmoLoader loader(archive, nullptr);
+
+    CHECK(loader.Load("World\\wmo\\Broken.wmo") == nullptr);
 }
