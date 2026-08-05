@@ -914,16 +914,41 @@ TEST(AdtMissingOneChunkFailsTheParse)
     CHECK(!ParseAdt(adt.b, d));
 }
 
-TEST(AdtStopsOnTruncatedChunk)
+TEST(AdtTruncatedChunkFailsTheParse)
 {
+    // A chunk declaring more bytes than the file holds. The walk stopping was never in
+    // doubt; SAYING SO is the change. Returning true here was safe only for as long as
+    // hasTerrain was the one thing a caller looked at -- and with AdtParts::Objects there
+    // are no MCNKs to come up short, so a split `_obj0` cut inside MODF or MDDF parsed
+    // "successfully" with its placements truncated away, and BakeMap wrote the tile.
+    // Same answer as AdtMissingOneChunkFailsTheParse, for the same reason.
     Blob adt;
     adt.U8('K'); adt.U8('N'); adt.U8('C'); adt.U8('M');
     adt.U32(0x7FFFFFFF);
     adt.Pad(16);
 
     AdtData d;
-    REQUIRE(ParseAdt(adt.b, d));
+    CHECK(!ParseAdt(adt.b, d));
     CHECK(!d.hasTerrain);
+}
+
+TEST(AdtTruncatedObjectHalfFailsTheParse)
+{
+    // The half with no MCNK in it, which is why nothing here used to notice. A complete
+    // MODF placement, then an MDDF whose declared size runs off the end: the doodads are
+    // gone and the buildings are not, which is indistinguishable downstream from a tile
+    // that legitimately has no doodads.
+    Blob modf;
+    modf.Pad(64);
+
+    Blob adt;
+    PutChunk(adt, "MODF", modf);
+    adt.U8('F'); adt.U8('D'); adt.U8('D'); adt.U8('M');
+    adt.U32(36 * 100);
+    adt.Pad(36);
+
+    AdtData d;
+    CHECK(!ParseAdt(adt.b, d, AdtParts::Objects));
 }
 
 TEST(WdtGridAndGlobalWmo)
@@ -1190,6 +1215,57 @@ TEST(WmoGroupWithAChunkPastTheEndIsMalformed)
 
     WmoGroupData g;
     CHECK(ParseWmoGroup(group.b, 0, g) == WmoGroupParse::Malformed);
+}
+
+TEST(WmoGroupMogpDeclaringPastTheEndIsMalformed)
+{
+    // The container was exempted from the bounds check -- stepping into it by the header
+    // is the whole point -- so its OWN declared size was checked nowhere. The 68 bytes it
+    // needs are present, so nothing else noticed either, and the walk read whatever
+    // followed the group as if it were that group's geometry.
+    Blob group;
+    group.U8('P'); group.U8('G'); group.U8('O'); group.U8('M');
+    group.U32(0x7FFFFFFF);
+    group.Pad(68);
+
+    WmoGroupData g;
+    CHECK(ParseWmoGroup(group.b, 0, g) == WmoGroupParse::Malformed);
+}
+
+TEST(WmoGroupChunkOfExactlyHeaderSizeIsStillBoundsChecked)
+{
+    // NOT from the review, and the sharper half of it: the exemption keyed on
+    // `advance != MOGP_HEADER`, which is a VALUE, so an ordinary chunk whose size
+    // happened to be exactly 68 excused itself from the only bounds check in the loop.
+    // Here MOPY declares 68 bytes and supplies 8.
+    Blob group;
+    group.U8('P'); group.U8('G'); group.U8('O'); group.U8('M');
+    group.U32(68 + 8 + 8);
+    group.Pad(68);
+    group.U8('Y'); group.U8('P'); group.U8('O'); group.U8('M');
+    group.U32(68);
+    group.Pad(8);
+
+    WmoGroupData g;
+    CHECK(ParseWmoGroup(group.b, 0, g) == WmoGroupParse::Malformed);
+}
+
+TEST(WmoRootTruncatedAfterTheHeaderIsMalformed)
+{
+    // MOHD is the FIRST chunk, so seeing it says only that the file began correctly. The
+    // bulk of a root is MODN/MODD, and a download cut there left the building standing
+    // with no collision on anything inside it -- reported as a successful parse.
+    Blob mohd;
+    mohd.Pad(64);
+
+    Blob root;
+    PutChunk(root, "MOHD", mohd);
+    root.U8('N'); root.U8('D'); root.U8('O'); root.U8('M');
+    root.U32(0x10000);
+    root.Pad(16);
+
+    WmoRootData r;
+    CHECK(!ParseWmoRoot(root.b, r));
 }
 
 TEST(WmoRootReadsHeaderAndDoodadNameOffsets)

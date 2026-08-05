@@ -265,6 +265,90 @@ namespace world::nav
             }
         }
 
+        // The liquid a WMO carries INSIDE itself, which is a different source from the
+        // one above and was reaching the navmesh from nowhere.
+        //
+        // A group's MLIQ is baked into the model and the runtime answers with it --
+        // FusedTerrain asks WmoModel::LiquidsLocal -- so the two halves disagreed: swim
+        // and liquid-aware pathing were told there is water in an indoor pool, a lava
+        // channel or a slime pit, while the mesh under it had no water polygon at all.
+        //
+        // Neither rule from AddLiquid applies here, and both were checked rather than
+        // assumed: there is no terrain heightmap to bury a surface under inside a
+        // building, and MLIQ HAS NO DEEP BIT -- see the note on WmoModel::Liquid, whose
+        // tile-flag nibble says only which tiles are dry.
+        void AddModelLiquids(const TerrainTile& tile, Soup& out)
+        {
+            for (const world::terrain::StaticInstance& inst : tile.instances)
+            {
+                if (!inst.model || inst.model->Kind() != world::terrain::ModelKind::Wmo)
+                {
+                    continue;
+                }
+
+                const auto* wmo =
+                    static_cast<const world::terrain::WmoModel*>(inst.model.get());
+
+                for (const world::terrain::WmoModel::Group& g : wmo->Groups())
+                {
+                    const world::terrain::WmoModel::Liquid& lq = g.liquid;
+                    if (!g.hasLiquid || !lq.tilesX || !lq.tilesY || lq.heights.empty())
+                    {
+                        continue;
+                    }
+
+                    const unsigned char area =
+                        LiquidArea(static_cast<world::terrain::LiquidKind>(lq.kind));
+                    if (area == NAV_EMPTY)
+                    {
+                        continue;
+                    }
+
+                    const uint32_t row = lq.tilesX + 1;
+                    if (lq.heights.size() < static_cast<size_t>(row) * (lq.tilesY + 1))
+                    {
+                        continue;
+                    }
+
+                    const float s = world::terrain::WMO_LIQUID_TILE_SIZE;
+                    const auto H = [&](uint32_t a, uint32_t b) {
+                        return lq.heights[static_cast<size_t>(a) + static_cast<size_t>(b) * row];
+                    };
+
+                    for (uint32_t ty = 0; ty < lq.tilesY; ++ty)
+                    {
+                        for (uint32_t tx = 0; tx < lq.tilesX; ++tx)
+                        {
+                            // The runtime's own dry test, spelled the same way, so the
+                            // mesh is swimmable exactly where the server says liquid is.
+                            const size_t fi = static_cast<size_t>(tx) + static_cast<size_t>(ty) * lq.tilesX;
+                            if (fi < lq.flags.size() && (lq.flags[fi] & 0x0F) == 0x0F)
+                            {
+                                continue;
+                            }
+
+                            const float x0 = lq.corner.x + static_cast<float>(tx) * s;
+                            const float y0 = lq.corner.y + static_cast<float>(ty) * s;
+                            const float x1 = x0 + s;
+                            const float y1 = y0 + s;
+
+                            const int a = out.AddVertex(
+                                inst.xf.localToWorld(Vec3{x0, y0, H(tx, ty)}));
+                            const int b = out.AddVertex(
+                                inst.xf.localToWorld(Vec3{x0, y1, H(tx, ty + 1)}));
+                            const int c = out.AddVertex(
+                                inst.xf.localToWorld(Vec3{x1, y1, H(tx + 1, ty + 1)}));
+                            const int d = out.AddVertex(
+                                inst.xf.localToWorld(Vec3{x1, y0, H(tx + 1, ty)}));
+
+                            out.AddTriangle(a, c, b, area);
+                            out.AddTriangle(a, d, c, area);
+                        }
+                    }
+                }
+            }
+        }
+
         void AddLiquidCells(const TerrainTile& tile, int gx, int gy,
                             const CellRect& cells, Soup& out)
         {
@@ -763,6 +847,7 @@ namespace world::nav
                 // No terrain, no neighbours: the one WMO is the whole map. Each grid it
                 // spans rasterises the shared soup; Recast clips it to the grid bounds.
                 AddModels(*mb.globalWmo, solid);
+                AddModelLiquids(*mb.globalWmo, liquid);
                 if (solid.Empty())
                 {
                     return false;
@@ -785,6 +870,7 @@ namespace world::nav
                 AddTerrain(*tile, gx, gy, solid);
                 AddModels(*tile, solid);
                 AddLiquid(*tile, gx, gy, liquid);
+                AddModelLiquids(*tile, liquid);
                 if (solid.Empty())
                 {
                     return false;  // ocean tile: nothing to stand on

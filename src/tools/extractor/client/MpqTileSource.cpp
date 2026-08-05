@@ -161,13 +161,29 @@ namespace world::terrain
         }
 
         const std::string path = WdtPath(mapId);
+        if (path.empty())
+        {
+            return nullptr;                             // no directory: never had terrain
+        }
+
+        // ABSENT AND BROKEN ARE DIFFERENT ANSWERS, and this function can only give one of
+        // them. Map.dbc lists identities that never had a WDT and BakeMap is right to pass
+        // over those; a WDT that IS there and will not read or parse is a truncated or
+        // stale-format client, and collapsing it to the same nullptr let a full extraction
+        // drop that map's entire tile and nav cache and still exit 0.
         std::vector<uint8_t> bytes;
         WdtData wdt;
-        if (path.empty() || !m_archive.Read(path, bytes) || !ParseWdt(bytes, wdt))
+        if (!m_archive.Read(path, bytes) || !ParseWdt(bytes, wdt))
         {
+            m_wdtBroken.insert(mapId);
             return nullptr;
         }
         return &m_wdtCache.emplace(mapId, std::move(wdt)).first->second;
+    }
+
+    bool MpqTileSource::WdtUnreadable(uint32_t mapId) const
+    {
+        return m_wdtBroken.find(mapId) != m_wdtBroken.end();
     }
 
     void MpqTileSource::AttachWmoDoodads(const Placement& p, const std::string& wmoPath,

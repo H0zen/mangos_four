@@ -356,14 +356,24 @@ namespace
     // Every collidable game-object model, keyed by GameObjectDisplayInfo id: doors,
     // lifts, bridges. Written as ordinary one-instance tiles at identity, so the runtime
     // reads them with the same code that reads terrain.
-    void BakeGoModels(WmoLoader& wmo, M2Loader& m2,
-                      const world::GameObjectDisplayInfoStore& display,
-                      const std::string& dest)
+    /// @return the number of models that could NOT be written -- the same contract
+    ///         ExtractDbc and BakeMap answer with, and for the same reason: getmangos.sh
+    ///         deletes the installed data before this runs, so a stage that half-writes
+    ///         and exits 0 leaves the runtime with no collision for doors, bridges and
+    ///         lifts, and nothing left to restore.
+    int BakeGoModels(WmoLoader& wmo, M2Loader& m2,
+                     const world::GameObjectDisplayInfoStore& display,
+                     const std::string& dest)
     {
         std::error_code ec;
         std::filesystem::create_directories(dest, ec);
+        if (ec)
+        {
+            g_console.Error("gomodels: cannot create " + dest + ": " + ec.message());
+            return 1;
+        }
 
-        int written = 0, empty = 0;
+        int written = 0, empty = 0, failed = 0;
         for (const auto& entry : display.All())
         {
             std::shared_ptr<const ICollisionModel> model =
@@ -389,15 +399,23 @@ namespace
             inst.worldBounds = model->Bounds();
             tile.instances.push_back(std::move(inst));
 
-            if (WriteTile(tile, dest + "/" + GoModelFileName(entry.first)))
+            const std::string path = dest + "/" + GoModelFileName(entry.first);
+            if (WriteTile(tile, path))
             {
                 ++written;
             }
+            else
+            {
+                ++failed;
+                g_console.Error("gomodels: cannot write " + path);
+            }
         }
+
         char msg[512];
-        std::snprintf(msg, sizeof(msg), "gomodels: %d written, %d without collision",
-                      written, empty);
-        g_console.Success(msg);
+        std::snprintf(msg, sizeof(msg), "gomodels: %d written, %d without collision, %d FAILED",
+                      written, empty, failed);
+        if (failed) { g_console.Error(msg); } else { g_console.Success(msg); }
+        return failed;
     }
 
     void NavProgress(void* ctx, uint32_t, const char* label, size_t done, size_t total)
@@ -600,6 +618,15 @@ namespace
         const WdtData* wdt = source.Wdt(mapId);
         if (!wdt)
         {
+            if (source.WdtUnreadable(mapId))
+            {
+                char msg[256];
+                std::snprintf(msg, sizeof(msg),
+                              "  map %4u %-24s WDT FAILED to read or parse", mapId,
+                              name.c_str());
+                g_console.Error(msg);
+                return 1;
+            }
             return 0;
         }
 
@@ -950,7 +977,21 @@ int main(int argc, char** argv)
         {
             WmoLoader wmo(mpq, &liquids);
             M2Loader m2(mpq);
-            BakeGoModels(wmo, m2, display, opt.dest + "/gomodels");
+            const int goFailed =
+                BakeGoModels(wmo, m2, display, opt.dest + "/gomodels");
+
+            // The DBC half of this stage already aborts; the write half used to count a
+            // failed tile as one simply not written and fall through green.
+            if (goFailed)
+            {
+                char msg[256];
+                std::snprintf(msg, sizeof(msg),
+                              "gomodels: %d model(s) could not be written -- the install "
+                              "is INCOMPLETE", goFailed);
+                g_console.Error(msg);
+                g_console.Stop();
+                return 1;
+            }
         }
         else
         {

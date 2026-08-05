@@ -5,11 +5,6 @@
 
 namespace world::terrain
 {
-    namespace
-    {
-        constexpr float LIQUID_TILE_SIZE = 533.333f / 128.f;
-    }
-
     WmoModel::WmoModel(TriSoup soup, std::vector<uint16_t> triGroup,
                        std::vector<Group> groups, uint32_t rootWmoId, Bvh bvh)
         : m_triGroup(std::move(triGroup)), m_groups(std::move(groups)), m_rootId(rootWmoId)
@@ -45,8 +40,8 @@ namespace world::terrain
             }
             const Vec3 c = g.liquid.corner;
             m_bounds.expand({c.x, c.y, zmin});
-            m_bounds.expand({c.x + g.liquid.tilesX * LIQUID_TILE_SIZE,
-                             c.y + g.liquid.tilesY * LIQUID_TILE_SIZE, zmax});
+            m_bounds.expand({c.x + g.liquid.tilesX * WMO_LIQUID_TILE_SIZE,
+                             c.y + g.liquid.tilesY * WMO_LIQUID_TILE_SIZE, zmax});
         }
     }
 
@@ -80,8 +75,8 @@ namespace world::terrain
             return std::nullopt;
         }
 
-        const float txf = (p.x - lq.corner.x) / LIQUID_TILE_SIZE;
-        const float tyf = (p.y - lq.corner.y) / LIQUID_TILE_SIZE;
+        const float txf = (p.x - lq.corner.x) / WMO_LIQUID_TILE_SIZE;
+        const float tyf = (p.y - lq.corner.y) / WMO_LIQUID_TILE_SIZE;
         const int tx = int(txf), ty = int(tyf);
         if (txf < 0.f || tyf < 0.f || tx >= int(lq.tilesX) || ty >= int(lq.tilesY))
         {

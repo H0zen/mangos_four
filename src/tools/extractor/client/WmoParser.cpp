@@ -167,12 +167,14 @@ namespace world::terrain
         }
 
         bool sawHeader = false;
+        bool truncated = false;
         size_t pos = 0;
         while (pos + 8 <= n)
         {
             const uint32_t sz = RdU32(d + pos + 4);
-            if (pos + 8 + sz > n)
+            if (static_cast<uint64_t>(pos) + 8 + sz > n)
             {
+                truncated = true;
                 break;
             }
             if (TagIs(d + pos, "MOHD") && sz >= 8)
@@ -193,7 +195,13 @@ namespace world::terrain
         }
 
         ReadDoodads(d, n, out);
-        return sawHeader;
+
+        // MOHD is the FIRST chunk, so sawHeader alone says only that the file began
+        // correctly. A root cut anywhere after it -- in MODN or MODD, which is where the
+        // bulk of a root's bytes are -- still returned true, and WmoLoader then baked the
+        // groups against doodads that were partial or absent: the building stands, the
+        // furniture inside it has no collision, and the extraction reports success.
+        return sawHeader && !truncated;
     }
 
     WmoGroupParse ParseWmoGroup(const uint8_t* d, size_t n, uint32_t rootFlags,
@@ -224,8 +232,20 @@ namespace world::terrain
             // MOGP is a container: step into it by its header only, so the geometry
             // chunks nested inside get walked as if they were top-level.
             uint32_t advance = sz;
+            bool isContainer = false;
             if (TagIs(tag, "MOGP"))
             {
+                isContainer = true;
+                // The container is exempted from the bounds check below, because stepping
+                // in by the header is the whole point -- so its own declared size is
+                // checked HERE or nowhere. Too short to hold the header, or declaring more
+                // bytes than the file has, and the nested walk reads whatever follows as
+                // if it were geometry.
+                if (sz < MOGP_HEADER || static_cast<uint64_t>(pos) + 8 + sz > n)
+                {
+                    truncated = true;
+                    break;
+                }
                 advance = MOGP_HEADER;
                 mogp = d + pos + 8;
             }
@@ -250,7 +270,10 @@ namespace world::terrain
                 mliqSize = sz;
             }
 
-            if (advance != MOGP_HEADER && pos + 8 + sz > n)
+            // On the container flag, NOT on `advance != MOGP_HEADER`: that compared a
+            // value, so any ordinary chunk whose size happened to be exactly 68 bytes
+            // exempted itself from the only bounds check in this loop.
+            if (!isContainer && static_cast<uint64_t>(pos) + 8 + sz > n)
             {
                 truncated = true;
                 break;

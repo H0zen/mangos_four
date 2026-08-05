@@ -419,6 +419,7 @@ namespace world::terrain
         uint32_t mh2oSize = 0;
 
         bool sawMcnk = false;
+        bool truncated = false;
         ChunkSeen filled{};
         size_t pos = 0;
         while (pos + 8 <= size)
@@ -426,8 +427,9 @@ namespace world::terrain
             const uint8_t* tag = data + pos;
             const uint32_t csize = RdU32(data + pos + 4);
             const uint8_t* body = data + pos + 8;
-            if (pos + 8 + csize > size)
+            if (static_cast<uint64_t>(pos) + 8 + csize > size)
             {
+                truncated = true;
                 break;
             }
 
@@ -487,6 +489,17 @@ namespace world::terrain
             }
 
             pos += 8 + csize;
+        }
+
+        // A chunk declaring more bytes than the file holds is a truncated file, and the
+        // half that noticed was only ever the terrain one: `filled` catches a cut-off
+        // MCNK grid below. Parsed with AdtParts::Objects there are no MCNKs to be
+        // missing, so a split `_obj0` cut inside MODF or MDDF returned true with the
+        // remaining placements silently absent -- and LoadAdt then hands back a tile that
+        // BakeMap counts as written, with the WMO and M2 collision simply not in it.
+        if (truncated)
+        {
+            return false;
         }
 
         if (mh2o)

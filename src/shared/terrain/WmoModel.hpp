@@ -16,6 +16,10 @@
 
 namespace world::terrain
 {
+    /// One MLIQ tile, in model space. Shared so the runtime lookup and the navmesh bake
+    /// index the same grid with the same number rather than each keeping its own copy.
+    constexpr float WMO_LIQUID_TILE_SIZE = 533.333f / 128.f;
+
     class WmoModel : public CollisionModel
     {
     public:
