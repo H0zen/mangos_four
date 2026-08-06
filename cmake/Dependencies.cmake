@@ -64,11 +64,13 @@ if(BUILD_MANGOSD)
     endif()
 endif()
 
-if(BUILD_MANGOSD OR BUILD_TOOLS)
+if(BUILD_MANGOSD OR BUILD_TOOLS OR WITH_TESTS)
     add_subdirectory(${MANGOS_DEP_DIR}/recastnavigation dep/recastnavigation)
     add_subdirectory(${MANGOS_DEP_DIR}/g3dlite dep/g3dlite)
 endif()
 
-if(BUILD_TOOLS)
+# StormLib backs extractor_mpq, which is configured alongside the parsers the unit
+# tests link -- so it follows the same switch rather than BUILD_TOOLS alone.
+if(BUILD_TOOLS OR WITH_TESTS)
     add_subdirectory(${MANGOS_DEP_DIR}/StormLib dep/StormLib)
 endif()

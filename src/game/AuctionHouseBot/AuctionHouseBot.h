@@ -425,7 +425,6 @@ struct AuctionHouseBotStatusInfoPerType
 typedef AuctionHouseBotStatusInfoPerType AuctionHouseBotStatusInfo[MAX_AUCTION_HOUSE_TYPE];
 
 /**
-<<<<<<< HEAD
  * @brief This class handle both Selling and Buying method
  * (holder of AuctionBotBuyer and AuctionBotSeller objects)
  * (Taken from comments in source)

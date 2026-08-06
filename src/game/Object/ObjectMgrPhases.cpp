@@ -24,6 +24,7 @@
  */
 
 #include "ObjectMgr.h"
+#include "SQLStorages.h"
 
 #include "Database/DatabaseEnv.h"
 #include "Log.h"

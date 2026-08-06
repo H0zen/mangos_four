@@ -25,6 +25,12 @@
 
 #include "DatabaseEnv.h"
 
+#include <algorithm>
+#include <sstream>
+#include <stdexcept>
+#include <string>
+#include <utility>
+
 /**
  * @brief Constructor to reserve memory for parameters.
  * @param nParams The number of parameters to reserve memory for.

@@ -22,8 +22,10 @@ FROM ubuntu:22.04 AS runtime
 RUN apt-get -y update && apt-get -y upgrade
 RUN apt-get -y install libmysqlclient-dev openssl
 
+# The config comes with the tree above. It used to have to be fetched from /etc,
+# because a relative CONF_INSTALL_DIR resolved against the PREFIX rather than bin/ and
+# installed it to <prefix>/../etc -- outside the image's own directory.
 COPY --from=build-step /mangos /mangos
-COPY --from=build-step /etc/realmd.conf.dist /mangos/etc/realmd.conf.dist
 WORKDIR /mangos/bin
 RUN chmod +x realmd
 

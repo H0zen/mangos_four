@@ -220,6 +220,13 @@ bool MySQLConnection::Initialize(const char* infoString)
     }
 
     mysql_options(mysqlInit, MYSQL_SET_CHARSET_NAME, "utf8");
+
+    // DELIBERATELY UNCONDITIONAL, though the client deprecates this from 8.0.34 on and
+    // prints its own warning for it. Nothing else here recovers a dropped connection:
+    // Ping() throws its result away and Execute/Query log mysql_error and return false,
+    // so removing this leaves every connection dead after a wait_timeout or a database
+    // restart until the process is restarted. Silence the warning by handling
+    // CR_SERVER_GONE_ERROR here first; do not simply drop the option.
     mysql_options(mysqlInit, MYSQL_OPT_RECONNECT, "1");
 #ifdef WIN32
     if (host == ".")                                        // named pipe use option (Windows)

@@ -1953,285 +1953,42 @@
         exit 1
       fi
 
-      if [[ $DLGAPP == 'fzf' ]]; then
-        ACTIONS=$(
-          {
-            echo '1 DBC and Maps';
-            echo '2 Vmaps';
-            echo '3 Mmaps';
-          } \
-          | $DLGAPPFZF --header 'Extractions to perform'
-        );
-      else
-        ACTIONS=$(
-          $DLGAPP \
-          --backtitle "MaNGOS Linux Build Configuration" \
-          --title "Select Tasks" \
-          --checklist "Please select the extractions to perform" 0 70 3 \
-          1 "DBC and Maps" On \
-          2 "Vmaps" On \
-          3 "Mmaps" On \
-          3>&2 2>&1 1>&3
-        )
-      fi
-
       if [ ! -d "$INSTPATH/bin/tools" ]; then
         Log "The client tools have not been built, cannot extract data" 1
         exit 1
       fi
 
-      #TODO What if DBC are not yet generated ??
-      if [[ $ACTIONS == *1* ]]; then
-        if [ -d "$GAMEPATH/dbc" ]; then
-          $DLGAPP --backtitle "MaNGOS Linux Build Configuration" --title "DBC and Maps were already generated" \
-            --yesno "Do you want to generate them again?" 8 60
+      # ONE tool now. mangos-extractor reads the client once and writes everything the
+      # server loads -- dbc/, tiles/, gomodels/ and mmaps/ -- so the old "which of the
+      # three do you want" checklist has nothing left to choose between: the components
+      # feed each other and the tool bakes them in dependency order.
+      if [ -d "$INSTPATH/bin/tiles" ]; then
+        $DLGAPP --backtitle "MaNGOS Linux Build Configuration" \
+          --title "Client data was already extracted" \
+          --yesno "Do you want to extract it again?" 8 60
 
-          # Check the user's answer
-          if [ $? -eq 0 ]; then
-            Log "Deleting DBC and Maps previously generated." 1
-            rm -rf "$GAMEPATH/dbc"
-            rm -rf "$GAMEPATH/maps"
-
-            Log "Copying DBC and Maps extractor" 0
-            rm -f "$GAMEPATH/map-extractor"
-            cp "$INSTPATH/bin/tools/map-extractor" "$GAMEPATH"
-
-            Log "Extracting DBC and Maps" 0
-            cd "$GAMEPATH"
-            ./map-extractor
-
-            if [ $? -eq 0 ]; then
-              Log "DBC and Maps are extracted" 0
-              Log "Copying DBC and Maps files to installation directory" 0
-              cp -R "$GAMEPATH/dbc" "$INSTPATH/bin"
-              cp -R "$GAMEPATH/maps" "$INSTPATH/bin"
-              rm -rf "$GAMEPATH/map-extractor"
-              Log "Changing ownership of the extracted directories"
-              chown -R $SERVER_USER:$SERVER_USER "$INSTPATH"
-            else
-              Log "There was an issue while extracting DBC and Maps!" 1
-              rm -rf "$GAMEPATH/map-extractor"
-              rm -rf "$GAMEPATH/dbc"
-              rm -rf "$GAMEPATH/maps"
-              exit 1
-            fi
-          else
-            Log "Copying DBC and Maps files to installation directory" 0
-            cp -R "$GAMEPATH/dbc" "$INSTPATH/bin"
-            cp -R "$GAMEPATH/maps" "$INSTPATH/bin"
-          fi
-        else
-        rm -rf "$GAMEPATH/map-extractor"
-        cp "$INSTPATH/bin/tools/map-extractor" "$GAMEPATH"
-
-        Log "Extracting DBC and Maps" 0
-        cd "$GAMEPATH"
-        ./map-extractor
-
-        if [ $? -eq 0 ]; then
-          Log "DBC and Maps are extracted" 0
-          Log "Copying DBC and Maps files to installation directory" 0
-          cp -R "$GAMEPATH/dbc" "$INSTPATH/bin"
-              cp -R "$GAMEPATH/maps" "$INSTPATH/bin"
-              rm -rf "$GAMEPATH/map-extractor"
-              Log "Changing ownership of the extracted directories"
-              chown -R $SERVER_USER:$SERVER_USER "$INSTPATH"
-            else
-              Log "There was an issue while extracting DBC and Maps!" 1
-              rm -rf "$GAMEPATH/map-extractor"
-              rm -rf "$GAMEPATH/dbc"
-              rm -rf "$GAMEPATH/maps"
-              exit 1
-            fi
+        if [ $? -ne 0 ]; then
+          Log "Keeping the client data already installed" 0
+          return
         fi
+
+        Log "Deleting the client data previously extracted." 1
+        rm -rf "$INSTPATH/bin/dbc" "$INSTPATH/bin/tiles"
+        rm -rf "$INSTPATH/bin/gomodels" "$INSTPATH/bin/mmaps"
       fi
 
-      if [[ $ACTIONS == *2* ]]; then
-        if [ -d "$GAMEPATH/vmaps" ]; then
-          $DLGAPP --backtitle "MaNGOS Linux Build Configuration" --title "VMaps were already generated" \
-            --yesno "Do you want to generate them again?" 8 60
+      Log "Extracting client data -- this takes a while" 0
+      "$INSTPATH/bin/tools/mangos-extractor" \
+        --src "$GAMEPATH/Data" --dest "$INSTPATH/bin" --no-menu
 
-          # Check the user's answer
-          if [ $? -eq 0 ]; then
-            Log "Deleting VMaps previously generated." 1
-            rm -rf $GAMEPATH/vmaps
-            Log "Copying VMaps extractor" 0
-            rm -f "$GAMEPATH/vmap-extractor"
-            cp "$INSTPATH/bin/tools/vmap-extractor" "$GAMEPATH"
-
-            Log "Extracting VMaps" 0
-            cd $GAMEPATH
-            # Make sure there is no previous vmaps generation that cause issue.
-            rm -rf Buildings
-            ./vmap-extractor
-
-            if [ $? -eq 0 ]; then
-              Log "VMaps are extracted" 0
-              Log "Copying VMaps files to installation directory" 0
-              cp -R "$GAMEPATH/vmaps" "$INSTPATH/bin"
-              rm -rf "$GAMEPATH/vmap-extractor"
-              Log "Changing ownership of the extracted directories"
-              chown -R $SERVER_USER:$SERVER_USER "$INSTPATH"
-            else
-              Log "There was an issue while extracting VMaps!" 1
-              rm -rf "$GAMEPATH/vmap-extractor"
-              rm -rf "$GAMEPATH/vmaps"
-              exit 1
-            fi
-          else
-            Log "Copying VMaps files to installation directory" 0
-            cp -R "$GAMEPATH/vmaps" "$INSTPATH/bin"
-          fi
-        else
-         Log "Copying VMaps extractor" 0
-         rm -f "$GAMEPATH/vmap-extractor"
-         cp "$INSTPATH/bin/tools/vmap-extractor" "$GAMEPATH"
-
-         Log "Extracting VMaps" 0
-         cd $GAMEPATH
-         # Make sure there is no previous vmaps generation that cause issue.
-         rm -rf Buildings
-         ./vmap-extractor
-
-         if [ $? -eq 0 ]; then
-           Log "VMaps are extracted" 0
-           Log "Copying VMaps files to installation directory" 0
-           cp -R "$GAMEPATH/vmaps" "$INSTPATH/bin"
-           rm -rf "$GAMEPATH/vmap-extractor"
-           Log "Changing ownership of the extracted directories"
-           chown -R $SERVER_USER:$SERVER_USER "$INSTPATH"
-         else
-           Log "There was an issue while extracting VMaps!" 1
-           rm -rf "$GAMEPATH/vmap-extractor"
-           rm -rf "$GAMEPATH/vmaps"
-           exit 1
-         fi
-        fi
+      if [ $? -ne 0 ]; then
+        Log "There was an issue while extracting the client data!" 1
+        exit 1
       fi
 
-      if [[ $ACTIONS == *3* ]]; then
-        if [ ! -d "$GAMEPATH/maps" ]; then
-          Log "Error: maps files must be created to be able to generate MMaps!" 1
-          exit 1
-        fi
-
-        if [ -d "$GAMEPATH/mmaps" ]; then
-          $DLGAPP --backtitle "MaNGOS Linux Build Configuration" --title "MMaps were already generated" \
-            --yesno "Do you want to generate them again?" 8 60
-
-          # Check the user's answer
-          if [ $? -eq 0 ]; then
-            Log "Deleting MMaps previously generated." 1
-            rm -rf $GAMEPATH/mmaps
-
-            Log "Copying MMaps extractor" 0
-            rm -f "$GAMEPATH/MoveMapGen.sh"
-            cp "$INSTPATH/bin/tools/MoveMapGen.sh" "$GAMEPATH"
-            cp "$INSTPATH/bin/tools/offmesh.txt" "$GAMEPATH"
-            cp "$INSTPATH/bin/tools/mmap_excluded.txt" "$GAMEPATH"
-            cp "$INSTPATH/bin/tools/mmap-extractor" "$GAMEPATH"
-
-            CPU=$($DLGAPP --backtitle "MaNGOS Linux Build Configuration" --title "Please provide the number of CPU to be used to generate MMaps (1-4)" \
-             --inputbox "Default: 1" 8 80 3>&2 2>&1 1>&3)
-
-            # User cancelled his choice, set default to 1.
-            if [ $? -ne 0 ]; then
-              Log "User selection was cancelled. Max CPU set to 1." 1
-              CPU=1
-            fi
-
-            if [ -z "$CPU" ]; then
-              Log "User didn't gave any value. Max CPU set to 1." 1
-              CPU=1
-            fi
-
-            if [ "$CPU" -lt 1 ] || [ "$CPU" -gt 4 ]; then
-              Log "User entered invalid value. Max CPU set to 1." 1
-              CPU=1
-            fi
-
-            Log "Extracting MMaps" 0
-            cd $GAMEPATH
-            # Making sure we can execute the script
-            chmod 700 MoveMapGen.sh
-            ./MoveMapGen.sh $CPU
-
-            if [ $? -eq 0 ]; then
-              Log "MMaps are extracted" 0
-              Log "Copying MMaps files to installation directory" 0
-              cp -R "$GAMEPATH/mmaps" "$INSTPATH/bin"
-              rm -rf "$GAMEPATH/MoveMapGen.sh"
-              rm -rf "$GAMEPATH/offmesh.txt"
-              rm -rf "$GAMEPATH/mmap_excluded.txt"
-              rm -rf "$GAMEPATH/mmap-extractor"
-              Log "Changing ownership of the extracted directories"
-              chown -R $SERVER_USER:$SERVER_USER "$INSTPATH"
-            else
-              Log "There was an issue while extracting MMaps!" 1
-              rm -rf "$GAMEPATH/MoveMapGen.sh"
-              rm -rf "$GAMEPATH/mmaps"
-              rm -rf "$GAMEPATH/offmesh.txt"
-              rm -rf "$GAMEPATH/mmap_excluded.txt"
-              rm -rf "$GAMEPATH/mmap-extractor"
-              exit 1
-            fi
-          else
-            Log "Copying MMaps files to installation directory" 0
-            cp -R "$GAMEPATH/mmaps" "$INSTPATH/bin"
-          fi
-        else
-        Log "Copying MMaps extractor" 0
-            rm -f "$GAMEPATH/MoveMapGen.sh"
-            cp "$INSTPATH/bin/tools/MoveMapGen.sh" "$GAMEPATH"
-            cp "$INSTPATH/bin/tools/offmesh.txt" "$GAMEPATH"
-            cp "$INSTPATH/bin/tools/mmap_excluded.txt" "$GAMEPATH"
-            cp "$INSTPATH/bin/tools/mmap-extractor" "$GAMEPATH"
-        CPU=$($DLGAPP --backtitle "MaNGOS Linux Build Configuration" --title "Please provide the number of CPU to be used to generate MMaps (1-4)" \
-             --inputbox "Default: 1" 8 80 3>&2 2>&1 1>&3)
-
-            # User cancelled his choice, set default to 1.
-            if [ $? -ne 0 ]; then
-              Log "User selection was cancelled. Max CPU set to 1." 1
-              CPU=1
-            fi
-
-            if [ -z "$CPU" ]; then
-              Log "User didn't gave any value. Max CPU set to 1." 1
-              CPU=1
-            fi
-
-            if [ "$CPU" -lt 1 ] || [ "$CPU" -gt 4 ]; then
-              Log "User entered invalid value. Max CPU set to 1." 1
-              CPU=1
-            fi
-
-            Log "Extracting MMaps" 0
-            cd $GAMEPATH
-            # Making sure we can execute the script
-            chmod 700 MoveMapGen.sh
-            ./MoveMapGen.sh $CPU
-
-            if [ $? -eq 0 ]; then
-              Log "MMaps are extracted" 0
-              Log "Copying MMaps files to installation directory" 0
-              cp -R "$GAMEPATH/mmaps" "$INSTPATH/bin"
-              rm -rf "$GAMEPATH/MoveMapGen.sh"
-              rm -rf "$GAMEPATH/offmesh.txt"
-              rm -rf "$GAMEPATH/mmap_excluded.txt"
-              rm -rf "$GAMEPATH/mmap-extractor"
-              Log "Changing ownership of the extracted directories"
-              chown -R $SERVER_USER:$SERVER_USER "$INSTPATH"
-            else
-          Log "There was an issue while extracting MMaps!" 1
-              rm -rf "$GAMEPATH/MoveMapGen.sh"
-              rm -rf "$GAMEPATH/mmaps"
-              rm -rf "$GAMEPATH/offmesh.txt"
-              rm -rf "$GAMEPATH/mmap_excluded.txt"
-              rm -rf "$GAMEPATH/mmap-extractor"
-              exit 1
-            fi
-        fi
-      fi
+      Log "Client data extracted" 0
+      Log "Changing ownership of the extracted directories" 0
+      chown -R $SERVER_USER:$SERVER_USER "$INSTPATH"
     }
 
     # Function to create a Code::Blocks project

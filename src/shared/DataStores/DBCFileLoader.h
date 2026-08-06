@@ -79,6 +79,10 @@ class DBCFileLoader
          */
         bool Load(const char* filename, const char* fmt);
 
+        /// Parse a DBC already in memory -- what the offline baker has, reading
+        /// out of the client MPQs. Load() is this, with a file read in front.
+        bool LoadFromMemory(const void* bytes, size_t size, const char* fmt);
+
         /**
          * @brief Represents a single record in the DBC file
          *

@@ -79,10 +79,12 @@ SqlDelayThread::~SqlDelayThread()
  */
 void SqlDelayThread::run()
 {
-#ifndef DO_POSTGRESQL
-    // Initialize MySQL thread-local data for this thread
-    mysql_thread_init();
-#endif
+    // Register this thread with the client library for as long as it runs. RAII, not a
+    // matching pair of calls: the end hook must run even if the loop leaves by an unexpected
+    // path, because a thread that skips it leaves the client library's per-thread state
+    // dangling instead of failing cleanly. It also goes through the Database, so a non-MySQL
+    // backend is the driver's business rather than an #ifdef here.
+    DbThreadGuard dbThread(m_dbEngine);
 
     const uint32 loopSleepms = 10; /**< Sleep interval between processing cycles in milliseconds */
 
@@ -106,12 +108,6 @@ void SqlDelayThread::run()
             m_dbEngine->Ping();
         }
     }
-
-#ifndef DO_POSTGRESQL
-    // Clean up MySQL thread-local data
-    mysql_thread_end();
-#endif
-
 }
 
 /**

@@ -68,7 +68,6 @@
 #include "Policies/Singleton.h"
 #include "SharedDefines.h"
 #include "LootMgr.h"
-#include "VMapFactory.h"
 #include "BattleGround/BattleGround.h"
 #include "Util.h"
 #include "Chat.h"
@@ -390,13 +389,13 @@ void Spell::SetTargetMap(SpellEffectIndex effIndex, uint32 targetMode, UnitList&
                     break;
                 }
 
-                if (!DisableMgr::IsDisabledFor(DISABLE_TYPE_SPELL, m_spellInfo->ID, NULL, SPELL_ATTR_EX2_IGNORE_LOS) && !prev->IsWithinLOSInMap(*next, VMAP::ModelIgnoreFlags::M2))
+                if (!DisableMgr::IsDisabledFor(DISABLE_TYPE_SPELL, m_spellInfo->ID, NULL, SPELL_ATTR_EX2_IGNORE_LOS) && !prev->IsWithinLOSInMap(*next, world::terrain::ModelIgnoreFlags::M2))
                 {
                     ++next;
                     continue;
                 }
 
-                if (!prev->IsWithinLOSInMap(*next, VMAP::ModelIgnoreFlags::M2)
+                if (!prev->IsWithinLOSInMap(*next, world::terrain::ModelIgnoreFlags::M2)
                     || (m_spellInfo->HasAttribute(SPELL_ATTR_EX6_IGNORE_CC_TARGETS) && !(*next)->CanFreeMove()))
                 {
                     ++next;
@@ -489,7 +488,7 @@ void Spell::SetTargetMap(SpellEffectIndex effIndex, uint32 targetMode, UnitList&
                         break;
                     }
 
-                    if (!DisableMgr::IsDisabledFor(DISABLE_TYPE_SPELL, m_spellInfo->ID, NULL, SPELL_ATTR_EX2_IGNORE_LOS) && !prev->IsWithinLOSInMap(*next, VMAP::ModelIgnoreFlags::M2))
+                    if (!DisableMgr::IsDisabledFor(DISABLE_TYPE_SPELL, m_spellInfo->ID, NULL, SPELL_ATTR_EX2_IGNORE_LOS) && !prev->IsWithinLOSInMap(*next, world::terrain::ModelIgnoreFlags::M2))
                     {
                         ++next;
                         continue;
@@ -1321,7 +1320,7 @@ void Spell::SetTargetMap(SpellEffectIndex effIndex, uint32 targetMode, UnitList&
                         break;
                     }
 
-                    if (!DisableMgr::IsDisabledFor(DISABLE_TYPE_SPELL, m_spellInfo->ID, NULL, SPELL_ATTR_EX2_IGNORE_LOS) && !prev->IsWithinLOSInMap(*next, VMAP::ModelIgnoreFlags::M2))
+                    if (!DisableMgr::IsDisabledFor(DISABLE_TYPE_SPELL, m_spellInfo->ID, NULL, SPELL_ATTR_EX2_IGNORE_LOS) && !prev->IsWithinLOSInMap(*next, world::terrain::ModelIgnoreFlags::M2))
                     {
                         ++next;
                         continue;
@@ -1440,7 +1439,7 @@ void Spell::SetTargetMap(SpellEffectIndex effIndex, uint32 targetMode, UnitList&
 
                 float _target_x, _target_y, _target_z;
                 pTarget->GetClosePoint(_target_x, _target_y, _target_z, pTarget->GetObjectBoundingRadius(), radius, angle);
-                if (pTarget->IsWithinLOS(_target_x, _target_y, _target_z, VMAP::ModelIgnoreFlags::M2))
+                if (pTarget->IsWithinLOS(_target_x, _target_y, _target_z, world::terrain::ModelIgnoreFlags::M2))
                 {
                     targetUnitMap.push_back(m_caster);
                     m_targets.setDestination(_target_x, _target_y, _target_z);

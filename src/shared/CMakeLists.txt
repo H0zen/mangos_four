@@ -112,6 +112,14 @@ set(SRC_GRP_LOCKQ
 )
 source_group("LockedQueue" FILES ${SRC_GRP_LOCKQ})
 
+set(SRC_GRP_CONSOLE
+  Console/ConsoleUI.cpp
+  Console/ConsoleUI.h
+  Console/Terminal.cpp
+  Console/Terminal.h
+)
+source_group("Console" FILES ${SRC_GRP_CONSOLE})
+
 set(SRC_GRP_LOG
   Log/Log.cpp
   Log/Log.h
@@ -240,6 +248,7 @@ add_library(shared STATIC
     ${SRC_GRP_AUTH}
     ${SRC_GRP_COMMON}
     ${SRC_GRP_CONFIG}
+    ${SRC_GRP_CONSOLE}
     ${SRC_GRP_DATASTORE}
     ${SRC_GRP_DATABASE}
     ${SRC_GRP_DYNAMIC}

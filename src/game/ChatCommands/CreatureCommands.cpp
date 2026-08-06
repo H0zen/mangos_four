@@ -47,7 +47,6 @@
 #include "ObjectMgr.h"
 
 #ifdef _DEBUG_VMAPS
-#include "VMapFactory.h"
 #endif
 
  /**********************************************************************

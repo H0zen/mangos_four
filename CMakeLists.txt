@@ -22,7 +22,7 @@ cmake_minimum_required(VERSION 3.18 FATAL_ERROR)
 
 list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/cmake")
 
-project(MaNGOS VERSION 0.22.0 LANGUAGES C CXX)
+project(MaNGOS VERSION 0.23.0 LANGUAGES C CXX)
 
 # Build artefacts never land in the source tree. This is a test, not hygiene:
 # sources here still carry relative includes like "../../dep/foo.h", and an
@@ -57,7 +57,7 @@ set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 # Define available cmake options below
 option(BUILD_MANGOSD        "Build the main server"                         ON)
 option(BUILD_REALMD         "Build the login server"                        ON)
-option(BUILD_TOOLS          "Build the map/vmap/mmap extractors"            ON)
+option(BUILD_TOOLS          "Build the client-data extractor"               ON)
 option(SCRIPT_LIB_ELUNA     "Compile with support for Eluna scripts"        ON)
 option(SCRIPT_LIB_SD3       "Compile with support for ScriptDev3 scripts"   ON)
 option(PLAYERBOTS           "Enable Player Bots"                            OFF)
@@ -70,6 +70,10 @@ option(WITHOUT_GIT          "Disable Git revision detection"                OFF)
 # code they cover. The name matches MangosTwo, and the realmd submodule already
 # keys off WITH_TESTS, so this single switch covers the core and realmd suites.
 option(WITH_TESTS           "Build the unit tests"                          OFF)
+# DECLARED because it is USED -- the guard further down reads it, and CI passes
+# -DWITH_NET_TESTS=0. CMake takes an undeclared -D almost silently, so an option
+# that only exists at the point of use is one nobody can discover or default.
+option(WITH_NET_TESTS       "Build the socket tests (slow; never in CI)"    OFF)
 #==================================================================================
 message("")
 message(
@@ -84,6 +88,10 @@ message(
     PCH                     Enable use of precompiled headers
     WITH_IO_URING           Use the io_uring network backend instead of epoll (Linux only,
                             requires liburing headers; falls back to epoll if absent)
+    WITH_TESTS              Build the unit tests (target: mangos_tests)
+    WITH_NET_TESTS          Build the socket tests as well. Disjoint from WITH_TESTS,
+                            off by default, and deliberately not run in CI: they bind
+                            real sockets and dominate the suite's wall-clock time.
     DEBUG                   Debug build, only for systems without IDE (Linux, *BSD)
    Scripting engines:
     SCRIPT_LIB_ELUNA        Compile with support for Eluna scripts
@@ -98,9 +106,10 @@ message(
 message("")
 #==================================================================================#
 
-project(MaNGOS VERSION 0.22.0)
-
-enable_testing()
+# The project is declared ONCE, at the top, with its languages. A second project()
+# here re-entered compiler detection with no LANGUAGES and reset what the first call
+# established; enable_testing() likewise belongs with the test switch further down,
+# not unconditionally, or ctest registers a suite nobody asked to build.
 
 if(CMAKE_INSTALL_PREFIX_INITIALIZED_TO_DEFAULT)
   set(CMAKE_INSTALL_PREFIX ${CMAKE_BINARY_DIR}/install CACHE PATH "Default install directory" FORCE)
@@ -114,16 +123,41 @@ if(NOT CMAKE_CONFIGURATION_TYPES)
   endif()
 endif()
 
+# ABSOLUTE, and inside the prefix. install(DESTINATION) resolves a RELATIVE path against
+# CMAKE_INSTALL_PREFIX, not against BIN_DIR -- so the previous "../etc" was read as
+# <prefix>/../etc and dropped the configs one level ABOVE the prefix that was asked for,
+# where several servers then shared one etc. Whoever wrote it meant bin/../etc.
 if(UNIX)
     set(BIN_DIR ${CMAKE_INSTALL_PREFIX}/bin)
     if (NOT CONF_INSTALL_DIR)
-        set(CONF_INSTALL_DIR ../etc)
+        set(CONF_INSTALL_DIR ${CMAKE_INSTALL_PREFIX}/etc)
     endif()
 else()
     set(BIN_DIR ${CMAKE_INSTALL_PREFIX})
     if (NOT CONF_INSTALL_DIR)
-        set(CONF_INSTALL_DIR .)
+        set(CONF_INSTALL_DIR ${CMAKE_INSTALL_PREFIX})
     endif()
+endif()
+
+# =============================================================================
+# Runtime library search path (RPATH)
+#
+# Eluna's Lua runtime is built as a SHARED library and installed to <prefix>/lib,
+# while the servers land in <prefix>/bin. Nothing recorded a search path for that,
+# so an installed mangosd cannot find liblua at start-up -- it only ever worked
+# from the build tree, where CMake writes a build-tree RPATH of its own. FreeBSD
+# surfaces this first because it has no /etc/ld.so.conf.d convention quietly
+# covering <prefix>/lib.
+#
+# $ORIGIN (and @loader_path on macOS) resolves relative to the binary itself, so
+# the install tree stays relocatable: move it anywhere and it still resolves.
+# =============================================================================
+if(APPLE)
+    set(CMAKE_INSTALL_RPATH "@loader_path/../lib")
+    set(CMAKE_INSTALL_RPATH_USE_LINK_PATH TRUE)
+elseif(UNIX)
+    set(CMAKE_INSTALL_RPATH "$ORIGIN/../lib")
+    set(CMAKE_INSTALL_RPATH_USE_LINK_PATH TRUE)
 endif()
 
 if(NOT WITHOUT_GIT)

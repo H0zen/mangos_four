@@ -76,7 +76,7 @@
 #include "BattleGround/BattleGroundMgr.h"
 #include "OutdoorPvP/OutdoorPvP.h"
 #include "TemporarySummon.h"
-#include "VMapFactory.h"
+#include "terrain/GoModelStore.hpp"
 #include "MoveMap.h"
 #include "GameEventMgr.h"
 #include "PoolManager.h"
@@ -116,7 +116,6 @@
 
 INSTANTIATE_SINGLETON_1(World);
 
-extern void LoadGameObjectModelList();
 
 volatile bool World::m_stopEvent = false;
 uint8 World::m_ExitCode = SHUTDOWN_EXIT_CODE;
@@ -220,7 +219,6 @@ World::~World()
         delete session;
     }
 
-    VMAP::VMapFactory::clear();
     MMAP::MMapFactory::clear();
 }
 
@@ -248,12 +246,11 @@ void World::SetInitialWorldSettings()
     ///- Initialize config settings
     LoadConfigSettings();
 
-    ///- Initialize VMapManager function pointers (to untangle game/collision circular deps)
-    if (VMAP::VMapManager2* vmmgr2 = dynamic_cast<VMAP::VMapManager2*>(VMAP::VMapFactory::createOrGetVMapManager()))
-    {
-        //vmmgr2->GetLiquidFlagsPtr = &GetLiquidFlags;
-        vmmgr2->IsVMAPDisabledForPtr = &DisableMgr::IsVMAPDisabledFor;
-    }
+    ///- Point the terrain engine at the baked tiles. Nothing else tells it where they
+    ///  are, and without this every height, liquid and sight query answers "no data"
+    ///  while the server otherwise starts perfectly.
+    world::terrain::FusedTerrain::SetTileDir(m_dataPath + "tiles");
+    world::terrain::GoModelStore::Instance().SetDirectory(m_dataPath + "gomodels");
 
     ///- Check the existence of the map files for all races start areas.
     if (!MapManager::ExistMapAndVMap(0, -6240.32f, 331.033f) ||                     // Dwarf/ Gnome
@@ -353,10 +350,6 @@ void World::SetInitialWorldSettings()
 
     sLog.outString("Loading Game Object Templates...");     // must be after LoadPageTexts
     sObjectMgr.LoadGameobjectInfo();
-
-    sLog.outString("Loading GameObject models...");
-    LoadGameObjectModelList();
-    sLog.outString();
 
     sLog.outString("Loading Spell Chain Data...");
     sSpellMgr.LoadSpellChains();

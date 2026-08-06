@@ -47,7 +47,7 @@
 #include "OutdoorPvP/OutdoorPvP.h"
 #include "Util.h"
 #include "ScriptMgr.h"
-#include "vmap/GameObjectModel.h"
+#include "GameObjectModel.h"
 #include "CreatureAISelector.h"
 #include "SQLStorages.h"
 #include "GameObjectAI.h"
@@ -1348,7 +1348,8 @@ void GameObject::UpdateCollisionState() const
         return;
     }
 
-    m_model->enable(IsCollisionEnabled() ? GetPhaseMask() : 0);
+    m_model->SetCollidable(IsCollisionEnabled());
+    m_model->SetPhaseMask(IsCollisionEnabled() ? GetPhaseMask() : 0);
 }
 
 /**
@@ -1366,6 +1367,12 @@ void GameObject::UpdateModel()
     if (m_model)
     {
         GetMap()->InsertGameObjectModel(*m_model);
+
+        // A FRESH model starts non-collidable, and only AddToWorld refreshed that. So a
+        // destructible building swapping to its damaged or destroyed display -- which is
+        // a SetDisplayId, not a spawn -- inserted a model that contributes nothing to LOS
+        // or height until some later state or phase change happens to call this.
+        UpdateCollisionState();
     }
 }
 

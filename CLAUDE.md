@@ -7,7 +7,8 @@ this repo. Humans: also read [`doc/CodingStandard.md`](doc/CodingStandard.md).
 
 **MangosFour** — The Mists of Pandaria World of Warcraft **5.4.8** server (C++, MySQL/MariaDB), client build
 **18414**. Compatibility target is **5.4.8 only**; do **not** introduce 6.x/Warlords of Draenor or
-later-expansion assumptions.
+later-expansion assumptions. The client’s data files are tagged 18273 while the wire protocol is 18414 — see
+the `EXPECTED_MANGOSD_CLIENT_BUILD` / `EXPECTED_MANGOSD_WIRE_BUILD` note in `src/game/Server/SharedDefines.h`.
 
 - **Database changes go in the separate `mangosfour/database` repo**, not here — as transactional, idempotent
   `Rel##_##_###_*.sql` migrations that chain via `db_version`.

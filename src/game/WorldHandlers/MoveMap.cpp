@@ -23,6 +23,9 @@
  * and lore are copyrighted by Blizzard Entertainment, Inc.
  */
 
+#include "Utilities/Errors.h"
+#include <string>
+#include <set>
 #include "GridMap.h"
 #include "Log.h"
 #include "World.h"
@@ -51,6 +54,25 @@
  * @see MMapFactory for creation utilities
  * @see DetourNavMesh for underlying navigation mesh
  */
+
+namespace
+{
+    /// Named from the expansion, never from the format string: a deck map's id is seven
+    /// digits and the old sizing silently cut the extension off.
+    std::string MMapFileName(uint32 mapId)
+    {
+        char leaf[64];
+        snprintf(leaf, sizeof(leaf), "mmaps/%04u.mmap", mapId);
+        return sWorld.GetDataPath() + leaf;
+    }
+
+    std::string MMapTileFileName(uint32 mapId, int32 x, int32 y)
+    {
+        char leaf[64];
+        snprintf(leaf, sizeof(leaf), "mmaps/%04u%02i%02i.mmtile", mapId, x, y);
+        return sWorld.GetDataPath() + leaf;
+    }
+}
 
 namespace MMAP
 {
@@ -236,21 +258,19 @@ namespace MMAP
             return true;
         }
 
-        // load and init dtNavMesh - read parameters from file
-        uint32 pathLen = sWorld.GetDataPath().length() + strlen("mmaps/%04u.mmap") + 1;
-        char* fileName = new char[pathLen];
-        // The configured path is an argument, not part of the format: a '%' in it
-        // would otherwise be read as a conversion and consume mapId wrongly.
-        snprintf(fileName, pathLen, "%smmaps/%04u.mmap", sWorld.GetDataPath().c_str(), mapId);
+        // The buffer is sized for the WIDEST EXPANSION, not for the format string: a map id
+        // wider than the %04u pad -- a vessel's deck, minted above a million -- expanded
+        // past a buffer measured from "mmaps/%04u.mmap" and the name was truncated to
+        // "...1181646.m", which fails to open and reads like missing data.
+        const std::string fileName = MMapFileName(mapId);
 
-        FILE* file = fopen(fileName, "rb");
+        FILE* file = fopen(fileName.c_str(), "rb");
         if (!file)
         {
             if (MMapFactory::IsPathfindingEnabled(mapId))
             {
-                sLog.outError("MMAP:loadMapData: Error: Could not open mmap file '%s'", fileName);
+                sLog.outError("MMAP:loadMapData: Error: Could not open mmap file '%s'", fileName.c_str());
             }
-            delete[] fileName;
             return false;
         }
 
@@ -263,12 +283,10 @@ namespace MMAP
         if (DT_SUCCESS != mesh->init(&params))
         {
             dtFreeNavMesh(mesh);
-            sLog.outError("MMAP:loadMapData: Failed to initialize dtNavMesh for mmap %04u from file %s", mapId, fileName);
-            delete[] fileName;
+            sLog.outError("MMAP:loadMapData: Failed to initialize dtNavMesh for mmap %04u from file %s", mapId, fileName.c_str());
             return false;
         }
 
-        delete[] fileName;
 
         DEBUG_FILTER_LOG(LOG_FILTER_MAP_LOADING, "MMAP:loadMapData: Loaded %04u.mmap", mapId);
 
@@ -305,20 +323,20 @@ namespace MMAP
             return false;
         }
 
-        // load this tile :: mmaps/MMMMXXYY.mmtile
-        uint32 pathLen = sWorld.GetDataPath().length() + strlen("mmaps/%04u%02i%02i.mmtile") + 1;
-        char* fileName = new char[pathLen];
-        // As above: the configured path is an argument, never part of the format.
-        snprintf(fileName, pathLen, "%smmaps/%04u%02i%02i.mmtile", sWorld.GetDataPath().c_str(), mapId, x, y);
+        /// Recast X is world Y, so the baker names a tile with the axes swapped
+        /// relative to the grid position. See NavMeshBuilder.hpp.
+        const int32 filenameTileX = y;
+        const int32 filenameTileY = x;
 
-        FILE* file = fopen(fileName, "rb");
+        // load this tile :: mmaps/MMMMXXYY.mmtile
+        const std::string fileName = MMapTileFileName(mapId, filenameTileX, filenameTileY);
+
+        FILE* file = fopen(fileName.c_str(), "rb");
         if (!file)
         {
-            DEBUG_FILTER_LOG(LOG_FILTER_MAP_LOADING, "ERROR: MMAP:loadMap: Could not open mmtile file '%s'", fileName);
-            delete[] fileName;
+            DEBUG_FILTER_LOG(LOG_FILTER_MAP_LOADING, "ERROR: MMAP:loadMap: Could not open mmtile file '%s'", fileName.c_str());
             return false;
         }
-        delete[] fileName;
 
         // read header
         MmapTileHeader fileHeader;
@@ -326,7 +344,7 @@ namespace MMAP
 
         if (fileHeader.mmapMagic != MMAP_MAGIC)
         {
-            sLog.outError("MMAP:loadMap: Bad header in mmap %04u%02i%02i.mmtile", mapId, x, y);
+            sLog.outError("MMAP:loadMap: Bad header in mmap %04u%02i%02i.mmtile", mapId, filenameTileX, filenameTileY);
             fclose(file);
             return false;
         }
@@ -334,7 +352,7 @@ namespace MMAP
         if (fileHeader.mmapVersion != MMAP_VERSION)
         {
             sLog.outError("MMAP:loadMap: %04u%02i%02i.mmtile was built with generator v%i, expected v%i",
-                          mapId, x, y, fileHeader.mmapVersion, MMAP_VERSION);
+                          mapId, filenameTileX, filenameTileY, fileHeader.mmapVersion, MMAP_VERSION);
             fclose(file);
             return false;
         }
@@ -345,7 +363,7 @@ namespace MMAP
         size_t result = fread(data, fileHeader.size, 1, file);
         if (!result)
         {
-            sLog.outError("MMAP:loadMap: Bad header or data in mmap %04u%02i%02i.mmtile", mapId, x, y);
+            sLog.outError("MMAP:loadMap: Bad header or data in mmap %04u%02i%02i.mmtile", mapId, filenameTileX, filenameTileY);
             fclose(file);
             return false;
         }
@@ -358,7 +376,7 @@ namespace MMAP
         // memory allocated for data is now managed by detour, and will be deallocated when the tile is removed
         if (mmap->navMesh->addTile(data, fileHeader.size, DT_TILE_FREE_DATA, 0, &tileRef) != DT_SUCCESS)
         {
-            sLog.outError("MMAP:loadMap: Could not load %04u%02i%02i.mmtile into navmesh", mapId, x, y);
+            sLog.outError("MMAP:loadMap: Could not load %04u%02i%02i.mmtile into navmesh", mapId, filenameTileX, filenameTileY);
             dtFree(data);
             return false;
         }

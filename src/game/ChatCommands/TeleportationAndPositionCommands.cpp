@@ -44,7 +44,6 @@
 #include "MapPersistentStateMgr.h"
 
 #ifdef _DEBUG_VMAPS
-#include "VMapFactory.h"
 #endif
  /*
      All commands related to Teleportation
@@ -665,8 +664,10 @@ bool ChatHandler::HandleGPSCommand(char* args)
     int gx = 63 - p.x_coord;
     int gy = 63 - p.y_coord;
 
-    uint32 have_map = GridMap::ExistMap(obj->GetMapId(), gx, gy) ? 1 : 0;
-    uint32 have_vmap = GridMap::ExistVMap(obj->GetMapId(), gx, gy) ? 1 : 0;
+    // One baked tile carries terrain, liquid, area AND collision, so the old
+    // "have map / have vmap" pair collapses into a single question.
+    uint32 have_map = TerrainInfo::ExistTile(obj->GetMapId(), gx, gy) ? 1 : 0;
+    uint32 have_vmap = have_map;
 
     TerrainInfo const* terrain = obj->GetTerrain();
 
@@ -713,19 +714,16 @@ bool ChatHandler::HandleGPSCommand(char* args)
     GridMapLiquidStatus res = terrain->getLiquidStatus(obj->GetPositionX(), obj->GetPositionY(), obj->GetPositionZ(), MAP_ALL_LIQUIDS, &liquid_status);
     if (res)
     {
-        PSendSysMessage(LANG_LIQUID_STATUS, liquid_status.level, liquid_status.depth_level, liquid_status.CreatureTypeFlags, res);
+        PSendSysMessage(LANG_LIQUID_STATUS, liquid_status.level, liquid_status.depth_level, liquid_status.type_flags, res);
     }
 
-    // Additional vmap debugging help
+    // Additional terrain debugging help
 #ifdef _DEBUG_VMAPS
-    PSendSysMessage("Static terrain height (maps only): %f", obj->GetTerrain()->GetHeightStatic(obj->GetPositionX(), obj->GetPositionY(), obj->GetPositionZ(), false));
+    const auto staticFloor = obj->GetTerrain()->StaticFloor(obj->GetPositionX(), obj->GetPositionY(), obj->GetPositionZ());
+    PSendSysMessage("Static floor: %f", staticFloor ? *staticFloor : INVALID_HEIGHT);
 
-    if (VMAP::IVMapManager* vmgr = VMAP::VMapFactory::createOrGetVMapManager())
-    {
-        PSendSysMessage("Vmap Terrain Height %f", vmgr->getHeight(obj->GetMapId(), obj->GetPositionX(), obj->GetPositionY(), obj->GetPositionZ() + 2.0f, 10000.0f));
-    }
-
-    PSendSysMessage("Static map height (maps and vmaps): %f", obj->GetTerrain()->GetHeightStatic(obj->GetPositionX(), obj->GetPositionY(), obj->GetPositionZ()));
+    // The old second number diagnosed .map disagreeing with .vmap; one baked tile
+    // carries both, so there is nothing left to disagree.
 #endif
 
     return true;
