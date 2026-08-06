@@ -1216,27 +1216,58 @@ namespace MopCompactPackets
     {
         out.Initialize(SMSG_PARTYKILLLOG, 18);
 
-        // Wow.exe 18414 reader sub_6F2FE4 consumes two packed GUIDs;
-        // terminal sub_841B83 treats them as credited killer then victim.
-        out.WriteGuidMask<7, 2>(victim);
-        out.WriteGuidMask<1>(killer);
-        out.WriteGuidMask<4>(victim);
-        out.WriteGuidMask<2, 5>(killer);
-        out.WriteGuidMask<3, 1, 0>(victim);
-        out.WriteGuidMask<3, 0, 4>(killer);
-        out.WriteGuidMask<6>(victim);
-        out.WriteGuidMask<7>(killer);
-        out.WriteGuidMask<5>(victim);
+        // Reader sub_6F2FE4 in Wow.exe 18414 decodes two packed GUIDs into adjacent buffers:
+        // slot A at this+16..23 and slot B at this+24..31. Its 16-bit mask order is
+        //   B7 B2 A1 B4 A2 A5 B3 B1 B0 A3 A0 A4 B6 A7 B5 A6
+        // which is exactly the interleaving written below, so the layout here is faithful.
+        //
+        // SLOT B IS THE KILLER, slot A the victim, and that is established from the binary:
+        //
+        //   dispatch  sub_659694 case 176 (0xB0) builds the message through sub_706C0A, which
+        //             installs off_D6AB30 and calls the reader, then calls sub_6C4FBA
+        //   terminal  sub_6C4FBA reaches its handler through a computed call:
+        //               0xCE6A6758 + 0xD283DFE6 - 0xA06A2BBB = 0x00841B83
+        //             landing on a push ebp/mov ebp,esp at .text:00841B83
+        //   roles     that handler copies slot B ([eax+18h]) and slot A ([eax+10h]) into
+        //             sub_8413FA, which routes B to event+0x18 and A to event+0x30; sub_840352
+        //             then pushes those as COMBAT_LOG_EVENT sourceGUID and destGUID respectively
+        //   subevent  0x2B = 43, and off_F58AD0[43] is "PARTY_KILL"
+        //
+        // Corroborated independently: the terminal resolves SLOT A through a path that sets the
+        // twelfth PARTY_KILL argument, unconsciousOnDeath -- a property of the unit that died.
+        //
+        // A note on the citation, because this comment has now been wrong in both directions.
+        // An earlier revision cited "terminal sub_841B83". No such SYMBOL exists: IDA defines no
+        // function at 0x841B83 (sub_841A86 ends at .text:00841B82, the next proc is sub_841DF7)
+        // because the only caller is the computed call above. A later revision concluded from that
+        // absence that the citation was fabricated and set the roles from observed behaviour
+        // instead -- also wrong. The ADDRESS was always correct; only the name never existed.
+        // Searching Wow.exe.c finds defined functions only, and searching Wow.exe.asm for an
+        // address finds nothing because that export carries no address column at all. Use
+        // Wow.exe.lst, which does: the code is at Wow.exe.lst:2111029.
+        //
+        // off_D6AB30 is { sub_6C4038, nullsub_2, nullsub_2, sub_708A54, sub_7677FF }. Slot 3
+        // tail-calls sub_6F2B7B, a schema-identical second copy of this reader, which corroborates
+        // the layout but does not resolve the roles.
+        out.WriteGuidMask<7, 2>(killer);
+        out.WriteGuidMask<1>(victim);
+        out.WriteGuidMask<4>(killer);
+        out.WriteGuidMask<2, 5>(victim);
+        out.WriteGuidMask<3, 1, 0>(killer);
+        out.WriteGuidMask<3, 0, 4>(victim);
         out.WriteGuidMask<6>(killer);
+        out.WriteGuidMask<7>(victim);
+        out.WriteGuidMask<5>(killer);
+        out.WriteGuidMask<6>(victim);
         out.FlushBits();
 
-        out.WriteGuidBytes<0, 5>(victim);
-        out.WriteGuidBytes<0, 2>(killer);
-        out.WriteGuidBytes<7, 6, 1, 4>(victim);
-        out.WriteGuidBytes<4, 1>(killer);
-        out.WriteGuidBytes<2>(victim);
-        out.WriteGuidBytes<6, 3, 5, 7>(killer);
-        out.WriteGuidBytes<3>(victim);
+        out.WriteGuidBytes<0, 5>(killer);
+        out.WriteGuidBytes<0, 2>(victim);
+        out.WriteGuidBytes<7, 6, 1, 4>(killer);
+        out.WriteGuidBytes<4, 1>(victim);
+        out.WriteGuidBytes<2>(killer);
+        out.WriteGuidBytes<6, 3, 5, 7>(victim);
+        out.WriteGuidBytes<3>(killer);
     }
 
     struct AttackStateUpdateData

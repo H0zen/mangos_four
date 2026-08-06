@@ -973,7 +973,7 @@ typedef uint16_t uint16;
  *   SMSG_SET_PLAY_HOVER_ANIM                       0x069F  DORMANT
  *
  *  -- UnitCombatLog_C.cpp (6) --
- *   SMSG_PARTYKILLLOG                              0x048A  ACTIVE   [Wow.exe binary: sub_6F2FE4 reads killer/victim GUIDs; sub_841B83 emits party-kill event]
+ *   SMSG_PARTYKILLLOG                              0x048A  ACTIVE   [Wow.exe binary: sub_6F2FE4 decodes two GUIDs, slot B the killer and slot A the victim; the unnamed handler at .text:00841B83 emits COMBAT_LOG_EVENT PARTY_KILL]
  *   SMSG_DISPEL_FAILED                             0x085B  DORMANT
  *   SMSG_SPELL_PERIODIC_AURA_LOG                   0x0CF2  ACTIVE
  *   SMSG_ENCHANTMENTLOG                            0x12A3  DORMANT
