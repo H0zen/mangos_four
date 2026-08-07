@@ -38,6 +38,7 @@
 #include "SQLStorages.h"
 #include "DBCStores.h"
 #include "Group.h"
+#include "LFGMgr.h"
 
 /**
  * @brief Gets instance template data by map id.
@@ -145,7 +146,24 @@ void ObjectMgr::LoadGroups()
     // TODO: maybe delete from the DB before loading in this case
     for (GroupMap::iterator itr = mGroupMap.begin(); itr != mGroupMap.end();)
     {
-        if (itr->second->GetMembersCount() < 2)
+        // Mirror RemoveMember's own survival threshold rather than assuming two.
+        //
+        // This loop predates the branch and was correct while a one-member group could
+        // never reach startup: the logout path dissolved it. It no longer does -- an LFG
+        // group survives logout deliberately, so a run that bled down to a single member
+        // persists to the database and loads here.
+        //
+        // Disbanding it at this point defeats the whole restart-survival feature, and
+        // silently: it runs BEFORE the instance-bind loop, so RestoreDungeonGroup is
+        // never called for the group, and before the demotion sweep, which then cannot
+        // see it either. The player logs back in inside the instance with no group, no
+        // LFG block, no eye and no teleport out -- exactly the stranding this branch
+        // exists to prevent.
+        //
+        // 1 < 1 is false, so a single-member LFG or battleground group now survives to
+        // the bind loop and is either restored or demoted there.
+        uint32 const minMembers = (itr->second->isBGGroup() || itr->second->isLFGGroup()) ? 1u : 2u;
+        if (itr->second->GetMembersCount() < minMembers)
         {
             itr->second->Disband();
             delete itr->second;
@@ -216,6 +234,13 @@ void ObjectMgr::LoadGroups()
 
             DungeonPersistentState* state = (DungeonPersistentState*)sMapPersistentStateMgr.AddPersistentState(mapEntry, fields[2].GetUInt32(), Difficulty(diff), (time_t)fields[5].GetUInt64(), (fields[6].GetUInt32() == 0), true, true, fields[8].GetUInt32());
             group->BindToInstance(state, fields[3].GetBool(), true);
+
+            // Nothing in LFGMgr is persisted, so a dungeon-finder party that was inside its
+            // instance when the world went down comes back with the group and the bind but
+            // no LFG status -- which empties SMSG_GROUP_LIST's LFG block and takes the eye,
+            // both teleport options and the Vote Kick gate away from the client. Rebuild it
+            // here, where the bind's map, difficulty and encounter mask are all in hand.
+            sLFGMgr.RestoreDungeonGroup(group, mapId, uint32(diff), fields[8].GetUInt32());
         }
         while (result->NextRow());
         delete result;
@@ -223,6 +248,51 @@ void ObjectMgr::LoadGroups()
 
     sLog.outString(">> Loaded %u group-instance binds total", count);
     sLog.outString();
+
+    // Any group still flagged as a finder run but WITHOUT a restored status has outlived
+    // its instance, and must be demoted rather than left in between.
+    //
+    // RestoreDungeonGroup above rebuilds a run's LFG status from its bind. A group whose
+    // bind is gone -- an ordinary dungeon instance expires two hours after it is created,
+    // so this is the normal outcome of leaving a party assembled overnight -- never
+    // reaches that call at all, because the loop iterates binds. It comes back with
+    // GROUPTYPE_LFD set and no status behind it.
+    //
+    // Left alone the client gets neither behaviour: SMSG_GROUP_LIST omits the LFG block,
+    // so the eye and the teleport options disappear, while every server-side
+    // isLFGGroup() test still says finder group -- which is why TeleportPlayer refuses
+    // with "has no LFG status" instead of moving anyone. Demote here, once, where the
+    // binds have all been processed and the answer is finally knowable.
+    {
+        uint32 demoted = 0;
+        for (GroupMap::const_iterator itr = mGroupMap.begin(); itr != mGroupMap.end(); ++itr)
+        {
+            Group* group = itr->second;
+            if (!group || !group->isLFGGroup())
+            {
+                continue;
+            }
+
+            // Exactly the predicate Group::SendUpdate uses to decide whether to emit an
+            // LFG block, so a group is demoted precisely when the client would otherwise
+            // have been sent nothing and left in the half-state.
+            if (sLFGMgr.GetGroupDungeonEntry(group->GetObjectGuid()) != 0)
+            {
+                continue;                                   // a live run, restored above
+            }
+
+            sLog.outString("Group %u was a dungeon finder group whose instance no longer "
+                           "exists; converting it to an ordinary party.", group->GetId());
+            group->ClearLfgGroup();
+            ++demoted;
+        }
+
+        if (demoted)
+        {
+            sLog.outString(">> Demoted %u finder group(s) with no surviving instance", demoted);
+            sLog.outString();
+        }
+    }
 
     sLog.outString(">> Loaded %u group members total", count);
     sLog.outString();

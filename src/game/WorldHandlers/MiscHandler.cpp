@@ -63,6 +63,8 @@
 #include "CinematicFlyover.h"
 #include "GuildMgr.h"
 #include "ObjectMgr.h"
+#include "LFGMgr.h"
+#include "Server/MopWhoPackets.h"
 #include "WorldSession.h"
 #include "Auth/BigNumber.h"
 #include "Auth/Sha1.h"
@@ -147,56 +149,43 @@ void WorldSession::HandleWhoOpcode(WorldPacket& recv_data)
 
     uint32 clientcount = 0;
 
-    uint32 level_min, level_max, racemask, classmask, zones_count, str_count;
-    uint32 zoneids[10];                                     // 10 is client limit
-    std::string player_name, guild_name;
-
-    recv_data >> level_min;                                 // maximal player level, default 0
-    recv_data >> level_max;                                 // minimal player level, default 100 (MAX_LEVEL)
-    recv_data >> player_name;                               // player name, case sensitive...
-
-    recv_data >> guild_name;                                // guild name, case sensitive...
-
-    recv_data >> racemask;                                  // race mask
-    recv_data >> classmask;                                 // class mask
-    recv_data >> zones_count;                               // zones count, client limit=10 (2.0.10)
-
-    if (zones_count > 10)
+    // Rebuilt for 18414. See MopWhoPackets for the derived layout and the five
+    // captures it was verified against. The inherited reader took a flat 3.3.5 body --
+    // two uint32s, two inline null-terminated strings, then masks and counts -- and
+    // shares no field order whatsoever with what this client sends, so registering it
+    // unchanged would have desynchronised the read stream on the first /who.
+    MopWhoPackets::WhoRequest request;
+    if (!MopWhoPackets::ParseWhoRequest(recv_data, request))
     {
-        return;                                             // can't be received from real client or broken packet
+        sLog.outError("WORLD: malformed CMSG_WHO from %s", GetPlayerName());
+        return;
     }
 
-    for (uint32 i = 0; i < zones_count; ++i)
-    {
-        uint32 temp;
-        recv_data >> temp;                                  // zone id, 0 if zone is unknown...
-        zoneids[i] = temp;
-        DEBUG_LOG("Zone %u: %u", i, zoneids[i]);
-    }
+    uint32 const racemask = request.raceMask;
+    uint32 const classmask = request.classMask;
+    uint32 const level_min = request.levelMin;
+    uint32 level_max = request.levelMax;
+    uint32 const zones_count = uint32(request.zoneIds.size());
+    uint32 const str_count = uint32(request.words.size());
+    std::string const& player_name = request.playerName;
+    std::string const& guild_name = request.guildName;
 
-    recv_data >> str_count;                                 // user entered strings count, client limit=4 (checked on 2.0.10)
-
-    if (str_count > 4)
-    {
-        return;                                             // can't be received from real client or broken packet
-    }
-
-    DEBUG_LOG("Minlvl %u, maxlvl %u, name %s, guild %s, racemask %u, classmask %u, zones %u, strings %u", level_min, level_max, player_name.c_str(), guild_name.c_str(), racemask, classmask, zones_count, str_count);
+    DEBUG_LOG("CMSG_WHO: minlvl %u, maxlvl %u, name '%s', guild '%s', realm '%s', "
+              "racemask 0x%X, classmask 0x%X, zones %u, words %u",
+              level_min, level_max, player_name.c_str(), guild_name.c_str(),
+              request.realmName.c_str(), racemask, classmask, zones_count, str_count);
 
     std::wstring str[4];                                    // 4 is client limit
     for (uint32 i = 0; i < str_count; ++i)
     {
-        std::string temp;
-        recv_data >> temp;                                  // user entered string, it used as universal search pattern(guild+player name)?
-
-        if (!Utf8toWStr(temp, str[i]))
+        if (!Utf8toWStr(request.words[i], str[i]))
         {
             continue;
         }
 
         wstrToLower(str[i]);
 
-        DEBUG_LOG("String %u: %s", i, temp.c_str());
+        DEBUG_LOG("String %u: %s", i, request.words[i].c_str());
     }
 
     std::wstring wplayer_name;
@@ -224,9 +213,11 @@ void WorldSession::HandleWhoOpcode(WorldPacket& recv_data)
     uint32 matchcount = 0;
     uint32 displaycount = 0;
 
-    WorldPacket data(SMSG_WHO, 50);                         // guess size
-    data << uint32(clientcount);                            // clientcount place holder, listed count
-    data << uint32(clientcount);                            // clientcount place holder, online count
+    // Collected first, then serialised. The 18414 reply is TWO passes over the result
+    // set -- a bit block for every entry, FlushBits, then a byte block for every entry
+    // -- so entries cannot be appended to the packet as they are matched the way the
+    // 3.3.5 body allowed.
+    std::vector<MopWhoPackets::WhoEntry> results;
 
     uint32 count = 0;
     sObjectAccessor.DoForAllPlayers([&](Player* pl)->void
@@ -292,7 +283,7 @@ void WorldSession::HandleWhoOpcode(WorldPacket& recv_data)
         bool z_show = true;
         for (uint32 i = 0; i < zones_count; ++i)
         {
-            if (zoneids[i] == pzoneid)
+            if (request.zoneIds[i] == pzoneid)
             {
                 z_show = true;
                 break;
@@ -361,23 +352,52 @@ void WorldSession::HandleWhoOpcode(WorldPacket& recv_data)
             return;
         }
 
-        data << pname;                                      // player name
-        data << gname;                                      // guild name
-        data << uint32(lvl);                                // player level
-        data << uint32(class_);                             // player class
-        data << uint32(race);                               // player race
-        data << uint8(gender);                              // player gender
-        data << uint32(pzoneid);                            // player zone id
+        MopWhoPackets::WhoEntry entry;
+        entry.playerGuid = pl->GetObjectGuid();
+        entry.guildGuid = pl->GetGuildId() ? ObjectGuid(HIGHGUID_GUILD, pl->GetGuildId()) : ObjectGuid();
+        entry.name = pname;
+        entry.guildName = gname;
+        entry.zoneId = pzoneid;
+        entry.race = uint8(race);
+        entry.gender = gender;
+        entry.classId = uint8(class_);
+        entry.level = uint8(lvl);
+        // The virtual realm ids must be OUR realm, not zero.
+        //
+        // Before displaying, the client resolves every entry's realm through its realm
+        // cache (sub_621E5D against dword_1087180) and only reaches the display path once
+        // they all resolve; a zero address does not, so the whole list is silently held
+        // back. Retail's entries carry a real address -- capture-000135 seq 177672 sends
+        // 0x03010018 for the name and 0x0304000D for the guild.
+        //
+        // realmID is what the rest of this core already puts on the wire for the same
+        // field, e.g. Guild.cpp:1039 for the guild roster, so it is the consistent value
+        // rather than a new invention.
+        entry.nameVirtualRealm = realmID;
+        entry.guildVirtualRealm = realmID;
+
+        // accountGuid stays empty: we do not model the battle.net account GUID, and the
+        // client only uses it for cross-realm grouping affordances the /who list does not
+        // need.
+        results.push_back(entry);
 
         ++clientcount;
     });
 
-    data.put(0, clientcount);                               // insert right count, listed count
-    data.put(4, count > 50 ? count : clientcount);          // insert right count, online count
+    // The 6-bit count caps a reply at 63 entries, and the client itself only stores 50
+    // (dword_12C6FB0 is clamped there in sub_A6BD8F). The match loop already stops at
+    // 50, so this is a belt-and-braces guard against ever overflowing the count field.
+    if (results.size() > 50)
+    {
+        results.resize(50);
+    }
 
-
+    WorldPacket data(SMSG_WHO, 1 + results.size() * 64);
+    MopWhoPackets::BuildWhoResponse(data, results);
     SendPacket(&data);
-    DEBUG_LOG("WORLD: Send SMSG_WHO Message");
+
+    DEBUG_LOG("WORLD: Sent SMSG_WHO with %u result(s) (%u online)",
+              uint32(results.size()), count);
 }
 
 /**
@@ -606,6 +626,99 @@ void WorldSession::HandleSetSelectionOpcode(WorldPacket& recv_data)
     if (FactionTemplateEntry const* factionTemplateEntry = sFactionTemplateStore.LookupEntry(unit->getFaction()))
     {
         _player->GetReputationMgr().SetVisible(factionTemplateEntry);
+    }
+}
+
+/**
+ * @brief The client could not build an object we sent an update for.
+ *
+ * This is the client telling us our bookkeeping is wrong: it received a VALUES
+ * update for a GUID it has no object for, so it discarded the block. It keeps
+ * parsing the rest of the packet -- the client's sub_79BC10 walks the update
+ * mask, throws the fields away and returns 1, so the caller does not break out
+ * of the block loop -- but that one object is now permanently broken for that
+ * client, because nothing on our side ever notices and nothing re-sends a
+ * create.
+ *
+ * That is exactly the "out of phase" symptom: UnitInPhase (sub_8A29C1) is not a
+ * phase comparison at all, it is an object-manager lookup, so a party member the
+ * client has no object for is drawn with the phase icon and never rendered.
+ *
+ * Forgetting the GUID here makes the next visibility pass treat the object as
+ * unknown and send a fresh create, which repairs the client without a relog.
+ *
+ * Body from the 18414 writer (packet class off_D65304, header virtual
+ * sub_690E2A writes opcode 4193, body virtual sub_694863): a packed GUID with
+ * mask order 3,5,6,0,1,2,7,4 and byte order 0,6,5,7,2,1,3,4.
+ *
+ * @param recv_data The received opcode packet.
+ */
+void WorldSession::HandleObjectUpdateFailedOpcode(WorldPacket& recv_data)
+{
+    ObjectGuid guid;
+
+    guid[3] = recv_data.ReadBit();
+    guid[5] = recv_data.ReadBit();
+    guid[6] = recv_data.ReadBit();
+    guid[0] = recv_data.ReadBit();
+    guid[1] = recv_data.ReadBit();
+    guid[2] = recv_data.ReadBit();
+    guid[7] = recv_data.ReadBit();
+    guid[4] = recv_data.ReadBit();
+
+    recv_data.ReadByteSeq(guid[0]);
+    recv_data.ReadByteSeq(guid[6]);
+    recv_data.ReadByteSeq(guid[5]);
+    recv_data.ReadByteSeq(guid[7]);
+    recv_data.ReadByteSeq(guid[2]);
+    recv_data.ReadByteSeq(guid[1]);
+    recv_data.ReadByteSeq(guid[3]);
+    recv_data.ReadByteSeq(guid[4]);
+
+    if (!_player)
+    {
+        return;
+    }
+
+    if (guid == _player->GetObjectGuid())
+    {
+        // The client has lost its own player object. Nothing we resend can
+        // rebuild that, so say so loudly rather than pretend a create will fix
+        // it.
+        sLog.outError("HandleObjectUpdateFailedOpcode: %s could not build its OWN object %s",
+                      _player->GetGuidStr().c_str(), guid.GetString().c_str());
+        return;
+    }
+
+    // Drop the stale bookkeeping first, unconditionally. Even if we cannot
+    // repair the object right now, our record that the client has it is known
+    // to be false, and leaving it in place is what makes the breakage
+    // permanent.
+    _player->m_clientGUIDs.erase(guid);
+
+    if (!_player->IsInWorld())
+    {
+        sLog.outError("HandleObjectUpdateFailedOpcode: %s reported a missing object %s while not in world",
+                      _player->GetGuidStr().c_str(), guid.GetString().c_str());
+        return;
+    }
+
+    WorldObject* obj = _player->GetMap()->GetWorldObject(guid);
+    if (!obj)
+    {
+        // The object is gone from our side too, so the client is right to have
+        // no object for it. Erasing the guid above is the whole repair.
+        sLog.outError("HandleObjectUpdateFailedOpcode: %s has no object for %s, and neither do we",
+                      _player->GetGuidStr().c_str(), guid.GetString().c_str());
+        return;
+    }
+
+    sLog.outError("HandleObjectUpdateFailedOpcode: client of %s has no object for %s (%s); resending a create",
+                  _player->GetGuidStr().c_str(), guid.GetString().c_str(), obj->GetName());
+
+    if (obj->SendCreateUpdateToPlayer(_player))
+    {
+        _player->m_clientGUIDs.insert(guid);
     }
 }
 
@@ -951,6 +1064,35 @@ void WorldSession::HandleAreaTriggerOpcode(WorldPacket& recv_data)
         // now we can resurrect player, and then check teleport requirements
         player->ResurrectPlayer(0.5f);
         player->SpawnCorpseBones();
+    }
+
+    // Leaving a dungeon finder run on foot returns the player to where they QUEUED, not to
+    // the dungeon's doorstep -- but only while they are still in the group.
+    //
+    // The rule is conditioned on group membership rather than on how the player leaves:
+    //   still in the LFD group and you exit  -> back to where you started
+    //   left or were kicked, then you exit   -> dropped outside the entrance
+    //
+    // Source is developer testimony from the getMangos community (2026-08-06) rather than a
+    // capture: the corpus contains no build-18414 episode of an on-foot exit from an LFG
+    // instance, so this cannot be settled from the wire. It is consistent with what IS
+    // proven, which is the same rule reached the other way -- in capture-000044 the
+    // CMSG_LFG_TELEPORT exits land on the player's pre-queue position on a DIFFERENT
+    // continent from the dungeon (map 974 Timeless Isle, while The Slave Pens' own entrance
+    // is map 530), and two exits in the same run are byte-identical while different queue
+    // episodes differ. Both paths returning to one recorded point is the coherent reading.
+    //
+    // It also matches what was observed live on 2026-08-06 20:12:07: two players walked out
+    // of Shadowfang Keep to the trigger's fixed target after their group had already
+    // disbanded, which is exactly the second branch.
+    //
+    // IsPlayerInLfgDungeon covers the whole condition -- it requires an LFG group, a live
+    // group status, and the player actually standing on that run's map -- so a player who
+    // has left the group, or whose run has ended, falls through to the ordinary trigger.
+    if (targetMapEntry->ID != player->GetMapId() && sLFGMgr.IsPlayerInLfgDungeon(player))
+    {
+        player->TeleportToBGEntryPoint();
+        return;
     }
 
     // teleport player (trigger requirement will be checked on TeleportTo)
@@ -2088,6 +2230,31 @@ void WorldSession::HandleBattlePayGetPurchaseListOpcode(WorldPacket& /*recvPacke
     SendPacket(&data);
 }
 
+/**
+ * @brief The client asking for the in-game store catalogue.
+ *
+ * Body is empty -- all thirteen corpus occurrences at build 18414 are zero bytes --
+ * and the client sends it immediately after CMSG_BATTLE_PAY_GET_PURCHASE_LIST on
+ * login, so the two arrive as a pair.
+ *
+ * Deliberately NOT answered. Retail replies with SMSG_BATTLE_PAY_GET_PRODUCT_LIST_
+ * RESPONSE carrying the whole catalogue -- 3517 bytes in capture-000234 seq 28146 --
+ * and we have no store to describe. Sending a guessed empty catalogue would put an
+ * underived layout on the wire for a feature that does not exist here; saying nothing
+ * simply leaves the store unavailable, which is true.
+ *
+ * Registered rather than left to fall through so it stops appearing as
+ * "received not handled opcode UNKNOWN (0x0DE0)". That line is how a genuinely
+ * unrecognised opcode gets noticed, and a known one repeating in it is noise that
+ * hides the signal.
+ *
+ * @param recvPacket The received opcode packet.
+ */
+void WorldSession::HandleBattlePayGetProductListOpcode(WorldPacket& /*recvPacket*/)
+{
+    DEBUG_LOG("WORLD: Received opcode CMSG_BATTLE_PAY_GET_PRODUCT_LIST (no store; not answered)");
+}
+
 void WorldSession::HandleHearthandResurrect(WorldPacket& /*recv_data*/)
 {
     DEBUG_LOG("WORLD: Received opcode CMSG_HEARTH_AND_RESURRECT");
@@ -2144,39 +2311,3 @@ void WorldSession::HandleRequestHotfix(WorldPacket& recv_data)
     }
 }
 
-void WorldSession::HandleObjectUpdateFailedOpcode(WorldPacket& recvPacket)
-{
-    ObjectGuid guid;
-
-    guid[2] = recvPacket.ReadBit();
-    guid[3] = recvPacket.ReadBit();
-    guid[5] = recvPacket.ReadBit();
-    guid[0] = recvPacket.ReadBit();
-    guid[4] = recvPacket.ReadBit();
-    guid[7] = recvPacket.ReadBit();
-    guid[6] = recvPacket.ReadBit();
-    guid[1] = recvPacket.ReadBit();
-
-    recvPacket.ReadByteSeq(guid[1]);
-    recvPacket.ReadByteSeq(guid[2]);
-    recvPacket.ReadByteSeq(guid[5]);
-    recvPacket.ReadByteSeq(guid[0]);
-    recvPacket.ReadByteSeq(guid[3]);
-    recvPacket.ReadByteSeq(guid[4]);
-    recvPacket.ReadByteSeq(guid[6]);
-    recvPacket.ReadByteSeq(guid[7]);
-
-
-    DEBUG_LOG("WORLD: Received CMSG_OBJECT_UPDATE_FAILED from %s (%u) guid: %s", GetPlayerName(), GetAccountId(), guid.GetString().c_str());
-    if (_player->IsInWorld())
-    {
-        if (WorldObject* obj = _player->GetMap()->GetWorldObject(guid))
-        {
-            obj->SendCreateUpdateToPlayer(_player);
-        }
-    }
-    else
-    {
-        sLog.outError("WorldSession::HandleObjectUpdateFailedOpcode: received from player not in map");
-    }
-}

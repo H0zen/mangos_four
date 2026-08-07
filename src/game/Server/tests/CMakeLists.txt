@@ -330,6 +330,86 @@ if(WIN32)
         "PATH=path_list_prepend:${MOP_LFG_LEAVE_MYSQL_RUNTIME_DIR}${MOP_TEST_LUA_PATH}")
 endif()
 
+add_executable(mop_lfg_player_info_packets_test
+    mop_lfg_player_info_packets_test.cpp)
+target_include_directories(mop_lfg_player_info_packets_test PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}/..
+    ${CMAKE_SOURCE_DIR}/src/shared)
+set_target_properties(mop_lfg_player_info_packets_test PROPERTIES
+    CXX_STANDARD 17 CXX_STANDARD_REQUIRED ON)
+target_link_libraries(mop_lfg_player_info_packets_test PRIVATE game)
+add_test(NAME mop_lfg_player_info_packets COMMAND mop_lfg_player_info_packets_test)
+if(WIN32)
+    get_filename_component(MOP_LFG_PI_MYSQL_RUNTIME_DIR "${MySQL_LIBRARY}" DIRECTORY)
+    set_tests_properties(mop_lfg_player_info_packets PROPERTIES
+        ENVIRONMENT_MODIFICATION
+        "PATH=path_list_prepend:${MOP_LFG_PI_MYSQL_RUNTIME_DIR}${MOP_TEST_LUA_PATH}")
+endif()
+
+add_executable(mop_lfg_proposal_response_packets_test
+    mop_lfg_proposal_response_packets_test.cpp)
+target_include_directories(mop_lfg_proposal_response_packets_test PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}/..
+    ${CMAKE_SOURCE_DIR}/src/shared)
+set_target_properties(mop_lfg_proposal_response_packets_test PROPERTIES
+    CXX_STANDARD 17 CXX_STANDARD_REQUIRED ON)
+target_link_libraries(mop_lfg_proposal_response_packets_test PRIVATE game)
+add_test(NAME mop_lfg_proposal_response_packets COMMAND mop_lfg_proposal_response_packets_test)
+if(WIN32)
+    get_filename_component(MOP_LFG_PR_MYSQL_RUNTIME_DIR "${MySQL_LIBRARY}" DIRECTORY)
+    set_tests_properties(mop_lfg_proposal_response_packets PROPERTIES
+        ENVIRONMENT_MODIFICATION
+        "PATH=path_list_prepend:${MOP_LFG_PR_MYSQL_RUNTIME_DIR}${MOP_TEST_LUA_PATH}")
+endif()
+
+add_executable(mop_lfg_proposal_packets_test
+    mop_lfg_proposal_packets_test.cpp)
+target_include_directories(mop_lfg_proposal_packets_test PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}/..
+    ${CMAKE_SOURCE_DIR}/src/shared)
+set_target_properties(mop_lfg_proposal_packets_test PROPERTIES
+    CXX_STANDARD 17 CXX_STANDARD_REQUIRED ON)
+target_link_libraries(mop_lfg_proposal_packets_test PRIVATE game)
+add_test(NAME mop_lfg_proposal_packets COMMAND mop_lfg_proposal_packets_test)
+if(WIN32)
+    get_filename_component(MOP_LFG_PROP_MYSQL_RUNTIME_DIR "${MySQL_LIBRARY}" DIRECTORY)
+    set_tests_properties(mop_lfg_proposal_packets PROPERTIES
+        ENVIRONMENT_MODIFICATION
+        "PATH=path_list_prepend:${MOP_LFG_PROP_MYSQL_RUNTIME_DIR}${MOP_TEST_LUA_PATH}")
+endif()
+
+add_executable(mop_lfg_role_check_packets_test
+    mop_lfg_role_check_packets_test.cpp)
+target_include_directories(mop_lfg_role_check_packets_test PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}/..
+    ${CMAKE_SOURCE_DIR}/src/shared)
+set_target_properties(mop_lfg_role_check_packets_test PROPERTIES
+    CXX_STANDARD 17 CXX_STANDARD_REQUIRED ON)
+target_link_libraries(mop_lfg_role_check_packets_test PRIVATE game)
+add_test(NAME mop_lfg_role_check_packets COMMAND mop_lfg_role_check_packets_test)
+if(WIN32)
+    get_filename_component(MOP_LFG_RC_MYSQL_RUNTIME_DIR "${MySQL_LIBRARY}" DIRECTORY)
+    set_tests_properties(mop_lfg_role_check_packets PROPERTIES
+        ENVIRONMENT_MODIFICATION
+        "PATH=path_list_prepend:${MOP_LFG_RC_MYSQL_RUNTIME_DIR}${MOP_TEST_LUA_PATH}")
+endif()
+
+add_executable(mop_lfg_set_roles_packets_test
+    mop_lfg_set_roles_packets_test.cpp)
+target_include_directories(mop_lfg_set_roles_packets_test PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}/..
+    ${CMAKE_SOURCE_DIR}/src/shared)
+set_target_properties(mop_lfg_set_roles_packets_test PROPERTIES
+    CXX_STANDARD 17 CXX_STANDARD_REQUIRED ON)
+target_link_libraries(mop_lfg_set_roles_packets_test PRIVATE game)
+add_test(NAME mop_lfg_set_roles_packets COMMAND mop_lfg_set_roles_packets_test)
+if(WIN32)
+    get_filename_component(MOP_LFG_SET_ROLES_MYSQL_RUNTIME_DIR "${MySQL_LIBRARY}" DIRECTORY)
+    set_tests_properties(mop_lfg_set_roles_packets PROPERTIES
+        ENVIRONMENT_MODIFICATION
+        "PATH=path_list_prepend:${MOP_LFG_SET_ROLES_MYSQL_RUNTIME_DIR}${MOP_TEST_LUA_PATH}")
+endif()
+
 add_executable(mop_group_role_poll_packets_test
     mop_group_role_poll_packets_test.cpp)
 target_include_directories(mop_group_role_poll_packets_test PRIVATE

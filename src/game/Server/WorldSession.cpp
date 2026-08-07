@@ -279,6 +279,10 @@ static bool IsEnterWorldConverted(uint16 opcode)
         case SMSG_WEATHER:
         case SMSG_ALL_ACHIEVEMENT_DATA:  // Wave 5 Task 2 -- converted 6908c5f9e (MopAchievementPackets)
         case SMSG_CRITERIA_UPDATE:       // Isolated timed-expiry tombstone (MopAchievementPackets)
+        case SMSG_WHO:                   // 0x161B -- /who results (MopWhoPackets::BuildWhoResponse, converted).
+                                         // Body derived from the client's reader sub_720854 and its
+                                         // 536-byte JamWhoEntry; the empty form is the single 0x00 byte
+                                         // seen at capture-000059 seq 1637608.
             return true;
 
         // Control/transition packets that must ALWAYS reach the client while suppression is active:
@@ -604,11 +608,20 @@ static bool IsEnterWorldConverted(uint16 opcode)
         case SMSG_SAVE_GUILD_EMBLEM:          // MopGuildPackets::BuildSaveGuildEmblemResult
         case SMSG_BINDER_CONFIRM:              // MopBindPackets::BuildBinderConfirm
         case SMSG_PLAYERBOUND:                 // MopBindPackets::BuildPlayerBound
+        case SMSG_LFG_PROPOSAL_UPDATE:        // MopLfgPackets::BuildProposalUpdate, byte-exact vs capture-000044 seq 1948 and capture-000059 seq 2063424
+        case SMSG_LFG_ROLE_CHECK_UPDATE:      // MopLfgPackets::BuildRoleCheckUpdate, byte-exact vs capture-000075 seq 891708 and capture-000059 seq 719547
         case SMSG_LFG_BOOT_PLAYER:            // MopLfgPackets::BuildBootPlayer
         case SMSG_LFG_UPDATE_STATUS:          // MopLfgPackets::BuildUpdateStatus
         case SMSG_LFG_QUEUE_STATUS:           // MopLfgPackets::BuildQueueStatus
+        case SMSG_LFG_OFFER_CONTINUE:         // 4-byte packed dungeon entry; 31/31 corpus bodies are this shape
+        case SMSG_LFG_JOIN_RESULT:            // MopLfgPackets::BuildJoinResult, byte-exact vs capture-000059 seq 490545 (18B refusal),
+                                              // capture-000044 seq 1547 (23B) and capture-000075 seq 891753 (24B)
         case SMSG_LFG_PLAYER_INFO:            // MopLfgPackets::BuildEmptyPlayerInfo
         case SMSG_LFG_PARTY_INFO:             // MopLfgPackets::BuildEmptyPartyInfo
+        case SMSG_LFG_PLAYER_REWARD:          // money/queuedSlot/xp/actualSlot + 20-bit count + per-reward is-currency bit + 16B entries
+        case SMSG_ROLE_CHOSEN:                // nine mask bits (6th is `accepted`), guid 0/3/6, roles u32, guid 5/1/4/2/7;
+                                              // derived from sub_6E921A, byte-exact vs 8 corpus packets over 7 captures
+        case SMSG_LFG_TELEPORT_DENIED:        // WriteBits(reason & 0xF, 4) + FlushBits; corpus 0x10 and 0x90 are reasons 1 and 9
         case SMSG_LFG_UPDATE_SEARCH:           // MopLfgPackets::BuildEmptyLfrSearchResponse
         case SMSG_RAID_INSTANCE_INFO:         // MopRaidInstancePackets::BuildRaidInstanceInfo
         case SMSG_RESPEC_WIPE_CONFIRM:        // MopRespecPackets::BuildRespecWipeConfirm
@@ -1199,8 +1212,29 @@ void WorldSession::LogoutPlayer(bool Save)
         _player->UninviteFromGroup();
 #ifndef ENABLE_PLAYERBOTS
         // remove player from the group if he is:
-        // a) in group; b) not in raid group; c) logging out normally (not being kicked or disconnected)
-        if (_player->GetGroup() && !_player->GetGroup()->isRaidGroup() && m_Socket)
+        // a) in group; b) not in raid group; c) not in a dungeon finder group;
+        // d) logging out normally (not being kicked or disconnected)
+        //
+        // Dungeon finder groups are exempt for the same reason raids are: the group is the
+        // run. Dropping a member on logout loses the group, and with it the group's instance
+        // bind -- so the player comes back to a BRAND NEW instance of the same dungeon, with
+        // no group, standing inside an instance nobody else is in.
+        //
+        // Observed live 2026-08-06: five characters idled to the character screen between
+        // 21:58:56 and 22:01:21, each sending a normal CMSG_LOGOUT_REQUEST. Each logout
+        // stripped that member, leadership walking down the line, until `group_member` held
+        // only guid 8 -- the last to leave. Returning put them in instance 3 of Wailing
+        // Caverns where they had left instance 2.
+        //
+        // The m_Socket term is why this went unnoticed: a hard disconnect (alt-F4) leaves no
+        // socket and skips the branch entirely, so relogging that way kept the group and
+        // looked correct. Only a GRACEFUL logout destroyed it.
+        //
+        // This also makes restart restoration meaningful. There is no point rebuilding a
+        // run's LFG status at group load if one member quitting to the character screen
+        // dissolves the group it was rebuilt for.
+        if (_player->GetGroup() && !_player->GetGroup()->isRaidGroup() &&
+            !_player->GetGroup()->isLFGGroup() && m_Socket)
         {
             _player->RemoveFromGroup();
         }

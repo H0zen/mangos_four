@@ -53,6 +53,7 @@
 #include "Player.h"
 #include "SpellAuras.h"
 #include "Group.h"
+#include "LFGMgr.h"
 #include "SocialMgr.h"
 #include "Util.h"
 #include "DB2Structure.h"
@@ -393,16 +394,38 @@ void WorldSession::HandleGroupUninviteGuidOpcode(WorldPacket& recv_data)
         return;
     }
 
+    Group* grp = GetPlayer()->GetGroup();
+    if (!grp)
+    {
+        return;
+    }
+
+    // In a dungeon-finder group nobody may remove anybody unilaterally; the request
+    // becomes a vote kick instead. That is why the client bothers to collect
+    // `reason` here -- it is the free text shown in the boot dialog and it has no
+    // other consumer.
+    //
+    // Deliberately BEFORE CanUninviteFromGroup, which requires leader or assistant.
+    // An LFD group has no meaningful leadership for this purpose: any member may
+    // start a vote, including against the leader, and the vote is what decides it.
+    // Routing through the normal path would both refuse ordinary members and, for a
+    // leader, silently perform a real removal that no one voted on.
+    if (grp->isLFGGroup())
+    {
+        if (!grp->IsMember(guid))
+        {
+            SendPartyResult(PARTY_OP_LEAVE, "", ERR_TARGET_NOT_IN_GROUP_S);
+            return;
+        }
+
+        sLFGMgr.AttemptToKickPlayer(grp, guid, GetPlayer()->GetObjectGuid(), request.reason);
+        return;
+    }
+
     PartyResult res = GetPlayer()->CanUninviteFromGroup();
     if (res != ERR_PARTY_RESULT_OK)
     {
         SendPartyResult(PARTY_OP_LEAVE, "", res);
-        return;
-    }
-
-    Group* grp = GetPlayer()->GetGroup();
-    if (!grp)
-    {
         return;
     }
 
@@ -471,9 +494,18 @@ void WorldSession::HandleGroupSetLeaderOpcode(WorldPacket& recv_data)
  *
  * @param recv_data The received opcode packet.
  */
-void WorldSession::HandleGroupDisbandOpcode(WorldPacket& /*recv_data*/)
+void WorldSession::HandleGroupDisbandOpcode(WorldPacket& recv_data)
 {
-    if (!GetPlayer()->GetGroup())
+    // One byte, observed 0x7F. It carries no authority -- the server acts on the caller --
+    // but it must be consumed or the dispatcher logs "unprocessed tail data" on every
+    // Leave Instance Group click.
+    if (recv_data.size() - recv_data.rpos() >= 1)
+    {
+        recv_data.read_skip<uint8>();
+    }
+
+    Group* pGroup = GetPlayer()->GetGroup();
+    if (!pGroup)
     {
         return;
     }
@@ -486,6 +518,65 @@ void WorldSession::HandleGroupDisbandOpcode(WorldPacket& /*recv_data*/)
 
     /** error handling **/
     /********************/
+
+    // Leaving an LFG group from INSIDE its dungeon has to put the player back where
+    // they came from. Retail answers the disband with SMSG_GROUP_LIST (the 40-byte
+    // no-group form), SMSG_TRANSFER_PENDING (mapId 0) and SMSG_NEW_WORLD
+    // (capture-000720 seq 46746, capture-000656 seq 191821).
+    //
+    // Without this the player simply stood in the instance, group gone, and was only
+    // collected 60 seconds later by the homebind timer that fires when the instance
+    // stops being valid for them. Observed live: "leave dungeon did not relocate me".
+    //
+    // Must run BEFORE RemoveFromGroup -- TeleportPlayer resolves the dungeon through the
+    // group's LFG status, which is gone once the group is. It is a no-op unless the
+    // player is actually standing on the dungeon's map.
+    if (pGroup->isLFGGroup())
+    {
+        // REFUSE the leave outright while the player is fighting inside the dungeon.
+        //
+        // The teleport out is refused in combat, but the removal used to run anyway, so a
+        // player who clicked Leave Instance Group mid-fight was taken out of the group and
+        // left standing in the instance, and the refusal itself was mute: it reported
+        // ERR_PARTY_RESULT_OK, the same code as success. The removal-without-teleport is
+        // what this guard exists to stop; the party-result code below now says so. Observed live: "i did leave instance
+        // group on the leader, i just got removed but not teleported out", while stuck in
+        // a combat stance.
+        //
+        // Worse for everyone else: once the group is gone the remaining player has no LFG
+        // state at all, so the minimap eye disappears and with it the only way out.
+        // Observed in the same session -- "he had no dungeon finder eyeball to teleport out
+        // or anything at all".
+        //
+        // Removing the group is the irreversible half, so it must not happen when the
+        // half that gets the player out cannot. Refusing keeps the two consistent: the
+        // player stays in the group, still able to leave once combat ends.
+        if (GetPlayer()->IsInCombat() && sLFGMgr.IsPlayerInLfgDungeon(GetPlayer()))
+        {
+            // Tell them it was REFUSED, and why. This used to send ERR_PARTY_RESULT_OK --
+            // the identical response the success path sends -- so a player who clicked
+            // Leave Instance Group in combat got an "OK" and stayed in the group, with
+            // nothing to explain the contradiction.
+            //
+            // The client owns the right message: ERR_PARTY_LFG_TELEPORT_IN_COMBAT, "You
+            // cannot teleport out of the dungeon while in combat." That is exactly this
+            // refusal, since the teleport is the half that cannot happen.
+            SendPartyResult(PARTY_OP_LEAVE, GetPlayer()->GetName(), ERR_PARTY_LFG_TELEPORT_IN_COMBAT);
+            DEBUG_LOG("HandleGroupDisbandOpcode: %s refused -- in combat inside an LFG dungeon",
+                      GetPlayer()->GetName());
+            return;
+        }
+
+        // Deserter BEFORE the teleport: OnPlayerLeftDungeonGroup only counts a player who
+        // is still in a live run, and the teleport is about to move them out of it.
+        sLFGMgr.OnPlayerLeftDungeonGroup(GetPlayer());
+        sLFGMgr.TeleportPlayer(GetPlayer(), true);
+
+        // Clear their own LFG state and withdraw any boot vote. Must run for every
+        // leaver, which is why it is not folded into OnPlayerLeftDungeonGroup -- that
+        // one returns early in several cases that are right for Deserter and wrong here.
+        sLFGMgr.OnPlayerLeftLfgGroup(GetPlayer(), pGroup);
+    }
 
     // everything is fine, do it
     SendPartyResult(PARTY_OP_LEAVE, GetPlayer()->GetName(), ERR_PARTY_RESULT_OK);

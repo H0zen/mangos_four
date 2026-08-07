@@ -1559,7 +1559,7 @@ class WorldSession
             SendNotification(format, args...);
         }
         void SendPetNameInvalid(uint32 error, const std::string& name, DeclinedName* declinedName);
-        void SendLfgJoinResult(LfgJoinResult result, LFGState state, partyForbidden const& lockedDungeons);
+        void SendLfgJoinResult(LfgJoinResult result, uint8 detail, partyForbidden const& lockedDungeons);
         void SendLfgUpdate(bool isGroup, LFGPlayerStatus status);
         void SendLfgQueueStatus(LFGQueueStatus const& status);
         void SendLfgPlayerLockInfo();
@@ -1568,6 +1568,7 @@ class WorldSession
         void SendLfgRoleChosen(uint64 rawGuid, uint8 roles);
         void SendLfgProposalUpdate(LFGProposal const& proposal);
         void SendLfgTeleportError(uint8 error);
+        void SendLfgOfferContinue(uint32 dungeonEntry);
         void SendLfgRewards(LFGRewards const& rewards);
         void SendLfgBootUpdate(LFGBoot const& boot);
         void SendPartyResult(PartyOperation operation, const std::string& member, PartyResult res);
@@ -2209,7 +2210,11 @@ class WorldSession
         void HandleLfrLeaveOpcode(WorldPacket& recv_data);
         void HandleLfgJoinOpcode(WorldPacket& recv_data);
         void HandleLfgLeaveOpcode(WorldPacket& recv_data);
+        void HandleLfgSetRolesOpcode(WorldPacket& recv_data);
+        void HandleLfgProposalResponseOpcode(WorldPacket& recv_data);
         void HandleLfgGetStatusOpcode(WorldPacket& recv_data);
+        void HandleLfgTeleportOpcode(WorldPacket& recv_data);
+        void HandleLfgBootPlayerVoteOpcode(WorldPacket& recv_data);
         void HandleLfgLockInfoRequestOpcode(WorldPacket& recv_data);
         void HandleSetLfgCommentOpcode(WorldPacket& recv_data);
         void HandleSetTitleOpcode(WorldPacket& recv_data);
@@ -2298,6 +2303,7 @@ class WorldSession
         void HandleUITimeRequestOpcode(WorldPacket& recv_data);
         void HandleReadyForAccountDataTimesOpcode(WorldPacket& recv_data);
         void HandleBattlePayGetPurchaseListOpcode(WorldPacket& recvPacket);
+        void HandleBattlePayGetProductListOpcode(WorldPacket& recvPacket);
         void HandleRandomizeCharNameOpcode(WorldPacket& recvPacket);
         void HandleQuestPOIQueryOpcode(WorldPacket& recv_data);
         void HandleQuestNpcQueryOpcode(WorldPacket& recv_data);

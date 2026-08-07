@@ -45,6 +45,7 @@
  */
 
 #include "MapPersistentStateMgr.h"
+#include "LFGMgr.h"
 
 #include "SQLStorages.h"
 #include "Player.h"
@@ -429,16 +430,32 @@ void DungeonPersistentState::UpdateEncounterState(EncounterCreditType type, uint
         // direct comparison against an internal mode -- see EncounterDifficultyMatches.
         if (iter->second->creditType == type && EncounterDifficultyMatches(dbcEntry->MapID, dbcEntry->DifficultyID, GetDifficulty()) && dbcEntry->MapID == GetMapId())
         {
-            m_completedEncountersMask |= 1 << dbcEntry->Bit;
+            uint32 const encounterBit = 1 << dbcEntry->Bit;
+            if (m_completedEncountersMask & encounterBit)
+            {
+                // Already credited. Returning here rather than re-applying makes the
+                // whole completion path idempotent: no repeated DB write, and above all
+                // no second LFG completion, which would pay the dungeon's rewards twice.
+                return;
+            }
+
+            m_completedEncountersMask |= encounterBit;
 
             CharacterDatabase.PExecute("UPDATE `instance` SET `encountersMask` = '%u' WHERE `id` = '%u'", m_completedEncountersMask, GetInstanceId());
 
             DEBUG_LOG("DungeonPersistentState: Dungeon %s (Id %u) completed encounter %s", GetMap()->GetMapName(), GetInstanceId(), dbcEntry->Name_lang[sWorld.GetDefaultDbcLocale()]);
-            if (/*uint32 dungeonId =*/ iter->second->lastEncounterDungeon)
+
+            bool const isLastEncounter = iter->second->lastEncounterDungeon != 0;
+            if (isLastEncounter)
             {
                 DEBUG_LOG("DungeonPersistentState:: Dungeon %s (Instance-Id %u) completed last encounter %s", GetMap()->GetMapName(), GetInstanceId(), dbcEntry->Name_lang[sWorld.GetDefaultDbcLocale()]);
-                // Place LFG reward here
             }
+
+            // The dungeon finder's only view of run progress. A credited encounter clears
+            // the group to leave without Deserter, and the LAST one completes the run --
+            // which is what the "Place LFG reward here" note stood for. HandleBossKilled
+            // had no caller anywhere in the tree, so no LFG run had ever paid a reward.
+            sLFGMgr.OnDungeonEncounterCredited(GetMap(), isLastEncounter);
             return;
         }
     }

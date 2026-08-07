@@ -54,6 +54,7 @@
 #include "ObjectMgr.h"
 #include "ObjectGuid.h"
 #include "Group.h"
+#include "LFGMgr.h"
 #include "Formulas.h"
 #include "ObjectAccessor.h"
 #include "BattleGround/BattleGround.h"
@@ -601,6 +602,116 @@ bool MopGroupPromotePackets::ParseAssistant(WorldPacket& in, AssistantRequest& o
 
     out = parsed;
     return true;
+}
+
+bool MopLfgProposalResponsePackets::ParseRequest(WorldPacket& in, Request& out)
+{
+    // 16 flat bytes, then 17 bits (1 accept + 16 GUID mask), then up to 16 GUID bytes.
+    // The minimum body is therefore 16 + 3 = 19 bytes with both GUIDs entirely zero.
+    if (in.size() - in.rpos() < 19)
+    {
+        return false;
+    }
+
+    in >> out.proposalId;
+    in >> out.clientQueueId;
+    in >> out.flags;
+    in >> out.joinTime;
+
+    out.accepted = in.ReadBit();
+
+    uint8 maskA[8] = { 0 };
+    uint8 maskB[8] = { 0 };
+
+    // Mask order straight off the writer: A6 A0 A2 A4 B6 B7 A3 B4 A7 B1 A5 B0 A1 B2 B3 B5.
+    uint8* const maskOrder[16] =
+    {
+        &maskA[6], &maskA[0], &maskA[2], &maskA[4], &maskB[6], &maskB[7],
+        &maskA[3], &maskB[4], &maskA[7], &maskB[1], &maskA[5], &maskB[0],
+        &maskA[1], &maskB[2], &maskB[3], &maskB[5]
+    };
+
+    for (size_t i = 0; i < 16; ++i)
+    {
+        *maskOrder[i] = in.ReadBit() ? 1 : 0;
+    }
+
+    uint8 bytesA[8] = { 0 };
+    uint8 bytesB[8] = { 0 };
+
+    // Byte order, again off the writer: A3 A6 A4 A1 B7 B0 A7 B6 A5 B3 B1 B5 B4 A0 A2 B2.
+    struct Slot { uint8 const* mask; uint8* value; };
+    Slot const byteOrder[16] =
+    {
+        { &maskA[3], &bytesA[3] }, { &maskA[6], &bytesA[6] },
+        { &maskA[4], &bytesA[4] }, { &maskA[1], &bytesA[1] },
+        { &maskB[7], &bytesB[7] }, { &maskB[0], &bytesB[0] },
+        { &maskA[7], &bytesA[7] }, { &maskB[6], &bytesB[6] },
+        { &maskA[5], &bytesA[5] }, { &maskB[3], &bytesB[3] },
+        { &maskB[1], &bytesB[1] }, { &maskB[5], &bytesB[5] },
+        { &maskB[4], &bytesB[4] }, { &maskA[0], &bytesA[0] },
+        { &maskA[2], &bytesA[2] }, { &maskB[2], &bytesB[2] }
+    };
+
+    // Bound the read before touching it: a truncated body must be refused, not read
+    // past its end.
+    size_t present = 0;
+    for (size_t i = 0; i < 16; ++i)
+    {
+        if (*byteOrder[i].mask)
+        {
+            ++present;
+        }
+    }
+
+    if (in.size() - in.rpos() < present)
+    {
+        return false;
+    }
+
+    for (size_t i = 0; i < 16; ++i)
+    {
+        if (*byteOrder[i].mask)
+        {
+            uint8 value = 0;
+            in >> value;
+            *byteOrder[i].value = uint8(value ^ 1);   // WriteByteSeq obfuscation
+        }
+    }
+
+    uint64 rawA = 0;
+    uint64 rawB = 0;
+    for (size_t i = 0; i < 8; ++i)
+    {
+        rawA |= uint64(bytesA[i]) << (i * 8);
+        rawB |= uint64(bytesB[i]) << (i * 8);
+    }
+
+    out.guidA = ObjectGuid(rawA);
+    out.guidB = ObjectGuid(rawB);
+
+    // Every byte must be accounted for. Leftover tail means the mask was misread and
+    // the GUIDs are wrong, which is worse than refusing the packet.
+    return in.rpos() == in.size();
+}
+
+bool MopLfgSetRolesPackets::ParseRequest(WorldPacket& in, Request& out)
+{
+    // Fixed 5 bytes. Refuse anything else rather than reading past the end -- a short
+    // body would otherwise leave the role mask half-populated and silently queue the
+    // player as the wrong role.
+    if (in.size() - in.rpos() < 5)
+    {
+        return false;
+    }
+
+    in >> out.roles;
+    in >> out.roleCheckCounter;
+
+    // The body is exactly 5 bytes. A longer one is not this packet, and accepting it
+    // would leave unread tail data -- the cheapest signal there is that a body was read
+    // wrongly, so it must not be swallowed silently.
+    return in.rpos() == in.size();
 }
 
 bool MopLfgLeavePackets::ParseRequest(WorldPacket& in, Request& out)
@@ -1224,8 +1335,66 @@ bool Group::LoadMemberFromDB(uint32 guidLow, uint8 subgroup, bool assistant)
 }
 
 /**
- * @brief Converts the group to raid mode and refreshes related state.
+ * @brief Clears the dungeon finder flag, turning the group back into an ordinary party.
  */
+void Group::ClearLfgGroup()
+{
+    // The counterpart to SetAsLfgGroup, and it persists for the same reason.
+    //
+    // A dungeon finder group outlives its instance: the bind in group_instance is removed
+    // when the instance expires -- two hours after creation for a normal dungeon -- while
+    // the group row survives with GROUPTYPE_LFD still set. LFGMgr persists nothing, and
+    // RestoreDungeonGroup rebuilds the run's status FROM that bind, so once the bind is
+    // gone there is nothing to rebuild from and the group comes back flagged as a finder
+    // run with no run behind it.
+    //
+    // That half-state is worse than either end of it. Group.cpp's
+    // `update.isLfg = isLFGGroup() && GetGroupDungeonEntry(...) != 0` goes false, so
+    // SMSG_GROUP_LIST carries no LFG block, the client zeroes its LFG fields, and the eye,
+    // both teleport options and the Vote Kick gate vanish -- while the group still claims
+    // to be a finder group to every server-side isLFGGroup() test. Observed live
+    // 2026-08-07: a player logged into Wailing Caverns still grouped, with no eye, and
+    // "LFG TeleportPlayer: refused (out) -- group has no LFG status" in the log. Only the
+    // portrait's Leave Instance Group entry got them out.
+    //
+    // Demoting to an ordinary party is honest: the run really is over.
+    m_groupType = GroupType(m_groupType & ~GROUPTYPE_LFD);
+
+    if (!isBGGroup())
+    {
+        CharacterDatabase.PExecute("UPDATE `groups` SET `groupType` = %u WHERE `groupId`='%u'", uint8(m_groupType), m_Id);
+    }
+}
+
+/**
+ * @brief Marks the group as a dungeon finder group and persists the flag.
+ */
+void Group::SetAsLfgGroup()
+{
+    // GROUPTYPE_LFD has to reach the DATABASE, not just m_groupType.
+    //
+    // This used to be a one-line header inline that only ORed the bit into the in-memory
+    // group type. Nothing ever wrote it out, so `groups`.`groupType` stayed at whatever it
+    // was when the group was created -- 0 for a group the finder built. Confirmed against
+    // the live database on 2026-08-06: an active dungeon finder group's row read
+    // groupType = 0 while the run was in progress.
+    //
+    // Everything that tries to recognise a finder run after a restart keys off
+    // isLFGGroup(), so with the bit unsaved the group came back as an ORDINARY PARTY: no
+    // LFG block in SMSG_GROUP_LIST, no eye, no teleport options, no Vote Kick gate, and
+    // LFGMgr::RestoreDungeonGroup refusing the group on its very first line.
+    //
+    // ConvertToRaid two functions down is the pattern; this now matches it. The isBGGroup
+    // guard is the same one every other group persist path uses -- battleground groups have
+    // no row to update.
+    m_groupType = GroupType(m_groupType | GROUPTYPE_LFD);
+
+    if (!isBGGroup())
+    {
+        CharacterDatabase.PExecute("UPDATE `groups` SET `groupType` = %u WHERE `groupId`='%u'", uint8(m_groupType), m_Id);
+    }
+}
+
 void Group::ConvertToRaid()
 {
     m_groupType = GroupType(m_groupType | GROUPTYPE_RAID);
@@ -1502,7 +1671,22 @@ uint32 Group::RemoveMember(ObjectGuid guid, uint8 removeMethod)
         CompleteReadyCheck();
 
     // remove member and change leader (if need) only if strong more 2 members _before_ member remove
-    if (GetMembersCount() > uint32(isBGGroup() ? 1 : 2))    // in BG group case allow 1 members group
+    //
+    // A dungeon finder group is allowed down to ONE member, exactly like a battleground
+    // group. Disbanding it strands the last player: with no group there is no LFG block in
+    // SMSG_GROUP_LIST, so the client loses the minimap eye, "Teleport out of dungeon" and
+    // "Leave Instance Group" -- and they are standing inside an instance with no way out
+    // short of walking or a hearthstone. Observed live twice on 2026-08-06: one player left
+    // a two-man run and the other was left inside with no eyeball at all.
+    //
+    // Keeping the group alive is also what the rest of the feature already assumes.
+    // SMSG_LFG_OFFER_CONTINUE ("a player has left your group, would you like to find
+    // another?") is sent to the REMAINING members from Group::RemoveMember, which is
+    // meaningless if the group it is offering to backfill has just been disbanded.
+    //
+    // The group still dies when the LAST member leaves: at one member this test is 1 > 1,
+    // which is false, so Disband runs as before.
+    if (GetMembersCount() > uint32((isBGGroup() || isLFGGroup()) ? 1 : 2))
     {
         bool leaderChanged = _removeMember(guid);
 
@@ -1551,6 +1735,33 @@ uint32 Group::RemoveMember(ObjectGuid guid, uint8 removeMethod)
         }
 
         SendUpdate();
+
+        // Offer to backfill the slot that just opened.
+        //
+        // Retail sends SMSG_LFG_OFFER_CONTINUE alongside the roster-shrink
+        // SMSG_GROUP_LIST, in the same second -- capture-000326 seq 582508 and 582522,
+        // capture-000656 seq 255287/255318, capture-000913 seq 636664/636680. The order
+        // of the two varies between captures, so adjacency is real but strict ordering is
+        // not an invariant.
+        //
+        // Only while the run is still live: a group that has finished its dungeon has no
+        // slot worth filling, and one with no status is not in a run at all.
+        if (isLFGGroup())
+        {
+            if (uint32 const dungeonEntry = sLFGMgr.GetGroupDungeonEntry(GetObjectGuid()))
+            {
+                if (sLFGMgr.GetGroupLfgState(GetObjectGuid()) != LFG_STATE_FINISHED_DUNGEON)
+                {
+                    for (member_citerator citr = m_memberSlots.begin(); citr != m_memberSlots.end(); ++citr)
+                    {
+                        if (Player* pMember = sObjectMgr.GetPlayer(citr->guid))
+                        {
+                            pMember->GetSession()->SendLfgOfferContinue(dungeonEntry);
+                        }
+                    }
+                }
+            }
+        }
     }
     // if group before remove <= 2 disband it
     else
@@ -1611,6 +1822,14 @@ void Group::ChangeLeader(ObjectGuid guid)
 void Group::Disband(bool hideDestroy)
 {
     CompleteReadyCheck();
+
+    // Release the LFG status here rather than when the dungeon finishes: while the Group
+    // still reports GROUPTYPE_LFD, SendUpdate needs the status to fill the LFG block, and
+    // a missing status makes it emit a zero dungeon slot.
+    if (isLFGGroup())
+    {
+        sLFGMgr.ReleaseGroupLfgStatus(this);
+    }
 
     Player* player;
 
@@ -1717,7 +1936,10 @@ static bool BuildMopGroupLootItem(Roll const& roll,
     item.randomSuffix = int32(roll.itemRandomSuffix);
     item.lootListId = roll.itemSlot;
     item.hasLootListId = true;
-    item.slotType = LOOT_SLOT_NORMAL;
+    // See ToWireLootSlotType: the client never receives 0 here from a retail server,
+    // and a 0 is skipped by the auto-loot pass and raises a bind confirmation.
+    item.slotType = ToWireLootSlotType(LOOT_SLOT_NORMAL);
+    item.unknown = 3;                                       // retail's constant; the client discards it
     item.situ.assign(4, 0); // Client-compatible empty item-modifier block.
     return true;
 }
@@ -2501,8 +2723,67 @@ void Group::SendUpdateToPlayer(ObjectGuid guid)
     update.hasLootMode = true;
     update.lootMethod = uint8(m_lootMethod);
     update.lootThreshold = uint8(m_lootThreshold);
-    update.isLfg = isLFGGroup();
+    // isLfg only when we can actually name the dungeon.
+    //
+    // GROUPTYPE_LFD is one-way: SetAsLfgGroup only ORs it in, it is set at PROPOSAL
+    // CREATION -- before anyone has answered -- and nothing in the tree ever clears it.
+    // So a declined or expired proposal leaves an ordinary party flagged for the rest of
+    // its life, and every SendUpdate then advertised an LFG block whose dungeon slot
+    // resolved through a group status that no longer exists, i.e. isLfg = 1 with A = 0.
+    //
+    // That is the state the note below calls worse than sending no block at all: the
+    // client copies it, party+232 becomes 0, and IsPartyLFG() goes false -- while the
+    // party keeps claiming to be a finder group in every other respect.
+    //
+    // Gating on the entry rather than clearing the flag: the flag is also what
+    // Group::Disband keys its LFG status release on, and what marks the party for the
+    // cooldown waiver, so clearing it would cost more than it fixes.
+    update.isLfg = isLFGGroup() && sLFGMgr.GetGroupDungeonEntry(GetObjectGuid()) != 0;
+    if (update.isLfg)
+    {
+        // The LFG block has TWO dungeon slots and they are not interchangeable.
+        //
+        // Slot A (lfgDungeonEntry) is the gating one: it is what the client copies to
+        // party+232, which is precisely what IsPartyLFG() tests and GetPartyLFGID()
+        // returns, and every UI gate for the minimap eye and the Leave Dungeon entries
+        // runs through it. It carries type 1 in all 8475 retail packets whose block is
+        // populated -- never type 6 -- so it must be the RESOLVED dungeon. Ours is,
+        // because LFGGroupStatus records the concrete dungeon CreateDungeonGroup ran.
+        //
+        // Slot B (lfgTail) carries the random category, type 6, and is 0 for a direct
+        // queue. Worked example, capture-000044 seq 6287, block at payload offset 0x6E:
+        //   00 00 80 3F | 01 | 00 | 88 00 00 01 | 00 00 04 | 03 01 00 06
+        //   float=1.0   | b0 | b1 | A=0x01000088 | b2 b3 b4 | B=0x06000103
+        // An earlier revision of this comment cited 03 01 00 06 as evidence for slot A.
+        // Those bytes are slot B. The code was right and the citation was not.
+        //
+        // Sending isLfg with a zero A is WORSE than sending no block: the client copies
+        // it, party+232 becomes 0, and IsPartyLFG() is then false -- indistinguishable
+        // from having no LFG party at all.
+        update.lfgDungeonEntry = sLFGMgr.GetGroupDungeonEntry(GetObjectGuid());
+        update.lfgTail = sLFGMgr.GetGroupRandomDungeonEntry(GetObjectGuid());
+
+        // b0 is the LFG state, and the client reads bit 0x02 of it as IsLFGComplete()
+        // (sub_90261A: *(party+228) & 2). Retail flips it 1 -> 2 at DUNGEON_FINISHED
+        // (capture-000720 seq 1074 -> 46476). We sent 0 always, so IsLFGComplete() was
+        // permanently false and UIParent.lua:4176's `IsPartyLFG() and not IsLFGComplete()`
+        // always fired the deserter warning on leaving.
+        LFGState const lfgState = sLFGMgr.GetGroupLfgState(GetObjectGuid());
+        update.lfgUnknownByte0 = (lfgState == LFG_STATE_FINISHED_DUNGEON) ? 2 : 1;
+
+        // b4 tracks the member count, observed as n-1 in 5192 of the sampled rows.
+        update.lfgUnknownByte4 = m_memberSlots.empty() ? 0 : uint8(m_memberSlots.size() - 1);
+    }
+    // Retail's LFG groups send groupType 0x0C, i.e. GROUPTYPE_LFD (0x08) plus 0x04.
+    // Bit 0x04 is what the client returns from HasLFGRestrictions() (sub_9025EA reads
+    // party+216 & 4). We stored and sent 0x08 alone, so every LFG group reported having
+    // no restrictions. Set on the WIRE value only -- m_groupType is persisted and used
+    // in server-side logic, and widening the stored enum would change both.
     update.groupType = uint8(m_groupType);
+    if (update.isLfg)
+    {
+        update.groupType |= 0x04;
+    }
     update.partyIndex = player->GetOriginalGroup() == this ? 0 :
         uint8(isBGGroup() || isLFGGroup());
     update.sequence = m_groupUpdateCounter;

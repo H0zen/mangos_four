@@ -527,6 +527,14 @@ void Object::BuildCreateUpdateBlockForPlayer(UpdateData* data, Player* target) c
         movement.z = unit->GetPositionZ();
         movement.o = unit->GetOrientation();
         movement.moveTime = GameTime::GetGameTimeMS();
+
+        // The nine speeds are sanitised inside AppendSimpleLivingMovement rather
+        // than here. The client's create validator rejects any object whose speed
+        // is approximately zero, and a rejected create discards the whole rest of
+        // the packet -- but this is NOT the only writer that fills a create block:
+        // Map::SendInitSelf builds the player's own create through the same
+        // emitter. Clamping at this call site left that path uncovered, and a
+        // rejected SELF create is worse than a rejected observer create.
         movement.speedWalk = unit->GetSpeed(MOVE_WALK);
         movement.speedRun = unit->GetSpeed(MOVE_RUN);
         movement.speedRunBack = unit->GetSpeed(MOVE_RUN_BACK);

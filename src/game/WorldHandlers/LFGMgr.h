@@ -103,14 +103,102 @@ namespace MopLfgPackets
         uint32 dungeonEntry = 0;
     };
 
+    /// One entry of a role check, in the order the client expects them: leader first.
+    struct RoleCheckMember
+    {
+        uint64 guid = 0;
+        uint32 roles = 0;
+        uint8 level = 0;
+    };
+
+    struct RoleCheckUpdate
+    {
+        std::vector<RoleCheckMember> members;
+        std::vector<uint32> dungeonEntries;
+        uint8 partyIndex = 0;
+        uint8 state = 0;
+    };
+
+    /// Wire value of LFG_ROLECHECK_INITIALITING.
+    ///
+    /// Spelled out here because LFGRoleCheckState is declared further down this header,
+    /// after these inline builders. A static_assert next to the enum keeps the two from
+    /// drifting apart.
+    uint8 const ROLE_CHECK_STATE_INITIATING = 2;
+
+    /// One participant of a dungeon proposal.
+    struct ProposalPlayer
+    {
+        uint32 roles = 0;
+        bool inProposedGroup = false;   // already in the group the proposal will reuse
+        bool isSelf = false;            // is this the recipient
+        bool answered = false;
+        bool agreed = false;
+        bool sameGroupAsSelf = false;
+    };
+
+    struct ProposalUpdate
+    {
+        std::vector<ProposalPlayer> players;
+        uint64 requesterGuid = 0;       // recipient's original group, else the player
+        uint64 instanceGuid = 0;        // see BuildProposalUpdate
+        uint32 dungeonEntry = 0;
+        uint32 clientQueueId = 0;
+        uint32 proposalId = 0;
+        uint32 joinTime = 0;
+        uint32 encounters = 0;
+        uint32 flags = 3;
+        uint8 state = 0;
+        bool silent = false;            // update an open window instead of opening one
+    };
+
     bool BuildBootPlayer(WorldPacket& out, BootUpdate const& update);
+    void BuildRoleCheckUpdate(WorldPacket& out, RoleCheckUpdate const& update);
+    void BuildProposalUpdate(WorldPacket& out, ProposalUpdate const& update);
     bool BuildUpdateStatus(WorldPacket& out, StatusUpdate const& update);
     void BuildQueueStatus(WorldPacket& out, QueueStatusUpdate const& update);
     bool ParseLfrSearchRequest(WorldPacket& in, LfrSearchRequest& request);
     void BuildEmptyLfrSearchResponse(WorldPacket& out, LfrSearchRequest const& request);
     bool ParseLockInfoRequest(WorldPacket& in, bool& forPlayer);
+    /// One entry of the lock array at the tail of SMSG_LFG_PLAYER_INFO.
+    struct PlayerLockInfo
+    {
+        /// (TypeID << 24) | dungeonId -- the same value LfgDungeonsEntry::Entry() produces.
+        uint32 dungeonEntry = 0;
+        /// LFGForbiddenTypes, which are the client's LFG_INSTANCE_INVALID_CODES verbatim.
+        uint32 lockStatus = 0;
+        /// Only meaningful for the gear-score reasons, where the client formats them as
+        /// "Requires: %2$d. Currently %3$d." Zero for every other reason, and zero in all
+        /// 206 records of the reference capture.
+        uint32 subReason1 = 0;
+        uint32 subReason2 = 0;
+    };
+
     void BuildEmptyPlayerInfo(WorldPacket& out);
+    void BuildPlayerInfo(WorldPacket& out, std::vector<PlayerLockInfo> const& locks);
     void BuildEmptyPartyInfo(WorldPacket& out);
+
+    /// One party member's lock list inside SMSG_LFG_JOIN_RESULT. Reuses PlayerLockInfo
+    /// because the 16-byte lock record is the same one SMSG_LFG_PLAYER_INFO carries --
+    /// only the field ORDER on the wire differs between the two packets.
+    struct JoinResultPlayer
+    {
+        uint64 guid = 0;
+        std::vector<PlayerLockInfo> locks;
+    };
+
+    struct JoinResult
+    {
+        std::vector<JoinResultPlayer> players;  // empty for every refusal observed
+        uint64 requesterGuid = 0;               // zero on a refusal
+        uint32 joinTime = 0;                    // queue ticket, shared with SMSG_LFG_QUEUE_STATUS
+        uint32 clientQueueId = 0;
+        uint32 ticketType = 0;                  // 3 on success, 0 on every observed refusal
+        uint8 result = 0;                       // LfgJoinResult
+        uint8 detail = 0;                       // LFGRoleCheckState; only read when result == 0x1C
+    };
+
+    void BuildJoinResult(WorldPacket& out, JoinResult const& update);
 }
 
 namespace MopLfgPacketDetail
@@ -133,6 +221,163 @@ namespace MopLfgPacketDetail
         for (size_t index : order)
             out.WriteByteSeq(GuidByte(guid, index));
     }
+}
+
+inline void MopLfgPackets::BuildRoleCheckUpdate(WorldPacket& out,
+    RoleCheckUpdate const& update)
+{
+    // SMSG_LFG_ROLE_CHECK_UPDATE (0x12BB).
+    //
+    // The body that stood here was the 3.3.5 shape -- a uint32 state, flat counts and
+    // raw uint64 GUIDs -- and shared no field order with 18414. Verified byte-exact
+    // against two real captures of different shape, decoding to zero leftover bytes:
+    //
+    //   capture-000075 seq 891708, 35 B: partyIndex 0, state 2, 2 members, 1 dungeon
+    //   capture-000059 seq 719547, 68 B: partyIndex 1, state 2, 5 members, 1 dungeon
+    //
+    // Corpus catalogueGenerationId 2BE10C89...88752.
+    //
+    // Note partyIndex is NOT always zero -- the second capture carries 1 -- so it is a
+    // real field rather than padding, even though GetLFGRoleUpdate does not surface it
+    // to Lua (the client stores it at dword_1209678 and reads it elsewhere).
+    //
+    // The "random dungeon" GUID is always empty in observed traffic; its mask bits are
+    // written all-zero and WriteByteSeq emits nothing for a zero byte, so it costs 8
+    // mask bits and no bytes. It is kept explicit because the bit positions are
+    // interleaved with the dungeon count and cannot be collapsed away.
+    uint64 const randomDungeonGuid = 0;
+
+    out << uint8(update.partyIndex);
+    out << uint8(update.state);
+
+    out.WriteBits(uint32(update.members.size()), 21);
+
+    for (std::vector<RoleCheckMember>::const_iterator it = update.members.begin();
+         it != update.members.end(); ++it)
+    {
+        out.WriteBit(it->roles > 0);        // has this member answered yet
+        MopLfgPacketDetail::WriteGuidMask(out, it->guid, { 3, 0, 5, 2, 7, 1, 4, 6 });
+    }
+
+    MopLfgPacketDetail::WriteGuidMask(out, randomDungeonGuid, { 3, 5 });
+    out.WriteBits(uint32(update.dungeonEntries.size()), 22);
+    MopLfgPacketDetail::WriteGuidMask(out, randomDungeonGuid, { 0, 7, 6, 1, 4, 2 });
+    out.WriteBit(update.state == ROLE_CHECK_STATE_INITIATING);
+
+    out.FlushBits();
+
+    MopLfgPacketDetail::WriteGuidBytes(out, randomDungeonGuid, { 0 });
+
+    for (std::vector<RoleCheckMember>::const_iterator it = update.members.begin();
+         it != update.members.end(); ++it)
+    {
+        out << uint8(it->level);
+        MopLfgPacketDetail::WriteGuidBytes(out, it->guid, { 3, 6 });
+        out << uint32(it->roles);
+        MopLfgPacketDetail::WriteGuidBytes(out, it->guid, { 2, 4, 0, 1, 5, 7 });
+    }
+
+    MopLfgPacketDetail::WriteGuidBytes(out, randomDungeonGuid, { 1, 7, 6, 4, 3, 2, 5 });
+
+    for (std::vector<uint32>::const_iterator it = update.dungeonEntries.begin();
+         it != update.dungeonEntries.end(); ++it)
+    {
+        out << uint32(*it);
+    }
+}
+
+inline void MopLfgPackets::BuildProposalUpdate(WorldPacket& out,
+    ProposalUpdate const& update)
+{
+    // SMSG_LFG_PROPOSAL_UPDATE (0x1E3B).
+    //
+    // The body that stood here was the 3.3.5 shape -- flat uint32/uint8 fields and a
+    // per-player run of single bytes -- and shared no field order with 18414. Verified
+    // byte-exact against two real captures chosen to differ as much as possible:
+    //
+    //   capture-000044 seq 1948,    64 B:  5 players, 1 tank / 1 healer / 3 dps
+    //   capture-000059 seq 2063424, 156 B: 25 players, 2 tank / 6 healer / 17 dps
+    //
+    // Both decode to zero leftover. The second is a raid finder proposal, and its
+    // composition matches the 2/6/17 that LfgDungeons.dbc carries for LFR rows -- an
+    // independent check on the decode from a completely different evidence source.
+    //
+    // Corpus catalogueGenerationId 2BE10C89...88752.
+    //
+    // Two corrections to the reference layout this was checked against:
+    //
+    //  - It builds the second GUID as `dungeonEntry | (0x1F45 << 48)`. Real traffic
+    //    carries neither: the top five bytes are constant 1F 44 00 00 11 in both
+    //    captures while the low three vary, i.e. a genuine instance-side GUID with a
+    //    counter, unrelated to the dungeon entry. We do not model that object, so we
+    //    send zero -- a legal encoding, since all eight mask bits then read false and
+    //    WriteByteSeq emits nothing. If a live client turns out to need it to match the
+    //    proposal, synthesise it from proposalId rather than guessing a constant.
+    //
+    //  - Roles are passed through verbatim. Observed values include 0x32 and 0x09, so
+    //    bits above DAMAGE are real and must not be masked off.
+    out.WriteBit(MopLfgPacketDetail::GuidByte(update.instanceGuid, 6) != 0);
+    out.WriteBit(MopLfgPacketDetail::GuidByte(update.instanceGuid, 0) != 0);
+    MopLfgPacketDetail::WriteGuidMask(out, update.requesterGuid, { 1, 7, 5 });
+    out.WriteBit(MopLfgPacketDetail::GuidByte(update.instanceGuid, 5) != 0);
+    MopLfgPacketDetail::WriteGuidMask(out, update.requesterGuid, { 4 });
+    out.WriteBit(update.silent);
+    out.WriteBit(MopLfgPacketDetail::GuidByte(update.instanceGuid, 2) != 0);
+    MopLfgPacketDetail::WriteGuidMask(out, update.requesterGuid, { 6 });
+    MopLfgPacketDetail::WriteGuidMask(out, update.instanceGuid, { 3, 7 });
+    MopLfgPacketDetail::WriteGuidMask(out, update.requesterGuid, { 3 });
+
+    out.WriteBits(uint32(update.players.size()), 21);
+
+    for (std::vector<ProposalPlayer>::const_iterator it = update.players.begin();
+         it != update.players.end(); ++it)
+    {
+        out.WriteBit(it->inProposedGroup);
+        out.WriteBit(it->isSelf);
+        out.WriteBit(it->answered);
+        out.WriteBit(it->agreed);
+        out.WriteBit(it->sameGroupAsSelf);
+    }
+
+    MopLfgPacketDetail::WriteGuidMask(out, update.requesterGuid, { 2 });
+    MopLfgPacketDetail::WriteGuidMask(out, update.instanceGuid, { 4 });
+    out.WriteBit(false);                                    // unknown; zero in all observed traffic
+    MopLfgPacketDetail::WriteGuidMask(out, update.requesterGuid, { 0 });
+    MopLfgPacketDetail::WriteGuidMask(out, update.instanceGuid, { 1 });
+
+    out.FlushBits();
+
+    MopLfgPacketDetail::WriteGuidBytes(out, update.instanceGuid, { 1 });
+    MopLfgPacketDetail::WriteGuidBytes(out, update.requesterGuid, { 4 });
+    MopLfgPacketDetail::WriteGuidBytes(out, update.instanceGuid, { 4 });
+    MopLfgPacketDetail::WriteGuidBytes(out, update.requesterGuid, { 7, 2, 0 });
+
+    out << uint32(update.dungeonEntry);
+    out << uint8(update.state);
+    out << uint32(update.clientQueueId);
+
+    MopLfgPacketDetail::WriteGuidBytes(out, update.instanceGuid, { 6 });
+    out << uint32(update.proposalId);
+    MopLfgPacketDetail::WriteGuidBytes(out, update.requesterGuid, { 5, 3 });
+    out << uint32(update.joinTime);
+    MopLfgPacketDetail::WriteGuidBytes(out, update.instanceGuid, { 5 });
+    MopLfgPacketDetail::WriteGuidBytes(out, update.requesterGuid, { 6 });
+
+    for (std::vector<ProposalPlayer>::const_iterator it = update.players.begin();
+         it != update.players.end(); ++it)
+    {
+        out << uint32(it->roles);
+    }
+
+    out << uint32(update.encounters);
+
+    MopLfgPacketDetail::WriteGuidBytes(out, update.instanceGuid, { 7 });
+    MopLfgPacketDetail::WriteGuidBytes(out, update.requesterGuid, { 1 });
+    MopLfgPacketDetail::WriteGuidBytes(out, update.instanceGuid, { 0, 2 });
+
+    out << uint32(update.flags);
+
+    MopLfgPacketDetail::WriteGuidBytes(out, update.instanceGuid, { 3 });
 }
 
 inline bool MopLfgPackets::ParseLfrSearchRequest(WorldPacket& in,
@@ -293,6 +538,65 @@ inline void MopLfgPackets::BuildQueueStatus(WorldPacket& out,
     MopLfgPacketDetail::WriteGuidBytes(out, update.queueGuid, { 5, 3, 6 });
 }
 
+inline void MopLfgPackets::BuildJoinResult(WorldPacket& out,
+    JoinResult const& update)
+{
+    // SMSG_LFG_JOIN_RESULT (0x18E3).
+    //
+    // Direct inverse of the 18414 reader sub_760C65, reached from dispatcher case 687.
+    // The body that stood here was the 3.3.5 shape -- uint32 result, uint32 state, then
+    // raw uint64 GUIDs -- which shares no field WIDTH with this client, let alone field
+    // order. That, plus the opcode never having been admitted, is why a refused join was
+    // silent in both directions.
+    //
+    // Verified byte-exact against all three observed sizes, decoding to zero leftover
+    // bytes and zero non-zero pad bits (catalogueGenerationId 2BE10C89...88752):
+    //
+    //   capture-000059 seq 490545, 18 B: refusal, result 0x1C detail 6, guid 0, ticket 0
+    //   capture-000044 seq 1547,   23 B: success, guid 0x0400000006296291, type 3
+    //   capture-000075 seq 891753, 24 B: success, guid 0x1F5400001249B4F0, type 3
+    //
+    // The governing identity when no locks are present is
+    //   len == 18 + popcount(byte0) + popcount(byte3)
+    // because the GUID mask is SPLIT either side of the 22-bit lock count.
+    //
+    // capture-000044 cross-checks against SMSG_LFG_QUEUE_STATUS seq 1577 in the same
+    // capture: joinTime 0x54146107 and queueId 0x9BFF are identical in both, so the
+    // ticket really is one shared identifier rather than a per-packet value.
+    MopLfgPacketDetail::WriteGuidMask(out, update.requesterGuid, { 7, 6, 3, 0 });
+    out.WriteBits(update.players.size(), 22);
+    for (JoinResultPlayer const& player : update.players)
+    {
+        MopLfgPacketDetail::WriteGuidMask(out, player.guid, { 3 });
+        out.WriteBits(player.locks.size(), 20);
+        MopLfgPacketDetail::WriteGuidMask(out, player.guid, { 6, 1, 4, 7, 2, 0, 5 });
+    }
+    MopLfgPacketDetail::WriteGuidMask(out, update.requesterGuid, { 5, 1, 4, 2 });
+    out.FlushBits();
+
+    out << update.result;
+    for (JoinResultPlayer const& player : update.players)
+    {
+        MopLfgPacketDetail::WriteGuidBytes(out, player.guid, { 4 });
+        for (PlayerLockInfo const& lock : player.locks)
+        {
+            // Reverse of the SMSG_LFG_PLAYER_INFO order: the dungeon entry is written
+            // LAST here, after both sub-reasons and the lock status.
+            out << lock.subReason2;
+            out << lock.subReason1;
+            out << lock.lockStatus;
+            out << lock.dungeonEntry;
+        }
+        MopLfgPacketDetail::WriteGuidBytes(out, player.guid, { 1, 0, 5, 7, 3, 6, 2 });
+    }
+    out << update.detail;
+    MopLfgPacketDetail::WriteGuidBytes(out, update.requesterGuid, { 2 });
+    out << update.joinTime;
+    out << update.clientQueueId;
+    out << update.ticketType;
+    MopLfgPacketDetail::WriteGuidBytes(out, update.requesterGuid, { 6, 4, 1, 0, 5, 7, 3 });
+}
+
 inline bool MopLfgPackets::ParseLockInfoRequest(WorldPacket& in,
     bool& forPlayer)
 {
@@ -307,6 +611,52 @@ inline bool MopLfgPackets::ParseLockInfoRequest(WorldPacket& in,
     in.read_skip<uint8>();
     forPlayer = in.ReadBit();
     return in.rpos() == in.size();
+}
+
+inline void MopLfgPackets::BuildPlayerInfo(WorldPacket& out,
+    std::vector<PlayerLockInfo> const& locks)
+{
+    // SMSG_LFG_PLAYER_INFO with a populated lock list.
+    //
+    // Sent ONLY in reply to CMSG_LFG_LOCK_INFO_REQUEST -- it is not pushed at login. In
+    // capture-000006 the two pair seven-for-seven, and the client asks at world-enter
+    // (CMSG_LFG_GET_STATUS then CMSG_LFG_LOCK_INFO_REQUEST at adjacent sequence numbers).
+    //
+    // Layout verified byte-exact against capture-000006 seq 1953, a 6068-byte reply to a
+    // max-level character:
+    //
+    //   bits   WriteBits(lockCount, 20)      -> 206
+    //          WriteBit(hasPlayerGuid)       -> 0
+    //          WriteBits(randomDungeonCount, 17) -> 35
+    //          FlushBits                     -> 38 bits, 5 bytes
+    //   ...random dungeon reward records, variable length...
+    //   tail   lockCount x 16 bytes, flat and unpacked:
+    //              uint32 dungeonEntry   (TypeID << 24) | id
+    //              uint32 lockStatus
+    //              uint32 subReason1
+    //              uint32 subReason2
+    //
+    // The locks sit at the TAIL, after the random records. With zero randoms the two are
+    // adjacent, which is what makes a locks-only reply coherent: the client installs the
+    // lock list and raises LFG_LOCK_INFO_RECEIVED whether or not any random rows follow,
+    // so none of the reward plumbing is needed to make the eligibility filter work.
+    //
+    // Why this matters: LFGList_DefaultFilterFunction shows a dungeon when
+    // `not LFGLockList[dungeonID]`, and LFGLockList is built from this array. Sending it
+    // empty told the client nothing is locked, so every dungeon in the game appeared in
+    // the finder and players could queue for content they cannot enter.
+    out.WriteBits(uint32(locks.size()), 20);
+    out.WriteBit(false);                // has player GUID -- 0 in the reference capture
+    out.WriteBits(0, 17);               // random dungeon count; see above
+    out.FlushBits();
+
+    for (std::vector<PlayerLockInfo>::const_iterator it = locks.begin(); it != locks.end(); ++it)
+    {
+        out << uint32(it->dungeonEntry);
+        out << uint32(it->lockStatus);
+        out << uint32(it->subReason1);
+        out << uint32(it->subReason2);
+    }
 }
 
 inline void MopLfgPackets::BuildEmptyPlayerInfo(WorldPacket& out)
@@ -325,6 +675,7 @@ inline void MopLfgPackets::BuildEmptyPartyInfo(WorldPacket& out)
 
 
 struct LFGBoot;
+class Map;
 struct LFGGroupStatus;
 struct LFGPlayers;
 struct LFGPlayerStatus;
@@ -343,26 +694,56 @@ enum LFGFlags
 };
 
 /// Possible statuses to send after a request to join the dungeon finder
+/// Result codes for SMSG_LFG_JOIN_RESULT, build 18414.
+///
+/// Re-valued from the 3.3.5 numbering this was inherited with. The client picks the
+/// displayed string by LINEAR SCAN of a 19-entry {u32 code, u32 stringId} table at
+/// .data:00F66A30, bounded by `cmp ecx, 13h` at .text:0098E80C. A code that is not in
+/// that table takes the `jmp short loc_98E820` at .text:0098E811, which skips the
+/// DisplayError call outright -- the player is shown NOTHING. Every value below was
+/// resolved through the descriptor array at .data:00F5C278 (stride 0x14, name pointer
+/// at +0x00), so these are table reads, not an ordering guess.
+///
+/// The shift is NOT a constant: +0x1B for the old 0x01..0x05, then +0x1A from
+/// MISMATCHED_SLOTS on, because MoP dropped NO_SLOTS_PARTY. A blanket offset would
+/// silently mis-value two thirds of the enum.
 enum LfgJoinResult
 {
-    ERR_LFG_OK                                  = 0x00,
-    ERR_LFG_ROLE_CHECK_FAILED                   = 0x01,
-    ERR_LFG_GROUP_FULL                          = 0x02,
-    ERR_LFG_NO_LFG_OBJECT                       = 0x04,
-    ERR_LFG_NO_SLOTS_PLAYER                     = 0x05,
-    ERR_LFG_NO_SLOTS_PARTY                      = 0x06,
-    ERR_LFG_MISMATCHED_SLOTS                    = 0x07,
-    ERR_LFG_PARTY_PLAYERS_FROM_DIFFERENT_REALMS = 0x08,
-    ERR_LFG_MEMBERS_NOT_PRESENT                 = 0x09,
-    ERR_LFG_GET_INFO_TIMEOUT                    = 0x0A,
-    ERR_LFG_INVALID_SLOT                        = 0x0B,
-    ERR_LFG_DESERTER_PLAYER                     = 0x0C,
-    ERR_LFG_DESERTER_PARTY                      = 0x0D,
-    ERR_LFG_RANDOM_COOLDOWN_PLAYER              = 0x0E,
-    ERR_LFG_RANDOM_COOLDOWN_PARTY               = 0x0F,
-    ERR_LFG_TOO_MANY_MEMBERS                    = 0x10,
-    ERR_LFG_CANT_USE_DUNGEONS                   = 0x11,
-    ERR_LFG_ROLE_CHECK_FAILED2                  = 0x12,
+    ERR_LFG_OK                                  = 0x00, // success; not in the table, client shows nothing
+    ERR_LFG_ROLE_CHECK_FAILED                   = 0x1C, // detail byte refines this one -- see LfgJoinResultDetail
+    ERR_LFG_GROUP_FULL                          = 0x1D,
+    ERR_LFG_NO_LFG_OBJECT                       = 0x1F,
+    ERR_LFG_NO_SLOTS_PLAYER                     = 0x20, // the only code that also carries the per-player lock array
+    ERR_LFG_MISMATCHED_SLOTS                    = 0x21,
+    ERR_LFG_PARTY_PLAYERS_FROM_DIFFERENT_REALMS = 0x22,
+    ERR_LFG_MEMBERS_NOT_PRESENT                 = 0x23,
+    ERR_LFG_GET_INFO_TIMEOUT                    = 0x24,
+    ERR_LFG_INVALID_SLOT                        = 0x25,
+    ERR_LFG_DESERTER_PLAYER                     = 0x26,
+    ERR_LFG_DESERTER_PARTY                      = 0x27,
+    ERR_LFG_RANDOM_COOLDOWN_PLAYER              = 0x28,
+    ERR_LFG_RANDOM_COOLDOWN_PARTY               = 0x29,
+    ERR_LFG_TOO_MANY_MEMBERS                    = 0x2A,
+    ERR_LFG_CANT_USE_DUNGEONS                   = 0x2B,
+    ERR_LFG_ROLE_CHECK_FAILED2                  = 0x2C, // genuine second code; renders the same string as 0x1C
+    ERR_LFG_TOO_FEW_MEMBERS                     = 0x32, // MoP-new
+    ERR_LFG_REASON_TOO_MANY_LFG                 = 0x33, // MoP-new
+    ERR_LFG_MISMATCHED_SLOTS_LOCAL_XREALM       = 0x35, // MoP-new
+
+    // ERR_LFG_NO_SLOTS_PARTY is deliberately absent. Its string still exists in the
+    // client (index 0x2EE) but NO result code maps to it, so there is no way to send
+    // it. Callers must use ERR_LFG_NO_SLOTS_PLAYER for a party too -- it is the code
+    // that carries the lock array, so the player is told which dungeons were locked
+    // instead of being shown nothing.
+};
+
+/// Second body byte, only consulted when the result is ERR_LFG_ROLE_CHECK_FAILED
+/// (.text:0098E7DE `cmp dl, 1Ch`). Any other value falls through to the plain string.
+enum LfgJoinResultDetail
+{
+    LFG_JOIN_DETAIL_NONE       = 0,
+    LFG_JOIN_DETAIL_TIMEOUT    = 3, // -> ERR_LFG_ROLE_CHECK_FAILED_TIMEOUT    (string 0x2E9)
+    LFG_JOIN_DETAIL_NOT_VIABLE = 4, // -> ERR_LFG_ROLE_CHECK_FAILED_NOT_VIABLE (string 0x2EA)
 };
 
 enum LfgUpdateType
@@ -381,6 +762,14 @@ enum LfgUpdateType
     LFG_UPDATE_STATUS               = 15,
     LFG_UPDATE_GROUP_MEMBER_OFFLINE = 16,
     LFG_UPDATE_GROUP_DISBAND        = 17,
+
+    /// Retail's opening reason for a fresh queue: 257 of 276 observed joins lead with
+    /// 24 and NONE lead with 6. LFG_UPDATE_JOIN (6) is the re-queue-from-inside-a-
+    /// dungeon reason, which is why it was the wrong thing to open with.
+    LFG_UPDATE_JOIN_QUEUE_INITIAL   = 24,
+    /// Sent after SMSG_LFG_PLAYER_REWARD when the run completes. All 283 observed
+    /// reason-25 bodies carry the same flag tuple.
+    LFG_UPDATE_DUNGEON_FINISHED     = 25,
 };
 
 enum LfgType
@@ -420,8 +809,10 @@ enum LFGSpells
 
 enum LFGTimes
 {
-    LFG_TIME_ROLECHECK                           = 45*IN_MILLISECONDS,
-    LFG_TIME_BOOT                                = 120,
+    // SECONDS, not milliseconds: waitForRoleTime is built from time(NULL),
+    // so 45*IN_MILLISECONDS made a role check expire after 12.5 HOURS.
+    LFG_TIME_ROLECHECK                           = 45,
+    LFG_TIME_BOOT                                = 30,   // retail: 30 s in all 14 observed boot sessions
     LFG_TIME_PROPOSAL                            = 45,
 };
 
@@ -466,6 +857,11 @@ enum LFGRoleCheckState
     LFG_ROLECHECK_NO_ROLE                        = 6       // Someone didn't select a role
 };
 
+static_assert(uint8(LFG_ROLECHECK_INITIALITING) == MopLfgPackets::ROLE_CHECK_STATE_INITIATING,
+    "SMSG_LFG_ROLE_CHECK_UPDATE writes a bit for state == INITIALITING; the value it "
+    "compares against must track the enum. Both captures the writer is tested on carry "
+    "state 2 with that bit set.");
+
 /// Role types
 enum LFGRoles
 {
@@ -474,6 +870,19 @@ enum LFGRoles
     PLAYER_ROLE_TANK                             = 0x02,
     PLAYER_ROLE_HEALER                           = 0x04,
     PLAYER_ROLE_DAMAGE                           = 0x08
+};
+
+/// Dungeon finder debug modes, driven by `.debug dungeon`.
+///
+/// Every relaxation these enable is gated on the queue entry actually containing a game
+/// master. Relaxing the matchmaker globally would change how ordinary players match each
+/// other while the operator is testing, which is exactly what makes a debug switch
+/// untrustworthy.
+enum LFGDebugMode
+{
+    LFG_DEBUG_OFF                                = 0,      // normal matchmaking
+    LFG_DEBUG_SOLO                               = 1,      // a GM's entry completes alone
+    LFG_DEBUG_GROUP                              = 2       // a GM's entry also absorbs whoever else is waiting
 };
 
 /// Role amounts
@@ -485,16 +894,39 @@ enum LFGRoleCount
 };
 
 /// Teleport errors
+/// Reason codes for SMSG_LFG_TELEPORT_DENIED.
+///
+/// Derived from the 18414 client, not from a fork. The body is a FOUR BIT field
+/// (WriteBits(reason & 0xF, 4) then FlushBits), which is why every captured body
+/// is one byte and why the single observed value looked unmappable: MSB-first, a
+/// reason of 1 occupies the high nibble and lands as 0x10, and the corpus also
+/// carries 0x90 for reason 9. Both are ordinary codes, not an unknown space.
+///
+/// Only the low nibble reaches the wire, so every value here must be 0-15.
 enum LFGTeleportError
 {
-    // 7 = "You can't do that right now" | 5 = No client reaction
     LFG_TELEPORTERROR_OK                         = 0,
-    LFG_TELEPORTERROR_PLAYER_DEAD                = 1,
-    LFG_TELEPORTERROR_FALLING                    = 2,
-    LFG_TELEPORTERROR_IN_VEHICLE                 = 3,
-    LFG_TELEPORTERROR_FATIGUE                    = 4,
-    LFG_TELEPORTERROR_INVALID_LOCATION           = 6,
-    LFG_TELEPORTERROR_CHARMING                   = 8
+    LFG_TELEPORTERROR_FALLING                    = 7,
+    LFG_TELEPORTERROR_PLAYER_DEAD                = 9,
+    LFG_TELEPORTERROR_FATIGUE                    = 12,
+    LFG_TELEPORTERROR_INVALID_LOCATION           = 15,
+
+    /// The three refusals with no dedicated client message.
+    ///
+    /// 5 and 10 both route to ERR_CLIENT_LOCKED_OUT ("You can't do that right
+    /// now"), which is vague but true and, crucially, VISIBLE. 6 and 13 are
+    /// silent in the client, so sending either would put the player back exactly
+    /// where they were before this opcode was admitted: a click that does
+    /// nothing and explains nothing.
+    ///
+    /// IN_COMBAT deliberately shares that generic code rather than using 30. The
+    /// client does own ERR_PARTY_LFG_TELEPORT_IN_COMBAT, but 30 was recovered
+    /// from the PARTY error dispatcher, and this opcode's four-bit field cannot
+    /// carry 30 at all -- it would truncate to 14. A vague visible message beats
+    /// a wrong one.
+    LFG_TELEPORTERROR_IN_VEHICLE                 = 5,
+    LFG_TELEPORTERROR_CHARMING                   = 5,
+    LFG_TELEPORTERROR_IN_COMBAT                  = 5
 };
 
 enum DungeonTypes
@@ -562,10 +994,27 @@ struct LFGPlayers //TODO: rename to LFGQueueData
     std::string comments;
     bool isGroup;
 
-    time_t joinedTime;
-    uint8 neededTanks;
-    uint8 neededHealers;
-    uint8 neededDps;
+    /// The concrete dungeons a RANDOM selection expanded to, kept so a proposal can name
+    /// one. Empty for a normal queue.
+    ///
+    /// dungeonList holds what the player asked for, which for a random queue is the single
+    /// category row -- that is what the client is shown and what the reward lookup keys on,
+    /// so it must not be replaced. But a category row is not a place: all 12 TypeID 6 rows
+    /// in LfgDungeons.dbc carry MapID 0 or 0xFFFFFFFF, so proposing one teleports the group
+    /// nowhere. The expansion is therefore kept alongside rather than collapsed away.
+    std::set<uint32> candidateDungeons;
+
+    // Zeroed: the default constructor left these indeterminate, and needed* decides both
+    // whether an entry is complete and what the queue advertises to the client.
+    time_t joinedTime = 0;
+    /// The queue ticket. Retail never sends 0 in any of the 5291 observed status
+    /// bodies; it is stable for the life of a queue entry and the client ECHOES IT
+    /// BACK verbatim in CMSG_LFG_PROPOSAL_RESPONSE and CMSG_LFG_LEAVE, so with 0 the
+    /// client's own replies cannot be matched to the entry that produced them.
+    uint32 ticketId = 0;
+    uint8 neededTanks = 0;
+    uint8 neededHealers = 0;
+    uint8 neededDps = 0;
 
     LFGPlayers() : currentState(LFG_STATE_NONE), currentRoles(0), isGroup(false) {}
     LFGPlayers(LFGState state, std::set<uint32> dungeonSelection, roleMap CurrentRoles, std::string comment, bool IsGroup, time_t JoinedTime,
@@ -611,6 +1060,7 @@ struct LFGQueueStatus
     uint8  neededDps;             // amount of dps needed
     uint32 timeSpentInQueue;      // time already spent in the queue
     uint32 joinTime;              // server epoch time when the queue entry was created
+    uint32 ticketId;              // retail's clientQueueId equals the status packet's ticketId
 };
 
 /// For CMSG_LFG_GET_STATUS, SMSG_LFG_UPDATE_PARTY, and SMSG_LFG_UPDATE_PLAYER
@@ -631,6 +1081,7 @@ struct LFGStatusPacketData
 {
     uint32 roles = 0;
     uint32 joinedTime = 0;
+    uint32 ticketId = 0;
     uint8 neededTanks = 0;
     uint8 neededHealers = 0;
     uint8 neededDps = 0;
@@ -640,7 +1091,23 @@ struct LFGStatusPacketData
 struct LFGGroupStatus //todo: check for this in joinlfg function, not lfgplayers struct
 {
     LFGState state;        // State of the group
-    uint32 dungeonID;      // ID of the dungeon the group should be in
+    uint32 dungeonID;      // ID of the dungeon the group should be in (the RESOLVED one)
+    /// Has this run made enough progress that leaving is no longer desertion?
+    ///
+    /// MoP's rule protected the OPENING of a run: leave or get vote-kicked before the
+    /// group had engaged/killed a boss and you took Dungeon Deserter for 30 minutes;
+    /// after the first boss you could ordinarily leave clean. Blizzard deliberately kept
+    /// the exact predicate hidden and it had edge cases (boss combat, a wipe, or simply
+    /// enough time inside could satisfy it, and Heroic Scarlet Monastery was reported in
+    /// 2013 to keep awarding Deserter after its first boss when others did not), so this
+    /// tracks the one signal that is unambiguous and that we can actually observe: a
+    /// credited dungeon encounter.
+    bool madeProgress = false;
+
+    /// The random category the group queued under, or 0 for a direct queue. Kept because
+    /// SMSG_GROUP_LIST carries BOTH: slot A is the resolved dungeon and slot B the random
+    /// row. Retail never puts a type-6 entry in slot A.
+    uint32 randomDungeonID = 0;
     roleMap playerRoles;   // Container holding each player's objectguid and their roles
     ObjectGuid leaderGuid; // The group leader's object guid
 
@@ -652,17 +1119,39 @@ struct LFGGroupStatus //todo: check for this in joinlfg function, not lfgplayers
 /// For SMSG_LFG_PROPOSAL_UPDATE
 struct LFGProposal
 {
-    uint32 id;                 // proposal id
-    uint32 dungeonID;          // dungeon id
-    LFGProposalState state;    // proposal state
-    uint32 encounters;         // encounters done
-    uint64 groupRawGuid;       // group raw guid value
-    uint64 groupLeaderGuid;    // group leader's guid
-    bool isNew;                // is new or old group
-    roleMap currentRoles;      // group player's roles
-    proposalAnswerMap answers; // answers to a proposal
-    playerGroupMap groups;     // data on which groups players belong/belonged to
-    time_t joinedQueue;        // time from when the players joined the queue
+    // Every scalar is initialised. groupRawGuid and groupLeaderGuid in particular are
+    // the only two SendDungeonProposal does not always assign -- it sets them solely on
+    // the premade path -- yet it READS groupRawGuid to decide whether to set it, and
+    // CreateDungeonGroup branches on it to choose between reusing an existing group and
+    // making a new one. Left indeterminate, an all-solo proposal picked its branch from
+    // whatever was on the stack.
+    uint32 id = 0;                  // proposal id
+    uint32 dungeonID = 0;           // dungeon id as QUEUED -- for a random queue this is the
+                                    // category row, which is what the client is shown and what
+                                    // the reward lookup keys on
+
+    /// The dungeon the group is actually put into. Equals dungeonID for a normal queue.
+    ///
+    /// For a random queue it is a concrete member of the expansion, because the category row
+    /// has no map to teleport to. Split from dungeonID rather than replacing it so the
+    /// proposal packet and the reward path keep naming the random entry the player chose.
+    uint32 concreteDungeonID = 0;
+
+    // The m_playerData key this proposal was built from. The queue entry is kept alive
+    // for the lifetime of the proposal so a failure can put the survivors back, which is
+    // what the client tells the player happens: ERR_LFG_PROPOSAL_FAILED reads "Someone
+    // has declined the invite. You have been returned to the front of the queue."
+    ObjectGuid queueGuid;
+    time_t createdTime = 0;         // for the timeout reaper
+    LFGProposalState state = LFG_PROPOSAL_INITIATING;  // proposal state
+    uint32 encounters = 0;          // encounters done
+    uint64 groupRawGuid = 0;        // group raw guid value
+    uint64 groupLeaderGuid = 0;     // group leader's guid
+    bool isNew = true;              // is new or old group
+    roleMap currentRoles;           // group player's roles
+    proposalAnswerMap answers;      // answers to a proposal
+    playerGroupMap groups;          // data on which groups players belong/belonged to
+    time_t joinedQueue = 0;         // time from when the players joined the queue
 };
 
 // For SMSG_LFG_PLAYER_REWARD
@@ -734,7 +1223,10 @@ public:
      *
      * @param plr The pointer to the player
      */
-    LfgJoinResult GetJoinResult(Player* plr);
+    /// \param queueIsRandom the request contains a random category. The Dungeon
+    ///        Cooldown (71328) gates only random queues, so a specific-dungeon request
+    ///        must pass while it is active.
+    LfgJoinResult GetJoinResult(Player* plr, bool queueIsRandom);
 
     /**
      * @brief Fetch the playerstatus struct of a player on request, if existant
@@ -761,6 +1253,10 @@ public:
      * @param state the LFGState value
      */
     void SetPlayerState(ObjectGuid guid, LFGState state);
+
+    /// Current `.debug dungeon` mode; LFG_DEBUG_OFF unless an administrator enabled it.
+    LFGDebugMode GetDebugMode() const { return m_debugMode; }
+    void SetDebugMode(LFGDebugMode mode) { m_debugMode = mode; }
 
     /**
      * @brief Set the player's LFG update type
@@ -829,6 +1325,49 @@ public:
     /// Given the ID of a dungeon, spit out its entry
     uint32 GetDungeonEntry(uint32 ID);
 
+    /// The resolved dungeon entry for a group that is in (or heading into) an LFG
+    /// dungeon, or 0 if it is not an LFG group. SMSG_GROUP_LIST carries this in its
+    /// LFG block; retail never sends the block with a zero entry.
+    uint32 GetGroupDungeonEntry(ObjectGuid groupGuid);
+
+    /// The random-category entry a group queued under, or 0. SMSG_GROUP_LIST slot B.
+    uint32 GetGroupRandomDungeonEntry(ObjectGuid groupGuid);
+
+    /// LFG state of a group, for the SMSG_GROUP_LIST state byte.
+    LFGState GetGroupLfgState(ObjectGuid groupGuid);
+
+    /// Drop a disbanded group's LFG status. Must run when the Group is torn down, not
+    /// when its dungeon finishes -- see the note in HandleBossKilled.
+    /// Drop a group's LFG state AND reset its members' player states.
+    void ReleaseGroupLfgStatus(Group* pGroup);
+
+    /// A dungeon encounter was credited on this map. Marks every LFG group with players
+    /// present as having made progress, so leaving no longer earns Dungeon Deserter, and
+    /// on the LAST encounter runs the completion/reward path.
+    void OnDungeonEncounterCredited(Map* map, bool lastEncounter);
+
+    /// Called when a player leaves an LFG group. Applies Dungeon Deserter if the run had
+    /// not yet made progress.
+    void OnPlayerLeftDungeonGroup(Player* pPlayer);
+
+    /// Always-runs cleanup for a player leaving an LFG group: clears their LFG state
+    /// and withdraws any vote they had cast.
+    void OnPlayerLeftLfgGroup(Player* pPlayer, Group* pGroup);
+
+    /// Is this player standing inside the dungeon of a live LFG run?
+    bool IsPlayerInLfgDungeon(Player* pPlayer);
+
+    /// Applies the 15-minute requeue cooldown that retail starts when a player enters.
+    void ApplyDungeonCooldown(Player* pPlayer);
+
+    /// Record where this player must be returned to when they leave the dungeon.
+    /// Called ONCE, when the queue is joined -- never on entry. See the definition.
+    void RecordEntryPoint(Player* pPlayer);
+
+    /// Rebuild a dungeon group's LFG status after a restart, from persisted state alone.
+    /// Called once per group_instance bind while groups load. See the definition.
+    void RestoreDungeonGroup(Group* pGroup, uint32 mapId, uint32 difficulty, uint32 encountersMask);
+
     /// Return the 5.4.8 LFG status category byte for a dungeon.
     uint8 GetDungeonCategory(uint32 ID);
 
@@ -845,6 +1384,58 @@ public:
      * @param information The LFGPlayers structure containing their information
      */
     void UpdateNeededRoles(ObjectGuid guid, LFGPlayers* information);
+
+    /**
+     * @brief Fire a proposal for this entry if every role it needs is filled, and
+     *        dequeue it so it cannot be matched or proposed again.
+     * @return true if a proposal was sent (the entry no longer exists).
+     */
+    bool TryFormGroup(ObjectGuid guid);
+
+    /**
+     * @brief Cancel a proposal, remove the players responsible, and return everyone else
+     *        to the queue.
+     *
+     * @param proposalId the proposal to cancel
+     * @param culprits   players removed from the dungeon finder entirely (the decliner
+     *                   and, if they were in a premade, that premade). Empty on timeout,
+     *                   where nobody is singled out.
+     */
+    void CancelProposal(uint32 proposalId, std::set<ObjectGuid> const& culprits);
+
+    /// Cancel proposals nobody answered within LFG_TIME_PROPOSAL.
+    void RemoveOldProposals();
+
+    /// The decline half of ProposalUpdate: work out who is responsible and cancel.
+    void DeclineProposal(ObjectGuid plrGuid, LFGProposal* proposal);
+
+    /**
+     * @brief The key of the queue entry that LISTS this player.
+     *
+     * After a merge an absorbed player has no entry under their own guid -- MergeGroups
+     * folds them into the absorbing entry and erases theirs -- so anything keyed on the
+     * player's own guid silently misses them.
+     *
+     * @return the entry key, or an empty guid if the player is not queued anywhere.
+     */
+    ObjectGuid FindQueueEntryContaining(ObjectGuid plrGuid) const;
+
+    /// Is there a proposal still awaiting this player's answer? Authoritative, unlike
+    /// the LFG_STATE_PROPOSAL status flag, which several paths can leave stale.
+    bool HasLiveProposalFor(ObjectGuid plrGuid) const;
+
+    /// Cancel every live proposal listing this player, counting them as the culprit.
+    /// Used when they leave the finder while a proposal is still open.
+    void CancelProposalsFor(ObjectGuid plrGuid);
+
+    /**
+     * @brief Take a single player out of whichever queue entry holds them, recomputing
+     *        that entry's needed roles, and drop the entry if it is left empty.
+     */
+    void RemovePlayerFromQueue(ObjectGuid plrGuid);
+
+    /// Does this queue entry contain at least one game master? Scopes `.debug dungeon`.
+    bool EntryHasGameMaster(LFGPlayers const* entry) const;
 
     /**
      * @brief Add the player or group to the Dungeon Finder queue
@@ -872,6 +1463,82 @@ public:
 
     /// Send a periodic status update for queued players
     void SendQueueStatus();
+    void SendQueueStatusFor(ObjectGuid queueGuid, time_t timeNow);
+
+    /// Non-zero, stable per queue entry, monotonic. See LFGPlayers::ticketId.
+    uint32 AllocateTicketId() { return ++m_nextTicketId; }
+
+    /// The ticket a player's status bodies have been going out under.
+    ///
+    /// The client files each status body under a 20-byte RideTicket and looks records up
+    /// by comparing it whole, so every body about one queue MUST carry the same one. If a
+    /// later body carries a different ticket the client creates a second record instead of
+    /// updating the first, and the first can never be addressed again. Re-deriving the
+    /// ticket from live state cannot guarantee that: the entry may have been erased (a
+    /// merge folds an absorbed queuer's entry away) or not yet stored.
+    struct RetainedTicket
+    {
+        uint32 id = 0;
+        uint32 time = 0;
+    };
+    typedef std::unordered_map<ObjectGuid, RetainedTicket> retainedTicketMap;
+
+    /// FIRST WINS. Once a player's bodies have gone out under a ticket, every later body
+    /// about that queue must carry the same one or the client files a second record.
+    ///
+    /// Overwriting would reintroduce the very failure this exists to stop: MergeGroups
+    /// erases an absorbed solo queuer's entry, after which GetStatusPacketData falls back
+    /// to whichever entry now LISTS them -- the absorbing one -- and hands back a stranger's
+    /// ticket. Adopting it would strand that player's own join record for good.
+    ///
+    /// Cleared by ForgetTicket when the queue genuinely ends, so the next join starts fresh.
+    void RetainTicket(ObjectGuid plrGuid, uint32 id, uint32 time)
+    {
+        if (!id)
+        {
+            return;
+        }
+
+        RetainedTicket& t = m_retainedTickets[plrGuid];
+        if (!t.id)
+        {
+            t.id = id;
+            t.time = time;
+        }
+    }
+
+    bool GetRetainedTicket(ObjectGuid plrGuid, RetainedTicket& out) const
+    {
+        retainedTicketMap::const_iterator it = m_retainedTickets.find(plrGuid);
+        if (it == m_retainedTickets.end() || !it->second.id)
+        {
+            return false;
+        }
+        out = it->second;
+        return true;
+    }
+
+    void ForgetTicket(ObjectGuid plrGuid) { m_retainedTickets.erase(plrGuid); }
+
+    /// Start a NEW queue for this player: overwrite whatever was retained.
+    ///
+    /// Ticket lifetime is tied to the QUEUE ENTRY, not to any packet. Dropping it when a
+    /// leave body goes out looked right and is not: the accept path also sends
+    /// LFG_UPDATE_LEAVE (the player left the queue, not the session), so the ticket went
+    /// away while the client's record was still live, and every later body -- including
+    /// the ones answering the player's own Leave Queue clicks -- had nothing to quote and
+    /// went out with ticketId = 0. The client cannot file those against any record, so the
+    /// eye stayed lit however many times it was clicked. Observed live at 11:31:09 with
+    /// five such refusals in a row.
+    ///
+    /// Overwriting here is safe precisely because it happens when a new entry is built:
+    /// the old queue is over, and the new one owns the player's records from now on.
+    void BeginTicket(ObjectGuid plrGuid, uint32 id, uint32 time)
+    {
+        RetainedTicket& t = m_retainedTickets[plrGuid];
+        t.id = id;
+        t.time = time;
+    }
 
     /// Role-Related Functions
 
@@ -885,7 +1552,16 @@ public:
     void PerformRoleCheck(Player* pPlayer, Group* pGroup, uint8 roles);
 
     /// Make sure role selections are okay
-    bool ValidateGroupRoles(roleMap groupMap);
+    bool ValidateGroupRoles(roleMap groupMap, std::set<uint32> const& dungeonList);
+
+    /**
+     * @brief Can every player fill exactly one of the roles they ticked, within the
+     *        role counts the dungeon's own DBC row asks for?
+     *
+     * Handles multi-role selections: the client offers four independent checkboxes,
+     * so a mask carrying tank|damage is a player willing to be either.
+     */
+    bool RolesAreValidForDungeons(roleMap const& roles, std::set<uint32> const& dungeonList);
 
     /// Proposal-Related Functions
 
@@ -896,6 +1572,9 @@ public:
 
     /// Group kick hook
     void AttemptToKickPlayer(Group* pGroup, ObjectGuid guid, ObjectGuid kicker, std::string reason);
+
+    /// Expire boot votes that ran past LFG_TIME_BOOT. An expired vote always fails.
+    void RemoveOldBoots();
 
     // Called when a player votes yes or no on a boot vote
     void CastVote(Player* pPlayer, bool vote);
@@ -919,13 +1598,29 @@ protected:
     bool HasLeaderFlag(roleMap const& roles);
 
     /// Compares two groups/players to see if their role combinations are compatible
-    bool RoleMapsAreCompatible(LFGPlayers* groupOne, LFGPlayers* groupTwo);
+    bool RoleMapsAreCompatible(LFGPlayers* groupOne, LFGPlayers* groupTwo, std::set<uint32> const& compatibleDungeons);
 
     /// Checks whether or not two combinations of players/groups are on the same team (alliance/horde)
     bool MatchesAreOfSameTeam(LFGPlayers* groupOne, LFGPlayers* groupTwo);
 
     /// Are the players in a proposal already grouped up?
-    bool IsProposalSameGroup(LFGProposal const& proposal);
+    /// Is this a finder group whose run is still live?
+    ///
+    /// GROUPTYPE_LFD is never cleared anywhere, so membership alone also matches a
+    /// finished run whose party stayed together -- hence the state test as well.
+    bool IsLiveLfgRun(Group* pGroup);
+
+    /// The group a proposal must be built INTO, or an empty guid to build a fresh one.
+    ///
+    /// Replaces IsProposalSameGroup, which asked the wrong question: it required EVERY
+    /// member to share one group, so a backfill (a live group plus one solo queuer) always
+    /// answered false and a brand new group was formed -- and with it a brand new instance.
+    /// It was also right to refuse a plain world premade, which this preserves: only a LIVE
+    /// FINDER RUN is continued, never an ordinary party.
+    ///
+    /// outLiveRuns > 1 means the matchmaker merged two live runs, which must not happen:
+    /// every fork treats that as hard-incompatible. Callers refuse rather than pick one.
+    ObjectGuid ResolveContinuingGroup(roleMap const& members, uint32& outLiveRuns);
 
     /// Update a proposal after a player refused to join
     void ProposalDeclined(ObjectGuid guid, LFGProposal* proposal);
@@ -937,7 +1632,13 @@ protected:
     void CreateDungeonGroup(LFGProposal* proposal);
 
     /// Sends a group to the dungeon assigned to them
-    void TeleportToDungeon(uint32 dungeonID, Group* pGroup);
+    /// Teleport into the dungeon. Passing onlyPlayer restricts the move to that
+    /// member while still resolving the destination from the whole group; NULL
+    /// moves every eligible member, which is what a proposal accept needs.
+    void TeleportToDungeon(uint32 dungeonID, Group* pGroup, Player* onlyPlayer = NULL);
+
+    /// Grant a completion reward item, mailing whatever does not fit in the bags.
+    void GiveDungeonRewardItem(Player* pPlayer, uint32 itemId, uint32 amount);
 
     /**
      * @brief Merges two players/groups/etc into one for dungeon assignment.
@@ -949,7 +1650,7 @@ protected:
     void MergeGroups(ObjectGuid guidOne, ObjectGuid guidTwo, std::set<uint32> compatibleDungeons);
 
     /// Send a proposal to each member of a group
-    void SendDungeonProposal(LFGPlayers* lfgGroup);
+    void SendDungeonProposal(ObjectGuid queueGuid, LFGPlayers* lfgGroup);
 
     /// Tell a group member that someone else just confirmed their role
     void SendRoleChosen(ObjectGuid plrGuid, ObjectGuid confirmedGuid, uint8 roles);
@@ -961,7 +1662,7 @@ protected:
     void SendLfgUpdate(ObjectGuid plrGuid, LFGPlayerStatus status, bool isGroup);
 
     /// Send SMSG_LFG_JOIN_RESULT
-    void SendLfgJoinResult(ObjectGuid plrGuid, LfgJoinResult result, LFGState state, partyForbidden const& lockedDungeons);
+    void SendLfgJoinResult(ObjectGuid plrGuid, LfgJoinResult result, uint8 detail, partyForbidden const& lockedDungeons);
 
     /// Get rid of expired role checks
     void RemoveOldRoleChecks();
@@ -976,6 +1677,8 @@ private:
     /// General info related to joining / leaving the dungeon finder
     playerData m_playerData;
     queueSet   m_queueSet;
+    uint32     m_nextTicketId;
+    retainedTicketMap m_retainedTickets;
 
     /// Dungeon Finder Status for players
     playerStatusMap m_playerStatusMap;
@@ -997,6 +1700,7 @@ private:
 
     /// Proposal information
     uint32 m_proposalId;
+    LFGDebugMode m_debugMode = LFG_DEBUG_OFF;
     proposalMap m_proposalMap;
 };
 

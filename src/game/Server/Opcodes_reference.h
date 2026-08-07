@@ -1575,7 +1575,7 @@ typedef uint16_t uint16;
  *   CMSG_INSPECT_RATED_BG_STATS                    0x0882  DORMANT
  *   CMSG_RAID_TARGET_UPDATE                        0x0886  ACTIVE
  *   CMSG_UNKNOWN_0x0896                            0x0896  DOC
- *   CMSG_LFG_SET_ROLES                             0x08A2  DORMANT
+ *   CMSG_LFG_SET_ROLES                             0x08A2  REGISTERED
  *   CMSG_RANDOM_ROLL                               0x08A3  DOC
  *   CMSG_REORDER_CHARACTERS                        0x08A7  DORMANT
  *   CMSG_MESSAGECHAT_ADDON_INSTANCE                0x08AF  ACTIVE
@@ -1877,7 +1877,7 @@ typedef uint16_t uint16;
  *   CMSG_UPDATE_CLIENT_SETTINGS                    0x1D8D  DOC
  *   CMSG_CALENDAR_EVENT_INVITE                     0x1D8E  DORMANT
  *   CMSG_UNKNOWN_0x1D9B                            0x1D9B  DOC
- *   CMSG_LFG_PROPOSAL_RESPONSE                     0x1D9D  DORMANT
+ *   CMSG_LFG_PROPOSAL_RESPONSE                     0x1D9D  REGISTERED
  *   CMSG_LF_GUILD_SET_GUILD_POST                   0x1D9F  DOC
  *   CMSG_QUEST_NPC_QUERY                           0x1DAE  ACTIVE
  *   CMSG_UNKNOWN_0x1DB9                            0x1DB9  DOC

@@ -4225,7 +4225,38 @@ void Player::HandleStealthedUnitsDetection()
             if (!hasAtClient)
             {
                 ObjectGuid i_guid = (*i)->GetObjectGuid();
-                (*i)->SendCreateUpdateToPlayer(this);
+
+                // Only record the object as known once the create block has ACTUALLY gone
+                // out. SendCreateUpdateToPlayer returns false when no block could be built
+                // -- BuildCreateUpdateBlockForPlayer bails on !CanBuildMopCreateUpdate(),
+                // which rejects vehicles, boarded units, units on a transport and units
+                // carrying optional movement extras -- and this site used to discard that
+                // result and insert the guid regardless.
+                //
+                // The consequence is not a missing object, it is a POISONED one. With the
+                // guid in m_clientGUIDs, HaveAtClient() reports true, so
+                // WorldObjectChangeAccumulator builds VALUES update blocks for an object the
+                // client was never given. The 18414 client resolves the guid in that block
+                // (ObjectMgrClient.cpp, block type 0 -> sub_79DE32), finds nothing, and
+                // replies CMSG_OBJECT_UPDATE_FAILED naming the guid. It then skips the block
+                // (sub_79BC10 walks the update mask, discards the fields and returns 1, so
+                // the caller does not break) and carries on with the packet -- the damage is
+                // confined to that one object, but it is permanent: nothing ever removes the
+                // guid from m_clientGUIDs, so no create is ever sent again and the player
+                // stays invisible to that client until they zone.
+                //
+                // Observed live 2026-08-06: four of five clients in one instance each sent
+                // CMSG_OBJECT_UPDATE_FAILED 17 times, naming player guids 1 and 6 and a pet
+                // (0xF140000400000001) -- exactly the characters reported invisible while
+                // still showing on the minimap. It surfaces as the party frame's "phasing"
+                // icon because UnitInPhase is not a phase test at all: it returns false when
+                // the client simply has no object for that member.
+                //
+                // The other two insert sites already guard this way; this one did not.
+                if (!(*i)->SendCreateUpdateToPlayer(this))
+                {
+                    continue;
+                }
                 m_clientGUIDs.insert(i_guid);
 
                 DEBUG_FILTER_LOG(LOG_FILTER_VISIBILITY_CHANGES, "%s is detected in stealth by player %u. Distance = %f", i_guid.GetString().c_str(), GetGUIDLow(), GetDistance(*i));

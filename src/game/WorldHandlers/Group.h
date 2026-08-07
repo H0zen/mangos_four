@@ -333,6 +333,60 @@ namespace MopLfgLeavePackets
     bool ParseRequest(WorldPacket& in, Request& out);
 }
 
+namespace MopLfgSetRolesPackets
+{
+    /// A parsed CMSG_LFG_SET_ROLES body.
+    ///
+    /// Derived from the client's own body writer sub_6688D0 -- vtable slot 1 behind the
+    /// opcode thunk sub_6615FE, which writes 2210 (0x08A2). It emits exactly two fields
+    /// and nothing else:
+    ///
+    ///     sub_40F075(pkt, *(uint32*)(this + 16));   // WriteUInt32 -- the role mask
+    ///     sub_40F018(pkt, *(uint8 *)(this + 20));   // WriteUInt8  -- role check counter
+    ///
+    /// Flat: no bit packing and no GUID, so there is nothing to XOR or reorder. All 99
+    /// build-18414 captures in the corpus are exactly 5 bytes, which agrees.
+    struct Request
+    {
+        /// Bitmask, NOT an enum. The LFD frame's four checkboxes are independent, so a
+        /// player offering tank-or-damage sends 0x0A -- observed on the wire in
+        /// capture-000112 seq 90341.
+        uint32 roles = 0;
+
+        /// Echoed back by the client; carries no authority server-side.
+        uint8 roleCheckCounter = 0;
+    };
+
+    bool ParseRequest(WorldPacket& in, Request& out);
+}
+
+namespace MopLfgProposalResponsePackets
+{
+    /// A parsed CMSG_LFG_PROPOSAL_RESPONSE body.
+    ///
+    /// Derived from the client's own body writer sub_66A29E -- vtable slot 1 behind the
+    /// opcode thunk sub_6622E8, which writes 7581 (0x1D9D). GUID A lives at this+24..31
+    /// and GUID B at this+48..55.
+    ///
+    /// Everything except `accepted` is an echo of the SMSG_LFG_PROPOSAL_UPDATE the
+    /// server sent: capture-000059 seq 2063770 echoes proposalId 11132, clientQueueId
+    /// 37743, flags 3 and joinTime 1409232359 straight back from seq 2063424 in the same
+    /// capture, along with both GUIDs. None of it is authority -- the server answers on
+    /// behalf of the CALLER and keys on its own proposal id.
+    struct Request
+    {
+        ObjectGuid guidA;           // the sender's group, or the sender
+        ObjectGuid guidB;           // instance-side GUID; echoed, never trusted
+        uint32 proposalId = 0;
+        uint32 clientQueueId = 0;
+        uint32 flags = 0;
+        uint32 joinTime = 0;
+        bool accepted = false;
+    };
+
+    bool ParseRequest(WorldPacket& in, Request& out);
+}
+
 namespace MopGroupMarkerPackets
 {
     struct MinimapPingRequest
@@ -1271,8 +1325,25 @@ enum GroupUpdateFlags
         GROUP_UPDATE_FLAG_ZONE |
         GROUP_UPDATE_FLAG_POSITION |
         GROUP_UPDATE_FLAG_AURAS |
-        GROUP_UPDATE_FLAG_VEHICLE_SEAT |
-        GROUP_UPDATE_FLAG_PHASE,
+        GROUP_UPDATE_FLAG_VEHICLE_SEAT,
+        // GROUP_UPDATE_FLAG_PHASE is deliberately NOT advertised.
+        //
+        // The writer for it is a stub: it emits a hardcoded `uint32(8)` and an EMPTY phase
+        // list, every time, for every player, regardless of their actual phase. The client
+        // reads that as "this member shares no phases with you", so
+        // PartyMemberFrame_UpdateNotPresentIcon takes its `not UnitInPhase(partyID)` branch
+        // and paints the phasing icon over a party member standing right next to you.
+        //
+        // Because the stats packet is built per member per recipient, the icon appeared on
+        // different members on different clients. Observed live 2026-08-06 21:16 with a
+        // five-man group all inside instance 2 of Wailing Caverns, whose SMSG_GROUP_LIST
+        // was byte-identical (121 bytes) on all five sessions -- so the roster agreed and
+        // only the phase claim did not.
+        //
+        // Sending nothing is both truthful and safer: with the flag clear the client keeps
+        // its default, which is in-phase. Restore this the day the core actually models
+        // phases and the writer reports a real phase mask; the writer itself is left in
+        // place for exactly that.
 };
 
 class Roll : public LootValidatorRef
@@ -1435,7 +1506,10 @@ class Group
         }
 
         // member manipulation methods
-        void SetAsLfgGroup() { m_groupType = GroupType(m_groupType | GROUPTYPE_LFD); }
+        /// Flag this group as a dungeon finder group AND persist it. Defined out of line
+        /// because it writes to `groups`.`groupType` -- see the definition for why.
+        void SetAsLfgGroup();
+        void ClearLfgGroup();
         bool IsMember(ObjectGuid guid) const
         {
             return _getMemberCSlot(guid) != m_memberSlots.end();

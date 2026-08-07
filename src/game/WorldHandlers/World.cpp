@@ -743,7 +743,16 @@ void World::SetInitialWorldSettings()
     m_timers[WUPDATE_AHBOT].SetInterval(20 * IN_MILLISECONDS); // every 20 sec
 
     // for Dungeon Finder
-    m_timers[WUPDATE_LFGMGR].SetInterval(30 * IN_MILLISECONDS); // every 30 sec
+    // 5 seconds, not 30. SMSG_LFG_QUEUE_STATUS is the only periodic LFG packet retail
+    // sends and its period is a hard 5000 ms: across 1283 one-beat intervals in
+    // millisecond-resolution captures the mean is 4999.7 ms, and long-run drift settles
+    // it (capture-000873: 1258 beats over 6,289,554 ms = 4999.98 ms/beat). The 10/15/20 s
+    // gaps that appear are exact multiples -- dropped sniff frames -- and the payload's
+    // own queuedTime still advances by exactly 5 across them, so the server never missed
+    // a beat. At 30 s the queue UI updated six times slower than the client expects, and
+    // matchmaking, role-check expiry and proposal expiry were all equally coarse because
+    // this one timer gates them together.
+    m_timers[WUPDATE_LFGMGR].SetInterval(5 * IN_MILLISECONDS);
 
     // for AutoBroadcast
     sLog.outString("Starting AutoBroadcast System");
@@ -1161,6 +1170,21 @@ void World::Update(uint32 diff)
     {
         m_timers[WUPDATE_DELETECHARS].Reset();
         Player::DeleteOldCharacters();
+    }
+
+    ///- Match queued dungeon finder entries and expire stale role checks.
+    //
+    // The WUPDATE_LFGMGR timer was configured at startup but never consumed, so
+    // LFGMgr::Update had no caller anywhere in the tree: players could join the queue
+    // and nothing ever looked at it again. Ticking it is deliberately the LAST step of
+    // the dungeon finder work, not the first, because everything it reaches had to be
+    // correct before it ran -- the reaper it calls first erased while iterating, the
+    // matchmaker it calls next could not form a group under any input, and the proposal
+    // it can now send read two uninitialised members to choose a branch.
+    if (m_timers[WUPDATE_LFGMGR].Passed())
+    {
+        m_timers[WUPDATE_LFGMGR].Reset();
+        sLFGMgr.Update();
     }
 
     // execute callbacks from sql queries that were queued recently

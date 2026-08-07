@@ -221,6 +221,10 @@ void InitializeOpcodes()
     // We have no Store backend, so we answer the same thing retail answers a player who has
     // bought nothing -- an empty list -- rather than dropping the request on the floor.
     DefC(CMSG_BATTLE_PAY_GET_PURCHASE_LIST, "CMSG_BATTLE_PAY_GET_PURCHASE_LIST", STATUS_AUTHED, PROCESS_INPLACE, &WorldSession::HandleBattlePayGetPurchaseListOpcode);
+    // Its partner: the client sends both on login, one after the other. We answered
+    // the purchase list and left this one to fall through as "UNKNOWN (0x0DE0)" in
+    // the log, which is noise that masks a genuinely unrecognised opcode.
+    DefC(CMSG_BATTLE_PAY_GET_PRODUCT_LIST, "CMSG_BATTLE_PAY_GET_PRODUCT_LIST", STATUS_AUTHED, PROCESS_INPLACE, &WorldSession::HandleBattlePayGetProductListOpcode);
     DefS(SMSG_BATTLE_PAY_GET_PURCHASE_LIST_RESPONSE, "SMSG_BATTLE_PAY_GET_PURCHASE_LIST_RESPONSE");
 
     // The character-creation randomise button. CharacterCreate.lua's RequestRandomName()
@@ -579,6 +583,13 @@ void InitializeOpcodes()
     DefC(CMSG_SETSHEATHED, "CMSG_SETSHEATHED", STATUS_LOGGEDIN, PROCESS_THREADUNSAFE, &WorldSession::HandleSetSheathedOpcode);
     DefC(CMSG_SET_SELECTION, "CMSG_SET_SELECTION", STATUS_LOGGEDIN, PROCESS_THREADUNSAFE, &WorldSession::HandleSetSelectionOpcode);
     DefC(CMSG_STANDSTATECHANGE, "CMSG_STANDSTATECHANGE", STATUS_LOGGEDIN, PROCESS_THREADUNSAFE, &WorldSession::HandleStandStateChangeOpcode);
+    // The client reporting that it could not build an object we sent a VALUES
+    // update for. Body is a packed GUID; the 18414 writer is the packet class at
+    // off_D65304, whose header virtual sub_690E2A writes 4193 and whose body
+    // virtual sub_694863 emits mask 3,5,6,0,1,2,7,4 then bytes 0,6,5,7,2,1,3,4.
+    // Not present anywhere in the corpus, because a retail server does not
+    // provoke it. Ours does, so it is the only signal naming a broken object.
+    DefC(CMSG_OBJECT_UPDATE_FAILED, "CMSG_OBJECT_UPDATE_FAILED", STATUS_LOGGEDIN, PROCESS_THREADUNSAFE, &WorldSession::HandleObjectUpdateFailedOpcode);
     DefS(SMSG_STANDSTATE_UPDATE, "SMSG_STANDSTATE_UPDATE");
     DefC(CMSG_ATTACKSWING, "CMSG_ATTACKSWING", STATUS_LOGGEDIN, PROCESS_THREADUNSAFE, &WorldSession::HandleAttackSwingOpcode);
     // Body recovered from decoded 18414 corpus payloads, not from size
@@ -804,6 +815,8 @@ void InitializeOpcodes()
 
     // Empty 18414 status refresh request. The handler replies through the
     // already-converted unified SMSG_LFG_UPDATE_STATUS body.
+    DefC(CMSG_LFG_SET_ROLES, "CMSG_LFG_SET_ROLES", STATUS_LOGGEDIN, PROCESS_THREADUNSAFE, &WorldSession::HandleLfgSetRolesOpcode);
+    DefC(CMSG_LFG_PROPOSAL_RESPONSE, "CMSG_LFG_PROPOSAL_RESPONSE", STATUS_LOGGEDIN, PROCESS_THREADUNSAFE, &WorldSession::HandleLfgProposalResponseOpcode);
     DefC(CMSG_LFG_GET_STATUS, "CMSG_LFG_GET_STATUS", STATUS_LOGGEDIN, PROCESS_THREADUNSAFE, &WorldSession::HandleLfgGetStatusOpcode);
 
     // Direct 18414 LFR-browser request and empty full-replacement response.
@@ -913,6 +926,14 @@ void InitializeOpcodes()
     // Wave 9 name query request and response.
     DefC(CMSG_NAME_QUERY, "CMSG_NAME_QUERY", STATUS_LOGGEDIN, PROCESS_THREADUNSAFE, &WorldSession::HandleNameQueryOpcode);
     DefS(SMSG_NAME_QUERY_RESPONSE, "SMSG_NAME_QUERY_RESPONSE");
+
+    // The /who list. Both bodies were rebuilt for 18414 -- see MopWhoPackets for the
+    // layouts and the captures they were verified against. HandleWhoOpcode has existed
+    // all along but was never registered, so /who has always been silent; registering
+    // it against the old 3.3.5 reader would have been worse than silence, which is why
+    // the reader was rewritten first.
+    DefC(CMSG_WHO, "CMSG_WHO", STATUS_LOGGEDIN, PROCESS_THREADUNSAFE, &WorldSession::HandleWhoOpcode);
+    DefS(SMSG_WHO, "SMSG_WHO");
 
     // Realm-name query. The 18414 client fires this from its name-cache path when a
     // queried character's realm is not yet in its RealmCache; until it is answered the
@@ -1128,6 +1149,28 @@ void InitializeOpcodes()
 
     // Direct 18414 leaf: periodic queue wait estimates and role vacancies.
     DefS(SMSG_LFG_QUEUE_STATUS, "SMSG_LFG_QUEUE_STATUS");
+    DefS(SMSG_LFG_JOIN_RESULT, "SMSG_LFG_JOIN_RESULT");
+    // 4-byte body, a single packed dungeon entry -- see WorldSession::SendLfgOfferContinue.
+    DefS(SMSG_LFG_OFFER_CONTINUE, "SMSG_LFG_OFFER_CONTINUE");
+    DefS(SMSG_LFG_PROPOSAL_UPDATE, "SMSG_LFG_PROPOSAL_UPDATE");
+    DefS(SMSG_LFG_ROLE_CHECK_UPDATE, "SMSG_LFG_ROLE_CHECK_UPDATE");
+    DefS(SMSG_LFG_TELEPORT_DENIED, "SMSG_LFG_TELEPORT_DENIED");
+    // Body is a single MSB-first bit (0x80 out, 0x00 in) -- see HandleLfgTeleportOpcode.
+    DefC(CMSG_LFG_TELEPORT, "CMSG_LFG_TELEPORT", STATUS_LOGGEDIN, PROCESS_THREADUNSAFE, &WorldSession::HandleLfgTeleportOpcode);
+    // Vote on an in-progress kick. Body is a single MSB-first bit and nothing else:
+    // the 18414 writer sub_688B4B (packet class vtable 0xD63364, header virtual
+    // sub_661F56 writing 6078) is exactly WriteBit(agree) + FlushBits. The client
+    // does not say WHICH boot -- the session identifies the voter and the voter's
+    // group identifies the vote.
+    DefC(CMSG_LFG_BOOT_PLAYER_VOTE, "CMSG_LFG_BOOT_PLAYER_VOTE", STATUS_LOGGEDIN, PROCESS_THREADUNSAFE, &WorldSession::HandleLfgBootPlayerVoteOpcode);
+    // The role-check confirmation each member receives as others answer. Layout from
+    // the 18414 reader sub_6E921A (handler 0x985605): nine mask bits whose SIXTH is
+    // `accepted` rather than a guid bit, then guid bytes 0,3,6, the roles dword, then
+    // 5,1,4,2,7. Confirmed against eight corpus packets across seven captures.
+    DefS(SMSG_ROLE_CHOSEN, "SMSG_ROLE_CHOSEN");
+    // Completion reward. Meanings from the consumer at 0x989771 and Lua sub_986CDD;
+    // field order from 13 corpus payloads that decode with zero leftover.
+    DefS(SMSG_LFG_PLAYER_REWARD, "SMSG_LFG_PLAYER_REWARD");
 
     // Wave 13 talent-respec confirmation request and prompt.
     DefC(CMSG_CONFIRM_RESPEC_WIPE, "CMSG_CONFIRM_RESPEC_WIPE", STATUS_LOGGEDIN, PROCESS_THREADUNSAFE, &WorldSession::HandleTalentWipeConfirmOpcode);
