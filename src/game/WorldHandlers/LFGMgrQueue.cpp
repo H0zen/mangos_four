@@ -49,7 +49,8 @@ void LFGMgr::JoinLFG(uint32 roles, std::set<uint32> dungeons, std::string commen
     //       - see if any of this code/information can be put into a generalized class for other use
     //       - look into splitting this into 2 fns- one for player case, one for group
     Group* pGroup = plr->GetGroup();
-    ObjectGuid guid = (pGroup) ? pGroup->GetObjectGuid() : plr->GetObjectGuid();
+    ObjectGuid const playerGuid = plr->GetObjectGuid();
+    ObjectGuid guid = (pGroup) ? pGroup->GetObjectGuid() : playerGuid;
     // Assigned only on the random-dungeon branch, but read unconditionally
     // further down, so it must not start indeterminate.
     uint32 randomDungeonID = 0; // used later if random dungeon has been chosen
@@ -68,21 +69,24 @@ void LFGMgr::JoinLFG(uint32 roles, std::set<uint32> dungeons, std::string commen
     // relog -- which is exactly what happened when the success path forgot to tear the
     // queue entry down. Asking m_proposalMap directly cannot go stale: if there is no
     // live proposal listing this player, there is nothing to protect.
-    if (HasLiveProposalFor(plr->GetObjectGuid()))
+    if (HasLiveProposalFor(playerGuid))
     {
         partyForbidden noneForbidden;
         plr->GetSession()->SendLfgJoinResult(ERR_LFG_NO_LFG_OBJECT, LFG_JOIN_DETAIL_NONE, noneForbidden);
         return;
     }
 
-    // Keyed on whichever entry LISTS this player, not on their own guid.
-    //
-    // A solo queuer already absorbed into somebody else's entry has no m_playerData
-    // under their own guid, so this lookup missed, the duplicate cleanup below was
-    // skipped, and the solo branch built a SECOND live entry while the merged one still
-    // listed them -- two queue entries for one player, and potentially two proposals.
-    ObjectGuid const existingEntryGuid = pGroup ? guid : FindQueueEntryContaining(guid);
+    // Prefer the party's own live entry. If a merge erased that key, fall back to
+    // whichever entry LISTS this player: player guids sort before group guids, so a
+    // solo entry can absorb a party while still listing every party member.
+    ObjectGuid existingEntryGuid;
+    if (pGroup && GetPlayerOrPartyData(guid))
+        existingEntryGuid = guid;
+    else
+        existingEntryGuid = FindQueueEntryContaining(playerGuid);
+
     LFGPlayers* currentInfo = existingEntryGuid ? GetPlayerOrPartyData(existingEntryGuid) : nullptr;
+    bool replaceQueuedEntry = false;
 
     // check if we actually have info on the player/group right now
     if (currentInfo)
@@ -92,10 +96,10 @@ void LFGMgr::JoinLFG(uint32 roles, std::set<uint32> dungeons, std::string commen
         // are they already queued?
         if (currentInfo->currentState == LFG_STATE_QUEUED)
         {
-            // Take them out of whatever they are in now so they can join this instead.
-            // RemovePlayerFromQueue rather than a bare m_queueSet.erase, because the
-            // entry may be shared with other players who must stay queued.
-            RemovePlayerFromQueue(guid);
+            // Keep the old entry until the replacement selection passes every join gate.
+            // Treat it as absent for the remaining state checks, then end that complete
+            // entry immediately before creating the replacement below.
+            replaceQueuedEntry = true;
             currentInfo = nullptr;
         }
 
@@ -183,12 +187,10 @@ void LFGMgr::JoinLFG(uint32 roles, std::set<uint32> dungeons, std::string commen
             // challenge), 11 and 12 (scenarios) and 14 (flexible) have no internal Difficulty, and
             // 77 of the 343 rows carry one of them.
             //
-            // This is the gate that makes ToInternalDifficulty's negative return mean something.
-            // CreateDungeonGroup runs long after the group has been built and its members pulled out
-            // of their previous groups, so it is far too late to refuse there; all it can do is
-            // substitute REGULAR_DIFFICULTY, which for an LFR row means a 25-player queue entering
-            // the 10-normal tier of the same raid. Refusing at admission returns
-            // ERR_LFG_INVALID_SLOT, which the client reports, and nothing is half-formed.
+            // Admission is the user-facing refusal point and returns ERR_LFG_INVALID_SLOT.
+            // CreateDungeonGroup independently resolves the tier before any group mutation as
+            // a safety backstop, but reaching that backstop means an upstream path bypassed this
+            // validation and cannot provide a normal join-result response.
             if (result == ERR_LFG_OK && ToInternalDifficulty(dungeon->DifficultyID) < 0)
             {
                 result = ERR_LFG_INVALID_SLOT;
@@ -236,26 +238,16 @@ void LFGMgr::JoinLFG(uint32 roles, std::set<uint32> dungeons, std::string commen
                 // because LfgDungeonsEntryfmt was missing its 'n' index marker, so every row read
                 // belonged to a different dungeon.
                 //
-                // With that corrected, this filter removes nothing for any shipped random: each one
-                // expands to a Group_ID whose members are ordinary dungeons carrying raw tier 1 or
-                // 2, both translatable. It is kept as a guard rather than deleted, because the
-                // expansion is driven by DBC content and a future row could carry a tier this core
-                // cannot represent -- but it is a guard, not a load-bearing filter, and it should
-                // not be cited as one.
-                //
-                // What actually stops an untranslatable tier reaching CreateDungeonGroup is the
-                // admission check above. Both the party and solo paths below replace the expanded
-                // set with randomDungeonID alone before the queued LFGPlayers state is built, and
-                // SendDungeonProposal takes *dungeonList.begin() from that, so the proposal always
-                // carries the random row -- which admission has already validated.
-                //
-                // Dropped, not refused: the expansion is a CANDIDATE list, so removing members this
-                // core cannot run leaves random queueing working. No empty-set check follows,
-                // because the admitted random row is itself translatable and always survives.
+                // The category row is identity, not a destination, and is deliberately removed
+                // from the candidate set. This matters for Group_ID 33: category 434 is its only
+                // member, so the result becomes empty and the ordinary no-slots gate below refuses
+                // the replacement while leaving any existing queue entry intact.
                 for (std::set<uint32>::iterator it = dungeons.begin(); it != dungeons.end(); )
                 {
                     LfgDungeonsEntry const* candidate = sLfgDungeonsStore.LookupEntry(*it);
-                    if (!candidate || ToInternalDifficulty(candidate->DifficultyID) < 0)
+                    if (!candidate || candidate->ID == randomDungeonID ||
+                        candidate->TypeID == LFG_TYPE_RANDOM_DUNGEON ||
+                        ToInternalDifficulty(candidate->DifficultyID) < 0)
                     {
                         it = dungeons.erase(it);
                     }
@@ -355,6 +347,61 @@ void LFGMgr::JoinLFG(uint32 roles, std::set<uint32> dungeons, std::string commen
         return;
     }
 
+    if (replaceQueuedEntry)
+    {
+        // End the complete merged entry before building its replacement. The client keys
+        // status records by RideTicket -- requesterGuid, ticketId, ticketTime, ticketType --
+        // so every listed player needs a terminal body while their OLD retained ticket is
+        // still active; BeginTicket below may then safely assign a new ticket to the
+        // members who are re-queueing.
+        //
+        // The WHOLE entry ends, not just the members re-queueing. That deliberately
+        // dequeues a bystander the party had been merged with, which is a real loss of
+        // their queue position. It is the safest available behaviour rather than the
+        // ideal one: MergeGroups collapses provenance -- requested versus candidate
+        // dungeons, random-category identity, per-entry join times and tickets -- so what
+        // survives may no longer represent that player's original queue. Often the merged
+        // selection is a narrowed intersection they did choose, but it can equally carry
+        // a random identity contributed by the other entry. Leaving them on it is a silent
+        // zombie; ending and telling them is honest, and they may queue again. Preserving
+        // them properly means retaining each constituent queue's own selection, candidates,
+        // random identity, role, comment and ticket through MergeGroups and splitting them
+        // back out here -- materially more than rekeying the merged object.
+        if (LFGPlayers const* staleEntry = GetPlayerOrPartyData(existingEntryGuid))
+        {
+            std::vector<ObjectGuid> staleMembers;
+            staleMembers.reserve(staleEntry->currentRoles.size());
+            for (roleMap::const_iterator itr = staleEntry->currentRoles.begin();
+                 itr != staleEntry->currentRoles.end(); ++itr)
+            {
+                staleMembers.push_back(itr->first);
+            }
+
+            for (std::vector<ObjectGuid>::const_iterator itr = staleMembers.begin();
+                 itr != staleMembers.end(); ++itr)
+            {
+                LFGPlayerStatus staleStatus = GetPlayerStatus(*itr);
+                staleStatus.updateType = LFG_UPDATE_LEAVE;
+                staleStatus.state = LFG_STATE_NONE;
+
+                if (Player* stalePlayer = sObjectAccessor.FindPlayer(*itr))
+                {
+                    // Current grouping is only the compatibility fallback. SendLfgUpdate
+                    // uses this member's retained requester, id and time when available, so
+                    // both announced-solo-then-grouped and announced-group-then-left records
+                    // are closed under the identity the client actually knows.
+                    SendLfgUpdate(*itr, staleStatus, stalePlayer->GetGroup() != NULL);
+                }
+
+                m_playerStatusMap.erase(*itr);
+            }
+        }
+
+        m_queueSet.erase(existingEntryGuid);
+        m_playerData.erase(existingEntryGuid);
+        m_playerStatusMap.erase(existingEntryGuid); // no-op unless the key is a player's
+    }
+
     if (pGroup)
     {
         ObjectGuid leaderGuid = pGroup->GetLeaderGuid();
@@ -416,6 +463,7 @@ void LFGMgr::JoinLFG(uint32 roles, std::set<uint32> dungeons, std::string commen
 
         LFGPlayers groupInfo(LFG_STATE_NONE, dungeons, roleCheck.currentRoles, comments, false, time(NULL), 0, 0, 0);
         groupInfo.candidateDungeons = candidates;
+        groupInfo.randomDungeonID = randomDungeonID;
         groupInfo.ticketId = AllocateTicketId();
         m_playerData[guid] = groupInfo;
 
@@ -424,7 +472,7 @@ void LFGMgr::JoinLFG(uint32 roles, std::set<uint32> dungeons, std::string commen
         {
             if (Player* pGroupPlr = itr->getSource())
             {
-                BeginTicket(pGroupPlr->GetObjectGuid(), groupInfo.ticketId, uint32(groupInfo.joinedTime));
+                BeginTicket(pGroupPlr->GetObjectGuid(), guid, groupInfo.ticketId, uint32(groupInfo.joinedTime));
                 // Where each member gets returned to. Per-player, taken here and never again.
                 RecordEntryPoint(pGroupPlr);
             }
@@ -434,16 +482,11 @@ void LFGMgr::JoinLFG(uint32 roles, std::set<uint32> dungeons, std::string commen
         {
             if (Player* pGroupPlr = itr->getSource())
             {
-                // ROLECHECK, not NONE -- the update used to announce the join while
-                // reporting the state as NONE, correcting it only for the stored copy.
-                //
-                // Reason 24, not 6: 6 is retail's re-queue-from-inside-a-dungeon reason
-                // (257 of 276 observed joins open with 24 and none with 6), and BOTH 6 and
-                // 13 make the client display ERR_LFG_JOINED_QUEUE.
+                // Stage the reason-24 opener, but do not send it during the role check.
+                // Retail answers the leader's CMSG_LFG_JOIN with the role-check update;
+                // only when every role is accepted does PerformRoleCheck emit the
+                // 24, 13, JOIN_RESULT, 13 completion burst.
                 LFGPlayerStatus overallStatus(LFG_STATE_ROLECHECK, LFG_UPDATE_JOIN_QUEUE_INITIAL, dungeons, comments);
-
-                pGroupPlr->GetSession()->SendLfgUpdate(true, overallStatus);
-
                 m_playerStatusMap[pGroupPlr->GetObjectGuid()] = overallStatus;
             }
         }
@@ -477,9 +520,10 @@ void LFGMgr::JoinLFG(uint32 roles, std::set<uint32> dungeons, std::string commen
 
         LFGPlayers playerInfo(LFG_STATE_QUEUED, dungeons, playerRole, comments, false, time(NULL), 0, 0, 0);
         playerInfo.candidateDungeons = candidates;
+        playerInfo.randomDungeonID = randomDungeonID;
         playerInfo.ticketId = AllocateTicketId();
         m_playerData[guid] = playerInfo;
-        BeginTicket(guid, playerInfo.ticketId, uint32(playerInfo.joinedTime));
+        BeginTicket(guid, guid, playerInfo.ticketId, uint32(playerInfo.joinedTime));
         // Where this player gets returned to. Taken here and never again -- see RecordEntryPoint.
         RecordEntryPoint(plr);
 

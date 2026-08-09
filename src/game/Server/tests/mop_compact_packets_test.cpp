@@ -2168,6 +2168,29 @@ static void test_can_fly_family_matches_retail_bodies()
     }
 }
 
+static void test_instance_reset_result_bodies()
+{
+    WorldPacket success(SMSG_INSTANCE_RESET, 4);
+    MopCompactPackets::BuildInstanceResetSuccess(success, 0x11223344u);
+    CHECK(BytesEqual(success, { 0x44, 0x33, 0x22, 0x11 }));
+
+    CHECK(MopCompactPackets::SelectInstanceResetFailureReason(false) ==
+          MopCompactPackets::INSTANCE_RESET_FAILURE_PLAYERS_INSIDE);
+    CHECK(MopCompactPackets::SelectInstanceResetFailureReason(true) ==
+          MopCompactPackets::INSTANCE_RESET_FAILURE_PLAYERS_OFFLINE);
+
+    WorldPacket failed(SMSG_INSTANCE_RESET_FAILED, 8);
+    MopCompactPackets::BuildInstanceResetFailed(
+        failed, MopCompactPackets::INSTANCE_RESET_FAILURE_PLAYERS_INSIDE,
+        0x11223344u);
+    CHECK(BytesEqual(failed, { 0x02, 0x00, 0x00, 0x00,
+                               0x44, 0x33, 0x22, 0x11 }));
+
+    WorldPacket notify(SMSG_RESET_FAILED_NOTIFY, 0);
+    MopCompactPackets::BuildResetFailedNotify(notify);
+    CHECK(BytesEqual(notify, {}));
+}
+
 
 int main(int /*argc*/, char** /*argv*/)
 {
@@ -2203,6 +2226,7 @@ int main(int /*argc*/, char** /*argv*/)
     test_guild_banker_activate_rejects_malformed_bodies();
     test_pre_resurrect_packet();
     test_combo_points_packet();
+    test_instance_reset_result_bodies();
 
     if (g_fail)
     {

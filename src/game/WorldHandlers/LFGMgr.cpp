@@ -33,6 +33,7 @@
 #include "GameEventMgr.h"
 #include "Group.h"
 #include "LFGMgr.h"
+#include "LFGStatePolicy.h"
 #include "Object.h"
 #include "Player.h"
 #include "ObjectAccessor.h"
@@ -938,6 +939,14 @@ bool LFGMgr::TryFormGroup(ObjectGuid guid)
         return false;   // no longer complete; stays queued and keeps looking
     }
 
+    // Construct the whole proposal while the entry is still queued. Every refusal in
+    // SendDungeonProposal occurs before player/proposal state or packets change, so a
+    // category with no concrete destination remains an intact queue entry here.
+    if (!SendDungeonProposal(guid, entry))
+    {
+        return false;
+    }
+
     // Out of the MATCH set, but the entry itself stays. Leaving it in m_queueSet would
     // have it matched again next tick and fire a fresh proposal -- and a new
     // SMSG_LFG_PROPOSAL_UPDATE -- every tick forever. Keeping m_playerData is what lets
@@ -945,8 +954,6 @@ bool LFGMgr::TryFormGroup(ObjectGuid guid)
     // ejecting them from the dungeon finder.
     m_queueSet.erase(guid);
     entry->currentState = LFG_STATE_PROPOSAL;
-
-    SendDungeonProposal(guid, entry);
     return true;
 }
 
@@ -990,24 +997,17 @@ void LFGMgr::CancelProposal(uint32 proposalId, std::set<ObjectGuid> const& culpr
             entry->currentRoles.erase(*bad);
         }
 
-        // isGroup derived from how this member was ANNOUNCED, not hardcoded false.
-        //
-        // The client files each status body under the whole 20-byte RideTicket, and
-        // SendLfgUpdate picks requesterGuid from this flag. A party-owned queue announced
-        // its opening bodies group-keyed (reason 24 at LFGMgrQueue.cpp, reason 14 at
-        // SendDungeonProposal), so closing with false carried a DIFFERENT ticket: the
-        // client created a second record and left the first at joined = 1, queued = 0,
-        // which UIParent.lua:3932 reports as "suspended" -- the eye stuck until relog.
-        // This is the mainline path for an ordinary decline.
-        //
-        // proposal.groups records exactly how each member was announced, so it is the
-        // authority here.
+        // The retained ticket is authoritative: requesterGuid is part of the client's
+        // record key and current group membership may have changed since the opening body.
+        // proposal.groups supplies only the compatibility fallback for a path lacking a
+        // retained ticket; reducing its exact group guid to a bool is not an authority.
         playerGroupMap::const_iterator badGroup = proposal.groups.find(*bad);
-        bool const badWasGroupKeyed = badGroup != proposal.groups.end() && badGroup->second;
+        bool const badFallbackWasGroupKeyed =
+            badGroup != proposal.groups.end() && badGroup->second;
 
         SetPlayerState(*bad, LFG_STATE_NONE);
         SetPlayerUpdateType(*bad, LFG_UPDATE_LEAVE);
-        SendLfgUpdate(*bad, GetPlayerStatus(*bad), badWasGroupKeyed);
+        SendLfgUpdate(*bad, GetPlayerStatus(*bad), badFallbackWasGroupKeyed);
 
         m_playerStatusMap.erase(*bad);
 
@@ -1035,11 +1035,12 @@ void LFGMgr::CancelProposal(uint32 proposalId, std::set<ObjectGuid> const& culpr
          role != entry->currentRoles.end(); ++role)
     {
         playerGroupMap::const_iterator roleGroup = proposal.groups.find(role->first);
-        bool const roleWasGroupKeyed = roleGroup != proposal.groups.end() && roleGroup->second;
+        bool const roleFallbackWasGroupKeyed =
+            roleGroup != proposal.groups.end() && roleGroup->second;
 
         SetPlayerState(role->first, LFG_STATE_QUEUED);
         SetPlayerUpdateType(role->first, LFG_UPDATE_ADDED_TO_QUEUE);
-        SendLfgUpdate(role->first, GetPlayerStatus(role->first), roleWasGroupKeyed);
+        SendLfgUpdate(role->first, GetPlayerStatus(role->first), roleFallbackWasGroupKeyed);
     }
 
     // Anyone in the proposal who was neither blamed nor requeued still has an open
@@ -1056,11 +1057,12 @@ void LFGMgr::CancelProposal(uint32 proposalId, std::set<ObjectGuid> const& culpr
         }
 
         playerGroupMap::const_iterator ansGroup = proposal.groups.find(ans->first);
-        bool const ansWasGroupKeyed = ansGroup != proposal.groups.end() && ansGroup->second;
+        bool const ansFallbackWasGroupKeyed =
+            ansGroup != proposal.groups.end() && ansGroup->second;
 
         SetPlayerState(ans->first, LFG_STATE_NONE);
         SetPlayerUpdateType(ans->first, LFG_UPDATE_LEAVE);
-        SendLfgUpdate(ans->first, GetPlayerStatus(ans->first), ansWasGroupKeyed);
+        SendLfgUpdate(ans->first, GetPlayerStatus(ans->first), ansFallbackWasGroupKeyed);
     }
 
     m_queueSet.insert(proposal.queueGuid);
@@ -1087,6 +1089,66 @@ void LFGMgr::CancelProposalsFor(ObjectGuid plrGuid)
         culprit.insert(plrGuid);
         CancelProposal(*it, culprit);
     }
+}
+
+/// End a boot vote and restore every state it touched before dropping its record.
+void LFGMgr::FinishBootVote(ObjectGuid groupGuid, Group* pGroup, LFGBoot boot,
+                            bool removeVictim, bool notify)
+{
+    LFGStatePolicy::BootTerminalPlan const plan =
+        LFGStatePolicy::ResolveBootTerminal(removeVictim, pGroup != NULL);
+
+    boot.inProgress = false;
+
+    // First clear everyone recorded by the vote. A participant may have left by a
+    // path that did not update the live Group roster; such a player is not a dungeon
+    // survivor and must not keep LFG_STATE_BOOT.
+    for (proposalAnswerMap::const_iterator ans = boot.answers.begin();
+         ans != boot.answers.end(); ++ans)
+    {
+        SetPlayerState(ans->first, LFG_STATE_NONE);
+    }
+    SetPlayerState(boot.playerVotedOn, LFG_STATE_NONE);
+
+    if (plan.restoreGroup)
+    {
+        if (LFGGroupStatus* status = GetGroupStatus(groupGuid))
+        {
+            if (status->state == LFG_STATE_BOOT)
+            {
+                status->state = LFG_STATE_IN_DUNGEON;
+                m_groupStatusMap[groupGuid] = *status;
+            }
+        }
+
+        // MemberSlots includes offline members; GroupReference does not. Restore state
+        // from the persisted roster, then use the live references only for notification.
+        for (Group::MemberSlotList::const_iterator member = pGroup->GetMemberSlots().begin();
+             member != pGroup->GetMemberSlots().end(); ++member)
+        {
+            bool const isVictim = member->guid == boot.playerVotedOn;
+            LFGStatePolicy::BootPlayerState const disposition =
+                isVictim ? plan.victim : plan.survivor;
+            LFGState const state = disposition == LFGStatePolicy::BootPlayerState::None
+                    ? LFG_STATE_NONE : LFG_STATE_IN_DUNGEON;
+            SetPlayerState(member->guid, state);
+        }
+
+        if (notify)
+        {
+            for (GroupReference* ref = pGroup->GetFirstMember(); ref != NULL; ref = ref->next())
+            {
+                if (Player* member = ref->getSource())
+                {
+                    member->GetSession()->SendLfgBootUpdate(boot);
+                }
+            }
+        }
+    }
+
+    // Every terminal path owns this erasure. Keeping it here prevents a completed,
+    // expired, abandoned or disbanded vote from blocking the next one.
+    m_bootStatusMap.erase(groupGuid);
 }
 
 /// Expire boot votes nobody finished answering.
@@ -1126,47 +1188,9 @@ void LFGMgr::RemoveOldBoots()
             continue;
         }
 
-        LFGBoot boot = bootIt->second;
-        boot.inProgress = false;
-
-        if (LFGGroupStatus* status = GetGroupStatus(groupGuid))
-        {
-            if (status->state == LFG_STATE_BOOT)
-            {
-                status->state = LFG_STATE_IN_DUNGEON;
-                m_groupStatusMap[groupGuid] = *status;
-            }
-        }
-
-        // Tell everyone the vote lapsed and put their state back, including the
-        // player it was aimed at -- leaving the target in LFG_STATE_BOOT would block
-        // every later vote in the group just as surely as the stale entry did.
-        if (Group* pGroup = sObjectMgr.GetGroupById(groupGuid.GetCounter()))
-        {
-            for (GroupReference* ref = pGroup->GetFirstMember(); ref != NULL; ref = ref->next())
-            {
-                if (Player* pGroupPlr = ref->getSource())
-                {
-                    SetPlayerState(pGroupPlr->GetObjectGuid(), LFG_STATE_IN_DUNGEON);
-                    pGroupPlr->GetSession()->SendLfgBootUpdate(boot);
-                }
-            }
-        }
-        else
-        {
-            // The group went away while the vote was running. Everyone who was polled is
-            // still carrying LFG_STATE_BOOT, and with no group to walk there is nothing
-            // to restore them to a dungeon state -- so clear them outright. Skipping this
-            // is what left players holding a phantom boot state across relog.
-            for (proposalAnswerMap::const_iterator ans = boot.answers.begin();
-                 ans != boot.answers.end(); ++ans)
-            {
-                SetPlayerState(ans->first, LFG_STATE_NONE);
-            }
-            SetPlayerState(boot.playerVotedOn, LFG_STATE_NONE);
-        }
-
-        m_bootStatusMap.erase(groupGuid);
+        LFGBoot const boot = bootIt->second;
+        Group* pGroup = sObjectMgr.GetGroupById(groupGuid.GetCounter());
+        FinishBootVote(groupGuid, pGroup, boot, false, true);
 
         DEBUG_LOG("LFG RemoveOldBoots: vote against %s in group %s expired after %u s; nobody removed",
                   boot.playerVotedOn.GetString().c_str(), groupGuid.GetString().c_str(),
@@ -1280,6 +1304,16 @@ void LFGMgr::FindSpecificQueueMatches(ObjectGuid guid)
             LFGPlayers* matchInfo = GetPlayerOrPartyData(*itr);
             if (matchInfo)
             {
+                // Distinct random categories cannot share one reward identity. Reject
+                // that permanent incompatibility before set intersection, role-quota
+                // backtracking or player/team lookup. MergeGroups repeats the guard as
+                // a commit-time invariant.
+                if (!LFGStatePolicy::CanMergeQueueSelections(
+                        queueInfo->randomDungeonID, matchInfo->randomDungeonID))
+                {
+                    continue;
+                }
+
                 // 1. iterate through queueInfo's dungeon set and search the matchInfo for a matching entry.
                 // 2. if an(y) entry is found, great and proceed!
                 // 2a. if an entry is found and the amounts of players-to-roles are compatible, make
@@ -1436,29 +1470,22 @@ void LFGMgr::MergeGroups(ObjectGuid guidOne, ObjectGuid guidTwo, std::set<uint32
         return;
     }
 
-    // update the dungeon selection with the compatible ones
-    mainGroup->dungeonList.clear();
-    mainGroup->dungeonList = compatibleDungeons;
-
-    // Narrow the candidates to the same overlap.
-    //
-    // candidateDungeons is what PickConcreteDungeon draws from, and it was left holding
-    // the absorbing entry's full expansion -- so a merged entry could be proposed a
-    // dungeon the newly merged-in player had never asked for and may be locked out of.
-    // Intersecting keeps the pick inside what BOTH sides agreed to.
-    if (!mainGroup->candidateDungeons.empty())
+    // Preserve random request/reward identity independently from the concrete
+    // overlap. Which entry absorbs which must not decide whether the category is
+    // forgotten. Two distinct random categories cannot share one reward identity,
+    // so refuse that merge rather than silently choosing one.
+    LFGStatePolicy::QueueSelectionPlan const selection =
+        LFGStatePolicy::MergeQueueSelection(mainGroup->randomDungeonID,
+                                            bufferGroup->randomDungeonID,
+                                            compatibleDungeons);
+    if (!selection.valid)
     {
-        std::set<uint32> narrowed;
-        for (std::set<uint32>::const_iterator it = compatibleDungeons.begin();
-             it != compatibleDungeons.end(); ++it)
-        {
-            if (mainGroup->candidateDungeons.find(*it) != mainGroup->candidateDungeons.end())
-            {
-                narrowed.insert(*it);
-            }
-        }
-        mainGroup->candidateDungeons = narrowed;
+        return;
     }
+
+    mainGroup->randomDungeonID = selection.randomDungeonId;
+    mainGroup->dungeonList = selection.requestedDungeons;
+    mainGroup->candidateDungeons = selection.candidateDungeons;
 
     // move players / roles into a single roleMap
     for (roleMap::iterator it = bufferGroup->currentRoles.begin(); it != bufferGroup->currentRoles.end(); ++it)
@@ -1546,11 +1573,38 @@ void LFGMgr::SendQueueStatusFor(ObjectGuid queueGuid, time_t timeNow)
             // missing. The absorbing player saw none of this, because for them
             // the merged key IS their own guid.
             //
-            // Mirrors SendLfgUpdate: a party member's queue is keyed by the
-            // group guid, everyone else by their own.
+            // Mirrors SendLfgUpdate, which files bodies under the RETAINED identity
+            // rather than current grouping. Deriving it here from the player's group
+            // instead would diverge the moment either changes: a member announced under
+            // a group who has since left it would be sent a status keyed to themselves
+            // while their update bodies still arrive keyed to the group, and the client
+            // -- tracking one record -- would drop the status and blank the eye's
+            // tooltip for the rest of the queue.
+            //
+            // All THREE identity fields come from the retained record, not just the
+            // requester. This body's key is queueGuid + clientQueueId + joinTime, which
+            // SendLfgQueueStatus fills from queueGuid, ticketId and joinTime -- so taking
+            // any one of them from the live entry tears the identity just as surely.
+            //
+            // joinTime is the one that bites without any merge at all: PerformRoleCheck
+            // overwrites the entry's joinedTime when the check completes, so a group whose
+            // role check took a few seconds would be told a start time its client never
+            // recorded. A merge does the same to an absorbed member by handing them the
+            // absorbing entry's start.
             ObjectGuid memberQueueGuid = rItr->first;
-            if (Group* pGroup = pPlayer->GetGroup())
+            uint32 memberTicketId = queueInfo->ticketId;
+            time_t memberJoinTime = queueInfo->joinedTime;
+
+            RetainedTicket memberTicket;
+            if (GetRetainedTicket(rItr->first, memberTicket))
             {
+                memberQueueGuid = ObjectGuid(memberTicket.requesterGuid);
+                memberTicketId = memberTicket.id;
+                memberJoinTime = time_t(memberTicket.time);
+            }
+            else if (Group* pGroup = pPlayer->GetGroup())
+            {
+                // No retained identity: fall back to the old derivation.
                 if (pGroup->GetObjectGuid() == queueGuid)
                 {
                     memberQueueGuid = queueGuid;
@@ -1563,9 +1617,11 @@ void LFGMgr::SendQueueStatusFor(ObjectGuid queueGuid, time_t timeNow)
             status.neededTanks      = queueInfo->neededTanks;
             status.neededHeals      = queueInfo->neededHealers;
             status.neededDps        = queueInfo->neededDps;
-            status.timeSpentInQueue = uint32(timeNow - queueInfo->joinedTime);
-            status.joinTime = uint32(queueInfo->joinedTime);
-            status.ticketId = queueInfo->ticketId;
+            // Elapsed is measured from the same start the identity states, or the body
+            // would claim one join time and a duration counted from another.
+            status.timeSpentInQueue = uint32(timeNow - memberJoinTime);
+            status.joinTime = uint32(memberJoinTime);
+            status.ticketId = memberTicketId;
 
             int32 playerWaitTime;
 
@@ -1898,15 +1954,19 @@ void LFGMgr::OnPlayerLeftLfgGroup(Player* pPlayer, Group* pGroup)
 
     ObjectGuid const plrGuid = pPlayer->GetObjectGuid();
 
-    bootStatusMap::iterator bootIt = m_bootStatusMap.find(pGroup->GetObjectGuid());
+    ObjectGuid const groupGuid = pGroup->GetObjectGuid();
+    bootStatusMap::iterator bootIt = m_bootStatusMap.find(groupGuid);
     if (bootIt != m_bootStatusMap.end())
     {
-        bootIt->second.answers.erase(plrGuid);
-
         // If the leaver WAS the target, the vote has nothing left to decide.
         if (bootIt->second.playerVotedOn == plrGuid)
         {
-            m_bootStatusMap.erase(bootIt);
+            LFGBoot const boot = bootIt->second;
+            FinishBootVote(groupGuid, pGroup, boot, true, true);
+        }
+        else
+        {
+            bootIt->second.answers.erase(plrGuid);
         }
     }
 
@@ -1973,6 +2033,13 @@ void LFGMgr::ReleaseGroupLfgStatus(Group* pGroup)
 
     ObjectGuid const groupGuid = pGroup->GetObjectGuid();
 
+    bootStatusMap::iterator boot = m_bootStatusMap.find(groupGuid);
+    if (boot != m_bootStatusMap.end())
+    {
+        LFGBoot const terminal = boot->second;
+        FinishBootVote(groupGuid, NULL, terminal, false, false);
+    }
+
     // Reset the MEMBERS too, not just the group maps.
     //
     // m_playerStatusMap is keyed by player guid and outlives the group entirely: nothing
@@ -1995,10 +2062,6 @@ void LFGMgr::ReleaseGroupLfgStatus(Group* pGroup)
     {
         SetPlayerState(itr->guid, LFG_STATE_NONE);
     }
-
-    // A vote in flight dies with the group. Leaving it for the reaper is not enough: its
-    // recovery path resolves the group to restore state, and by then there is no group.
-    m_bootStatusMap.erase(groupGuid);
 
     m_groupStatusMap.erase(groupGuid);
     m_groupSet.erase(groupGuid);

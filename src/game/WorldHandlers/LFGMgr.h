@@ -27,6 +27,7 @@
 #define __MANGOS_LFGMGR_H
 
 #include "Common.h"
+#include "LFGStatePolicy.h"
 #include "ObjectGuid.h"
 #include "Policies/Singleton.h"
 #include "Opcodes.h"
@@ -1004,6 +1005,10 @@ struct LFGPlayers //TODO: rename to LFGQueueData
     /// nowhere. The expansion is therefore kept alongside rather than collapsed away.
     std::set<uint32> candidateDungeons;
 
+    /// The random category the entry requested, kept independently from the
+    /// concrete candidates. Zero for an ordinary specific-dungeon selection.
+    uint32 randomDungeonID = 0;
+
     // Zeroed: the default constructor left these indeterminate, and needed* decides both
     // whether an entry is complete and what the queue advertises to the client.
     time_t joinedTime = 0;
@@ -1468,19 +1473,15 @@ public:
     /// Non-zero, stable per queue entry, monotonic. See LFGPlayers::ticketId.
     uint32 AllocateTicketId() { return ++m_nextTicketId; }
 
-    /// The ticket a player's status bodies have been going out under.
+    /// The complete ticket identity a player's status bodies have been going out under.
     ///
     /// The client files each status body under a 20-byte RideTicket and looks records up
-    /// by comparing it whole, so every body about one queue MUST carry the same one. If a
-    /// later body carries a different ticket the client creates a second record instead of
-    /// updating the first, and the first can never be addressed again. Re-deriving the
-    /// ticket from live state cannot guarantee that: the entry may have been erased (a
-    /// merge folds an absorbed queuer's entry away) or not yet stored.
-    struct RetainedTicket
-    {
-        uint32 id = 0;
-        uint32 time = 0;
-    };
+    /// by comparing it whole, so every body about one queue MUST carry the same requester,
+    /// id and time. If a later body changes any field the client creates a second record
+    /// instead of updating the first, and the first can never be addressed again.
+    /// Re-deriving identity from live state cannot guarantee that: the entry may have been
+    /// erased (a merge folds an absorbed queuer's entry away) or not yet stored.
+    typedef LFGStatePolicy::TicketIdentity RetainedTicket;
     typedef std::unordered_map<ObjectGuid, RetainedTicket> retainedTicketMap;
 
     /// FIRST WINS. Once a player's bodies have gone out under a ticket, every later body
@@ -1491,20 +1492,20 @@ public:
     /// to whichever entry now LISTS them -- the absorbing one -- and hands back a stranger's
     /// ticket. Adopting it would strand that player's own join record for good.
     ///
-    /// Cleared by ForgetTicket when the queue genuinely ends, so the next join starts fresh.
-    void RetainTicket(ObjectGuid plrGuid, uint32 id, uint32 time)
+    /// Replaced wholesale by BeginTicket when the next queue starts, which is what actually
+    /// keeps this fresh. ForgetTicket exists for an explicit clear but currently has no
+    /// callers, so nothing relies on it -- a retained record simply lives until the player's
+    /// next join overwrites it. That is bounded by one entry per player and correct for the
+    /// paths that send bodies, since a leave sets LFG_STATE_NONE and the only body between
+    /// leave and re-join is gated on that state.
+    void RetainTicket(ObjectGuid plrGuid, ObjectGuid requesterGuid, uint32 id, uint32 time)
     {
         if (!id)
         {
             return;
         }
 
-        RetainedTicket& t = m_retainedTickets[plrGuid];
-        if (!t.id)
-        {
-            t.id = id;
-            t.time = time;
-        }
+        m_retainedTickets[plrGuid].Retain(requesterGuid.GetRawValue(), id, time);
     }
 
     bool GetRetainedTicket(ObjectGuid plrGuid, RetainedTicket& out) const
@@ -1533,11 +1534,9 @@ public:
     ///
     /// Overwriting here is safe precisely because it happens when a new entry is built:
     /// the old queue is over, and the new one owns the player's records from now on.
-    void BeginTicket(ObjectGuid plrGuid, uint32 id, uint32 time)
+    void BeginTicket(ObjectGuid plrGuid, ObjectGuid requesterGuid, uint32 id, uint32 time)
     {
-        RetainedTicket& t = m_retainedTickets[plrGuid];
-        t.id = id;
-        t.time = time;
+        m_retainedTickets[plrGuid].Begin(requesterGuid.GetRawValue(), id, time);
     }
 
     /// Role-Related Functions
@@ -1628,9 +1627,6 @@ protected:
     /// Updates a wait map with the amount of time it took the last player to join
     void UpdateWaitMap(LFGRoles role, uint32 dungeonID, time_t waitTime);
 
-    /// Creates a group so they can enter a dungeon together
-    void CreateDungeonGroup(LFGProposal* proposal);
-
     /// Sends a group to the dungeon assigned to them
     /// Teleport into the dungeon. Passing onlyPlayer restricts the move to that
     /// member while still resolving the destination from the whole group; NULL
@@ -1649,8 +1645,9 @@ protected:
      */
     void MergeGroups(ObjectGuid guidOne, ObjectGuid guidTwo, std::set<uint32> compatibleDungeons);
 
-    /// Send a proposal to each member of a group
-    void SendDungeonProposal(ObjectGuid queueGuid, LFGPlayers* lfgGroup);
+    /// Send a proposal to each member of a group. Returns false without mutating
+    /// queue/player/proposal state when no valid proposal can be constructed.
+    bool SendDungeonProposal(ObjectGuid queueGuid, LFGPlayers* lfgGroup);
 
     /// Tell a group member that someone else just confirmed their role
     void SendRoleChosen(ObjectGuid plrGuid, ObjectGuid confirmedGuid, uint8 roles);
@@ -1659,7 +1656,7 @@ protected:
     void SendRoleCheckUpdate(ObjectGuid plrGuid, LFGRoleCheck const& roleCheck);
 
     /// Send SMSG_LFG_UPDATE_PARTY or SMSG_LFG_UPDATE_PLAYER
-    void SendLfgUpdate(ObjectGuid plrGuid, LFGPlayerStatus status, bool isGroup);
+    void SendLfgUpdate(ObjectGuid plrGuid, LFGPlayerStatus status, bool fallbackIsGroup);
 
     /// Send SMSG_LFG_JOIN_RESULT
     void SendLfgJoinResult(ObjectGuid plrGuid, LfgJoinResult result, uint8 detail, partyForbidden const& lockedDungeons);
@@ -1668,6 +1665,21 @@ protected:
     void RemoveOldRoleChecks();
 
 private:
+    struct DungeonGroupPlan;
+
+    /// Resolve every fallible proposal-completion decision before success packets.
+    bool PrepareDungeonGroup(LFGProposal* proposal, DungeonGroupPlan& plan,
+                             std::set<ObjectGuid>& culprits);
+
+    /// Commit a preflighted group plan; no client-visible refusal remains here.
+    void CreateDungeonGroup(LFGProposal* proposal, DungeonGroupPlan const& plan);
+
+    /// Complete a boot vote through one state-restoration and record-removal path.
+    /// removeVictim is true for a passed vote or when the target leaves voluntarily;
+    /// notify is false only while the whole group is being disbanded.
+    void FinishBootVote(ObjectGuid groupGuid, Group* pGroup, LFGBoot boot,
+                        bool removeVictim, bool notify);
+
     /// Daily occurences of a player doing X type dungeon
     dailyEntries m_dailyAny;
     dailyEntries m_dailyTBCHeroic;

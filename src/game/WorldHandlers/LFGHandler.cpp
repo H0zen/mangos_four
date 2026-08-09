@@ -44,6 +44,7 @@
 #include "DBCStores.h"
 #include "Group.h"
 #include "LFGMgr.h"
+#include "LFGStatePolicy.h"
 #include "Log.h"
 #include "Player.h"
 #include "WorldPacket.h"
@@ -149,8 +150,21 @@ void WorldSession::HandleLfgJoinOpcode(WorldPacket& recv_data)
     // SMSG_LFG_JOIN_RESULT is now built to the 18414 layout and admitted, so a
     // refused join reaches the player. See MopLfgPackets::BuildJoinResult for the
     // three captures it is pinned to.
+    Player* plr = GetPlayer();
+    if (!plr)
+    {
+        return;
+    }
+
+    Group* pGroup = plr->GetGroup();
+    if (!LFGStatePolicy::CanMutateGroupQueue(
+            pGroup != nullptr, pGroup && pGroup->IsLeader(plr->GetObjectGuid())))
+    {
+        return;
+    }
+
     std::set<uint32> requested(dungeons.begin(), dungeons.end());
-    sLFGMgr.JoinLFG(roles, requested, comment, GetPlayer());
+    sLFGMgr.JoinLFG(roles, requested, comment, plr);
 }
 
 void WorldSession::HandleLfgLeaveOpcode(WorldPacket& recv_data)
@@ -174,16 +188,15 @@ void WorldSession::HandleLfgLeaveOpcode(WorldPacket& recv_data)
         return;
     }
 
-    // A grouped player leaves on behalf of the group, which is how the queue stores it
-    // -- JoinLFG keys group entries by the GROUP guid.
-    //
-    // The test used to be `pGroup && pGroup->IsLeader(...)`, which sent a non-leader
-    // down the SOLO branch. That branch erases m_playerData[playerGuid], and for a
-    // grouped queuer no such entry exists: the party's real entry, keyed by the group
-    // guid, was left in the queue untouched while the client was told it had left.
-    // Whether a non-leader may cancel for the party is a permission question, answered
-    // in LeaveLFG, not a reason to cancel the wrong thing.
+    // A grouped queue is keyed by the group GUID and can only be mutated by its leader.
+    // A non-leader must not be sent down a solo path either: there is no player-keyed
+    // entry to cancel, and reporting success would leave the actual party queue alive.
     Group* pGroup = plr->GetGroup();
+    if (!LFGStatePolicy::CanMutateGroupQueue(
+            pGroup != nullptr, pGroup && pGroup->IsLeader(plr->GetObjectGuid())))
+    {
+        return;
+    }
 
     sLFGMgr.LeaveLFG(plr, pGroup != nullptr);
 }
@@ -434,14 +447,28 @@ void WorldSession::SendLfgJoinResult(LfgJoinResult result, uint8 detail, partyFo
     // zeroed shape, so a refusal must not invent a ticket.
     if (result == ERR_LFG_OK)
     {
-        if (Player* player = GetPlayer())
+        ObjectGuid const playerGuid = GetPlayer()->GetObjectGuid();
+        ObjectGuid queueGuid = playerGuid;
+
+        LFGMgr::RetainedTicket retained;
+        LFGMgr::RetainedTicket const* retainedIdentity = nullptr;
+        if (sLFGMgr.GetRetainedTicket(playerGuid, retained))
         {
-            update.requesterGuid = player->GetObjectGuid().GetRawValue();
+            queueGuid = ObjectGuid(retained.requesterGuid);
+            retainedIdentity = &retained;
         }
+
         LFGStatusPacketData queueData;
-        sLFGMgr.GetStatusPacketData(GetPlayer()->GetObjectGuid(), GetPlayer()->GetObjectGuid(), queueData);
-        update.joinTime = queueData.joinedTime ? queueData.joinedTime : uint32(time(NULL));
-        update.clientQueueId = queueData.ticketId;
+        sLFGMgr.GetStatusPacketData(queueGuid, playerGuid, queueData);
+
+        LFGStatePolicy::TicketIdentity const identity =
+            LFGStatePolicy::ResolveTicketIdentity(
+                retainedIdentity, playerGuid.GetRawValue(), queueData.ticketId,
+                queueData.joinedTime ? queueData.joinedTime : uint32(time(NULL)));
+
+        update.requesterGuid = identity.requesterGuid;
+        update.joinTime = identity.time;
+        update.clientQueueId = identity.id;
         update.ticketType = 3;
     }
 
@@ -467,7 +494,7 @@ void WorldSession::SendLfgJoinResult(LfgJoinResult result, uint8 detail, partyFo
     SendPacket(&data);
 }
 
-void WorldSession::SendLfgUpdate(bool isGroup, LFGPlayerStatus status)
+void WorldSession::SendLfgUpdate(bool fallbackIsGroup, LFGPlayerStatus status)
 {
     bool joined = false;
     bool isQueued = false;
@@ -502,15 +529,21 @@ void WorldSession::SendLfgUpdate(bool isGroup, LFGPlayerStatus status)
     }
 
     ObjectGuid const playerGuid = GetPlayer()->GetObjectGuid();
+
+    // The requester is part of the RideTicket key, so current group membership is
+    // only a fallback for a path that has not established an authoritative ticket.
     ObjectGuid queueGuid = playerGuid;
-    if (isGroup && GetPlayer()->GetGroup())
+    if (fallbackIsGroup && GetPlayer()->GetGroup())
         queueGuid = GetPlayer()->GetGroup()->GetObjectGuid();
+
+    LFGMgr::RetainedTicket retained;
+    if (sLFGMgr.GetRetainedTicket(playerGuid, retained))
+        queueGuid = ObjectGuid(retained.requesterGuid);
 
     LFGStatusPacketData queueData;
     sLFGMgr.GetStatusPacketData(queueGuid, playerGuid, queueData);
 
     MopLfgPackets::StatusUpdate update;
-    update.requesterGuid = queueGuid.GetRawValue();
     update.comment = status.comment;
     // Retail leaves these 0,0,0 in all 5291 observed bodies without exception; the
     // role shortage is advertised in SMSG_LFG_QUEUE_STATUS instead.
@@ -524,11 +557,6 @@ void WorldSession::SendLfgUpdate(bool isGroup, LFGPlayerStatus status)
     // notifyUi tracks joined -- equal in 5288 of 5291 bodies, and 0 for every terminal
     // reason (8, 9, 11, 15, 25). It was defaulted true and never assigned.
     update.notifyUi = joined;
-    // Not "did the player leave" and not "is the player inside": this bit says the
-    // queue entry is owned by a GROUP. All 1931 bodies with a group-typed requesterGuid
-    // carry it at every stage, including open-world queueing. It moves together with
-    // requesterGuid, which is exactly the condition that selected queueGuid above.
-    update.lfgJoined = (queueGuid != playerGuid);
     update.queued = isQueued;
     update.requestedRoles = queueData.roles;
     update.updateReason = uint8(status.updateType);
@@ -541,15 +569,14 @@ void WorldSession::SendLfgUpdate(bool isGroup, LFGPlayerStatus status)
     // stored) and used to hand back a default-constructed struct, shipping ticketId = 0.
     // Retail sends 0 in none of 5291 observed bodies.
     //
-    // So: take the live ticket when there is one and remember it; otherwise reuse whatever
-    // this player's bodies have already gone out under.
-    // Remember the first ticket this player's bodies go out under, then use THAT for
-    // every later body -- including ones whose live lookup would now resolve elsewhere.
-    sLFGMgr.RetainTicket(playerGuid, queueData.ticketId, queueData.joinedTime);
+    // Remember the first COMPLETE identity this player's bodies go out under, then
+    // use that requester, id and time for every later body -- including ones whose
+    // live lookup now resolves elsewhere after a merge or regroup.
+    sLFGMgr.RetainTicket(playerGuid, queueGuid, queueData.ticketId, queueData.joinedTime);
 
-    LFGMgr::RetainedTicket retained;
     if (sLFGMgr.GetRetainedTicket(playerGuid, retained))
     {
+        queueGuid = ObjectGuid(retained.requesterGuid);
         update.ticketId = retained.id;
         update.ticketTime = retained.time;
     }
@@ -564,6 +591,12 @@ void WorldSession::SendLfgUpdate(bool isGroup, LFGPlayerStatus status)
                           GetPlayerName(), uint32(status.updateType));
         }
     }
+
+    update.requesterGuid = queueGuid.GetRawValue();
+    // Not "did the player leave" and not "is the player inside": this bit says the
+    // retained requester is a group rather than this player. It must move with
+    // requesterGuid because both describe the same client record.
+    update.lfgJoined = (queueGuid != playerGuid);
 
     // NOTHING is forgotten here. The ticket belongs to the queue entry and is replaced by
     // LFGMgr::BeginTicket when the next entry is built -- see the note there for why

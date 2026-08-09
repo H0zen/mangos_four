@@ -298,6 +298,9 @@ void InitializeOpcodes()
     DefS(SMSG_UPDATE_INSTANCE_ENCOUNTER_UNIT, "SMSG_UPDATE_INSTANCE_ENCOUNTER_UNIT");
     DefS(SMSG_SET_RAID_DIFFICULTY, "SMSG_SET_RAID_DIFFICULTY");
     DefS(SMSG_SET_DUNGEON_DIFFICULTY, "SMSG_SET_DUNGEON_DIFFICULTY");
+    DefS(SMSG_INSTANCE_RESET, "SMSG_INSTANCE_RESET");
+    DefS(SMSG_INSTANCE_RESET_FAILED, "SMSG_INSTANCE_RESET_FAILED");
+    DefS(SMSG_RESET_FAILED_NOTIFY, "SMSG_RESET_FAILED_NOTIFY");
     DefS(SMSG_TRAINER_BUY_FAILED, "SMSG_TRAINER_BUY_FAILED");
     DefS(SMSG_GM_TICKET_UPDATE, "SMSG_GM_TICKET_UPDATE");
     DefC(CMSG_GMTICKET_CREATE, "CMSG_GMTICKET_CREATE", STATUS_LOGGEDIN, PROCESS_THREADUNSAFE, &WorldSession::HandleGMTicketCreateOpcode);
@@ -834,11 +837,14 @@ void InitializeOpcodes()
     DefS(SMSG_RAID_INSTANCE_INFO, "SMSG_RAID_INSTANCE_INFO");
 
     // Wave 6 creature query request and response.
-    DefC(CMSG_CREATURE_QUERY, "CMSG_CREATURE_QUERY", STATUS_LOGGEDIN, PROCESS_INPLACE, &WorldSession::HandleCreatureQueryOpcode);
+    // Sent for every creature the client sees on zone-in, which begins before
+    // worldport ACK while the Player is still out of world. Static template read.
+    DefC(CMSG_CREATURE_QUERY, "CMSG_CREATURE_QUERY", STATUS_LOGGEDIN_OR_TRANSFER, PROCESS_INPLACE, &WorldSession::HandleCreatureQueryOpcode);
     DefS(SMSG_CREATURE_QUERY_RESPONSE, "SMSG_CREATURE_QUERY_RESPONSE");
 
     // Wave 8 game-object query request and response.
-    DefC(CMSG_GAMEOBJECT_QUERY, "CMSG_GAMEOBJECT_QUERY", STATUS_LOGGEDIN, PROCESS_INPLACE, &WorldSession::HandleGameObjectQueryOpcode);
+    // Same zone-in burst as CMSG_CREATURE_QUERY. Static template read.
+    DefC(CMSG_GAMEOBJECT_QUERY, "CMSG_GAMEOBJECT_QUERY", STATUS_LOGGEDIN_OR_TRANSFER, PROCESS_INPLACE, &WorldSession::HandleGameObjectQueryOpcode);
     DefS(SMSG_GAMEOBJECT_QUERY_RESPONSE, "SMSG_GAMEOBJECT_QUERY_RESPONSE");
 
     // The GameObject page packet triggers this shared item/GameObject cache
@@ -923,8 +929,8 @@ void InitializeOpcodes()
     DefS(SMSG_CLEAR_QUEST_COMPLETED_BIT, "SMSG_CLEAR_QUEST_COMPLETED_BIT");
     DefS(SMSG_CLEAR_QUEST_COMPLETED_BITS, "SMSG_CLEAR_QUEST_COMPLETED_BITS");
 
-    // Wave 9 name query request and response.
-    DefC(CMSG_NAME_QUERY, "CMSG_NAME_QUERY", STATUS_LOGGEDIN, PROCESS_THREADUNSAFE, &WorldSession::HandleNameQueryOpcode);
+    // The client also sends name queries before worldport ACK while its Player is out of world.
+    DefC(CMSG_NAME_QUERY, "CMSG_NAME_QUERY", STATUS_LOGGEDIN_OR_TRANSFER, PROCESS_THREADUNSAFE, &WorldSession::HandleNameQueryOpcode);
     DefS(SMSG_NAME_QUERY_RESPONSE, "SMSG_NAME_QUERY_RESPONSE");
 
     // The /who list. Both bodies were rebuilt for 18414 -- see MopWhoPackets for the
@@ -940,11 +946,14 @@ void InitializeOpcodes()
     // client parks the queried name and never commits it (the name shows "Unknown").
     // CMSG value client-confirmed live (0x1A16, body = uint32 realmId); response
     // contract RE-verified against the client handler sub_1403073A0.
-    DefC(CMSG_REALM_NAME_QUERY, "CMSG_REALM_NAME_QUERY", STATUS_LOGGEDIN, PROCESS_THREADUNSAFE, &WorldSession::HandleRealmNameQueryOpcode);
+    // Fired from the name-cache path, which runs during the transfer window. Reads
+    // only the cached realm name.
+    DefC(CMSG_REALM_NAME_QUERY, "CMSG_REALM_NAME_QUERY", STATUS_LOGGEDIN_OR_TRANSFER, PROCESS_THREADUNSAFE, &WorldSession::HandleRealmNameQueryOpcode);
     DefS(SMSG_REALM_NAME_QUERY_RESPONSE, "SMSG_REALM_NAME_QUERY_RESPONSE");
 
     // Wave 7 compact time query requests and responses.
-    DefC(CMSG_QUERY_TIME, "CMSG_QUERY_TIME", STATUS_LOGGEDIN, PROCESS_THREADUNSAFE, &WorldSession::HandleQueryTimeOpcode);
+    // Sends server time and the daily reset countdown; touches no player state.
+    DefC(CMSG_QUERY_TIME, "CMSG_QUERY_TIME", STATUS_LOGGEDIN_OR_TRANSFER, PROCESS_THREADUNSAFE, &WorldSession::HandleQueryTimeOpcode);
     DefS(SMSG_QUERY_TIME_RESPONSE, "SMSG_QUERY_TIME_RESPONSE");
     DefC(CMSG_PLAYED_TIME, "CMSG_PLAYED_TIME", STATUS_LOGGEDIN, PROCESS_THREADUNSAFE, &WorldSession::HandlePlayedTime);
     DefS(SMSG_PLAYED_TIME, "SMSG_PLAYED_TIME");
@@ -1341,27 +1350,13 @@ void InitializeOpcodes()
     DefC(CMSG_GROUP_INITIATE_ROLE_POLL, "CMSG_GROUP_INITIATE_ROLE_POLL", STATUS_LOGGEDIN, PROCESS_THREADUNSAFE, &WorldSession::HandleGroupInitiateRolePollOpcode);
     DefS(SMSG_GROUP_ROLE_POLL_INFORM, "SMSG_GROUP_ROLE_POLL_INFORM");
 
-    // NOT registered, deliberately: CMSG_SET_DUNGEON_DIFFICULTY 0x1A36 and
-    // CMSG_SET_RAID_DIFFICULTY 0x0591. Both values are binary-proved and both
-    // handlers exist with their reply SMSGs already admitted, so they look ready.
-    // They are not.
-    //
-    // The translation blocker is CLOSED. The client sends a RAW Difficulty.dbc
-    // DifficultyID while the internal Difficulty enum is 0-based, and the handlers
-    // used to cast one onto the other; they now call ToInternalDifficultyChecked,
-    // which converts and rejects an id belonging to the other key space.
-    //
-    // What holds them is a different, still-open gap: both handlers call
-    // ResetInstances(INSTANCE_RESET_CHANGE_DIFFICULTY, ...), so accepting one of
-    // these tears down the player's or group's instance binds. The two packets that
-    // report that outcome -- SMSG_INSTANCE_RESET and SMSG_INSTANCE_RESET_FAILED --
-    // are NOT admitted by WorldSession::IsEnterWorldConverted, so they are built and
-    // dropped. Registering these now would silently destroy binds and tell the
-    // player nothing, whether it succeeded or failed.
-    //
-    // That is the same reason CMSG_RESET_INSTANCES is held below, and it is the
-    // condition to re-check before registering either of these -- NOT "has the
-    // instance-difficulty work landed", which it now has.
+    // The client sends raw Difficulty.dbc ids. The handlers translate those ids
+    // into the core's separate dungeon/raid key spaces before resetting binds.
+    // The complete reset-result family is now recovered and admitted atomically,
+    // so a successful or refused reset is never made invisible by the send gate.
+    DefC(CMSG_SET_DUNGEON_DIFFICULTY, "CMSG_SET_DUNGEON_DIFFICULTY", STATUS_LOGGEDIN, PROCESS_THREADUNSAFE, &WorldSession::HandleSetDungeonDifficultyOpcode);
+    DefC(CMSG_SET_RAID_DIFFICULTY, "CMSG_SET_RAID_DIFFICULTY", STATUS_LOGGEDIN, PROCESS_THREADUNSAFE, &WorldSession::HandleSetRaidDifficultyOpcode);
+    DefC(CMSG_RESET_INSTANCES, "CMSG_RESET_INSTANCES", STATUS_LOGGEDIN, PROCESS_THREADUNSAFE, &WorldSession::HandleResetInstancesOpcode);
 
     // Wave 15 stable-pet list request, list response, and operation result.
     DefC(CMSG_REQUEST_STABLED_PETS, "CMSG_REQUEST_STABLED_PETS", STATUS_LOGGEDIN, PROCESS_THREADUNSAFE, &WorldSession::HandleListStabledPetsOpcode);
@@ -1464,16 +1459,6 @@ void InitializeOpcodes()
     //                          registered, already admitted and already live via the
     //                          invite path, so it adds no new outbound surface.
     //
-    // CMSG_RESET_INSTANCES is deliberately NOT in this group. It looked like the
-    // cheapest member -- an empty body and a four-byte SMSG_INSTANCE_RESET reply
-    // that retail carries at exactly 4 bytes in all 15 corpus observations -- but
-    // its failure paths reach SMSG_RESET_FAILED_NOTIFY from DungeonMap::Reset and
-    // SMSG_INSTANCE_RESET_FAILED from Group::ResetInstances, neither of which is
-    // registered or admitted. Resetting an occupied instance would silently do
-    // nothing visible, which is the exact no-op this grouping exists to avoid. It
-    // returns once both failure bodies are recovered and admitted; note the current
-    // SMSG_INSTANCE_RESET_FAILED writer emits two uint32 against a four-byte
-    // capacity hint and must not be admitted on trust.
     DefC(CMSG_REQUEST_PET_INFO, "CMSG_REQUEST_PET_INFO", STATUS_LOGGEDIN, PROCESS_THREADUNSAFE, &WorldSession::HandleRequestPetInfoOpcode);
     DefC(CMSG_LEAVE_BATTLEFIELD, "CMSG_LEAVE_BATTLEFIELD", STATUS_LOGGEDIN, PROCESS_THREADUNSAFE, &WorldSession::HandleLeaveBattlefieldOpcode);
     DefC(CMSG_COMPLETE_CINEMATIC, "CMSG_COMPLETE_CINEMATIC", STATUS_LOGGEDIN, PROCESS_THREADUNSAFE, &WorldSession::HandleCompleteCinematic);

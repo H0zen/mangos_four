@@ -34,6 +34,7 @@
 #include "Mail.h"
 #include "Group.h"
 #include "LFGMgr.h"
+#include "LFGStatePolicy.h"
 #include "Object.h"
 #include "Player.h"
 #include "ObjectAccessor.h"
@@ -43,12 +44,29 @@
 
 /**
  * @file LFGMgrProposal.cpp
- * @brief Cohesion split of LFGMgr.cpp -- role check, dungeon proposal and in-dungeon flow: PerformRoleCheck, proposal send/update/decline, dungeon group create, teleport, boss-kill, kick/vote and LFG packet senders. Same LFGMgr class; no behaviour change. CMake file(GLOB) picks this file up automatically; LFGMgr.h is unchanged.
+ * @brief Cohesion split of LFGMgr.cpp -- role check, dungeon proposal and in-dungeon flow: PerformRoleCheck, proposal send/update/decline, dungeon group create, teleport, boss-kill, kick/vote and LFG packet senders. Same LFGMgr class; CMake file(GLOB) picks this file up automatically.
  */
+
+struct LFGMgr::DungeonGroupPlan
+{
+    LfgDungeonsEntry const* dungeon = NULL;
+    Group* group = NULL;
+    ObjectGuid leaderGuid;
+    LFGStatePolicy::DifficultyPlan difficultyPlan = { false, false, 0 };
+    uint32 finalSize = 0;
+    uint32 capacity = 0;
+    bool createNewGroup = true;
+    bool convertToRaid = false;
+};
 
 // called each time a player selects their role
 void LFGMgr::PerformRoleCheck(Player* pPlayer, Group* pGroup, uint8 roles)
 {
+    if (!pGroup)
+    {
+        return;
+    }
+
     ObjectGuid groupGuid = pGroup->GetObjectGuid();
     ObjectGuid plrGuid = pPlayer ? pPlayer->GetObjectGuid() : ObjectGuid();
 
@@ -63,6 +81,17 @@ void LFGMgr::PerformRoleCheck(Player* pPlayer, Group* pGroup, uint8 roles)
     // was discarded on return -- no member's answer was ever recorded, and a party of
     // two or more could never complete its role check no matter what anyone clicked.
     LFGRoleCheck& roleCheck = it->second;
+
+    roleMap::iterator member = roleCheck.currentRoles.end();
+    if (pPlayer)
+    {
+        member = roleCheck.currentRoles.find(plrGuid);
+        if (!LFGStatePolicy::CanSubmitRole(true, member != roleCheck.currentRoles.end()))
+        {
+            return;
+        }
+    }
+
     bool roleChosen = roleCheck.state != LFG_ROLECHECK_DEFAULT && plrGuid;
 
     if (!plrGuid)
@@ -78,7 +107,7 @@ void LFGMgr::PerformRoleCheck(Player* pPlayer, Group* pGroup, uint8 roles)
     }
     else
     {
-        roleCheck.currentRoles[plrGuid] = roles;
+        member->second = roles;
 
         bool allRolesChosen = true;
         for (roleMap::iterator rItr = roleCheck.currentRoles.begin(); rItr != roleCheck.currentRoles.end(); ++rItr)
@@ -124,11 +153,8 @@ void LFGMgr::PerformRoleCheck(Player* pPlayer, Group* pGroup, uint8 roles)
             case LFG_ROLECHECK_INITIALITING:
                 continue;
             case LFG_ROLECHECK_FINISHED:
-                // set current plr's state to queued. then set their role in that struct
-                // then send lfgupdate packet with UPDATETYPE_ADDED_TO_QUEUE
-                SetPlayerState(guidBuff, LFG_STATE_QUEUED);
-                SetPlayerUpdateType(guidBuff, LFG_UPDATE_ADDED_TO_QUEUE);
-                SendLfgUpdate(guidBuff, GetPlayerStatus(guidBuff), true);
+                // The completion burst is sent below, after the live queue entry has
+                // the final roles that all three status bodies must describe.
                 break;
             default:
                 if (roleCheck.leaderGuidRaw == guidBuff.GetRawValue())
@@ -155,6 +181,34 @@ void LFGMgr::PerformRoleCheck(Player* pPlayer, Group* pGroup, uint8 roles)
         queueInfo->joinedTime   = time(NULL);
 
         m_playerData[groupGuid] = *queueInfo;
+
+        // Retail group completion (capture-000075 seq 891751-891754): reason 24
+        // queued=false, reason 13 queued=true, leader-only JOIN_RESULT, then the same
+        // reason-13 body again. Every member gets the status bodies; capture-000499
+        // seq 898014-898016 shows the 24/13/13 sequence without a join result.
+        for (roleMap::const_iterator itr = roleCheck.currentRoles.begin(); itr != roleCheck.currentRoles.end(); ++itr)
+        {
+            ObjectGuid guidBuff = itr->first;
+
+            // JoinLFG staged the reason-24 ROLECHECK status for this completion point.
+            SendLfgUpdate(guidBuff, GetPlayerStatus(guidBuff), true);
+
+            SetPlayerState(guidBuff, LFG_STATE_QUEUED);
+            SetPlayerUpdateType(guidBuff, LFG_UPDATE_ADDED_TO_QUEUE);
+            SendLfgUpdate(guidBuff, GetPlayerStatus(guidBuff), true);
+        }
+
+        // BeginTicket ran before the role check, so this quotes the same retained group
+        // requester, id and time as the two status bodies immediately before it.
+        SendLfgJoinResult(ObjectGuid(roleCheck.leaderGuidRaw), ERR_LFG_OK,
+                          LFG_JOIN_DETAIL_NONE, nullForbidden);
+
+        // Each member's queued status, the shared queue data and retained identity are
+        // unchanged since its first reason-13 send, so this is the byte-identical repeat.
+        for (roleMap::const_iterator itr = roleCheck.currentRoles.begin(); itr != roleCheck.currentRoles.end(); ++itr)
+        {
+            SendLfgUpdate(itr->first, GetPlayerStatus(itr->first), true);
+        }
 
         AddToQueue(groupGuid);
 
@@ -263,19 +317,22 @@ static uint32 PickConcreteDungeon(uint32 queuedDungeonId, std::set<uint32> const
 }
 
 //todo: remove from queue, update queue average settings
-void LFGMgr::SendDungeonProposal(ObjectGuid queueGuid, LFGPlayers* lfgGroup)
+bool LFGMgr::SendDungeonProposal(ObjectGuid queueGuid, LFGPlayers* lfgGroup)
 {
-    ++m_proposalId; // increment number to make a new proposal id
+    if (!lfgGroup || lfgGroup->dungeonList.empty())
+    {
+        return false;
+    }
 
-    std::set<uint32>::iterator dItr = lfgGroup->dungeonList.begin();
+    uint32 const queuedDungeonId = lfgGroup->randomDungeonID
+        ? lfgGroup->randomDungeonID : *lfgGroup->dungeonList.begin();
 
     // note: group create function's parameters are leader guid & leader name
     LFGProposal newProposal;
-    newProposal.id = m_proposalId;
     newProposal.state = LFG_PROPOSAL_INITIATING;
     newProposal.encounters = 0; // todo: check if group has already started a dungeon and are looking for another plr
     newProposal.currentRoles = lfgGroup->currentRoles;
-    newProposal.dungeonID = *dItr;
+    newProposal.dungeonID = queuedDungeonId;
 
     // The dungeon the group is actually put into.
     //
@@ -284,14 +341,14 @@ void LFGMgr::SendDungeonProposal(ObjectGuid queueGuid, LFGPlayers* lfgGroup)
     // teleports the group nowhere -- 4 of the 12 silently to Eastern Kingdoms and the other 8 to
     // a plain failure. A concrete member of the expansion is chosen instead, while dungeonID
     // keeps naming the random entry for the proposal packet and the reward lookup.
-    newProposal.concreteDungeonID = PickConcreteDungeon(*dItr, lfgGroup->candidateDungeons);
-    if (!newProposal.concreteDungeonID)
+    newProposal.concreteDungeonID = PickConcreteDungeon(queuedDungeonId, lfgGroup->candidateDungeons);
+    if (!LFGStatePolicy::CanStartProposal(newProposal.concreteDungeonID))
     {
         // Nothing runnable behind the category. Do not build a proposal that cannot complete:
         // the group would be formed, torn out of its previous groups and then left standing.
-        sLog.outError("LFG SendDungeonProposal: random dungeon %u expanded to no runnable "
-                      "member; refusing to propose.", *dItr);
-        return;
+        DEBUG_LOG("LFG SendDungeonProposal: random dungeon %u expanded to no runnable "
+                  "member; refusing to propose.", queuedDungeonId);
+        return false;
     }
 
     newProposal.isNew = true;
@@ -332,7 +389,7 @@ void LFGMgr::SendDungeonProposal(ObjectGuid queueGuid, LFGPlayers* lfgGroup)
         // the merge, so reaching here means something upstream slipped.
         sLog.outError("LFG SendDungeonProposal: %u live LFG runs in one proposal; refusing. "
                       "The queue entry is left intact.", liveRuns);
-        return;
+        return false;
     }
 
     bool const continuing = !continueGuid.IsEmpty();
@@ -341,7 +398,7 @@ void LFGMgr::SendDungeonProposal(ObjectGuid queueGuid, LFGPlayers* lfgGroup)
     {
         sLog.outError("LFG SendDungeonProposal: continuing group %s vanished; refusing.",
                       continueGuid.GetString().c_str());
-        return;
+        return false;
     }
 
     if (continuing)
@@ -364,6 +421,10 @@ void LFGMgr::SendDungeonProposal(ObjectGuid queueGuid, LFGPlayers* lfgGroup)
     // (LFGHandler.cpp:684-685, :708-709), which were dead while this was hardcoded true.
     newProposal.isNew = !continuing;
 
+    // All refusal checks are above this point. Allocate the id only for a
+    // proposal that will be stored and announced.
+    newProposal.id = ++m_proposalId;
+
     // iterate through role map just so get everyone's guid
     for (roleMap::iterator it = lfgGroup->currentRoles.begin(); it != lfgGroup->currentRoles.end(); ++it)
     {
@@ -376,6 +437,7 @@ void LFGMgr::SendDungeonProposal(ObjectGuid queueGuid, LFGPlayers* lfgGroup)
             continue;
         }
 
+        bool continuingMember = false;
         if (Group* pGroup = pPlayer->GetGroup())
         {
             ObjectGuid grpGuid = pGroup->GetObjectGuid();
@@ -387,17 +449,7 @@ void LFGMgr::SendDungeonProposal(ObjectGuid queueGuid, LFGPlayers* lfgGroup)
             // happened to carry the leader bit, which for a mixed proposal is arbitrary.
             newProposal.groups[plrGuid] = grpGuid;
 
-            // AUTO-ACCEPT the players already in the continuing run.
-            //
-            // This is mandatory, not a courtesy. With isNew = false, SendLfgProposalUpdate
-            // marks their proposal `silent` -- they get NO window to answer it. Leaving
-            // them PENDING would time the proposal out at 45 s every single time and turn
-            // a broken feature into a total one. They are already in the dungeon; they are
-            // not being asked anything.
-            if (continuing && grpGuid == continueGuid)
-            {
-                newProposal.answers[plrGuid] = LFG_ANSWER_AGREE;
-            }
+            continuingMember = continuing && grpGuid == continueGuid;
 
             SendLfgUpdate(plrGuid, GetPlayerStatus(plrGuid), true);
         }
@@ -412,7 +464,14 @@ void LFGMgr::SendDungeonProposal(ObjectGuid queueGuid, LFGPlayers* lfgGroup)
             SendLfgUpdate(plrGuid, GetPlayerStatus(plrGuid), false);
         }
 
-        newProposal.answers[plrGuid] = LFG_ANSWER_PENDING;
+        // Assign exactly once. Continuing members receive a silent proposal and
+        // therefore must already agree; newly matched players get the popup and
+        // remain pending until they answer it.
+        newProposal.answers[plrGuid] =
+            LFGStatePolicy::InitialProposalAnswer(continuingMember) ==
+                LFGStatePolicy::ProposalAnswerDecision::Agree
+                    ? LFG_ANSWER_AGREE
+                    : LFG_ANSWER_PENDING;
     }
 
     // Sent only once the proposal is COMPLETE.
@@ -440,6 +499,7 @@ void LFGMgr::SendDungeonProposal(ObjectGuid queueGuid, LFGPlayers* lfgGroup)
 
     // also save the proposal
     m_proposalMap[newProposal.id] = newProposal;
+    return true;
 }
 
 bool LFGMgr::IsLiveLfgRun(Group* pGroup)
@@ -515,6 +575,156 @@ void LFGMgr::DeclineProposal(ObjectGuid plrGuid, LFGProposal* proposal)
     CancelProposal(proposal->id, culprits);
 }
 
+bool LFGMgr::PrepareDungeonGroup(LFGProposal* proposal, DungeonGroupPlan& plan,
+                                 std::set<ObjectGuid>& culprits)
+{
+    if (!proposal)
+    {
+        return false;
+    }
+
+    bool validRoster = !proposal->currentRoles.empty() &&
+        proposal->currentRoles.size() == proposal->groups.size() &&
+        proposal->currentRoles.size() == proposal->answers.size();
+
+    for (roleMap::const_iterator it = proposal->currentRoles.begin();
+         it != proposal->currentRoles.end(); ++it)
+    {
+        if (proposal->groups.find(it->first) == proposal->groups.end())
+        {
+            validRoster = false;
+        }
+
+        proposalAnswerMap::const_iterator answer = proposal->answers.find(it->first);
+        if (answer == proposal->answers.end() || answer->second != LFG_ANSWER_AGREE)
+        {
+            validRoster = false;
+        }
+
+        if (!sObjectAccessor.FindPlayer(it->first))
+        {
+            culprits.insert(it->first);
+        }
+    }
+
+    uint32 const runDungeonId = proposal->concreteDungeonID
+        ? proposal->concreteDungeonID : proposal->dungeonID;
+    plan.dungeon = sLfgDungeonsStore.LookupEntry(runDungeonId);
+    if (plan.dungeon)
+    {
+        bool const isRaid = plan.dungeon->TypeID == LFG_TYPE_RAID;
+        plan.difficultyPlan = LFGStatePolicy::ResolveDifficulty(
+            ToInternalDifficulty(plan.dungeon->DifficultyID), isRaid,
+            uint8(MAX_DUNGEON_DIFFICULTY), uint8(MAX_RAID_DIFFICULTY));
+
+        uint32 const requestedSize = plan.dungeon->Count_tank +
+            plan.dungeon->Count_healer + plan.dungeon->Count_damage;
+        plan.convertToRaid = requestedSize > MAX_GROUP_SIZE;
+        plan.capacity = plan.convertToRaid ? MAX_RAID_SIZE : MAX_GROUP_SIZE;
+    }
+
+    if (proposal->groupRawGuid)
+    {
+        plan.group = sObjectMgr.GetGroupById(
+            ObjectGuid(proposal->groupRawGuid).GetCounter());
+        if (!IsLiveLfgRun(plan.group))
+        {
+            plan.group = NULL;
+        }
+    }
+
+    plan.createNewGroup = plan.group == NULL;
+    if (plan.createNewGroup)
+    {
+        // `.debug dungeon` keeps the game master in control of the generated group.
+        if (m_debugMode != LFG_DEBUG_OFF)
+        {
+            for (roleMap::const_iterator it = proposal->currentRoles.begin();
+                 it != proposal->currentRoles.end(); ++it)
+            {
+                Player* player = sObjectAccessor.FindPlayer(it->first);
+                if (player && player->GetSession() &&
+                    player->GetSession()->GetSecurity() >= SEC_GAMEMASTER)
+                {
+                    plan.leaderGuid = it->first;
+                    break;
+                }
+            }
+        }
+
+        for (roleMap::const_iterator it = proposal->currentRoles.begin();
+             !plan.leaderGuid && it != proposal->currentRoles.end(); ++it)
+        {
+            if ((it->second & PLAYER_ROLE_LEADER) &&
+                sObjectAccessor.FindPlayer(it->first))
+            {
+                plan.leaderGuid = it->first;
+            }
+        }
+
+        for (roleMap::const_iterator it = proposal->currentRoles.begin();
+             !plan.leaderGuid && it != proposal->currentRoles.end(); ++it)
+        {
+            if (sObjectAccessor.FindPlayer(it->first))
+            {
+                plan.leaderGuid = it->first;
+            }
+        }
+    }
+
+    plan.finalSize = plan.group ? plan.group->GetMembersCount() : 0;
+    for (roleMap::const_iterator it = proposal->currentRoles.begin();
+         it != proposal->currentRoles.end(); ++it)
+    {
+        if (!plan.group || !plan.group->IsMember(it->first))
+        {
+            ++plan.finalSize;
+        }
+    }
+
+    bool const allMembersOnline = validRoster && culprits.empty();
+    bool const hasGroupOrLeader = plan.group != NULL || bool(plan.leaderGuid);
+    if (!LFGStatePolicy::CanCompleteProposal(
+            allMembersOnline, plan.dungeon != NULL, plan.difficultyPlan.valid,
+            hasGroupOrLeader, plan.finalSize, plan.capacity))
+    {
+        if (!validRoster)
+        {
+            sLog.outError("LFG proposal %u has inconsistent role, answer or group rosters; "
+                          "cancelling before success.", proposal->id);
+        }
+        else if (!culprits.empty())
+        {
+            sLog.outError("LFG proposal %u lost %u accepted member(s) before success.",
+                          proposal->id, uint32(culprits.size()));
+        }
+        else if (!plan.dungeon)
+        {
+            sLog.outError("LFG proposal %u names unknown concrete dungeon %u.",
+                          proposal->id, runDungeonId);
+        }
+        else if (!plan.difficultyPlan.valid)
+        {
+            sLog.outError("LFG proposal %u dungeon %u has unsupported client "
+                          "DifficultyID %u.", proposal->id, plan.dungeon->ID,
+                          plan.dungeon->DifficultyID);
+        }
+        else if (!hasGroupOrLeader)
+        {
+            sLog.outError("LFG proposal %u has no live continuation group or online leader.",
+                          proposal->id);
+        }
+        else
+        {
+            sLog.outError("LFG proposal %u would create %u members over capacity %u.",
+                          proposal->id, plan.finalSize, plan.capacity);
+        }
+        return false;
+    }
+
+    return true;
+}
+
 void LFGMgr::ProposalUpdate(uint32 proposalID, ObjectGuid plrGuid, bool accepted)
 {
     //note: create a group here if it doesn't exist and everyone accepted proposal
@@ -574,7 +784,18 @@ void LFGMgr::ProposalUpdate(uint32 proposalID, ObjectGuid plrGuid, bool accepted
         return;
     }
 
-    // at this point everyone's good to join the dungeon!
+    // Prove the whole completion before telling any client it succeeded. This is
+    // intentionally before proposal->state changes and before the first SUCCESS,
+    // GROUP_FOUND or LEAVE body: a later FAILED cannot reliably undo that UI flow.
+    DungeonGroupPlan groupPlan;
+    std::set<ObjectGuid> culprits;
+    if (!PrepareDungeonGroup(proposal, groupPlan, culprits))
+    {
+        CancelProposal(proposal->id, culprits);
+        return;
+    }
+
+    // At this point everyone's online and the group can be built.
 
     time_t joinedTime = time(NULL);
     bool sendProposalUpdate = proposal->state != LFG_PROPOSAL_SUCCESS;
@@ -589,18 +810,7 @@ void LFGMgr::ProposalUpdate(uint32 proposalID, ObjectGuid plrGuid, bool accepted
 
         ObjectGuid proposalPlrGuid  = rItr->first;
         Player* pProposalPlayer = sObjectAccessor.FindPlayer(proposalPlrGuid);
-        if (!pProposalPlayer)
-        {
-            // Accepted, then logged out before the last answer arrived. allOkay still
-            // passed because their answer was already AGREE, and skipping them here
-            // built a SHORT group and teleported it while groupStatus recorded a role
-            // for someone who was never added. Cancel instead: the absent member is the
-            // culprit and everyone else goes back to the queue.
-            std::set<ObjectGuid> absent;
-            absent.insert(proposalPlrGuid);
-            CancelProposal(proposal->id, absent);
-            return;
-        }
+        MANGOS_ASSERT(pProposalPlayer);
 
         if (sendProposalUpdate)
         {
@@ -646,28 +856,21 @@ void LFGMgr::ProposalUpdate(uint32 proposalID, ObjectGuid plrGuid, bool accepted
         proposalPlrStatus.dungeonList.clear();
         proposalPlrStatus.dungeonList.insert(proposal->dungeonID);
 
-        // ONE key, used for both packets.
-        //
-        // The queue entry is owned by the player's CURRENT group if they have one --
-        // that is the same test JoinLFG used to key m_playerData -- so the GROUP_FOUND
-        // and the LEAVE that follows it must both be sent under that key. The LEAVE used
-        // to be sent TWICE, once in each form, on the theory that one of them would
-        // match. It cannot help: SendLfgUpdate picks requesterGuid from the isGroup flag,
-        // so the wrong-form copy names a queue the client is not tracking, and at accept
-        // time GetGroup() is still the player's OLD party rather than the LFG group being
-        // formed -- so the group-form copy could name a third guid again.
-        bool const queueIsGroupOwned = pProposalPlayer->GetGroup() != nullptr;
+        // ONE retained key, used for both packets. Current grouping is only the
+        // compatibility fallback; SendLfgUpdate keeps the requester originally announced
+        // for this queue even if the player's group changed during the proposal.
+        bool const fallbackIsGroupOwned = pProposalPlayer->GetGroup() != nullptr;
 
-        SendLfgUpdate(proposalPlrGuid, proposalPlrStatus, queueIsGroupOwned);
-        RemoveFromQueue(queueIsGroupOwned ? pProposalPlayer->GetGroup()->GetObjectGuid()
-                                          : proposalPlrGuid);
+        SendLfgUpdate(proposalPlrGuid, proposalPlrStatus, fallbackIsGroupOwned);
+        RemoveFromQueue(fallbackIsGroupOwned ? pProposalPlayer->GetGroup()->GetObjectGuid()
+                                             : proposalPlrGuid);
 
         proposalPlrStatus.updateType = LFG_UPDATE_LEAVE;
         proposalPlrStatus.dungeonList = queuedDungeons;
-        SendLfgUpdate(proposalPlrGuid, proposalPlrStatus, queueIsGroupOwned);
+        SendLfgUpdate(proposalPlrGuid, proposalPlrStatus, fallbackIsGroupOwned);
     }
 
-    CreateDungeonGroup(proposal);
+    CreateDungeonGroup(proposal, groupPlan);
 
     // Tear the queue entry down. TryFormGroup deliberately KEEPS it alive for the
     // lifetime of the proposal so a decline or timeout can put the survivors back --
@@ -704,12 +907,10 @@ bool LFGMgr::HasLeaderFlag(roleMap const& roles)
     return false;
 }
 
-void LFGMgr::CreateDungeonGroup(LFGProposal* proposal)
+void LFGMgr::CreateDungeonGroup(LFGProposal* proposal, DungeonGroupPlan const& plan)
 {
-    if (!proposal)
-    {
-        return;
-    }
+    MANGOS_ASSERT(proposal);
+    MANGOS_ASSERT(plan.dungeon);
 
     // Rewritten. The previous version had four independent defects on this one path:
     //
@@ -728,104 +929,25 @@ void LFGMgr::CreateDungeonGroup(LFGProposal* proposal)
     //    it, it leaked at shutdown, and the boot path called RemoveGroup on a group
     //    that had never been added.
     //
-    // Resolve the leader ONCE, up front, and require them to be online.
-    ObjectGuid leaderGuid;
+    // Everything which can be decided from the proposal, DBC and live group state was
+    // resolved before the first success packet. This function only commits that plan.
+    LfgDungeonsEntry const* dungeon = plan.dungeon;
+    LFGStatePolicy::DifficultyPlan const& difficultyPlan = plan.difficultyPlan;
+    Group* pGroup = plan.group;
+    bool const createdNewGroup = plan.createNewGroup;
 
-    // With `.debug dungeon` active a game master leads the dungeon regardless of who
-    // carries the LEADER bit, so the operator always has control of the group they are
-    // testing. Checked first, so it wins outright.
-    if (m_debugMode != LFG_DEBUG_OFF)
+    if (createdNewGroup)
     {
-        for (roleMap::const_iterator it = proposal->currentRoles.begin();
-             it != proposal->currentRoles.end(); ++it)
-        {
-            Player* pPlayer = sObjectAccessor.FindPlayer(it->first);
-            if (pPlayer && pPlayer->GetSession() &&
-                pPlayer->GetSession()->GetSecurity() >= SEC_GAMEMASTER)
-            {
-                leaderGuid = it->first;
-                break;
-            }
-        }
-    }
+        // A stale continuation snapshot was deliberately downgraded during preflight.
+        // Clear its identity so the status merge below creates a fresh run record.
+        proposal->groupRawGuid = 0;
+        proposal->groupLeaderGuid = 0;
 
-    for (roleMap::const_iterator it = proposal->currentRoles.begin();
-         !leaderGuid && it != proposal->currentRoles.end(); ++it)
-    {
-        if ((it->second & PLAYER_ROLE_LEADER) && sObjectAccessor.FindPlayer(it->first))
-        {
-            leaderGuid = it->first;
-            break;
-        }
-    }
-
-    // Looked up BEFORE anything is created. This used to sit after group creation, so
-    // an unknown dungeon id returned having already new'd a Group, run Create (a group
-    // id plus an INSERT INTO groups) and registered it with ObjectMgr -- leaking the
-    // object and stranding its rows, with the proposal also left in m_proposalMap.
-    // The CONCRETE dungeon: proposal->dungeonID may be a random category, which has no map.
-    // Older proposals predating the split carry 0 here, so fall back rather than refuse.
-    uint32 const runDungeonId = proposal->concreteDungeonID ? proposal->concreteDungeonID
-                                                            : proposal->dungeonID;
-    LfgDungeonsEntry const* dungeon = sLfgDungeonsStore.LookupEntry(runDungeonId);
-    if (!dungeon)
-    {
-        return;
-    }
-
-    Group* pGroup = nullptr;
-
-    if (proposal->groupRawGuid)
-    {
-        // Resolve by GROUP ID, not through the stored leader.
-        //
-        // The leader may have logged out, been promoted away, or left in the 45 seconds a
-        // proposal can sit open, and proposal->groups is a snapshot taken when it was
-        // built -- both are stale by the time anyone accepts. The group id is not.
-        pGroup = sObjectMgr.GetGroupById(ObjectGuid(proposal->groupRawGuid).GetCounter());
-
-        // VALIDATE, then DOWNGRADE -- never refuse here.
-        //
-        // By the time this runs, ProposalUpdate has already told every member the group
-        // was found and dequeued them. Refusing now would leave them holding that message
-        // with nothing behind it, and CancelProposal with an empty culprit set requeues
-        // the entry unchanged and re-proposes forever.
-        //
-        // Downgrading is safe in every case it can fire: if the group disbanded there is
-        // nothing left to continue, and if it finished its dungeon then forming a fresh
-        // group for these players is exactly right.
-        if (!IsLiveLfgRun(pGroup))
-        {
-            DEBUG_LOG("LFG CreateDungeonGroup: continuing group %s is gone or finished; "
-                      "forming a new group instead",
-                      ObjectGuid(proposal->groupRawGuid).GetString().c_str());
-            pGroup = nullptr;
-            proposal->groupRawGuid = 0;
-            proposal->groupLeaderGuid = 0;
-        }
-    }
-
-    if (!pGroup)
-    {
-        // No group to reuse: build one. The leader is whoever carries the LEADER bit
-        // and is online, else the first online member.
-        if (!leaderGuid)
-        {
-            for (playerGroupMap::const_iterator it = proposal->groups.begin();
-                 it != proposal->groups.end(); ++it)
-            {
-                if (sObjectAccessor.FindPlayer(it->first))
-                {
-                    leaderGuid = it->first;
-                    break;
-                }
-            }
-        }
-
-        Player* pLeader = sObjectAccessor.FindPlayer(leaderGuid);
+        Player* pLeader = sObjectAccessor.FindPlayer(plan.leaderGuid);
+        MANGOS_ASSERT(pLeader);
         if (!pLeader)
         {
-            return;     // everyone went offline; nothing to build
+            return; // defensive release-build guard; preflight proved this player live
         }
 
         // Detach from any prior group BEFORE creating, so Create does not run against a
@@ -835,31 +957,42 @@ void LFGMgr::CreateDungeonGroup(LFGProposal* proposal)
         // out of a two-man group makes RemoveMember Disband it, and Disband does not
         // delete the object or unregister it. The helper is the codebase's own
         // convention for exactly this and handles RemoveGroup plus delete.
-        for (playerGroupMap::const_iterator it = proposal->groups.begin();
-             it != proposal->groups.end(); ++it)
+        for (roleMap::const_iterator it = proposal->currentRoles.begin();
+             it != proposal->currentRoles.end(); ++it)
         {
             Player* pMember = sObjectAccessor.FindPlayer(it->first);
-            if (pMember && pMember->GetGroup())
+            MANGOS_ASSERT(pMember);
+            if (pMember->GetGroup())
             {
                 Player::RemoveFromGroup(pMember->GetGroup(), it->first);
             }
         }
 
         pGroup = new Group();
-        if (!pGroup->Create(pLeader->GetObjectGuid(), pLeader->GetName()))
+        bool const groupCreated = pGroup->Create(pLeader->GetObjectGuid(), pLeader->GetName());
+        MANGOS_ASSERT(groupCreated);
+        if (!groupCreated)
         {
+            sLog.outError("LFG: preflighted proposal %u failed to persist its dungeon group.",
+                          proposal->id);
             delete pGroup;
             return;
         }
 
+        // Group::Create inherits the leader's manual setting. Replace it before
+        // the group is marked LFG, registered, or given another member, so nobody
+        // observes or persists the wrong Heroic/Normal state.
+        if (difficultyPlan.isRaid)
+        {
+            pGroup->SetRaidDifficulty(Difficulty(difficultyPlan.mode));
+        }
+        else
+        {
+            pGroup->SetDungeonDifficulty(Difficulty(difficultyPlan.mode));
+        }
         pGroup->SetAsLfgGroup();
 
-        // A dungeon whose composition exceeds a party must be a RAID before anyone is
-        // added. Group::IsFull caps a normal party at MAX_GROUP_SIZE, and AddMember just
-        // returns false past that -- so a raid-finder proposal (2/6/17 = 25) silently
-        // completed as a five-man while the other twenty were told a group had been
-        // found, never added, and never teleported.
-        if (dungeon->Count_tank + dungeon->Count_healer + dungeon->Count_damage > MAX_GROUP_SIZE)
+        if (plan.convertToRaid)
         {
             pGroup->ConvertToRaid();
         }
@@ -867,15 +1000,35 @@ void LFGMgr::CreateDungeonGroup(LFGProposal* proposal)
         sObjectMgr.AddGroup(pGroup);
     }
 
+    if (!createdNewGroup)
+    {
+        // Continuing run: synchronize the run's selected mode before any matched
+        // replacement is added and inherits the group's current difficulty.
+        if (difficultyPlan.isRaid)
+        {
+            pGroup->SetRaidDifficulty(Difficulty(difficultyPlan.mode));
+        }
+        else
+        {
+            pGroup->SetDungeonDifficulty(Difficulty(difficultyPlan.mode));
+        }
+
+        if (plan.convertToRaid && !pGroup->isRaidGroup())
+        {
+            pGroup->ConvertToRaid();
+        }
+    }
+
     // Everyone in the proposal who is not already in this group joins it. That covers
     // both paths: a freshly created group needs every non-leader added, and a reused
     // premade needs the solo queuers that were matched into it.
     ObjectGuid const groupGuid = pGroup->GetObjectGuid();
-    for (playerGroupMap::const_iterator it = proposal->groups.begin();
-         it != proposal->groups.end(); ++it)
+    for (roleMap::const_iterator it = proposal->currentRoles.begin();
+         it != proposal->currentRoles.end(); ++it)
     {
         Player* pMember = sObjectAccessor.FindPlayer(it->first);
-        if (!pMember || pGroup->IsMember(it->first))
+        MANGOS_ASSERT(pMember);
+        if (pGroup->IsMember(it->first))
         {
             continue;
         }
@@ -885,81 +1038,18 @@ void LFGMgr::CreateDungeonGroup(LFGProposal* proposal)
             Player::RemoveFromGroup(existing, it->first);
         }
 
-        if (!pGroup->AddMember(it->first, pMember->GetName()))
+        bool const memberAdded = pGroup->AddMember(it->first, pMember->GetName());
+        MANGOS_ASSERT(memberAdded);
+        if (!memberAdded)
         {
-            // Ignoring this return is how the raid case failed silently. Say so.
-            sLog.outError("LFG: could not add %s to dungeon group %u (full at %u members).",
+            sLog.outError("LFG: preflighted proposal %u could not add %s to group %u "
+                          "(currently %u members).", proposal->id,
                           it->first.GetString().c_str(), pGroup->GetId(),
                           pGroup->GetMembersCount());
         }
     }
 
-    // `dungeon` is the lookup made at the top of this function, before any group was
-    // created -- it is not re-fetched here.
-    //
-    // LfgDungeons.dbc carries a RAW client DifficultyID. Casting it straight to
-    // Difficulty made LFG normal (id 1) select internal mode 1 -- HEROIC -- and LFG
-    // heroic (id 2) select mode 2, CHALLENGE. That value does not stay in the session:
-    // Group::SetDungeonDifficulty persists it to `groups`.`difficulty` and, through the
-    // members, to `characters`.`dungeon_difficulty`, so a single LFG run left every
-    // member's saved difficulty wrong.
-    int32 const dungeonMode = ToInternalDifficulty(dungeon->DifficultyID);
-
-    // Raids and dungeons keep their difficulty in DIFFERENT fields, and the two setters do not
-    // persist symmetrically:
-    //   SetDungeonDifficulty -> `groups`.`difficulty` and every member's
-    //                           `characters`.`dungeon_difficulty`
-    //   SetRaidDifficulty    -> `groups`.`raiddifficulty` only, plus in-memory
-    //                           Player::m_raidDifficulty
-    //
-    // There is deliberately no `characters`.`raid_difficulty` claim here: that column does not
-    // exist in the schema. The raid tier reaches a character through Player::_LoadGroup at the
-    // next login, not through a column of its own. An earlier revision of this comment asserted
-    // the symmetric pair and was wrong about half of it.
-    //
-    // Sending a raid through the dungeon setter therefore stores the raid tier in the dungeon slot
-    // and leaves the raid slot untouched. 61 of the 343 LfgDungeons rows are TypeID 2, and the
-    // tiers they carry translate to internal 0..3 -- client 3 and 9 to 0, 4 to 1, 5 to 2, 6 to 3.
-    // Internal 3 is 25-player heroic, which no 5-man tier corresponds to, so a group could end up
-    // holding a dungeon difficulty outside the range dungeon difficulties represent.
-    bool const isRaid = (dungeon->TypeID == LFG_TYPE_RAID);
-
-    if (dungeonMode < 0)
-    {
-        // UNREACHABLE from the queue: JoinLFG refuses any slot whose DifficultyID has no internal
-        // mode with ERR_LFG_INVALID_SLOT, and also filters the random-dungeon group expansion, which
-        // otherwise smuggles 20 scenario rows in behind a valid random selection. Together those are
-        // where an unsupported tier is actually rejected.
-        // By the time execution arrives here the group exists and its members have already been
-        // pulled out of their previous groups, so refusing is no longer an option -- all that is
-        // left is to avoid persisting a mode the core cannot read.
-        //
-        // So this is a safety net, not a policy, and it is deliberately loud: if it ever fires, a
-        // proposal reached here by some path that does not go through JoinLFG's admission check, and
-        // the group is about to be teleported into REGULAR_DIFFICULTY of a map it did not queue for.
-        // LFR (7), 5-man challenge (8), scenarios (11, 12) and flexible (14) have no internal
-        // equivalent; 77 of the 343 LfgDungeons rows are one of those, 4 of them raids.
-        sLog.outError("LFGMgr::CreateDungeonGroup: dungeon %u has client DifficultyID %u with no internal mode. "
-                      "JoinLFG should have refused this slot; falling back to regular difficulty.",
-                      dungeon->ID, dungeon->DifficultyID);
-
-        if (isRaid)
-        {
-            pGroup->SetRaidDifficulty(REGULAR_DIFFICULTY);
-        }
-        else
-        {
-            pGroup->SetDungeonDifficulty(REGULAR_DIFFICULTY);
-        }
-    }
-    else if (isRaid)
-    {
-        pGroup->SetRaidDifficulty(Difficulty(dungeonMode));
-    }
-    else
-    {
-        pGroup->SetDungeonDifficulty(Difficulty(dungeonMode));
-    }
+    MANGOS_ASSERT(pGroup->GetMembersCount() == plan.finalSize);
 
     // Add group to our group set and group map, then teleport to the dungeon.
     // groupGuid is the one taken above; do not shadow it.
@@ -1088,29 +1178,37 @@ void LFGMgr::TeleportToDungeon(uint32 dungeonID, Group* pGroup, Player* onlyPlay
         }
     }
 
-    if (teleportTo)
+    DungeonFinderEntrance const* lfgEntrance =
+        sObjectMgr.GetDungeonFinderEntrance(dungeonID);
+    AreaTrigger const* physicalEntrance = sObjectMgr.GetMapEntranceTrigger(mapID);
+
+    switch (LFGStatePolicy::ChooseEntranceSource(
+        teleportTo != NULL, lfgEntrance != NULL, physicalEntrance != NULL))
     {
-        x = teleportTo->GetPositionX();
-        y = teleportTo->GetPositionY();
-        z = teleportTo->GetPositionZ();
-        o = teleportTo->GetOrientation();
-    }
-    else
-    {
-        if (AreaTrigger const* at = sObjectMgr.GetMapEntranceTrigger(mapID))
-        {
-            x = at->target_X;
-            y = at->target_Y;
-            z = at->target_Z;
-            o = at->target_Orientation;
-        }
-        else
-        {
-            sLog.outError("LFG TeleportToDungeon: no map entrance trigger for map %u "
-                          "(dungeon %u) -- areatrigger_teleport has no row targeting it",
-                          mapID, dungeonID);
+        case LFGStatePolicy::EntranceSource::InMapMember:
+            x = teleportTo->GetPositionX();
+            y = teleportTo->GetPositionY();
+            z = teleportTo->GetPositionZ();
+            o = teleportTo->GetOrientation();
+            break;
+        case LFGStatePolicy::EntranceSource::LfgOnly:
+            x = lfgEntrance->x;
+            y = lfgEntrance->y;
+            z = lfgEntrance->z;
+            o = lfgEntrance->orientation;
+            break;
+        case LFGStatePolicy::EntranceSource::Physical:
+            x = physicalEntrance->target_X;
+            y = physicalEntrance->target_Y;
+            z = physicalEntrance->target_Z;
+            o = physicalEntrance->target_Orientation;
+            break;
+        case LFGStatePolicy::EntranceSource::None:
+            sLog.outError("LFG TeleportToDungeon: no LFG-only entrance for dungeon %u "
+                          "and no physical entrance targeting map %u",
+                          dungeonID, mapID);
             err = LFG_TELEPORTERROR_INVALID_LOCATION;
-        }
+            break;
     }
 
     dungeonForbidden lockedDungeons;
@@ -1924,45 +2022,8 @@ void LFGMgr::CastVote(Player* pPlayer, bool vote)
         return;
     }
 
-    // if we dont have enough votes to kick or keep plr, don't send packet update
-    // if else, set boot.inProgress to false, set plr + group states back to lfg-state-dungeon,
-    // send packet update to group, kick plr if we had the votes, and then erase entry from boot map
-
-    boot.inProgress = false;
-    status->state = LFG_STATE_IN_DUNGEON;
-    m_groupStatusMap[groupGuid] = *status;
-
     bool const passed = yay >= REQUIRED_VOTES_FOR_BOOT;
-
-    for (GroupReference* itr = pGroup->GetFirstMember(); itr != NULL; itr = itr->next())
-    {
-        if (Player* pGroupPlr = itr->getSource())
-        {
-            ObjectGuid plrGuid = pGroupPlr->GetObjectGuid();
-
-            if (plrGuid != boot.playerVotedOn)
-            {
-                SetPlayerState(plrGuid, LFG_STATE_IN_DUNGEON);
-                pGroupPlr->GetSession()->SendLfgBootUpdate(boot);
-            }
-        }
-    }
-
-    // The target is told the outcome too, and their state is restored either way.
-    // Skipping them entirely left a survivor of a failed vote stuck in
-    // LFG_STATE_BOOT for the rest of the run, which blocks the next vote against
-    // anyone and is invisible until someone tries.
-    if (Player* pVictim = sObjectAccessor.FindPlayer(boot.playerVotedOn))
-    {
-        SetPlayerState(boot.playerVotedOn, LFG_STATE_IN_DUNGEON);
-        pVictim->GetSession()->SendLfgBootUpdate(boot);
-    }
-
-    // The vote is over however it went; drop it before acting on the result so a
-    // rejected target can be voted on again later, and so RemoveMember below cannot
-    // re-enter this function against a boot that no longer exists. Nothing erased
-    // this map before, so one vote per group per session was the real behaviour.
-    m_bootStatusMap.erase(groupGuid);
+    FinishBootVote(groupGuid, pGroup, boot, passed, true);
 
     if (passed)
     {
@@ -2016,13 +2077,13 @@ void LFGMgr::SendRoleCheckUpdate(ObjectGuid plrGuid, LFGRoleCheck const& roleChe
     }
 }
 
-void LFGMgr::SendLfgUpdate(ObjectGuid plrGuid, LFGPlayerStatus status, bool isGroup)
+void LFGMgr::SendLfgUpdate(ObjectGuid plrGuid, LFGPlayerStatus status, bool fallbackIsGroup)
 {
     Player* pPlayer = sObjectAccessor.FindPlayer(plrGuid);
 
     if (pPlayer)
     {
-        pPlayer->GetSession()->SendLfgUpdate(isGroup, status);
+        pPlayer->GetSession()->SendLfgUpdate(fallbackIsGroup, status);
     }
 }
 
