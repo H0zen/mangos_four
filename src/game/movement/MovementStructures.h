@@ -560,8 +560,13 @@ MovementStatusElements MovementSetFacingSequence[] =
     MSEHasSplineElevation,
     MSEHasTransportData,
     MSEGuidBit7,
-    MSETransportGuidBit0,
+    // Bit 7 leads bit 0 here. The client's writer sub_67FFA9 emits the transport
+    // presence bits as +63, +56, HasTime2, +59, +62, HasTime3, +58, +61, +57,
+    // +60; the inherited sequence had the first pair the other way round, so a
+    // mover on a transport exchanged transport GUID bytes 0 and 7. The byte
+    // count is unaffected, which is why it never desynced the body.
     MSETransportGuidBit7,
+    MSETransportGuidBit0,
     MSEHasTransportTime2,
     MSETransportGuidBit3,
     MSETransportGuidBit6,

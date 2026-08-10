@@ -331,7 +331,11 @@ static RefOp const kSetFacing[] = {
     RefOp::ForceCount, RefOp::Raw172, RefOp::HasPitch, G(0), RefOp::HasOrientation,
     RefOp::HasTimestamp, RefOp::Raw148, RefOp::HasUnknownUInt32, G(4), RefOp::Raw149,
     G(1), G(6), RefOp::HasFall, RefOp::HasFlags, RefOp::HasSplineElevation, RefOp::HasTransport, G(7),
-    T(0), T(7), RefOp::HasTransportTime2, T(3), T(6), RefOp::HasTransportTime3,
+    // T(7) before T(0): this list was transcribed from the production sequence,
+    // so it carried that sequence's transposed first transport pair. The client's
+    // writer sub_67FFA9 emits +63 then +56, and +56 is transport byte 0 in every
+    // other opcode, so byte 7 leads.
+    T(7), T(0), RefOp::HasTransportTime2, T(3), T(6), RefOp::HasTransportTime3,
     T(2), T(5), T(1), T(4), RefOp::HasFallDirection, RefOp::Flags2, RefOp::Flags,
     RefOp::ForceIds, GB(0), GB(6), GB(3), GB(1), GB(2), GB(7), GB(4), GB(5),
     TB(0), TB(2), RefOp::TransportO, TB(7), RefOp::TransportTime3, TB(5),
