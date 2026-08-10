@@ -171,24 +171,23 @@ void PlayerSocial::SetFriendNote(ObjectGuid friend_guid, std::string note)
     m_playerSocialMap[friend_guid.GetCounter()].Note = note;
 }
 
-/// KNOWN DEFECT, 18414: each entry is missing two uint32 realm-address fields
-/// between the GUID and the type flags. The client's reader (sub_A6AAB5 at
-/// 0x00A6AAB5) takes guid, realmAddrA, realmAddrB, typeFlags, NUL-terminated
+/// FIXED, 18414: the two uint32 realm-address fields that belonged between the
+/// GUID and the type flags are now written. The client's reader (sub_A6AAB5 at
+/// 0x00A6AAB5) takes guid, virtualRealm, nativeRealm, typeFlags, NUL-terminated
 /// note, and only then -- if the friend bit is set -- a status byte plus an
-/// online-only area/level/class triple. Everything below except those two
-/// missing fields is 18414-correct, but without them the client loses alignment
-/// immediately after the GUID.
+/// online-only area/level/class triple. Without those two fields the client lost
+/// alignment immediately after the GUID.
 ///
-/// Nothing builds this today. The login call from
+/// The body now goes through MopSocialPackets::BuildContactList, which has a
+/// byte-exact fixture over the retail two-entry list recorded in Opcodes.cpp.
+///
+/// Note the login path still does not build this: the call from
 /// Player::SendInitialPacketsBeforeAddToMap runs before Map::Add, and the lookup
-/// below goes through ObjectAccessor::FindPlayer with inWorld=true, so it
-/// returns early there. The in-world path is reached only by registering
-/// CMSG_CONTACT_LIST, which is why that opcode stays dormant; and even then
-/// SMSG_CONTACT_LIST is not admitted by IsEnterWorldConverted, so the reply
-/// would be dropped. Fix the two missing fields before either gate is opened.
+/// below goes through ObjectAccessor::FindPlayer with inWorld=true, so it returns
+/// early there. The in-world path is reached by registering CMSG_CONTACT_LIST.
 ///
 /// The full layout and the corpus bytes are recorded in Opcodes.cpp beside the
-/// CMSG_CONTACT_LIST dormancy note.
+/// CMSG_CONTACT_LIST note.
 void PlayerSocial::SendSocialList()
 {
     Player* plr = sObjectMgr.GetPlayer(ObjectGuid(HIGHGUID_PLAYER, m_playerLowGuid));
@@ -197,31 +196,36 @@ void PlayerSocial::SendSocialList()
         return;
     }
 
-    uint32 size = m_playerSocialMap.size();
-
-    WorldPacket data(SMSG_CONTACT_LIST, (4 + 4 + size * 25)); // just can guess size
-    data << uint32(7);                                      // unk flag (0x1, 0x2, 0x4), 0x7 if it include ignore list
-    data << uint32(size);                                   // friends count
+    std::vector<MopSocialPackets::ContactEntry> entries;
+    entries.reserve(m_playerSocialMap.size());
 
     for (PlayerSocialMap::iterator itr = m_playerSocialMap.begin(); itr != m_playerSocialMap.end(); ++itr)
     {
         FriendInfo& friendInfo = itr->second;
         sSocialMgr.GetFriendInfo(plr, itr->first, friendInfo);
 
-        data << ObjectGuid(HIGHGUID_PLAYER, itr->first);    // player guid
-        data << uint32(friendInfo.Flags);                  // player flag (0x1-friend?, 0x2-ignored?, 0x4-muted?)
-        data << friendInfo.Note;                           // string note
-        if (friendInfo.Flags & SOCIAL_FLAG_FRIEND)         // if IsFriend()
-        {
-            data << uint8(friendInfo.Status);              // online/offline/etc?
-            if (friendInfo.Status)                         // if online
-            {
-                data << uint32(friendInfo.Area);           // player area
-                data << uint32(friendInfo.Level);          // player level
-                data << uint32(friendInfo.Class);          // player class
-            }
-        }
+        MopSocialPackets::ContactEntry e;
+        e.guid = ObjectGuid(HIGHGUID_PLAYER, itr->first).GetRawValue();
+        // Single-realm server: a contact is always on this realm, so both
+        // addresses are our own. Retail carries two DIFFERENT values because they
+        // encode region and site alongside the realm id, and a cross-realm contact
+        // is presented under one address while living on another. Guild.cpp already
+        // uses realmID for its virtualRealm field, so this stays consistent with
+        // the only other place the core writes a realm address.
+        e.virtualRealm = realmID;
+        e.nativeRealm = realmID;
+        e.typeFlags = friendInfo.Flags;                    // 0x1 friend, 0x2 ignored, 0x4 muted
+        e.note = friendInfo.Note;
+        e.status = uint8(friendInfo.Status);
+        e.areaId = friendInfo.Area;
+        e.level = friendInfo.Level;
+        e.classId = friendInfo.Class;
+        entries.push_back(e);
     }
+
+    // 0x7 = friends, ignore and mute lists all present.
+    WorldPacket data(SMSG_CONTACT_LIST, 4 + 4 + entries.size() * 25);
+    MopSocialPackets::BuildContactList(data, 7, entries);
 
     plr->GetSession()->SendPacket(&data);
     DEBUG_LOG("WORLD: Sent SMSG_CONTACT_LIST");

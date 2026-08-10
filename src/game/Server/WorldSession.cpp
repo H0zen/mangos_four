@@ -338,6 +338,16 @@ static bool IsEnterWorldConverted(uint16 opcode)
         case SMSG_START_TIMER:                       // max time, remaining time, timer type; sub_6E7584
         case SMSG_CALENDAR_SEND_NUM_PENDING:         // one uint32 pending count; sub_6D9F28 -> sub_40F340
         case SMSG_DB_REPLY:                          // entry, hotfix date, table hash, byte-count, record; sub_708034 -> sub_6E5250
+        // Admitted only now that the body is 18414-correct. It previously omitted
+        // the two per-entry realm addresses, so the client lost alignment after
+        // the first GUID. MopSocialPackets::BuildContactList carries a byte-exact
+        // fixture over the retail two-entry list. Note the empty list was NOT
+        // evidence either way -- it is identical with and without the fix.
+        case SMSG_CONTACT_LIST:                      // MopSocialPackets::BuildContactList; client reader sub_A6AAB5
+        // uint8 result + raw uint64 guid, then a per-result tail. Client handler
+        // 0x00A6BCED -> sub_A6A2B2. Unchanged body -- it was already 18414-correct
+        // for every result the server can emit; only the gate was missing.
+        case SMSG_FRIEND_STATUS:                     // SocialMgr::SendFriendStatus
         case SMSG_CLIENT_CONTROL_UPDATE:           // MopControlPackets::BuildClientControlUpdate
         case SMSG_MOVE_SET_ACTIVE_MOVER:           // MopControlPackets::BuildSetActiveMover
         case SMSG_PLAYER_MOVE:                     // MovementInfo relay serializer

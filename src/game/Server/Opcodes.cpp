@@ -1639,19 +1639,25 @@ void InitializeOpcodes()
     // button is a misparse by another name. Promote once those two are
     // identified and accepted.
 
-    // CMSG_CONTACT_LIST (0x0BB4, 4,122 observed) is deliberately NOT registered,
-    // and this note exists because it looks safe and is not.
+    // CMSG_CONTACT_LIST (0x0BB4, 4,122 observed) is now REGISTERED. It was held
+    // dormant because its reply was wrong, not because its request was.
     //
-    // Its inbound side is one uint32 whose width matches every observed
-    // four-byte body. The reply is what blocks it: registering the CMSG makes
-    // HandleContactListOpcode call PlayerSocial::SendSocialList for a player who
-    // IS in world, which builds SMSG_CONTACT_LIST (0x1F22) from a serializer
-    // that is missing two fields.
+    // Its inbound side is one uint32, confirmed against the client's own writer:
+    // this opcode has no vtable thunk and is sent through the direct route --
+    // sub_A67E96 builds a stack-local packet on off_D298F8, writes 2996 then a
+    // single uint32, and sends via sub_A65935. HandleContactListOpcode reads
+    // exactly that.
     //
-    // Two gates therefore stand between here and a visible defect, and both
-    // matter. SMSG_CONTACT_LIST is also absent from IsEnterWorldConverted, so
-    // even once built the reply is dropped in-world. Neither gate on its own is
-    // the reason to stay dormant: the reason is that the body is wrong.
+    // What blocked it was the reply. SendSocialList omitted the two per-entry
+    // realm addresses that sit between the GUID and the type flags, so the client
+    // lost alignment immediately after the first GUID. That is fixed:
+    // MopSocialPackets::BuildContactList now carries them and has a byte-exact
+    // fixture over the retail two-entry list below. SMSG_CONTACT_LIST is also
+    // admitted to IsEnterWorldConverted, so the reply now survives suppression.
+    //
+    // Keep the retail bytes below. The trap they exist to defeat is that the
+    // EMPTY list agrees byte for byte with the old broken serializer, so any
+    // check that stops at the header passes on a defect.
     //
     // Note the login path does NOT build this packet. Player::
     // SendInitialPacketsBeforeAddToMap calls SendSocialList before Map::Add, and
@@ -1697,7 +1703,39 @@ void InitializeOpcodes()
     // type flags, the NUL-terminated note, the status byte and the online-only
     // area/level/class triple in that order, is 18414-correct.
     //
-    // It returns once SendSocialList carries the two realm addresses, populated
-    // cases have byte-exact fixtures, and SMSG_CONTACT_LIST is admitted to
-    // IsEnterWorldConverted.
+    // All three conditions are now met, so it returns.
+    DefC(CMSG_CONTACT_LIST, "CMSG_CONTACT_LIST", STATUS_LOGGEDIN, PROCESS_THREADUNSAFE, &WorldSession::HandleContactListOpcode);
+    DefS(SMSG_CONTACT_LIST, "SMSG_CONTACT_LIST");
+
+    // The rest of the contact subsystem, which was dormant for the same reason.
+    // All five are DIRECT senders -- no vtable thunk -- so the thunk table never
+    // saw them; each was recovered from its inline writer instead:
+    //
+    //   CMSG_ADD_FRIEND        0x09A6  sub_A68A9B  two cstrings: name, then note
+    //   CMSG_DEL_FRIEND        0x1103  sub_A68B5F  raw uint64 guid
+    //   CMSG_ADD_IGNORE        0x0D20  sub_A6901C  one cstring: name
+    //   CMSG_DEL_IGNORE        0x0737  sub_A6901C  raw uint64 guid
+    //   CMSG_SET_CONTACT_NOTES 0x0937  sub_A68BBA  raw uint64 guid, then a cstring
+    //
+    // sub_40F2AE writes strlen+1 bytes, so those really are NUL-terminated
+    // cstrings and the existing `>> std::string` readers are right as they stand.
+    // Every one of the five readers already matched its writer; none needed a fix.
+    //
+    // The reply, SMSG_FRIEND_STATUS (0x0532), also needed no change. Its client
+    // handler is 0x00A6BCED -> sub_A6A2B2: a uint8 result and a raw uint64 guid,
+    // then a per-result tail. Only three results carry one, and each matches what
+    // SendFriendStatus already writes -- 0x02 status/area/level/class, 0x06 note
+    // then status/area/level/class, 0x07 note alone. Every other result the server
+    // can emit reads nothing further, so the existing bodies are 18414-correct.
+    // The client's arms 26 and 27 read a trailing byte and uint32, but no server
+    // path can produce either result, so they stay unreachable.
+    //
+    // What was missing was purely the send gate: SMSG_FRIEND_STATUS is now
+    // admitted by IsEnterWorldConverted, which it was not before.
+    DefC(CMSG_ADD_FRIEND, "CMSG_ADD_FRIEND", STATUS_LOGGEDIN, PROCESS_THREADUNSAFE, &WorldSession::HandleAddFriendOpcode);
+    DefC(CMSG_DEL_FRIEND, "CMSG_DEL_FRIEND", STATUS_LOGGEDIN, PROCESS_THREADUNSAFE, &WorldSession::HandleDelFriendOpcode);
+    DefC(CMSG_ADD_IGNORE, "CMSG_ADD_IGNORE", STATUS_LOGGEDIN, PROCESS_THREADUNSAFE, &WorldSession::HandleAddIgnoreOpcode);
+    DefC(CMSG_DEL_IGNORE, "CMSG_DEL_IGNORE", STATUS_LOGGEDIN, PROCESS_THREADUNSAFE, &WorldSession::HandleDelIgnoreOpcode);
+    DefC(CMSG_SET_CONTACT_NOTES, "CMSG_SET_CONTACT_NOTES", STATUS_LOGGEDIN, PROCESS_THREADUNSAFE, &WorldSession::HandleSetContactNotesOpcode);
+    DefS(SMSG_FRIEND_STATUS, "SMSG_FRIEND_STATUS");
 }

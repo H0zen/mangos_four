@@ -29,6 +29,10 @@
 #include "Policies/Singleton.h"
 #include "Database/DatabaseEnv.h"
 #include "ObjectGuid.h"
+#include "ByteBuffer.h"
+
+#include <string>
+#include <vector>
 
 class SocialMgr;
 class PlayerSocial;
@@ -157,6 +161,63 @@ class SocialMgr
     private:
         SocialMap m_socialMap;
 };
+
+namespace MopSocialPackets
+{
+    /// One SMSG_CONTACT_LIST entry, in wire order.
+    struct ContactEntry
+    {
+        uint64      guid = 0;
+        uint32      virtualRealm = 0;   ///< realm the contact is presented as
+        uint32      nativeRealm = 0;    ///< the contact's home realm
+        uint32      typeFlags = 0;      ///< 1 friend, 2 ignored, 4 muted
+        std::string note;
+        uint8       status = 0;         ///< friend-only; 0 = offline
+        uint32      areaId = 0;         ///< online-only
+        uint32      level = 0;          ///< online-only
+        uint32      classId = 0;        ///< online-only
+    };
+
+    /// Body-only 18414 SMSG_CONTACT_LIST serializer.
+    ///
+    /// Byte-aligned throughout -- this packet carries no bit-packing. The client's
+    /// reader is sub_A6AAB5 (asserts "FriendList.cpp"), and the two realm
+    /// addresses sit between the GUID and the type flags. Omitting them, as this
+    /// core did until now, loses alignment immediately after the GUID: the first
+    /// realm address lands where the type flags are read.
+    ///
+    /// Verified against the retail bytes recorded beside the CMSG_CONTACT_LIST
+    /// note in Opcodes.cpp -- a two-entry list consuming exactly 50 bytes.
+    ///
+    /// The status byte and the online-only triple are written ONLY when the friend
+    /// bit is set. An ignore- or mute-only entry ends at the note, which is why a
+    /// populated entry can be as short as 21 bytes.
+    inline void BuildContactList(ByteBuffer& out, uint32 listFlags,
+                                 std::vector<ContactEntry> const& entries)
+    {
+        out << uint32(listFlags);
+        out << uint32(entries.size());
+
+        for (ContactEntry const& e : entries)
+        {
+            out << uint64(e.guid);
+            out << uint32(e.virtualRealm);
+            out << uint32(e.nativeRealm);
+            out << uint32(e.typeFlags);
+            out << e.note;                                  // NUL-terminated
+            if (e.typeFlags & SOCIAL_FLAG_FRIEND)
+            {
+                out << uint8(e.status);
+                if (e.status)                               // online only
+                {
+                    out << uint32(e.areaId);
+                    out << uint32(e.level);
+                    out << uint32(e.classId);
+                }
+            }
+        }
+    }
+}
 
 #define sSocialMgr MaNGOS::Singleton<SocialMgr>::Instance()
 #endif
