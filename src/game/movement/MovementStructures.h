@@ -2220,23 +2220,26 @@ MovementStatusElements MovementChngTransportSequence[]=
 
 MovementStatusElements MovementSetRunModeSequence[] =
 {
-    // ⚠️ NOT REBUILT, and DO NOT REGISTER until the value question below is
-    // settled. Every sibling in this file was rebuilt from its client writer;
-    // this one could not be, because the writer reached from 0x0748 is not a
-    // movement writer at all.
+    // ⚠️ NOT REBUILT, and it should not be: CMSG_MOVE_SET_RUN_MODE does not exist
+    // in 5.4.8. Opcodes.h marks 0x0748 "not in 5.4.8 (legacy; handler retained)",
+    // and that is the whole explanation.
     //
-    // sub_68937A emits two uint32 from +272 and +288, an eight-bit presence mask
-    // for a GUID at +280..+287, a bit-packed string length, the present GUID
-    // bytes and then a string from +16. That is a GUID-plus-name request, not a
-    // movement block, and it has none of the movement struct's offsets.
+    // Every sibling here was rebuilt from its client writer. This one could not be,
+    // because 0x0748 in an 18414 client belongs to a DIFFERENT opcode: the writer
+    // reached from it, sub_68937A, emits two uint32 from +272 and +288, an
+    // eight-bit presence mask for a GUID at +280..+287, a bit-packed string length,
+    // the present GUID bytes, then a string from +16. That is a GUID-plus-name
+    // request and shares none of the movement struct's offsets.
     //
-    // The corpus agrees it is not movement: opcode 0x0748 shows 1,976 packets in
-    // build 18414 at 15-17 bytes, where every movement body in this file runs
-    // 28-83. Catalogue 2BE10C89.
+    // The corpus says the same: 0x0748 shows 1,976 packets in 18414 at 15-17 bytes,
+    // where every movement body in this file runs 28-83. Catalogue 2BE10C89. Those
+    // packets belong to that other opcode, not to this name.
     //
-    // So either CMSG_MOVE_SET_RUN_MODE's value is wrong, or this sequence is
-    // attached to the wrong opcode. Resolve that before touching either. The
-    // sequence below is the inherited one, left exactly as found.
+    // So there is no defect to fix and no value to correct -- only a legacy name
+    // and value retained for a handler that 5.4.8 never exercises. Do not rebuild
+    // this sequence from 0x0748's writer, and do not register it. If the retained
+    // handler is ever wanted, first establish which 18414 opcode, if any, carries
+    // that meaning. The sequence below is the inherited one, left exactly as found.
     MSEPositionY,
     MSEPositionX,
     MSEPositionZ,
