@@ -356,6 +356,9 @@ static bool IsEnterWorldConverted(uint16 opcode)
         // constructor that reads nothing, and SendCalendarClearPendingAction has
         // always sent a zero-length body. It never needed converting, only admitting.
         case SMSG_CALENDAR_CLEAR_PENDING_ACTION:     // CalendarMgr::SendCalendarClearPendingAction
+        // u64 eventId, u32 packedTime, then a trailing BIT. Rebuilt from the
+        // client's reader sub_6EC557; the flag used to lead as a byte.
+        case SMSG_CALENDAR_EVENT_REMOVED_ALERT:      // CalendarMgr::SendCalendarEventRemovedAlert
         case SMSG_CLIENT_CONTROL_UPDATE:           // MopControlPackets::BuildClientControlUpdate
         case SMSG_MOVE_SET_ACTIVE_MOVER:           // MopControlPackets::BuildSetActiveMover
         case SMSG_PLAYER_MOVE:                     // MovementInfo relay serializer

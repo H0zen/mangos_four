@@ -954,11 +954,23 @@ void CalendarMgr::SendCalendarCommandResult(Player* player, CalendarError err, c
 void CalendarMgr::SendCalendarEventRemovedAlert(CalendarEvent const* event)
 {
     DEBUG_FILTER_LOG(LOG_FILTER_CALENDAR, "SMSG_CALENDAR_EVENT_REMOVED_ALERT");
-    WorldPacket data(SMSG_CALENDAR_EVENT_REMOVED_ALERT, 1 + 8 + 1);
-    data << uint8(1);       // show pending alert?
+
+    // 18414 body, from the client's reader sub_6EC557 (reached via sub_6F6809,
+    // which constructs on vtable off_D6AE78):
+    //
+    //     u64    eventId          sub_660A2A -> sub_40F370
+    //     u32    packedTime       sub_40F340
+    //     1 bit  showPendingAlert sub_665262, MSB-first, then flushed
+    //
+    // The flag is a trailing BIT, not a leading byte. The previous body led with
+    // uint8(1) and put the two scalars after it, so all three fields landed in the
+    // wrong places.
+    WorldPacket data(SMSG_CALENDAR_EVENT_REMOVED_ALERT, 8 + 4 + 1);
     data << uint64(event->EventId);
     data << secsToTimeBitFields(event->EventTime);
-    //data.hexlike();
+    data.WriteBit(1);                                       // show pending alert
+    data.FlushBits();
+
     SendPacketToAllEventRelatives(data, event);
 }
 

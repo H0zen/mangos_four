@@ -1471,15 +1471,19 @@ void InitializeOpcodes()
     DefC(CMSG_CALENDAR_EVENT_RSVP, "CMSG_CALENDAR_EVENT_RSVP", STATUS_LOGGEDIN, PROCESS_THREADUNSAFE, &WorldSession::HandleCalendarEventRsvp);
     DefS(SMSG_CALENDAR_CLEAR_PENDING_ACTION, "SMSG_CALENDAR_CLEAR_PENDING_ACTION");
 
+    // And REMOVE_EVENT, once SMSG_CALENDAR_EVENT_REMOVED_ALERT was rebuilt from the
+    // client's reader sub_6EC557 -- u64 eventId, u32 packedTime, then a trailing
+    // BIT. The old body led with uint8(1), which put all three fields in the wrong
+    // places. Its request reader (sub_665987: u64, u64, u32) was already correct.
+    DefC(CMSG_CALENDAR_REMOVE_EVENT, "CMSG_CALENDAR_REMOVE_EVENT", STATUS_LOGGEDIN, PROCESS_THREADUNSAFE, &WorldSession::HandleCalendarRemoveEvent);
+    DefS(SMSG_CALENDAR_EVENT_REMOVED_ALERT, "SMSG_CALENDAR_EVENT_REMOVED_ALERT");
+
     // PARKED 2026-08-10: the remaining ten calendar CMSGs stay dormant. The shared
     // blocker is GONE -- SMSG_CALENDAR_COMMAND_RESULT is rebuilt and admitted --
     // and what is left is per-opcode.
     //
     // Blocked on an UNCONVERTED REPLY (reader state noted separately):
     //
-    //   CMSG_CALENDAR_REMOVE_EVENT     0x0C61  sub_665987  reader PROVEN
-    //        -> SMSG_CALENDAR_EVENT_REMOVED_ALERT (parser sub_6F6809 per
-    //           bridge_548.json, not yet decoded)
     //   CMSG_CALENDAR_EVENT_INVITE     0x1D8E  sub_66CA8E  reader unproven
     //        -> SMSG_CALENDAR_EVENT_INVITE
     //   CMSG_CALENDAR_UPDATE_EVENT     0x1F8D  sub_66D0A3  reader unproven
