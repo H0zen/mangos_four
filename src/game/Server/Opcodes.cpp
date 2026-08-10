@@ -1434,33 +1434,61 @@ void InitializeOpcodes()
     DefC(CMSG_CALENDAR_GET_NUM_PENDING, "CMSG_CALENDAR_GET_NUM_PENDING", STATUS_LOGGEDIN, PROCESS_THREADUNSAFE, &WorldSession::HandleCalendarGetNumPending);
     DefS(SMSG_CALENDAR_SEND_NUM_PENDING, "SMSG_CALENDAR_SEND_NUM_PENDING");
 
-    // PARKED 2026-08-10: the twelve remaining calendar CMSGs stay dormant, and
-    // the blocker is ONE reply shared by all of them.
+    // Two promoted 2026-08-10, once SMSG_CALENDAR_COMMAND_RESULT was rebuilt from
+    // the client's parser sub_706B85 and admitted. Both clear all four gates:
     //
-    //   CMSG_CALENDAR_EVENT_SIGNUP            0x01E3  sub_6665D7
-    //   CMSG_CALENDAR_GUILD_FILTER            0x04E3  sub_668A7F
-    //   CMSG_CALENDAR_EVENT_MODERATOR_STATUS  0x0708  sub_6657A5
-    //   CMSG_CALENDAR_EVENT_REMOVE_INVITE     0x0962  sub_669371
-    //   CMSG_CALENDAR_ADD_EVENT               0x0A37  sub_66D4E2
-    //   CMSG_CALENDAR_REMOVE_EVENT            0x0C61  sub_665987
-    //   CMSG_CALENDAR_COPY_EVENT              0x1A97  sub_665987  (same writer)
-    //   CMSG_CALENDAR_EVENT_STATUS            0x1AB3  sub_667F7B
-    //   CMSG_CALENDAR_EVENT_INVITE            0x1D8E  sub_66CA8E
-    //   CMSG_CALENDAR_UPDATE_EVENT            0x1F8D  sub_66D0A3
-    //   CMSG_CALENDAR_COMPLAIN                0x1F8F  sub_6669F0
-    //   CMSG_CALENDAR_EVENT_RSVP              0x1FB8  sub_66919E
+    //   CMSG_CALENDAR_GUILD_FILTER 0x04E3, writer sub_668A7F -- three uint8. The
+    //   reader asked for three uint32 until this pass; fixed here. Replies are
+    //   SMSG_CALENDAR_EVENT_INITIAL_INVITE (already converted and admitted) and the
+    //   command result, both reached via Guild::MassInviteToEvent.
     //
-    // EVERY one of them reaches CalendarMgr::SendCalendarCommandResult, directly
-    // or through CalendarMgr/Guild, and SMSG_CALENDAR_COMMAND_RESULT (0x142A) is
-    // still the legacy body: uint32(0), uint8(0), then either a cstring param or
-    // uint8(0), then uint32(err). It is neither converted nor admitted by
-    // IsEnterWorldConverted. Registering any of these makes the server answer with
-    // that body, which is the CMSG_CONTACT_LIST mistake exactly.
+    //   CMSG_CALENDAR_COPY_EVENT 0x1A97, writer sub_665987 -- uint64 eventId,
+    //   uint64 inviteId, uint32 packedTime. The reader already matched. Replies are
+    //   SMSG_CALENDAR_SEND_EVENT (converted, admitted) and the command result, via
+    //   CalendarMgr::CopyEvent.
     //
-    // Note the reply gate is NOT visible from the handler alone. Three of the
-    // twelve -- GUILD_FILTER, REMOVE_EVENT, COPY_EVENT -- emit no SMSG in their own
-    // body and look free; they reach the command result one level down, inside
-    // CalendarMgr::RemoveEvent, CalendarMgr::CopyEvent and Guild::MassInviteToEvent.
+    // CMSG_CALENDAR_REMOVE_EVENT (0x0C61) shares sub_665987 and its reader is
+    // likewise already correct, but it is NOT promoted: CalendarMgr::RemoveEvent
+    // also emits SMSG_CALENDAR_EVENT_REMOVED_ALERT, which is neither converted nor
+    // admitted. Reader proven, reply not -- so it waits.
+    DefC(CMSG_CALENDAR_GUILD_FILTER, "CMSG_CALENDAR_GUILD_FILTER", STATUS_LOGGEDIN, PROCESS_THREADUNSAFE, &WorldSession::HandleCalendarGuildFilter);
+    DefC(CMSG_CALENDAR_COPY_EVENT, "CMSG_CALENDAR_COPY_EVENT", STATUS_LOGGEDIN, PROCESS_THREADUNSAFE, &WorldSession::HandleCalendarCopyEvent);
+    DefS(SMSG_CALENDAR_COMMAND_RESULT, "SMSG_CALENDAR_COMMAND_RESULT");
+
+    // PARKED 2026-08-10: the remaining ten calendar CMSGs stay dormant. The shared
+    // blocker is GONE -- SMSG_CALENDAR_COMMAND_RESULT is rebuilt and admitted --
+    // and what is left is per-opcode.
+    //
+    // Blocked on an UNCONVERTED REPLY (reader state noted separately):
+    //
+    //   CMSG_CALENDAR_REMOVE_EVENT     0x0C61  sub_665987  reader PROVEN
+    //        -> SMSG_CALENDAR_EVENT_REMOVED_ALERT
+    //   CMSG_CALENDAR_EVENT_SIGNUP     0x01E3  sub_6665D7  reader unproven
+    //   CMSG_CALENDAR_EVENT_STATUS     0x1AB3  sub_667F7B  reader unproven
+    //   CMSG_CALENDAR_EVENT_RSVP       0x1FB8  sub_66919E  reader unproven
+    //        -> SMSG_CALENDAR_CLEAR_PENDING_ACTION
+    //   CMSG_CALENDAR_EVENT_INVITE     0x1D8E  sub_66CA8E  reader unproven
+    //        -> SMSG_CALENDAR_EVENT_INVITE
+    //   CMSG_CALENDAR_UPDATE_EVENT     0x1F8D  sub_66D0A3  reader unproven
+    //        -> SMSG_CALENDAR_EVENT_UPDATED_ALERT
+    //   CMSG_CALENDAR_COMPLAIN         0x1F8F  sub_6669F0  reader unproven
+    //        -> SMSG_COMPLAIN_RESULT
+    //
+    // Reply is fine, blocked on the READER:
+    //
+    //   CMSG_CALENDAR_ADD_EVENT              0x0A37  sub_66D4E2
+    //        Needs a full rewrite. The writer is bit-packed: four uint32 and a
+    //        byte, then a bit-packed invite count and description length, per-invite
+    //        eight-bit GUID masks, a title length, a flush, then the GUID bytes and
+    //        BOTH STRINGS LAST. The current reader reads title-first with a pre-MoP
+    //        ReadAsPacked() GUID and shares no field order with it.
+    //   CMSG_CALENDAR_EVENT_MODERATOR_STATUS 0x0708  sub_6657A5  reader unproven
+    //   CMSG_CALENDAR_EVENT_REMOVE_INVITE    0x0962  sub_669371  reader unproven
+    //
+    // Note the reply gate is NOT visible from the handler alone. GUILD_FILTER,
+    // REMOVE_EVENT and COPY_EVENT emit no SMSG in their own body and look free;
+    // they reach their replies one level down, inside CalendarMgr::RemoveEvent,
+    // CalendarMgr::CopyEvent and Guild::MassInviteToEvent. Follow the call.
     //
     // What IS already done, so nobody redoes it:
     //   - SMSG_CALENDAR_SEND_CALENDAR/SEND_EVENT/SEND_NUM_PENDING/RAID_LOCKOUT_REMOVED,
@@ -1477,28 +1505,28 @@ void InitializeOpcodes()
     //     The current reader reads title-first with a pre-MoP ReadAsPacked() GUID
     //     and bears no resemblance to it.
     //
-    // Next step is SMSG_CALENDAR_COMMAND_RESULT's 18414 body, and it is BLOCKED on
-    // evidence rather than on effort. Both oracles were tried and both come back
-    // empty, so do not start by repeating either:
+    // How SMSG_CALENDAR_COMMAND_RESULT was recovered, because the obvious route is
+    // a dead end and the next person should not spend a day on it:
     //
-    //   BINARY. The SMSG oracle maps 0x142A to 0x00972E78 at LOW confidence, and
-    //   that function is NOT the parser. It never touches the packet: all 41 of its
-    //   switch arms push a CALENDAR_ERROR_* localization key and call sub_972C8A.
-    //   It is the error-display function, taking an already-parsed record with a
-    //   0x132-byte string at +0x10 and the error byte at +0x142. The two rows in
-    //   that table that ARE confirmed -- SMSG_CONTACT_LIST 0x1F22 -> 0x00A6BD2D and
-    //   SMSG_FRIEND_STATUS 0x0532 -> 0x00A6BCED -- both take the packet at
-    //   [ebp+14h] and hand it to a reader; 0x972E78 reads [ebp+8] as a record and
-    //   has no static xrefs. The row is mis-assigned, which is what LOW meant.
+    //   The SMSG oracle's markdown table maps 0x142A to 0x00972E78 at LOW
+    //   confidence, and that function is NOT the parser. It never touches the
+    //   packet: all 41 switch arms push a CALENDAR_ERROR_* localization key and
+    //   call sub_972C8A. It is the error DISPLAY function, taking an already-parsed
+    //   record, and it has no static xrefs. The confirmed rows in that same table
+    //   -- SMSG_CONTACT_LIST 0x1F22 -> 0x00A6BD2D, SMSG_FRIEND_STATUS 0x0532 ->
+    //   0x00A6BCED -- take the packet at [ebp+14h] and hand it to a reader. The row
+    //   is mis-assigned, which is what LOW was telling us.
     //
-    //   CORPUS. Zero SMSG rows for 0x142A in build 18414, catalogue 2BE10C89. There
-    //   is no captured body to decode.
+    //   The corpus is no help either: zero SMSG rows for 0x142A in 18414.
     //
-    // So recovering it needs new evidence: resolve the receive-dispatch slot (424,
-    // installer sub_659694) through the guard trampolines, or capture one. The
-    // record shape above is a useful constraint on the answer -- a name string and
-    // an error code -- but a shape is not a layout, and this must not be guessed.
-    // A wrong SMSG body reaching the client is worse than sending nothing.
+    //   The answer was in the oracle's JSON, not its markdown.
+    //   claude/bridge-tooling/bridge_548.json gives parser sub_708A1C for key 5162,
+    //   which constructs on vtable off_D6AEA0 and delegates to sub_706B85 -- the
+    //   real reader. Its record offsets then confirm the identification against the
+    //   display function: it fills the string at +16 (0x10) and the error at +322
+    //   (0x142), exactly the two fields sub_972E78 consumes.
+    //
+    // Prefer the JSON artefacts over the summarised tables when a row looks wrong.
 
     // Empty-bodied client actions. Every one is observed in the 18414 corpus with a
     // zero-length body in every single observation, and every handler reads nothing

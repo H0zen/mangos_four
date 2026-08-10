@@ -897,23 +897,50 @@ void CalendarMgr::SendCalendarCommandResult(Player* player, CalendarError err, c
     }
 
     DEBUG_FILTER_LOG(LOG_FILTER_CALENDAR, "SMSG_CALENDAR_COMMAND_RESULT (%u)", err);
-    WorldPacket data(SMSG_CALENDAR_COMMAND_RESULT, 0);
-    data << uint32(0);
-    data << uint8(0);
-    switch (err)
+
+    // 18414 body, recovered from the client's own parser sub_706B85 (reached from
+    // the receive dispatch through sub_708A1C, which installs vtable off_D6AEA0):
+    //
+    //     u8    nameLen >> 1          high eight bits of a NINE-bit length
+    //     u8    (nameLen & 1) << 7    the low bit, in the MSB; seven bits padding
+    //     u8    unidentified          parser stores it at record +323
+    //     u8    error                 parser stores it at record +322
+    //     bytes name                  nameLen raw bytes, NOT NUL-terminated
+    //
+    // The length really is split: the parser does `2 * readByte()` then ORs a
+    // single ReadBit, and then goes back to raw byte reads, so the remaining seven
+    // bits of the second byte are discarded padding rather than part of the stream.
+    //
+    // The record offsets are what tie this together. The client's error-display
+    // switch sub_972E78 reads the error at +0x142 (322) and, for the three _S
+    // variants, passes the string at +0x10 (16) as the format argument -- exactly
+    // the two fields this parser fills. Its 41 cases also map 1:1 onto CalendarError
+    // below (1 GUILD_EVENTS_EXCEEDED, 5 PERMISSIONS, 10 ALREADY_INVITED_TO_EVENT_S,
+    // 13 IGNORING_YOU_S, 26 ARENA_EVENTS_EXCEEDED, 29 NO_INVITE ...), so the wire
+    // byte is the enum value directly, with no bias.
+    //
+    // The previous body was pre-MoP -- uint32, uint8, a NUL-terminated param or a
+    // filler byte, then uint32(err) -- and shares no field with this one.
+    //
+    // The name is sent whatever the error; the client only formats it for the _S
+    // variants. Clamped because the client's destination buffer runs from +0x10 to
+    // +0x142, i.e. 306 bytes, and it NUL-terminates at name[len].
+    std::string name = param ? param : "";
+    if (name.size() > 255)
     {
-        case CALENDAR_ERROR_OTHER_INVITES_EXCEEDED_S:
-        case CALENDAR_ERROR_ALREADY_INVITED_TO_EVENT_S:
-        case CALENDAR_ERROR_IGNORING_YOU_S:
-            data << param;
-            break;
-        default:
-            data << uint8(0);
-            break;
+        name.resize(255);
     }
 
-    data << uint32(err);
-    //data.hexlike();
+    WorldPacket data(SMSG_CALENDAR_COMMAND_RESULT, 4 + name.size());
+    data << uint8(uint8(name.size() >> 1));
+    data << uint8(uint8((name.size() & 1) << 7));
+    data << uint8(0);                                       // record +323, purpose not identified
+    data << uint8(uint8(err));                              // record +322
+    if (!name.empty())
+    {
+        data.append(name.c_str(), name.size());
+    }
+
     player->SendDirectMessage(&data);
 }
 

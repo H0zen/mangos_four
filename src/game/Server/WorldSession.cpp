@@ -348,6 +348,10 @@ static bool IsEnterWorldConverted(uint16 opcode)
         // 0x00A6BCED -> sub_A6A2B2. Unchanged body -- it was already 18414-correct
         // for every result the server can emit; only the gate was missing.
         case SMSG_FRIEND_STATUS:                     // SocialMgr::SendFriendStatus
+        // Nine-bit name length, an unidentified byte, the error byte, then the raw
+        // name. Rebuilt from the client's parser sub_706B85; the error and name
+        // offsets are corroborated by its display switch sub_972E78 (+0x142, +0x10).
+        case SMSG_CALENDAR_COMMAND_RESULT:           // CalendarMgr::SendCalendarCommandResult
         case SMSG_CLIENT_CONTROL_UPDATE:           // MopControlPackets::BuildClientControlUpdate
         case SMSG_MOVE_SET_ACTIVE_MOVER:           // MopControlPackets::BuildSetActiveMover
         case SMSG_PLAYER_MOVE:                     // MovementInfo relay serializer
