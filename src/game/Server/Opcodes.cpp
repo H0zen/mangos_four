@@ -1477,10 +1477,28 @@ void InitializeOpcodes()
     //     The current reader reads title-first with a pre-MoP ReadAsPacked() GUID
     //     and bears no resemblance to it.
     //
-    // Next step is SMSG_CALENDAR_COMMAND_RESULT's 18414 body. The oracle maps
-    // 0x142A to 0x00972E78 at LOW confidence, and that function is the consumer,
-    // not the parser -- it takes an already-parsed record, reading a byte at +0x142
-    // and a string at +0x10. Find the real reader before rebuilding the body.
+    // Next step is SMSG_CALENDAR_COMMAND_RESULT's 18414 body, and it is BLOCKED on
+    // evidence rather than on effort. Both oracles were tried and both come back
+    // empty, so do not start by repeating either:
+    //
+    //   BINARY. The SMSG oracle maps 0x142A to 0x00972E78 at LOW confidence, and
+    //   that function is NOT the parser. It never touches the packet: all 41 of its
+    //   switch arms push a CALENDAR_ERROR_* localization key and call sub_972C8A.
+    //   It is the error-display function, taking an already-parsed record with a
+    //   0x132-byte string at +0x10 and the error byte at +0x142. The two rows in
+    //   that table that ARE confirmed -- SMSG_CONTACT_LIST 0x1F22 -> 0x00A6BD2D and
+    //   SMSG_FRIEND_STATUS 0x0532 -> 0x00A6BCED -- both take the packet at
+    //   [ebp+14h] and hand it to a reader; 0x972E78 reads [ebp+8] as a record and
+    //   has no static xrefs. The row is mis-assigned, which is what LOW meant.
+    //
+    //   CORPUS. Zero SMSG rows for 0x142A in build 18414, catalogue 2BE10C89. There
+    //   is no captured body to decode.
+    //
+    // So recovering it needs new evidence: resolve the receive-dispatch slot (424,
+    // installer sub_659694) through the guard trampolines, or capture one. The
+    // record shape above is a useful constraint on the answer -- a name string and
+    // an error code -- but a shape is not a layout, and this must not be guessed.
+    // A wrong SMSG body reaching the client is worse than sending nothing.
 
     // Empty-bodied client actions. Every one is observed in the 18414 corpus with a
     // zero-length body in every single observation, and every handler reads nothing
