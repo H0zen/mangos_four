@@ -261,12 +261,124 @@ static void test_event_invite_matches_retail_bodies()
     }
 }
 
+/// SMSG_CALENDAR_EVENT_INVITE_ALERT against two of the six real 18414 bodies:
+/// capture-000163 seq 229424 (66 bytes, a guild announcement — guild GUID set,
+/// inviteId 0, type OTHER) and capture-000601 seq 1037992 (50 bytes, a personal
+/// invite — inviteId set, no guild GUID, type RAID with a real dungeon).
+///
+/// The pair is chosen deliberately: they exercise both arms of the GUID presence
+/// mask. All six captures decode exactly under this layout; these two are the ones
+/// that would catch a mask/byte transposition, because a body with an absent guild
+/// GUID writes eight fewer bytes and would still "look" plausible.
+static void test_event_invite_alert_matches_retail_bodies()
+{
+    struct Case
+    {
+        uint64 eventId;
+        int32 dungeonId;
+        uint8 type;
+        uint64 inviteId;
+        uint32 flags;
+        uint8 status;
+        uint32 eventTime;
+        uint8 rank;
+        uint64 creator;
+        uint64 guild;
+        uint64 sender;
+        char const* title;
+        size_t len;
+        uint8 const expected[70];
+    };
+
+    static Case const cases[] =
+    {
+        {   // capture-000163 seq 229424 — guild announcement
+            UINT64_C(0x00000000008751AA), 531, 0, 0, 0x400, 7, 0x0E7654DE, 0,
+            UINT64_C(0x040000000017208D), UINT64_C(0x1FF4000001FF2589), UINT64_C(0x040000000017208D),
+            "Pro dobrou guildy", 66,
+            {
+                0xAA,0x51,0x87,0x00,0x00,0x00,0x00,0x00, 0x13,0x02,0x00,0x00, 0x00,
+                0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00, 0x00,0x04,0x00,0x00, 0x07,
+                0xDE,0x54,0x76,0x0E, 0x00,
+                0x95,0xDA,0xAC,0x45, 0xF5,0x88,
+                0x50,0x72,0x6F,0x20,0x64,0x6F,0x62,0x72,0x6F,0x75,0x20,0x67,0x75,0x69,0x6C,0x64,0x79,
+                0x8C,0x21,0xFE,0x1E,0x24,0x16,0x05,0x8C,0x16,0x05,0x00,0x21,
+            }
+        },
+        {   // capture-000601 seq 1037992 — personal invite, no guild GUID
+            UINT64_C(0x0000000000851300), 714, 0, UINT64_C(0x00000000031E99C1), 0x1, 0, 0x0E7494DE, 0,
+            UINT64_C(0x04000000053D19D9), 0, UINT64_C(0x04000000053D19D9),
+            "R2 HC", 50,
+            {
+                0x00,0x13,0x85,0x00,0x00,0x00,0x00,0x00, 0xCA,0x02,0x00,0x00, 0x00,
+                0xC1,0x99,0x1E,0x03,0x00,0x00,0x00,0x00, 0x01,0x00,0x00,0x00, 0x00,
+                0xDE,0x94,0x74,0x0E, 0x00,
+                0x0D,0x82,0xB4,0x15,
+                0x52,0x32,0x20,0x48,0x43,
+                0xD8,0x18,0x3C,0x04,0x05,0xD8,0x04,0x3C,0x05,0x18,
+            }
+        },
+    };
+
+    for (Case const& c : cases)
+    {
+        ObjectGuid const creator(c.creator), guild(c.guild), sender(c.sender);
+        std::string const title(c.title);
+
+        WorldPacket data(SMSG_CALENDAR_EVENT_INVITE_ALERT, c.len);
+        data << uint64(c.eventId);
+        data << int32(c.dungeonId);
+        data << uint8(c.type);
+        data << uint64(c.inviteId);
+        data << uint32(c.flags);
+        data << uint8(c.status);
+        data << uint32(c.eventTime);
+        data << uint8(c.rank);
+
+        data.WriteGuidMask<7>(guild);   data.WriteGuidMask<6>(sender);
+        data.WriteGuidMask<4>(guild);   data.WriteGuidMask<0>(guild);
+        data.WriteGuidMask<3>(sender);  data.WriteGuidMask<1>(creator);
+        data.WriteGuidMask<5>(guild);   data.WriteGuidMask<2>(sender);
+        data.WriteGuidMask<0>(sender);  data.WriteGuidMask<1>(guild);
+        data.WriteGuidMask<5>(sender);  data.WriteGuidMask<6>(guild);
+        data.WriteGuidMask<3>(guild);   data.WriteGuidMask<6>(creator);
+        data.WriteGuidMask<2>(creator); data.WriteGuidMask<4>(sender);
+        data.WriteGuidMask<7>(sender);  data.WriteGuidMask<4>(creator);
+        data.WriteGuidMask<1>(sender);  data.WriteGuidMask<3>(creator);
+        data.WriteGuidMask<2>(guild);   data.WriteGuidMask<0>(creator);
+        data.WriteBits(title.size(), 8);
+        data.WriteGuidMask<5>(creator); data.WriteGuidMask<7>(creator);
+        data.FlushBits();
+
+        data.WriteGuidBytes<5>(sender); data.WriteGuidBytes<6>(guild);
+        data.WriteGuidBytes<0>(guild);  data.WriteGuidBytes<6>(sender);
+        data.WriteGuidBytes<5>(creator); data.WriteGuidBytes<4>(creator);
+        data.append(title.data(), title.size());
+        data.WriteGuidBytes<0>(sender); data.WriteGuidBytes<1>(sender);
+        data.WriteGuidBytes<2>(guild);  data.WriteGuidBytes<7>(guild);
+        data.WriteGuidBytes<6>(creator); data.WriteGuidBytes<1>(guild);
+        data.WriteGuidBytes<2>(sender); data.WriteGuidBytes<3>(creator);
+        data.WriteGuidBytes<7>(creator); data.WriteGuidBytes<0>(creator);
+        data.WriteGuidBytes<3>(sender); data.WriteGuidBytes<2>(creator);
+        data.WriteGuidBytes<7>(sender); data.WriteGuidBytes<5>(guild);
+        data.WriteGuidBytes<4>(guild);  data.WriteGuidBytes<3>(guild);
+        data.WriteGuidBytes<1>(creator); data.WriteGuidBytes<4>(sender);
+
+        CHECK(data.size() == c.len);
+        if (data.size() == c.len)
+        {
+            CHECK(std::memcmp(data.contents(), c.expected, c.len) == 0);
+        }
+    }
+}
+
 int main(int /*argc*/, char** /*argv*/)
 {
     test_populated_calendar_list();
     test_populated_selected_event();
     test_raid_lockout_removed_matches_retail_bodies();
     test_event_invite_matches_retail_bodies();
+    test_event_invite_alert_matches_retail_bodies();
 
     if (g_fail)
     {

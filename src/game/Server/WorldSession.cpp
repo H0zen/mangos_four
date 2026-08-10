@@ -368,6 +368,9 @@ static bool IsEnterWorldConverted(uint16 opcode)
         // Rebuilt from reader sub_708569 and verified against two real 18414
         // captures; both strings go last behind an 11-bit and an 8-bit length.
         case SMSG_CALENDAR_EVENT_UPDATED_ALERT:      // CalendarMgr::SendCalendarEventUpdateAlert
+        // Rebuilt from reader sub_6F4D55 and verified against ALL SIX captured 18414
+        // bodies. Three interleaved GUIDs with the title emitted mid byte-run.
+        case SMSG_CALENDAR_EVENT_INVITE_ALERT:       // CalendarMgr::SendCalendarEventInviteAlert
         case SMSG_CLIENT_CONTROL_UPDATE:           // MopControlPackets::BuildClientControlUpdate
         case SMSG_MOVE_SET_ACTIVE_MOVER:           // MopControlPackets::BuildSetActiveMover
         case SMSG_PLAYER_MOVE:                     // MovementInfo relay serializer

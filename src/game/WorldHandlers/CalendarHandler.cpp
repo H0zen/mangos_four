@@ -983,19 +983,78 @@ void CalendarMgr::SendCalendarEventInviteAlert(CalendarInvite const* invite)
         return;
     }
 
-    WorldPacket data(SMSG_CALENDAR_EVENT_INVITE_ALERT);
+    // 18414 body, from the client's reader sub_6F4D55 and VERIFIED against ALL SIX
+    // captured bodies in the corpus (catalogue 2BE10C89) -- capture-000163 seq
+    // 229424 and 626761, capture-000261 seq 911254, capture-000389 seq 2024636,
+    // capture-000601 seq 1037992, capture-000696 seq 288566, sizes 50 to 66 bytes,
+    // every one consumed exactly.
+    //
+    //     u64 eventId, i32 dungeonId, u8 type, u64 inviteId, u32 flags,
+    //     u8 status, u32 eventTime, u8 rank,
+    //     then 22 GUID mask bits across THREE guids, an 8-bit title length,
+    //     two more mask bits, a flush, six GUID bytes, the title, and the
+    //     remaining eighteen GUID bytes.
+    //
+    // The captures name the fields. `type` reads 0 (RAID) in exactly the bodies
+    // whose dungeonId is a real dungeon (531, 714) and 4 (OTHER) in exactly those
+    // where it is -1; `status` reads 7, 0 and 3 (NOT_SIGNED_UP, INVITED,
+    // CONFIRMED); `rank` reads 2 (OWNER) only in the body where the invitee is the
+    // creator. Guild announcements carry the guild GUID with inviteId 0, personal
+    // invites carry inviteId with no guild GUID.
+    //
+    // ONE UNRESOLVED POINT, stated rather than hidden: the creator and sender GUIDs
+    // are IDENTICAL in all six captures, so the corpus cannot say which of the two
+    // slots is which. They are assigned in the pre-MoP order, creator first. If an
+    // invite sent by someone other than the event's creator ever shows the wrong
+    // "invited by" name, swap these two. It cannot desync -- both are GUIDs in
+    // fixed slots.
+    // Guild GUID built the same way CalendarHandler.cpp:84 and Player.cpp:1465
+    // already do it, so this field stays consistent with the calendar list and the
+    // roster rather than inventing a second convention. Empty when the event is not
+    // a guild event, which is what the captures show for personal invites.
+    ObjectGuid const creatorGuid = event->CreatorGuid;
+    ObjectGuid const guildGuid = event->IsGuildEvent()
+        ? ObjectGuid(HIGHGUID_GUILD, event->GuildId) : ObjectGuid();
+    ObjectGuid const senderGuid = invite->SenderGuid;
+
+    WorldPacket data(SMSG_CALENDAR_EVENT_INVITE_ALERT, 8 + 4 + 1 + 8 + 4 + 1 + 4 + 1 + 4 + 24 + event->Title.size());
     data << uint64(event->EventId);
-    data << event->Title;
-    data << secsToTimeBitFields(event->EventTime);
-    data << uint32(event->Flags);
-    data << uint32(event->Type);
     data << int32(event->DungeonId);
+    data << uint8(event->Type);
     data << uint64(invite->InviteId);
+    data << uint32(event->Flags);
     data << uint8(invite->Status);
+    data << secsToTimeBitFields(event->EventTime);
     data << uint8(invite->Rank);
-    data << event->CreatorGuid.WriteAsPacked();
-    data << invite->SenderGuid.WriteAsPacked();
-    //data.hexlike();
+
+    data.WriteGuidMask<7>(guildGuid);   data.WriteGuidMask<6>(senderGuid);
+    data.WriteGuidMask<4>(guildGuid);   data.WriteGuidMask<0>(guildGuid);
+    data.WriteGuidMask<3>(senderGuid);  data.WriteGuidMask<1>(creatorGuid);
+    data.WriteGuidMask<5>(guildGuid);   data.WriteGuidMask<2>(senderGuid);
+    data.WriteGuidMask<0>(senderGuid);  data.WriteGuidMask<1>(guildGuid);
+    data.WriteGuidMask<5>(senderGuid);  data.WriteGuidMask<6>(guildGuid);
+    data.WriteGuidMask<3>(guildGuid);   data.WriteGuidMask<6>(creatorGuid);
+    data.WriteGuidMask<2>(creatorGuid); data.WriteGuidMask<4>(senderGuid);
+    data.WriteGuidMask<7>(senderGuid);  data.WriteGuidMask<4>(creatorGuid);
+    data.WriteGuidMask<1>(senderGuid);  data.WriteGuidMask<3>(creatorGuid);
+    data.WriteGuidMask<2>(guildGuid);   data.WriteGuidMask<0>(creatorGuid);
+    data.WriteBits(event->Title.size(), 8);
+    data.WriteGuidMask<5>(creatorGuid); data.WriteGuidMask<7>(creatorGuid);
+    data.FlushBits();
+
+    data.WriteGuidBytes<5>(senderGuid); data.WriteGuidBytes<6>(guildGuid);
+    data.WriteGuidBytes<0>(guildGuid);  data.WriteGuidBytes<6>(senderGuid);
+    data.WriteGuidBytes<5>(creatorGuid); data.WriteGuidBytes<4>(creatorGuid);
+    data.append(event->Title.data(), event->Title.size());
+    data.WriteGuidBytes<0>(senderGuid); data.WriteGuidBytes<1>(senderGuid);
+    data.WriteGuidBytes<2>(guildGuid);  data.WriteGuidBytes<7>(guildGuid);
+    data.WriteGuidBytes<6>(creatorGuid); data.WriteGuidBytes<1>(guildGuid);
+    data.WriteGuidBytes<2>(senderGuid); data.WriteGuidBytes<3>(creatorGuid);
+    data.WriteGuidBytes<7>(creatorGuid); data.WriteGuidBytes<0>(creatorGuid);
+    data.WriteGuidBytes<3>(senderGuid); data.WriteGuidBytes<2>(creatorGuid);
+    data.WriteGuidBytes<7>(senderGuid); data.WriteGuidBytes<5>(guildGuid);
+    data.WriteGuidBytes<4>(guildGuid);  data.WriteGuidBytes<3>(guildGuid);
+    data.WriteGuidBytes<1>(creatorGuid); data.WriteGuidBytes<4>(senderGuid);
 
     DEBUG_FILTER_LOG(LOG_FILTER_CALENDAR, "SendCalendarInviteAlert> senderGuid[%s], inviteeGuid[%s], EventId[" UI64FMTD "], Status[%u], InviteId[" UI64FMTD "]",
                      invite->SenderGuid.GetString().c_str(), invite->InviteeGuid.GetString().c_str(), event->EventId, uint32(invite->Status), invite->InviteId);
