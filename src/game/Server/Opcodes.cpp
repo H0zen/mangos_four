@@ -1487,7 +1487,15 @@ void InitializeOpcodes()
     //   CMSG_CALENDAR_EVENT_INVITE     0x1D8E  sub_66CA8E  reader unproven
     //        -> SMSG_CALENDAR_EVENT_INVITE
     //   CMSG_CALENDAR_UPDATE_EVENT     0x1F8D  sub_66D0A3  reader unproven
-    //        -> SMSG_CALENDAR_EVENT_UPDATED_ALERT
+    //        -> SMSG_CALENDAR_EVENT_UPDATED_ALERT, whose client reader IS decoded
+    //           (sub_708569 via sub_71B7DA, vtable off_D6AA7C):
+    //             u32 +176, u8 +170, u32 +16, u32 +32, u64 +24, u32 +36, u32 +172,
+    //             1 bit +169, an n-bit length for string B, an 8-bit length for
+    //             string A, then string A and string B raw, in that order.
+    //           Not rebuilt: the server has eleven fields (flags, both times, type,
+    //           dungeon, title, description, repeatable, max invites, unknown time)
+    //           to map onto ten wire values, and the object offsets do not name
+    //           them. Both strings go LAST, which the legacy body does not do.
     //   CMSG_CALENDAR_COMPLAIN         0x1F8F  sub_6669F0  reader unproven
     //        -> SMSG_COMPLAIN_RESULT
     //
