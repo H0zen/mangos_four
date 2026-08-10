@@ -1541,6 +1541,25 @@ void InitializeOpcodes()
     //        eight-bit GUID masks, a title length, a flush, then the GUID bytes and
     //        BOTH STRINGS LAST. The current reader reads title-first with a pre-MoP
     //        ReadAsPacked() GUID and shares no field order with it.
+    //
+    //        The field INVENTORY is settled, which is most of the remaining work.
+    //        MopCalendarPackets::BuildCalendarEvent -- already converted, admitted
+    //        and the 18414 reference for an event -- carries exactly flags(u32),
+    //        eventTime(u32), dungeonId(i32), one opaque uint32, type(u8), title and
+    //        description. That is precisely this writer's shape, so MoP DROPPED
+    //        maxInvites and repeatable from the request; their absence is why the
+    //        legacy reader's field count never matched. The extracted client UI
+    //        agrees: the setters are Title, Description, Type, TextureID (the
+    //        dungeon id), Date, Time, RepeatOption, AutoApprove, Locked -- no
+    //        max-invites concept at all.
+    //
+    //        What is NOT settled is which of the four uint32 is which. The writer
+    //        emits object offsets +1200, +1180, +1172, +1176 in that order, which
+    //        is neither ascending nor the SMSG order, and the per-opcode
+    //        randomisation means the reply's order does not carry over. Assigning
+    //        them would be a one-in-twenty-four guess that silently swaps a
+    //        timestamp for a flags word. Needs a captured body, or the Lua
+    //        setter-to-field-offset mapping, before it is written.
     //   (none -- MODERATOR_STATUS, REMOVE_INVITE and EVENT_STATUS were rewritten
     //    from their writers and are registered above.)
     //
