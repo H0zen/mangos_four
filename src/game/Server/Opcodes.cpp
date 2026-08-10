@@ -1478,6 +1478,30 @@ void InitializeOpcodes()
     DefC(CMSG_CALENDAR_REMOVE_EVENT, "CMSG_CALENDAR_REMOVE_EVENT", STATUS_LOGGEDIN, PROCESS_THREADUNSAFE, &WorldSession::HandleCalendarRemoveEvent);
     DefS(SMSG_CALENDAR_EVENT_REMOVED_ALERT, "SMSG_CALENDAR_EVENT_REMOVED_ALERT");
 
+    // Three more, all rewritten from their writers. Each had the same inherited
+    // shape: a LEADING pre-MoP ReadAsPacked() invitee GUID and a uint32 where the
+    // client sends a byte. In 18414 the GUID is bit-packed and goes LAST.
+    //
+    //   CMSG_CALENDAR_EVENT_MODERATOR_STATUS 0x0708  sub_6657A5
+    //        rank BYTE first, then eventId, inviteId, ownerInviteId, then the GUID.
+    //   CMSG_CALENDAR_EVENT_REMOVE_INVITE    0x0962  sub_669371
+    //        inviteId, ownerInviteId, eventId, then the GUID. No status field.
+    //   CMSG_CALENDAR_EVENT_STATUS           0x1AB3  sub_667F7B
+    //        eventId, inviteId, ownerInviteId, status BYTE, then the GUID.
+    //
+    // Note the byte's position differs between MODERATOR_STATUS (first) and
+    // EVENT_STATUS (after the ids). MoP randomises that per opcode, so neither can
+    // be inferred from the other.
+    //
+    // The three ids keep their pre-MoP ORDER in every case. That is an inference,
+    // and it is stated so it can be challenged: it holds for all four calendar
+    // opcodes already proven from their writers -- RSVP, REMOVE_EVENT, COPY_EVENT
+    // and SIGNUP -- each of which changed only field widths and GUID placement.
+    // If a captured body ever contradicts it, these three are where to look.
+    DefC(CMSG_CALENDAR_EVENT_MODERATOR_STATUS, "CMSG_CALENDAR_EVENT_MODERATOR_STATUS", STATUS_LOGGEDIN, PROCESS_THREADUNSAFE, &WorldSession::HandleCalendarEventModeratorStatus);
+    DefC(CMSG_CALENDAR_EVENT_REMOVE_INVITE, "CMSG_CALENDAR_EVENT_REMOVE_INVITE", STATUS_LOGGEDIN, PROCESS_THREADUNSAFE, &WorldSession::HandleCalendarEventRemoveInvite);
+    DefC(CMSG_CALENDAR_EVENT_STATUS, "CMSG_CALENDAR_EVENT_STATUS", STATUS_LOGGEDIN, PROCESS_THREADUNSAFE, &WorldSession::HandleCalendarEventStatus);
+
     // PARKED 2026-08-10: the remaining ten calendar CMSGs stay dormant. The shared
     // blocker is GONE -- SMSG_CALENDAR_COMMAND_RESULT is rebuilt and admitted --
     // and what is left is per-opcode.
@@ -1507,18 +1531,8 @@ void InitializeOpcodes()
     //        eight-bit GUID masks, a title length, a flush, then the GUID bytes and
     //        BOTH STRINGS LAST. The current reader reads title-first with a pre-MoP
     //        ReadAsPacked() GUID and shares no field order with it.
-    //   CMSG_CALENDAR_EVENT_MODERATOR_STATUS 0x0708  sub_6657A5  reader unproven
-    //   CMSG_CALENDAR_EVENT_REMOVE_INVITE    0x0962  sub_669371  reader unproven
-    //   CMSG_CALENDAR_EVENT_STATUS           0x1AB3  sub_667F7B
-    //        Writer decoded, reader NOT rewritten. The writer emits three uint64
-    //        (object offsets +24, +32, +16), a uint8 status at +48, then a packed
-    //        GUID based at +40 -- mask 44,43,47,46,42,40,45,41 and bytes
-    //        47,45,42,41,44,46,40,43. The reader instead takes the packed GUID
-    //        FIRST with a pre-MoP ReadAsPacked() and a uint32 status.
-    //        Held because the three uint64 cannot be named from offsets alone:
-    //        +24 is eventId by the convention the sibling writers follow, but
-    //        whether +32 or +16 is inviteId or ownerInviteId is not established,
-    //        and guessing would silently swap two ids that are both plausible.
+    //   (none -- MODERATOR_STATUS, REMOVE_INVITE and EVENT_STATUS were rewritten
+    //    from their writers and are registered above.)
     //
     // Note the reply gate is NOT visible from the handler alone. GUILD_FILTER,
     // REMOVE_EVENT and COPY_EVENT emit no SMSG in their own body and look free;

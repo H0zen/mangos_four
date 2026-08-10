@@ -638,8 +638,11 @@ void WorldSession::HandleCalendarEventRemoveInvite(WorldPacket& recv_data)
     uint64 ownerInviteId; // isn't it sender's inviteId? TODO: need more test to see what we can do with that value
     uint64 inviteId;
 
-    recv_data >> invitee.ReadAsPacked();
+    // From the client's writer sub_669371: three ids in the pre-MoP order, then the
+    // invitee GUID bit-packed at the END. The leading pre-MoP packed GUID is gone.
     recv_data >> inviteId >> ownerInviteId >> eventId;
+    recv_data.ReadGuidMask<6, 3, 2, 4, 5, 7, 0, 1>(invitee);
+    recv_data.ReadGuidBytes<0, 4, 7, 3, 5, 1, 2, 6>(invitee);
 
     DEBUG_FILTER_LOG(LOG_FILTER_CALENDAR, "EventId [" UI64FMTD "], ownerInviteId [" UI64FMTD "], Invitee ([%s] id: [" UI64FMTD "])",
                      eventId, ownerInviteId, invitee.GetString().c_str(), inviteId);
@@ -664,10 +667,17 @@ void WorldSession::HandleCalendarEventStatus(WorldPacket& recv_data)
     uint64 eventId;
     uint64 inviteId;
     uint64 ownerInviteId; // isn't it sender's inviteId?
-    uint32 status;
+    uint8 status;
 
-    recv_data >> invitee.ReadAsPacked();
-    recv_data >> eventId >> inviteId >> ownerInviteId >> status;
+    // From the client's writer sub_667F7B: three ids in the pre-MoP order, then the
+    // status BYTE, then the invitee GUID bit-packed at the END. Note the byte sits
+    // AFTER the ids here where CMSG_CALENDAR_EVENT_MODERATOR_STATUS puts its rank
+    // byte FIRST -- MoP randomises that per opcode, so neither can be assumed from
+    // the other.
+    recv_data >> eventId >> inviteId >> ownerInviteId;
+    recv_data >> status;
+    recv_data.ReadGuidMask<4, 3, 7, 6, 2, 0, 5, 1>(invitee);
+    recv_data.ReadGuidBytes<7, 5, 2, 1, 4, 6, 0, 3>(invitee);
     DEBUG_FILTER_LOG(LOG_FILTER_CALENDAR, "EventId [" UI64FMTD "] ownerInviteId [" UI64FMTD "], Invitee ([%s] id: [" UI64FMTD "], status %u",
                      eventId, ownerInviteId, invitee.GetString().c_str(), inviteId, status);
 
@@ -718,10 +728,19 @@ void WorldSession::HandleCalendarEventModeratorStatus(WorldPacket& recv_data)
     uint64 eventId;
     uint64 inviteId;
     uint64 ownerInviteId; // isn't it sender's inviteId?
-    uint32 rank;
+    uint8 rank;
 
-    recv_data >> invitee.ReadAsPacked();
-    recv_data >> eventId >>  inviteId >> ownerInviteId >> rank;
+    // From the client's writer sub_6657A5: the rank BYTE leads, the three ids
+    // follow, and the invitee GUID is bit-packed at the END -- not a leading
+    // pre-MoP packed GUID, and rank is not a uint32.
+    //
+    // The three ids keep their pre-MoP order. That holds for every calendar opcode
+    // proven from its writer so far -- RSVP, REMOVE_EVENT, COPY_EVENT and SIGNUP
+    // all kept the legacy scalar order and changed only widths and GUID placement.
+    recv_data >> rank;
+    recv_data >> eventId >> inviteId >> ownerInviteId;
+    recv_data.ReadGuidMask<6, 5, 1, 3, 4, 7, 0, 2>(invitee);
+    recv_data.ReadGuidBytes<7, 5, 0, 4, 1, 3, 2, 6>(invitee);
     DEBUG_FILTER_LOG(LOG_FILTER_CALENDAR, "EventId [" UI64FMTD "] ownerInviteId [" UI64FMTD "], Invitee ([%s] id: [" UI64FMTD "], rank %u",
                      eventId, ownerInviteId, invitee.GetString().c_str(), inviteId, rank);
 
