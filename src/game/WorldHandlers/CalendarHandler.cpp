@@ -397,10 +397,71 @@ void WorldSession::HandleCalendarUpdateEvent(WorldPacket& recv_data)
     uint32 UnknownPackedTime;
     uint32 flags;
 
-    recv_data >> eventId >> inviteId >> title >> description >> type >> repetitionType >> maxInvites >> dungeonId;
+    // Rebuilt from the client's writer sub_66D0A3, with field names from
+    // CalendarUpdateEvent's own builder sub_9E78EE, which fills this packet object
+    // on its stack: +1200 maxInvites, +1188 dungeonId, +1192 eventTime,
+    // +1196 flags, +1186 type, +16 eventId, +24 inviteId, +32 title (128),
+    // +161 description (1024).
+    //
+    // Both GUIDs and both strings are INTERLEAVED. The two lengths sit inside the
+    // GUID mask run, and eventId's bit 3 comes after them; the title is emitted
+    // partway through the byte run and the description later still. The reads below
+    // are in the writer's exact order and must stay that way.
+    ObjectGuid eventGuid;
+    ObjectGuid inviteGuid;
+
+    recv_data >> maxInvites;
+    recv_data >> dungeonId;
     recv_data >> eventPackedTime;
-    recv_data >> UnknownPackedTime;
     recv_data >> flags;
+    recv_data >> type;
+
+    recv_data.ReadGuidMask<4>(eventGuid);
+    recv_data.ReadGuidMask<5>(eventGuid);
+    recv_data.ReadGuidMask<2>(eventGuid);
+    recv_data.ReadGuidMask<4>(inviteGuid);
+    recv_data.ReadGuidMask<7>(eventGuid);
+    recv_data.ReadGuidMask<0>(eventGuid);
+    recv_data.ReadGuidMask<5>(inviteGuid);
+    recv_data.ReadGuidMask<3>(inviteGuid);
+    recv_data.ReadGuidMask<6>(eventGuid);
+    recv_data.ReadGuidMask<1>(eventGuid);
+    recv_data.ReadGuidMask<6>(inviteGuid);
+    recv_data.ReadGuidMask<2>(inviteGuid);
+    recv_data.ReadGuidMask<7>(inviteGuid);
+    recv_data.ReadGuidMask<1>(inviteGuid);
+    recv_data.ReadGuidMask<0>(inviteGuid);
+
+    uint32 const descriptionLength = recv_data.ReadBits(11);
+    uint32 const titleLength = recv_data.ReadBits(8);
+
+    recv_data.ReadGuidMask<3>(eventGuid);                   // after the lengths
+
+    recv_data.ReadGuidBytes<6>(inviteGuid);
+    recv_data.ReadGuidBytes<0>(eventGuid);
+    recv_data.ReadGuidBytes<7>(inviteGuid);
+    recv_data.ReadGuidBytes<3>(inviteGuid);
+    recv_data.ReadGuidBytes<6>(eventGuid);
+    recv_data.ReadGuidBytes<1>(inviteGuid);
+    recv_data.ReadGuidBytes<2>(eventGuid);
+    title = recv_data.ReadString(titleLength);
+    recv_data.ReadGuidBytes<5>(inviteGuid);
+    recv_data.ReadGuidBytes<4>(inviteGuid);
+    recv_data.ReadGuidBytes<5>(eventGuid);
+    recv_data.ReadGuidBytes<3>(eventGuid);
+    recv_data.ReadGuidBytes<0>(inviteGuid);
+    recv_data.ReadGuidBytes<4>(eventGuid);
+    description = recv_data.ReadString(descriptionLength);
+    recv_data.ReadGuidBytes<1>(eventGuid);
+    recv_data.ReadGuidBytes<2>(inviteGuid);
+    recv_data.ReadGuidBytes<7>(eventGuid);
+
+    eventId = eventGuid.GetRawValue();
+    inviteId = inviteGuid.GetRawValue();
+
+    // 5.4.8 sends neither a repetition type nor a second packed time here.
+    repetitionType = 0;
+    UnknownPackedTime = 0;
 
     eventPackedTime = uint32(LocalTimeToUTCTime(eventPackedTime));
 
