@@ -1502,6 +1502,18 @@ void InitializeOpcodes()
     DefC(CMSG_CALENDAR_EVENT_REMOVE_INVITE, "CMSG_CALENDAR_EVENT_REMOVE_INVITE", STATUS_LOGGEDIN, PROCESS_THREADUNSAFE, &WorldSession::HandleCalendarEventRemoveInvite);
     DefC(CMSG_CALENDAR_EVENT_STATUS, "CMSG_CALENDAR_EVENT_STATUS", STATUS_LOGGEDIN, PROCESS_THREADUNSAFE, &WorldSession::HandleCalendarEventStatus);
 
+    // And the complaint. Its request follows the same shape as the three above --
+    // writer sub_6669F0 emits eventId and inviteId, then the reported player's GUID
+    // bit-packed at the END, where the inherited reader took a raw uint64 first.
+    //
+    // Its reply is now correct too: SMSG_COMPLAIN_RESULT is uint32 then uint8 per
+    // the client's reader sub_C69B0E, not the two bytes the core used to send. Note
+    // MiscHandler.cpp holds CMSG_COMPLAIN (the chat/mail spam report, a different
+    // opcode) unregistered partly because this reply was unverified -- the reply
+    // side of that objection is now answered, though its own request reader is not.
+    DefC(CMSG_CALENDAR_COMPLAIN, "CMSG_CALENDAR_COMPLAIN", STATUS_LOGGEDIN, PROCESS_THREADUNSAFE, &WorldSession::HandleCalendarComplain);
+    DefS(SMSG_COMPLAIN_RESULT, "SMSG_COMPLAIN_RESULT");
+
     // PARKED 2026-08-10: the remaining ten calendar CMSGs stay dormant. The shared
     // blocker is GONE -- SMSG_CALENDAR_COMMAND_RESULT is rebuilt and admitted --
     // and what is left is per-opcode.
@@ -1520,8 +1532,6 @@ void InitializeOpcodes()
     //           dungeon, title, description, repeatable, max invites, unknown time)
     //           to map onto ten wire values, and the object offsets do not name
     //           them. Both strings go LAST, which the legacy body does not do.
-    //   CMSG_CALENDAR_COMPLAIN         0x1F8F  sub_6669F0  reader unproven
-    //        -> SMSG_COMPLAIN_RESULT
     //
     // Reply is fine, blocked on the READER:
     //

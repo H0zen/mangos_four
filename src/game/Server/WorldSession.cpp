@@ -359,6 +359,9 @@ static bool IsEnterWorldConverted(uint16 opcode)
         // u64 eventId, u32 packedTime, then a trailing BIT. Rebuilt from the
         // client's reader sub_6EC557; the flag used to lead as a byte.
         case SMSG_CALENDAR_EVENT_REMOVED_ALERT:      // CalendarMgr::SendCalendarEventRemovedAlert
+        // uint32 then uint8, from the client's reader sub_C69B0E. The old body was
+        // two bytes, so the client read four past the end of it.
+        case SMSG_COMPLAIN_RESULT:                   // calendar complaint acknowledgement
         case SMSG_CLIENT_CONTROL_UPDATE:           // MopControlPackets::BuildClientControlUpdate
         case SMSG_MOVE_SET_ACTIVE_MOVER:           // MopControlPackets::BuildSetActiveMover
         case SMSG_PLAYER_MOVE:                     // MovementInfo relay serializer

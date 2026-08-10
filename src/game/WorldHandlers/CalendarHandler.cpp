@@ -795,16 +795,23 @@ void WorldSession::HandleCalendarComplain(WorldPacket& recv_data)
     uint64 eventId;
     uint64 inviteId;
 
-    recv_data >> badGuyGuid;
-    recv_data >> eventId >>  inviteId;
+    // From the client's writer sub_6669F0: the two ids first, in their pre-MoP
+    // order, then the reported player's GUID bit-packed at the END. The inherited
+    // reader took a raw uint64 GUID first.
+    recv_data >> eventId >> inviteId;
+    recv_data.ReadGuidMask<4, 6, 2, 7, 1, 5, 3, 0>(badGuyGuid);
+    recv_data.ReadGuidBytes<6, 7, 1, 0, 4, 2, 3, 5>(badGuyGuid);
     DEBUG_FILTER_LOG(LOG_FILTER_CALENDAR, "EventId [" UI64FMTD "], BadGuyGuid ([%s] inviteId: [" UI64FMTD "])",
                      eventId, badGuyGuid.GetString().c_str(), inviteId);
 
     // Remove the invite
     if (sCalendarMgr.RemoveInvite(eventId, inviteId, guid))
     {
-        WorldPacket data(SMSG_COMPLAIN_RESULT, 1 + 1);
-        data << uint8(0);
+        // uint32 then uint8, from the client's reader sub_C69B0E (reached via
+        // sub_6BE3FD, vtable off_D6A040). The inherited body sent two bytes, so the
+        // client read four bytes past the end of it.
+        WorldPacket data(SMSG_COMPLAIN_RESULT, 4 + 1);
+        data << uint32(0);
         data << uint8(0); // show complain saved. We can send 0x0C to show windows with ok button
         SendPacket(&data);
     }
