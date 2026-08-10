@@ -580,7 +580,18 @@ void WorldSession::HandleCalendarEventInvite(WorldPacket& recv_data)
     uint32 inviteeGuildId = 0;
     bool isIgnored = false;
 
-    recv_data >> eventId >> inviteId >> name >> isPreInvite >> isGuildEvent;
+    // From the client's writer sub_66CA8E: the two ids, then the pre-invite bit, a
+    // NINE-bit name length split as eight bits then one, the guild-event bit, and
+    // the raw name last. The length split is the same shape SMSG_CALENDAR_COMMAND_
+    // RESULT uses. The inherited reader took a NUL-terminated name mid-body and two
+    // whole bytes for the flags.
+    recv_data >> eventId;
+    recv_data >> inviteId;
+    isPreInvite = recv_data.ReadBit();
+    uint32 nameLength = recv_data.ReadBits(8) << 1;
+    nameLength |= recv_data.ReadBit();
+    isGuildEvent = recv_data.ReadBit();
+    name = recv_data.ReadString(nameLength);
 
     if (Player* player = sObjectAccessor.FindPlayerByName(name.c_str()))
     {
@@ -1001,18 +1012,48 @@ void CalendarMgr::SendCalendarEventInvite(CalendarInvite const* invite)
 
     uint8 level = player ? player->getLevel() : Player::GetLevelFromDB(invite->InviteeGuid);
     DEBUG_FILTER_LOG(LOG_FILTER_CALENDAR, "SMSG_CALENDAR_EVENT_INVITE");
-    WorldPacket data(SMSG_CALENDAR_EVENT_INVITE, 8 + 8 + 8 + 1 + 1 + 1 + (preInvite ? 0 : 4) + 1);
-    data << invite->InviteeGuid.WriteAsPacked();
-    data << uint64(eventId);
+    // 18414 body, from the client's reader sub_6C3312 and VERIFIED byte-exact
+    // against two real captures (capture-000444 seq 262179 and capture-000696 seq
+    // 290114, catalogue 2BE10C89), both 30 bytes and both consumed exactly:
+    //
+    //     u8    !preInvite
+    //     u8    status
+    //     u64   inviteId
+    //     u8    level
+    //     u64   eventId
+    //     guid mask  <6,4,1,3,7,0,2,5>  invitee
+    //     1 bit  preInvite  (SET when there is no status time -- inverted)
+    //     1 bit  sender != invitee
+    //     guid bytes 7, 0, 5
+    //     u32   statusTime  -- only when !preInvite, INTERLEAVED here
+    //     guid bytes 2, 3, 4, 1, 6
+    //
+    // The captures name the fields: +24 held 90, a MoP max level; the eventId slot
+    // was identical across two packets for different invitees; and the status byte
+    // read 6 (SIGNED_UP) and 8 (TENTATIVE) with the sender-differs bit clear, which
+    // is exactly a self sign-up and confirms both readings at once.
+    //
+    // Note the status time sits INSIDE the GUID byte run, between byte 5 and byte 2.
+    // The previous body led with a pre-MoP packed GUID and shares no position.
+    ObjectGuid const inviteeGuid = invite->InviteeGuid;
+    bool const senderDiffers = invite->SenderGuid != invite->InviteeGuid;
+
+    WorldPacket data(SMSG_CALENDAR_EVENT_INVITE, 1 + 1 + 8 + 1 + 8 + 2 + 8 + 4);
+    data << uint8(!preInvite);
+    data << uint8(invite->Status);
     data << uint64(invite->InviteId);
     data << uint8(level);
-    data << uint8(invite->Status);
-    data << uint8(!preInvite);
+    data << uint64(eventId);
+    data.WriteGuidMask<6, 4, 1, 3, 7, 0, 2, 5>(inviteeGuid);
+    data.WriteBit(preInvite ? 1 : 0);                       // inverted: set = no time
+    data.WriteBit(senderDiffers ? 1 : 0);
+    data.FlushBits();
+    data.WriteGuidBytes<7, 0, 5>(inviteeGuid);
     if (!preInvite)
     {
         data << secsToTimeBitFields(statusTime);
     }
-    data << uint8(invite->SenderGuid != invite->InviteeGuid); // false only if the invite is sign-up (invitee create himself his invite)
+    data.WriteGuidBytes<2, 3, 4, 1, 6>(inviteeGuid);
 
     DEBUG_FILTER_LOG(LOG_FILTER_CALENDAR, "SendCalendarInvit> %s senderGuid[%s], inviteeGuid[%s], EventId[" UI64FMTD "], Status[%u], InviteId[" UI64FMTD "]",
                      preInvite ? "is PreInvite," : "", invite->SenderGuid.GetString().c_str(), invite->InviteeGuid.GetString().c_str(), eventId, uint32(invite->Status), invite->InviteId);
@@ -1248,21 +1289,50 @@ void CalendarMgr::SendCalendarEventModeratorStatusAlert(CalendarInvite const* in
 void CalendarMgr::SendCalendarEventUpdateAlert(CalendarEvent const* event, time_t oldEventTime)
 {
     DEBUG_FILTER_LOG(LOG_FILTER_CALENDAR, "SMSG_CALENDAR_EVENT_UPDATED_ALERT");
-    WorldPacket data(SMSG_CALENDAR_EVENT_UPDATED_ALERT, 1 + 8 + 4 + 4 + 4 + 1 + 4 +
-                     event->Title.size() + event->Description.size() + 1 + 4 + 4);
-    data << uint8(1);       // show pending alert?
-    data << uint64(event->EventId);
-    data << secsToTimeBitFields(oldEventTime);
+    // 18414 body, from the client's reader sub_708569 and VERIFIED against two real
+    // captures (capture-000389 seq 2030417, 84 bytes; capture-000163 seq 614026,
+    // 118 bytes; catalogue 2BE10C89), both consumed exactly:
+    //
+    //     u32   flags
+    //     u8    type
+    //     u32   unknownTime
+    //     u32   oldEventTime
+    //     u64   eventId
+    //     u32   eventTime
+    //     i32   dungeonId
+    //     1 bit showPendingAlert
+    //     11 bits descriptionLength, then 8 bits titleLength
+    //     title bytes, then description bytes  -- both raw, neither NUL-terminated
+    //
+    // The captures name the fields outright. dungeonId read -1 in one and 531 in the
+    // other; flags read 0x400 in both; and the two time slots were IDENTICAL in the
+    // capture whose event time had not moved but differed in the one where it had,
+    // which is what fixes them as oldEventTime then eventTime. Their titles and
+    // descriptions decode as real text at the recovered lengths.
+    //
+    // 5.4.8 sends neither `repeatable` nor a max-invite count here, which is why the
+    // old body -- which led with the alert byte and appended both -- could never
+    // line up. Both strings go LAST.
+    //
+    // The alert flag's POLARITY is the one thing the captures do not settle: both
+    // carried 0 where this core intends 1. It is written as the server's own value.
+    // Getting it backwards costs a spurious or missing toast, not a desync.
+    WorldPacket data(SMSG_CALENDAR_EVENT_UPDATED_ALERT,
+                     4 + 1 + 4 + 4 + 8 + 4 + 4 + 3 +
+                     event->Title.size() + event->Description.size());
     data << uint32(event->Flags);
-    data << secsToTimeBitFields(event->EventTime);
     data << uint8(event->Type);
-    data << int32(event->DungeonId);
-    data << event->Title;
-    data << event->Description;
-    data << uint8(event->Repeatable);
-    data << uint32(CALENDAR_MAX_INVITES);
     data << secsToTimeBitFields(event->UnknownTime);
-    //data.hexlike();
+    data << secsToTimeBitFields(oldEventTime);
+    data << uint64(event->EventId);
+    data << secsToTimeBitFields(event->EventTime);
+    data << int32(event->DungeonId);
+    data.WriteBit(1);                                       // show pending alert
+    data.WriteBits(event->Description.size(), 11);
+    data.WriteBits(event->Title.size(), 8);
+    data.FlushBits();
+    data.append(event->Title.data(), event->Title.size());
+    data.append(event->Description.data(), event->Description.size());
 
     SendPacketToAllEventRelatives(data, event);
 }

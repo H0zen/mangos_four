@@ -1533,6 +1533,32 @@ void InitializeOpcodes()
     // packet offsets. The writer alone gives layout; the builder gives identity.
     DefC(CMSG_CALENDAR_ADD_EVENT, "CMSG_CALENDAR_ADD_EVENT", STATUS_LOGGEDIN, PROCESS_THREADUNSAFE, &WorldSession::HandleCalendarAddEvent);
 
+    // And the invite. Request from writer sub_66CA8E: two uint64, a pre-invite bit,
+    // a NINE-bit name length (eight bits then one, the same split
+    // SMSG_CALENDAR_COMMAND_RESULT uses), a guild-event bit, then the raw name.
+    //
+    // Its reply SMSG_CALENDAR_EVENT_INVITE is rebuilt from reader sub_6C3312 and is
+    // the one packet in this subsystem VERIFIED against real captures -- two
+    // 18414 bodies, capture-000444 seq 262179 and capture-000696 seq 290114,
+    // catalogue 2BE10C89, both 30 bytes and both consumed exactly. Those bodies also
+    // named the fields: a level of 90, an eventId identical across two packets to
+    // different invitees, and status 6/8 (SIGNED_UP/TENTATIVE) with the
+    // sender-differs bit clear -- a self sign-up, which corroborates both readings.
+    // The status time is INTERLEAVED into the GUID byte run, between byte 5 and 2.
+    DefC(CMSG_CALENDAR_EVENT_INVITE, "CMSG_CALENDAR_EVENT_INVITE", STATUS_LOGGEDIN, PROCESS_THREADUNSAFE, &WorldSession::HandleCalendarEventInvite);
+    DefS(SMSG_CALENDAR_EVENT_INVITE, "SMSG_CALENDAR_EVENT_INVITE");
+
+    // The twelfth and last. Its request was rewritten from writer sub_66D0A3 with
+    // names from builder sub_9E78EE; its reply SMSG_CALENDAR_EVENT_UPDATED_ALERT is
+    // rebuilt from reader sub_708569 and verified against two real 18414 captures
+    // (84 and 118 bytes, catalogue 2BE10C89), both consumed exactly. Those bodies
+    // named the fields: dungeonId read -1 in one and 531 in the other, flags 0x400
+    // in both, and the two time slots were identical in the capture whose event
+    // time had not moved but differed in the one where it had -- which is what
+    // fixes them as oldEventTime then eventTime.
+    DefC(CMSG_CALENDAR_UPDATE_EVENT, "CMSG_CALENDAR_UPDATE_EVENT", STATUS_LOGGEDIN, PROCESS_THREADUNSAFE, &WorldSession::HandleCalendarUpdateEvent);
+    DefS(SMSG_CALENDAR_EVENT_UPDATED_ALERT, "SMSG_CALENDAR_EVENT_UPDATED_ALERT");
+
     // PARKED 2026-08-10: the remaining ten calendar CMSGs stay dormant. The shared
     // blocker is GONE -- SMSG_CALENDAR_COMMAND_RESULT is rebuilt and admitted --
     // and what is left is per-opcode.

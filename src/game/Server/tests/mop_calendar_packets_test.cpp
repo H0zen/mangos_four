@@ -189,11 +189,84 @@ static void test_raid_lockout_removed_matches_retail_bodies()
 }
 
 
+/// SMSG_CALENDAR_EVENT_INVITE against two real 18414 bodies -- capture-000444
+/// seq 262179 and capture-000696 seq 290114, catalogue 2BE10C89. Both are 30 bytes
+/// and both are consumed exactly by the client's reader sub_6C3312.
+///
+/// These also NAME the fields, which is why they are worth keeping as a fixture
+/// rather than a size check: level reads 90, the eventId slot is identical across
+/// two packets sent to different invitees, and status reads 6 (SIGNED_UP) and 8
+/// (TENTATIVE) with the sender-differs bit clear -- exactly a self sign-up.
+///
+/// Note the status time sits INSIDE the GUID byte run, between byte 5 and byte 2.
+/// A serializer that appends it after the GUID produces the same length and the
+/// same bytes for an empty GUID, so length alone cannot catch that mistake.
+static void test_event_invite_matches_retail_bodies()
+{
+    struct Case
+    {
+        uint64 inviteId;
+        uint8 status;
+        uint8 level;
+        uint64 eventId;
+        uint64 invitee;
+        uint32 statusTime;
+        uint8 const expected[30];
+    };
+
+    static Case const cases[] =
+    {
+        {
+            UINT64_C(0x0000000002FC6663), 8, 90, UINT64_C(0x0000000000985C13),
+            UINT64_C(0x050000000572B573), 240524531,
+            {
+                0x01, 0x08, 0x63, 0x66, 0xFC, 0x02, 0x00, 0x00, 0x00, 0x00,
+                0x5A, 0x13, 0x5C, 0x98, 0x00, 0x00, 0x00, 0x00, 0x00, 0x3E,
+                0x00, 0x04, 0x72, 0xF3, 0x1C, 0x56, 0x0E, 0x73, 0x04, 0xB4,
+            }
+        },
+        {
+            UINT64_C(0x0000000002FC60A5), 6, 90, UINT64_C(0x0000000000985C13),
+            UINT64_C(0x05000000058AAD38), 240524432,
+            {
+                0x01, 0x06, 0xA5, 0x60, 0xFC, 0x02, 0x00, 0x00, 0x00, 0x00,
+                0x5A, 0x13, 0x5C, 0x98, 0x00, 0x00, 0x00, 0x00, 0x00, 0x3E,
+                0x00, 0x04, 0x39, 0x90, 0x1C, 0x56, 0x0E, 0x8B, 0x04, 0xAC,
+            }
+        },
+    };
+
+    for (Case const& c : cases)
+    {
+        ObjectGuid const invitee(c.invitee);
+        WorldPacket data(SMSG_CALENDAR_EVENT_INVITE, 30);
+        data << uint8(1);                                   // !preInvite
+        data << uint8(c.status);
+        data << uint64(c.inviteId);
+        data << uint8(c.level);
+        data << uint64(c.eventId);
+        data.WriteGuidMask<6, 4, 1, 3, 7, 0, 2, 5>(invitee);
+        data.WriteBit(0);                                   // preInvite: status time present
+        data.WriteBit(0);                                   // sender == invitee
+        data.FlushBits();
+        data.WriteGuidBytes<7, 0, 5>(invitee);
+        data << uint32(c.statusTime);
+        data.WriteGuidBytes<2, 3, 4, 1, 6>(invitee);
+
+        CHECK(data.size() == sizeof(c.expected));
+        if (data.size() == sizeof(c.expected))
+        {
+            CHECK(std::memcmp(data.contents(), c.expected, sizeof(c.expected)) == 0);
+        }
+    }
+}
+
 int main(int /*argc*/, char** /*argv*/)
 {
     test_populated_calendar_list();
     test_populated_selected_event();
     test_raid_lockout_removed_matches_retail_bodies();
+    test_event_invite_matches_retail_bodies();
 
     if (g_fail)
     {

@@ -362,6 +362,12 @@ static bool IsEnterWorldConverted(uint16 opcode)
         // uint32 then uint8, from the client's reader sub_C69B0E. The old body was
         // two bytes, so the client read four past the end of it.
         case SMSG_COMPLAIN_RESULT:                   // calendar complaint acknowledgement
+        // Rebuilt from reader sub_6C3312 and verified byte-exact against two real
+        // 18414 captures. Status time is interleaved into the GUID byte run.
+        case SMSG_CALENDAR_EVENT_INVITE:             // CalendarMgr::SendCalendarEventInvite
+        // Rebuilt from reader sub_708569 and verified against two real 18414
+        // captures; both strings go last behind an 11-bit and an 8-bit length.
+        case SMSG_CALENDAR_EVENT_UPDATED_ALERT:      // CalendarMgr::SendCalendarEventUpdateAlert
         case SMSG_CLIENT_CONTROL_UPDATE:           // MopControlPackets::BuildClientControlUpdate
         case SMSG_MOVE_SET_ACTIVE_MOVER:           // MopControlPackets::BuildSetActiveMover
         case SMSG_PLAYER_MOVE:                     // MovementInfo relay serializer
