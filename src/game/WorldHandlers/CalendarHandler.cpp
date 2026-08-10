@@ -212,9 +212,16 @@ void WorldSession::HandleCalendarGuildFilter(WorldPacket& recv_data)
 {
     DEBUG_LOG("WORLD: Received opcode CMSG_CALENDAR_GUILD_FILTER [%s]", _player->GetGuidStr().c_str());
 
-    uint32 minLevel;
-    uint32 maxLevel;
-    uint32 minRank;
+    // Three BYTES, not three uint32s. The client's writer sub_668A7F emits
+    // sub_40F018 three times from object offsets +16, +17 and +18, so the whole
+    // body is three bytes. The inherited reader asked for twelve and would have
+    // over-read the buffer on every request.
+    //
+    // The widths are also right on their own terms: all three are a character
+    // level or a guild rank index, and none can exceed 255.
+    uint8 minLevel;
+    uint8 maxLevel;
+    uint8 minRank;
 
     recv_data >> minLevel >> maxLevel >> minRank;
 

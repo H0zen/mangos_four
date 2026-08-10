@@ -224,7 +224,13 @@ void PlayerSocial::SendSocialList()
     }
 
     // 0x7 = friends, ignore and mute lists all present.
-    WorldPacket data(SMSG_CONTACT_LIST, 4 + 4 + entries.size() * 25);
+    //
+    // Size is a pre-allocation hint only; WorldPacket grows on demand. Real entry
+    // widths with an empty note are 21 bytes for ignore- or mute-only, 22 for an
+    // offline friend and 34 for an online one, plus the note. 34 is used so the
+    // common all-online case does not reallocate. The previous hint of 25 predates
+    // the two realm addresses.
+    WorldPacket data(SMSG_CONTACT_LIST, 4 + 4 + entries.size() * 34);
     MopSocialPackets::BuildContactList(data, 7, entries);
 
     plr->GetSession()->SendPacket(&data);

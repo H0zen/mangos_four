@@ -1434,6 +1434,54 @@ void InitializeOpcodes()
     DefC(CMSG_CALENDAR_GET_NUM_PENDING, "CMSG_CALENDAR_GET_NUM_PENDING", STATUS_LOGGEDIN, PROCESS_THREADUNSAFE, &WorldSession::HandleCalendarGetNumPending);
     DefS(SMSG_CALENDAR_SEND_NUM_PENDING, "SMSG_CALENDAR_SEND_NUM_PENDING");
 
+    // PARKED 2026-08-10: the twelve remaining calendar CMSGs stay dormant, and
+    // the blocker is ONE reply shared by all of them.
+    //
+    //   CMSG_CALENDAR_EVENT_SIGNUP            0x01E3  sub_6665D7
+    //   CMSG_CALENDAR_GUILD_FILTER            0x04E3  sub_668A7F
+    //   CMSG_CALENDAR_EVENT_MODERATOR_STATUS  0x0708  sub_6657A5
+    //   CMSG_CALENDAR_EVENT_REMOVE_INVITE     0x0962  sub_669371
+    //   CMSG_CALENDAR_ADD_EVENT               0x0A37  sub_66D4E2
+    //   CMSG_CALENDAR_REMOVE_EVENT            0x0C61  sub_665987
+    //   CMSG_CALENDAR_COPY_EVENT              0x1A97  sub_665987  (same writer)
+    //   CMSG_CALENDAR_EVENT_STATUS            0x1AB3  sub_667F7B
+    //   CMSG_CALENDAR_EVENT_INVITE            0x1D8E  sub_66CA8E
+    //   CMSG_CALENDAR_UPDATE_EVENT            0x1F8D  sub_66D0A3
+    //   CMSG_CALENDAR_COMPLAIN                0x1F8F  sub_6669F0
+    //   CMSG_CALENDAR_EVENT_RSVP              0x1FB8  sub_66919E
+    //
+    // EVERY one of them reaches CalendarMgr::SendCalendarCommandResult, directly
+    // or through CalendarMgr/Guild, and SMSG_CALENDAR_COMMAND_RESULT (0x142A) is
+    // still the legacy body: uint32(0), uint8(0), then either a cstring param or
+    // uint8(0), then uint32(err). It is neither converted nor admitted by
+    // IsEnterWorldConverted. Registering any of these makes the server answer with
+    // that body, which is the CMSG_CONTACT_LIST mistake exactly.
+    //
+    // Note the reply gate is NOT visible from the handler alone. Three of the
+    // twelve -- GUILD_FILTER, REMOVE_EVENT, COPY_EVENT -- emit no SMSG in their own
+    // body and look free; they reach the command result one level down, inside
+    // CalendarMgr::RemoveEvent, CalendarMgr::CopyEvent and Guild::MassInviteToEvent.
+    //
+    // What IS already done, so nobody redoes it:
+    //   - SMSG_CALENDAR_SEND_CALENDAR/SEND_EVENT/SEND_NUM_PENDING/RAID_LOCKOUT_REMOVED,
+    //     EVENT_INITIAL_INVITE, EVENT_INVITE_STATUS and EVENT_MODERATOR_STATUS are
+    //     converted (MopCalendarPackets) and admitted.
+    //   - REMOVE_EVENT and COPY_EVENT readers are PROVEN against sub_665987:
+    //     uint64 eventId, uint64 inviteId, uint32. Both already match.
+    //   - GUILD_FILTER's reader was WRONG and is fixed in this pass -- three uint8,
+    //     not three uint32; it over-read a three-byte body.
+    //   - ADD_EVENT's reader is legacy and must be rewritten before it is
+    //     registered. sub_66D4E2 is bit-packed: four uint32 and a byte, then a
+    //     bit-packed invite count and description length, per-invite 8-bit GUID
+    //     masks, a title length, a flush, then the GUID bytes and both strings LAST.
+    //     The current reader reads title-first with a pre-MoP ReadAsPacked() GUID
+    //     and bears no resemblance to it.
+    //
+    // Next step is SMSG_CALENDAR_COMMAND_RESULT's 18414 body. The oracle maps
+    // 0x142A to 0x00972E78 at LOW confidence, and that function is the consumer,
+    // not the parser -- it takes an already-parsed record, reading a byte at +0x142
+    // and a string at +0x10. Find the real reader before rebuilding the body.
+
     // Empty-bodied client actions. Every one is observed in the 18414 corpus with a
     // zero-length body in every single observation, and every handler reads nothing
     // at all -- no `>>`, no bit reads -- so there is no reader to get wrong and no
