@@ -1257,9 +1257,20 @@ void WorldSession::HandleChatIgnoredOpcode(WorldPacket& recv_data)
     uint8 unk;
     // DEBUG_LOG("WORLD: Received opcode CMSG_CHAT_IGNORED");
 
+    // Taken from the client's writer sub_C87F40, reached by the standard route:
+    // the thunk for 0x048A -> its vtable slot +4. The writer emits a whole byte
+    // from object offset +24 first -- it really is a uint8 here, not the single
+    // leading bit this shape usually carries -- then the eight presence bits and
+    // the present bytes in the orders below.
+    //
+    // The inherited permutations were wrong in both halves, so the ignoring
+    // player's GUID came out with its bytes shuffled and GetPlayer() below never
+    // resolved it. The popcount is identical whatever the order, so the body
+    // still consumed exactly, which is why this survived: the whisper simply
+    // produced no "is ignoring you" notice and nothing logged an error.
     recv_data >> unk;                                       // probably related to spam reporting
-    recv_data.ReadGuidMask<2, 5, 6, 4, 7, 0, 1, 3>(iguid);
-    recv_data.ReadGuidBytes<0, 6, 5, 1, 4, 3, 7, 2>(iguid);
+    recv_data.ReadGuidMask<5, 0, 1, 3, 6, 7, 4, 2>(iguid);
+    recv_data.ReadGuidBytes<2, 0, 3, 4, 7, 6, 1, 5>(iguid);
 
     Player* player = sObjectMgr.GetPlayer(iguid);
     if (!player || !player->GetSession())
