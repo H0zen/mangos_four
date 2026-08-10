@@ -352,6 +352,10 @@ static bool IsEnterWorldConverted(uint16 opcode)
         // name. Rebuilt from the client's parser sub_706B85; the error and name
         // offsets are corroborated by its display switch sub_972E78 (+0x142, +0x10).
         case SMSG_CALENDAR_COMMAND_RESULT:           // CalendarMgr::SendCalendarCommandResult
+        // Empty body on both sides: the client's parser sub_6BC12D is a bare
+        // constructor that reads nothing, and SendCalendarClearPendingAction has
+        // always sent a zero-length body. It never needed converting, only admitting.
+        case SMSG_CALENDAR_CLEAR_PENDING_ACTION:     // CalendarMgr::SendCalendarClearPendingAction
         case SMSG_CLIENT_CONTROL_UPDATE:           // MopControlPackets::BuildClientControlUpdate
         case SMSG_MOVE_SET_ACTIVE_MOVER:           // MopControlPackets::BuildSetActiveMover
         case SMSG_PLAYER_MOVE:                     // MovementInfo relay serializer

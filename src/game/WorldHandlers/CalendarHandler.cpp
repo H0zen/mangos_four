@@ -239,10 +239,14 @@ void WorldSession::HandleCalendarEventSignup(WorldPacket& recv_data)
     DEBUG_LOG("WORLD: Received opcode CMSG_CALENDAR_EVENT_SIGNUP [%s]", guid.GetString().c_str());
 
     uint64 eventId;
-    bool tentative;
 
+    // The tentative flag is a single BIT, not a byte. The client's writer
+    // sub_6665D7 emits the uint64 and then one sub_665157 followed by a flush, so
+    // the trailing byte is 0x80 for true and 0x00 for false. Reading it as a uint8
+    // yielded 128, which is truthy by luck rather than by parse -- any comparison
+    // against 1 would have failed silently.
     recv_data >> eventId;
-    recv_data >> tentative; // uint8 == bool size in all compilator???
+    bool const tentative = recv_data.ReadBit();
     DEBUG_FILTER_LOG(LOG_FILTER_CALENDAR, "EventId [" UI64FMTD "] Tentative %u", eventId, uint32(tentative));
 
     if (CalendarEvent* event = sCalendarMgr.GetEventById(eventId))
@@ -570,11 +574,14 @@ void WorldSession::HandleCalendarEventRsvp(WorldPacket& recv_data)
 
     uint64 eventId;
     uint64 inviteId;
-    uint32 status;
+    // One BYTE, not a uint32. The client's writer sub_66919E emits two uint64 and
+    // then a single sub_40F018; the inherited reader took four bytes where the
+    // client sends one and ran three bytes past the end of the body.
+    uint8 status;
 
     recv_data >> eventId >> inviteId >> status;
     DEBUG_FILTER_LOG(LOG_FILTER_CALENDAR, "EventId [" UI64FMTD "], InviteId [" UI64FMTD "], status %u",
-                     eventId, inviteId, status);
+                     eventId, inviteId, uint32(status));
 
     if (CalendarEvent* event = sCalendarMgr.GetEventById(eventId))
     {

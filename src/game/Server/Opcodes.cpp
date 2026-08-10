@@ -1455,6 +1455,22 @@ void InitializeOpcodes()
     DefC(CMSG_CALENDAR_COPY_EVENT, "CMSG_CALENDAR_COPY_EVENT", STATUS_LOGGEDIN, PROCESS_THREADUNSAFE, &WorldSession::HandleCalendarCopyEvent);
     DefS(SMSG_CALENDAR_COMMAND_RESULT, "SMSG_CALENDAR_COMMAND_RESULT");
 
+    // Two more, once SMSG_CALENDAR_CLEAR_PENDING_ACTION was admitted. That reply
+    // needed no conversion at all -- the client's parser sub_6BC12D is a bare
+    // constructor that reads nothing and the server has always sent an empty body,
+    // so it was only ever missing from the gate.
+    //
+    //   CMSG_CALENDAR_EVENT_SIGNUP 0x01E3, writer sub_6665D7 -- uint64 then ONE
+    //   BIT. The reader took a uint8, so tentative arrived as 128 rather than 1:
+    //   truthy by luck, and wrong against any equality test. Fixed here.
+    //
+    //   CMSG_CALENDAR_EVENT_RSVP   0x1FB8, writer sub_66919E -- uint64, uint64,
+    //   uint8. The reader took a uint32 status and ran three bytes past the body.
+    //   Fixed here.
+    DefC(CMSG_CALENDAR_EVENT_SIGNUP, "CMSG_CALENDAR_EVENT_SIGNUP", STATUS_LOGGEDIN, PROCESS_THREADUNSAFE, &WorldSession::HandleCalendarEventSignup);
+    DefC(CMSG_CALENDAR_EVENT_RSVP, "CMSG_CALENDAR_EVENT_RSVP", STATUS_LOGGEDIN, PROCESS_THREADUNSAFE, &WorldSession::HandleCalendarEventRsvp);
+    DefS(SMSG_CALENDAR_CLEAR_PENDING_ACTION, "SMSG_CALENDAR_CLEAR_PENDING_ACTION");
+
     // PARKED 2026-08-10: the remaining ten calendar CMSGs stay dormant. The shared
     // blocker is GONE -- SMSG_CALENDAR_COMMAND_RESULT is rebuilt and admitted --
     // and what is left is per-opcode.
@@ -1462,11 +1478,8 @@ void InitializeOpcodes()
     // Blocked on an UNCONVERTED REPLY (reader state noted separately):
     //
     //   CMSG_CALENDAR_REMOVE_EVENT     0x0C61  sub_665987  reader PROVEN
-    //        -> SMSG_CALENDAR_EVENT_REMOVED_ALERT
-    //   CMSG_CALENDAR_EVENT_SIGNUP     0x01E3  sub_6665D7  reader unproven
-    //   CMSG_CALENDAR_EVENT_STATUS     0x1AB3  sub_667F7B  reader unproven
-    //   CMSG_CALENDAR_EVENT_RSVP       0x1FB8  sub_66919E  reader unproven
-    //        -> SMSG_CALENDAR_CLEAR_PENDING_ACTION
+    //        -> SMSG_CALENDAR_EVENT_REMOVED_ALERT (parser sub_6F6809 per
+    //           bridge_548.json, not yet decoded)
     //   CMSG_CALENDAR_EVENT_INVITE     0x1D8E  sub_66CA8E  reader unproven
     //        -> SMSG_CALENDAR_EVENT_INVITE
     //   CMSG_CALENDAR_UPDATE_EVENT     0x1F8D  sub_66D0A3  reader unproven
@@ -1484,6 +1497,16 @@ void InitializeOpcodes()
     //        ReadAsPacked() GUID and shares no field order with it.
     //   CMSG_CALENDAR_EVENT_MODERATOR_STATUS 0x0708  sub_6657A5  reader unproven
     //   CMSG_CALENDAR_EVENT_REMOVE_INVITE    0x0962  sub_669371  reader unproven
+    //   CMSG_CALENDAR_EVENT_STATUS           0x1AB3  sub_667F7B
+    //        Writer decoded, reader NOT rewritten. The writer emits three uint64
+    //        (object offsets +24, +32, +16), a uint8 status at +48, then a packed
+    //        GUID based at +40 -- mask 44,43,47,46,42,40,45,41 and bytes
+    //        47,45,42,41,44,46,40,43. The reader instead takes the packed GUID
+    //        FIRST with a pre-MoP ReadAsPacked() and a uint32 status.
+    //        Held because the three uint64 cannot be named from offsets alone:
+    //        +24 is eventId by the convention the sibling writers follow, but
+    //        whether +32 or +16 is inviteId or ownerInviteId is not established,
+    //        and guessing would silently swap two ids that are both plausible.
     //
     // Note the reply gate is NOT visible from the handler alone. GUILD_FILTER,
     // REMOVE_EVENT and COPY_EVENT emit no SMSG in their own body and look free;
