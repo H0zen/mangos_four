@@ -731,31 +731,6 @@ void WorldSession::HandleSetActiveMoverOpcode(WorldPacket& recv_data)
 }
 
 /**
- * @brief Stores movement info sent for a non-active mover.
- *
- * @param recv_data The received opcode packet.
- */
-void WorldSession::HandleMoveNotActiveMoverOpcode(WorldPacket& recv_data)
-{
-    DEBUG_LOG("WORLD: Received opcode CMSG_MOVE_NOT_ACTIVE_MOVER");
-    recv_data.hexlike();
-
-    MovementInfo mi;
-    recv_data >> mi;
-
-    if (_player->GetMover()->GetObjectGuid() == mi.GetGuid())
-    {
-        sLog.outError("HandleMoveNotActiveMover: incorrect mover guid: mover is %s and should be %s instead of %s",
-                      _player->GetMover()->GetGuidStr().c_str(),
-                      _player->GetGuidStr().c_str(),
-                      mi.GetGuid().GetString().c_str());
-        return;
-    }
-
-    _player->m_movementInfo = mi;
-}
-
-/**
  * @brief Broadcasts the player's mount special animation.
  *
  * @param recvdata The received opcode packet.

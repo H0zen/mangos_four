@@ -620,78 +620,6 @@ MovementStatusElements MovementSetFacingSequence[] =
     MSEEnd,
 };
 
-MovementStatusElements MovementSetPitchSequence[] =
-{
-    MSEPositionX,
-    MSEPositionZ,
-    MSEPositionY,
-    MSEHasFallData,
-    MSEHasMovementFlags,
-    MSEGuidBit1,
-    MSEHasOrientation,
-    MSEGuidBit7,
-    MSEGuidBit3,
-    MSEHasMovementFlags2,
-    MSEHasTransportData,
-    MSEHasSplineElevation,
-    MSEGuidBit6,
-    MSEHasPitch,
-    MSEGuidBit4,
-    MSEHasSpline,
-    MSEGuidBit2,
-    MSEHasUnknownBit,
-    MSEHasTimestamp,
-    MSEGuidBit0,
-    MSEGuidBit5,
-    MSETransportGuidBit3,
-    MSETransportGuidBit6,
-    MSETransportGuidBit2,
-    MSETransportGuidBit4,
-    MSETransportGuidBit0,
-    MSETransportGuidBit1,
-    MSETransportGuidBit5,
-    MSEHasTransportTime3,
-    MSETransportGuidBit7,
-    MSEHasTransportTime2,
-    MSEFlags2,
-    MSEFlags,
-    MSEHasFallDirection,
-    MSEGuidByte3,
-    MSEGuidByte7,
-    MSEGuidByte1,
-    MSEGuidByte6,
-    MSEGuidByte0,
-    MSEGuidByte5,
-    MSEGuidByte2,
-    MSEGuidByte4,
-    MSETransportGuidByte4,
-    MSETransportGuidByte3,
-    MSETransportGuidByte6,
-    MSETransportPositionO,
-    MSETransportGuidByte1,
-    MSETransportTime3,
-    MSETransportTime,
-    MSETransportGuidByte2,
-    MSETransportPositionZ,
-    MSETransportGuidByte0,
-    MSETransportTime2,
-    MSETransportPositionY,
-    MSETransportGuidByte5,
-    MSETransportSeat,
-    MSETransportGuidByte7,
-    MSETransportPositionX,
-    MSEFallVerticalSpeed,
-    MSEFallTime,
-    MSEFallHorizontalSpeed,
-    MSEFallCosAngle,
-    MSEFallSinAngle,
-    MSEPitch,
-    MSESplineElevation,
-    MSETimestamp,
-    MSEPositionO,
-    MSEEnd,
-};
-
 MovementStatusElements MovementStartBackwardSequence[] =
 {
     MSEPositionY,
@@ -2218,170 +2146,6 @@ MovementStatusElements MovementChngTransportSequence[]=
     MSEEnd,
 };
 
-MovementStatusElements MovementSetRunModeSequence[] =
-{
-    // ⚠️ NOT REBUILT, and it should not be: CMSG_MOVE_SET_RUN_MODE does not exist
-    // in 5.4.8. Opcodes.h marks 0x0748 "not in 5.4.8 (legacy; handler retained)",
-    // and that is the whole explanation.
-    //
-    // Every sibling here was rebuilt from its client writer. This one could not be,
-    // because 0x0748 in an 18414 client belongs to a DIFFERENT opcode: the writer
-    // reached from it, sub_68937A, emits two uint32 from +272 and +288, an
-    // eight-bit presence mask for a GUID at +280..+287, a bit-packed string length,
-    // the present GUID bytes, then a string from +16. That is a GUID-plus-name
-    // request and shares none of the movement struct's offsets.
-    //
-    // The corpus says the same: 0x0748 shows 1,976 packets in 18414 at 15-17 bytes,
-    // where every movement body in this file runs 28-83. Catalogue 2BE10C89. Those
-    // packets belong to that other opcode, not to this name.
-    //
-    // So there is no defect to fix and no value to correct -- only a legacy name
-    // and value retained for a handler that 5.4.8 never exercises. Do not rebuild
-    // this sequence from 0x0748's writer, and do not register it. If the retained
-    // handler is ever wanted, first establish which 18414 opcode, if any, carries
-    // that meaning. The sequence below is the inherited one, left exactly as found.
-    MSEPositionY,
-    MSEPositionX,
-    MSEPositionZ,
-    MSEHasTimestamp,
-    MSEHasMovementFlags2,
-    MSEGuidBit1,
-    MSEHasSpline,
-    MSEHasMovementFlags,
-    MSEGuidBit7,
-    MSEHasTransportData,
-    MSEHasUnknownBit,
-    MSEGuidBit0,
-    MSEGuidBit3,
-    MSEHasSplineElevation,
-    MSEGuidBit5,
-    MSEHasPitch,
-    MSEGuidBit6,
-    MSEGuidBit4,
-    MSEHasFallData,
-    MSEHasOrientation,
-    MSEGuidBit2,
-    MSETransportGuidBit6,
-    MSETransportGuidBit4,
-    MSEHasTransportTime3,
-    MSETransportGuidBit5,
-    MSETransportGuidBit3,
-    MSETransportGuidBit1,
-    MSEHasTransportTime2,
-    MSETransportGuidBit7,
-    MSETransportGuidBit0,
-    MSETransportGuidBit2,
-    MSEHasFallDirection,
-    MSEFlags2,
-    MSEFlags,
-    MSEGuidByte3,
-    MSEGuidByte6,
-    MSEGuidByte0,
-    MSEGuidByte7,
-    MSEGuidByte4,
-    MSEGuidByte1,
-    MSEGuidByte5,
-    MSEGuidByte2,
-    MSEPitch,
-    MSETransportTime2,
-    MSETransportGuidByte3,
-    MSETransportPositionX,
-    MSETransportSeat,
-    MSETransportGuidByte5,
-    MSETransportGuidByte1,
-    MSETransportPositionZ,
-    MSETransportGuidByte2,
-    MSETransportGuidByte7,
-    MSETransportPositionO,
-    MSETransportGuidByte4,
-    MSETransportTime,
-    MSETransportTime3,
-    MSETransportGuidByte0,
-    MSETransportPositionY,
-    MSETransportGuidByte6,
-    MSEFallSinAngle,
-    MSEFallHorizontalSpeed,
-    MSEFallCosAngle,
-    MSEFallTime,
-    MSEFallVerticalSpeed,
-    MSESplineElevation,
-    MSETimestamp,
-    MSEPositionO,
-    MSEEnd,
-};
-
-MovementStatusElements MovementSetWalkModeSequence[] =
-{
-    MSEPositionY,
-    MSEPositionX,
-    MSEPositionZ,
-    MSEGuidBit6,
-    MSEHasSpline,
-    MSEHasTimestamp,
-    MSEGuidBit0,
-    MSEGuidBit1,
-    MSEHasMovementFlags,
-    MSEHasPitch,
-    MSEGuidBit7,
-    MSEHasSplineElevation,
-    MSEGuidBit4,
-    MSEHasOrientation,
-    MSEHasTransportData,
-    MSEGuidBit2,
-    MSEGuidBit5,
-    MSEGuidBit3,
-    MSEHasUnknownBit,
-    MSEHasMovementFlags2,
-    MSEHasFallData,
-    MSETransportGuidBit2,
-    MSETransportGuidBit0,
-    MSETransportGuidBit6,
-    MSETransportGuidBit1,
-    MSETransportGuidBit3,
-    MSEHasTransportTime2,
-    MSETransportGuidBit5,
-    MSEHasTransportTime3,
-    MSETransportGuidBit4,
-    MSETransportGuidBit7,
-    MSEHasFallDirection,
-    MSEFlags,
-    MSEFlags2,
-    MSEGuidByte5,
-    MSEGuidByte6,
-    MSEGuidByte4,
-    MSEGuidByte7,
-    MSEGuidByte3,
-    MSEGuidByte0,
-    MSEGuidByte2,
-    MSEGuidByte1,
-    MSETransportGuidByte2,
-    MSETransportGuidByte5,
-    MSETransportSeat,
-    MSETransportPositionZ,
-    MSETransportGuidByte3,
-    MSETransportGuidByte6,
-    MSETransportGuidByte0,
-    MSETransportTime,
-    MSETransportGuidByte4,
-    MSETransportTime2,
-    MSETransportPositionO,
-    MSETransportPositionX,
-    MSETransportTime3,
-    MSETransportGuidByte7,
-    MSETransportPositionY,
-    MSETransportGuidByte1,
-    MSEFallCosAngle,
-    MSEFallHorizontalSpeed,
-    MSEFallSinAngle,
-    MSEFallVerticalSpeed,
-    MSEFallTime,
-    MSESplineElevation,
-    MSEPitch,
-    MSETimestamp,
-    MSEPositionO,
-    MSEEnd,
-};
-
 MovementStatusElements MovementFallResetSequence[] =
 {
 
@@ -2475,55 +2239,6 @@ MovementStatusElements MovementFallResetSequence[] =
  *   Further trial and error is required to figure out
  *   the proper sequence, but this works for now.
  */
-MovementStatusElements MovementSetCanFlySequence[] =
-{
-    MSEPositionZ,
-    MSEPositionX,
-    MSEPositionY,
-    MSEHasTransportData,
-    MSEHasFallData,
-    MSEHasMovementFlags,
-    MSEHasMovementFlags2,
-    MSEHasTimestamp,
-    MSEHasSplineElevation,
-    MSEHasSpline,
-    MSEHasPitch,
-    MSEHasTransportTime2,
-    MSEHasFallDirection,
-    MSEGuidByte2,
-    MSEGuidByte0,
-    MSEGuidByte4,
-    MSEGuidByte7,
-    MSEGuidByte5,
-    MSEGuidByte1,
-    MSEGuidByte3,
-    MSEGuidByte6,
-    MSETransportPositionZ,
-    MSETransportGuidByte3,
-    MSETransportGuidByte5,
-    MSETransportGuidByte4,
-    MSETransportSeat,
-    MSETransportPositionX,
-    MSETransportGuidByte2,
-    MSETransportTime2,
-    MSETransportPositionY,
-    MSETransportGuidByte1,
-    MSETransportTime,
-    MSETransportGuidByte7,
-    MSETransportGuidByte0,
-    MSETransportGuidByte6,
-    MSESplineElevation,
-    MSEFallSinAngle,
-    MSEFallCosAngle,
-    MSEFallHorizontalSpeed,
-    MSEFallVerticalSpeed,
-    MSEFallTime,
-    MSEPitch,
-    MSETimestamp,
-    MSEHasOrientation,
-    MSEEnd,
-};
-
 MovementStatusElements MovementSetCanFlyAckSequence[] =
 {
     // Rebuilt from the client's own writer sub_674EA6, reached by the standard
@@ -2950,78 +2665,6 @@ MovementStatusElements MoveUpdateKnockBackSequence[] =
     MSEPitch,
     MSEGuidByte5,
     MSETimestamp,
-    MSEEnd,
-};
-
-MovementStatusElements MoveNotActiveMoverSequence[] =
-{
-    MSEPositionZ,
-    MSEPositionX,
-    MSEPositionY,
-    MSEHasMovementFlags2,
-    MSEHasTransportData,
-    MSEGuidBit6,
-    MSEHasSplineElevation,
-    MSEGuidBit3,
-    MSEHasUnknownBit,
-    MSEHasTimestamp,
-    MSEGuidBit0,
-    MSEHasOrientation,
-    MSEGuidBit5,
-    MSEHasPitch,
-    MSEGuidBit1,
-    MSEGuidBit4,
-    MSEGuidBit7,
-    MSEHasSpline,
-    MSEGuidBit2,
-    MSEHasFallData,
-    MSEHasMovementFlags,
-    MSETransportGuidBit4,
-    MSETransportGuidBit0,
-    MSETransportGuidBit1,
-    MSETransportGuidBit6,
-    MSETransportGuidBit2,
-    MSEHasTransportTime3,
-    MSETransportGuidBit5,
-    MSETransportGuidBit7,
-    MSEHasTransportTime2,
-    MSETransportGuidBit3,
-    MSEHasFallDirection,
-    MSEFlags,
-    MSEFlags2,
-    MSEGuidByte1,
-    MSEGuidByte0,
-    MSEGuidByte4,
-    MSEGuidByte2,
-    MSEGuidByte7,
-    MSEGuidByte5,
-    MSEGuidByte6,
-    MSEGuidByte3,
-    MSEFallVerticalSpeed,
-    MSEFallCosAngle,
-    MSEFallSinAngle,
-    MSEFallHorizontalSpeed,
-    MSEFallTime,
-    MSETransportTime3,
-    MSETransportGuidByte1,
-    MSETransportTime2,
-    MSETransportPositionO,
-    MSETransportGuidByte0,
-    MSETransportSeat,
-    MSETransportGuidByte4,
-    MSETransportGuidByte6,
-    MSETransportGuidByte3,
-    MSETransportGuidByte5,
-    MSETransportPositionY,
-    MSETransportPositionX,
-    MSETransportGuidByte2,
-    MSETransportPositionZ,
-    MSETransportGuidByte7,
-    MSETransportTime,
-    MSETimestamp,
-    MSESplineElevation,
-    MSEPitch,
-    MSEPositionO,
     MSEEnd,
 };
 
@@ -3937,18 +3580,10 @@ MovementStatusElements* GetMovementStatusElementsSequence(uint16 opcode)
             return MovementFallResetSequence;
         case CMSG_MOVE_JUMP:
             return MovementJumpSequence;
-        case CMSG_MOVE_SET_CAN_FLY:
-            return MovementSetCanFlySequence;
         case CMSG_MOVE_SET_CAN_FLY_ACK:
             return MovementSetCanFlyAckSequence;
         case CMSG_MOVE_SET_FACING:
             return MovementSetFacingSequence;
-        case CMSG_MOVE_SET_PITCH:
-            return MovementSetPitchSequence;
-        case CMSG_MOVE_SET_RUN_MODE:
-            return MovementSetRunModeSequence;
-        case CMSG_MOVE_SET_WALK_MODE:
-            return MovementSetWalkModeSequence;
         case CMSG_MOVE_SPLINE_DONE:
             return MovementSplineDoneSequence;
         case CMSG_MOVE_START_BACKWARD:
@@ -4001,8 +3636,6 @@ MovementStatusElements* GetMovementStatusElementsSequence(uint16 opcode)
             return MovementWaterWalkAckSequence;
         case SMSG_MOVE_UPDATE_KNOCK_BACK:
             return MoveUpdateKnockBackSequence;
-        case CMSG_MOVE_NOT_ACTIVE_MOVER:
-            return MoveNotActiveMoverSequence;
         case CMSG_DISMISS_CONTROLLED_VEHICLE:
             return DismissControlledVehicleSequence;
         case CMSG_CHANGE_SEATS_ON_CONTROLLED_VEHICLE:

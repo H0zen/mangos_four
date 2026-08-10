@@ -241,8 +241,6 @@ enum OpcodesList
     CMSG_MOVE_START_PITCH_UP                     = 0x00D8, // 5.4.8 18414
     CMSG_MOVE_START_PITCH_DOWN                   = 0x08D8, // 5.4.8 18414
     CMSG_MOVE_STOP_PITCH                         = 0x007A, // 5.4.8 18414
-    CMSG_MOVE_SET_RUN_MODE                       = 0x0748, // not in 5.4.8 (legacy; handler retained)
-    CMSG_MOVE_SET_WALK_MODE                      = 0x0BE1, // not in 5.4.8 (legacy; handler retained)
     MSG_MOVE_TOGGLE_LOGGING                      = 0x10C5,    // (no client leaf)
     SMSG_MOVE_TELEPORT                           = 0x0B39,    // 5.4.8 18414 (Wow.exe leaf; name reference-consensus)
     MSG_MOVE_TELEPORT_CHEAT                      = 0x10C7,    // (no client leaf)
@@ -266,7 +264,6 @@ enum OpcodesList
     SMSG_MOVE_SET_TURN_RATE                      = 0x0069,    // 5.4.8 18414 (Wow.exe leaf; name reference-consensus)
     MSG_MOVE_TOGGLE_COLLISION_CHEAT              = 0x0BC8,    // 5.4.1 17538 (no client leaf)
     CMSG_MOVE_SET_FACING                         = 0x1050, // 5.4.8 18414
-    CMSG_MOVE_SET_PITCH                          = 0x0261, // not in 5.4.8 (legacy; handler retained)
     MSG_MOVE_WORLDPORT_ACK                       = 0x1FAD,    // 5.4.8 18414 (retail: 2022 zero-length CMSG, one per SMSG_NEW_WORLD)
     SMSG_MONSTER_MOVE                            = 0x1A07,    // 5.4.8 18414 (Wow.exe leaf; name single-source fork)
     SMSG_MOVE_WATER_WALK                         = 0x1F9A,    // 5.4.8 18414 (Wow.exe leaf; name reference-consensus)
@@ -721,7 +718,6 @@ enum OpcodesList
     CMSG_MOVE_TIME_SKIPPED                       = 0x0150, // 5.4.8 18414 (Wow.exe binary)
     CMSG_MOVE_FEATHER_FALL_ACK                   = 0x08D0, // 5.4.8 18414 (Wow.exe binary)
     CMSG_MOVE_WATER_WALK_ACK                     = 0x10F2, // 5.4.8 18414 (Wow.exe binary)
-    CMSG_MOVE_NOT_ACTIVE_MOVER                   = 0x7A1A, // 4.3.4 15595 — NYI in 5.4.8 refs (unverified)
     SMSG_PLAY_SOUND                              = 0x102A,    // 5.4.8 18414 (Wow.exe leaf; name reference-consensus)
     CMSG_BATTLEFIELD_STATUS                      = 0x1F9E, // 5.4.8 18414 (Wow.exe binary)
     SMSG_BATTLEFIELD_STATUS                      = 0x0433,    // 5.4.8 18414 (Wow.exe NONE/removal semantics; token reference-sourced)
@@ -831,7 +827,6 @@ enum OpcodesList
     MSG_MOVE_STOP_SWIM_CHEAT                     = 0x1343,    // (no client leaf)
     SMSG_MOVE_SET_CAN_FLY                        = 0x178D,    // 5.4.8 18414 (Wow.exe leaf; name reference-consensus)
     SMSG_MOVE_UNSET_CAN_FLY                      = 0x0162,    // 5.4.8 18414 (Wow.exe leaf; name reference-consensus)
-    CMSG_MOVE_SET_CAN_FLY                        = 0x720E, // not in 5.4.8 (legacy; SMSG_MOVE_SET_CAN_FLY 0x178D; client sends the _ACK)
     CMSG_MOVE_SET_CAN_FLY_ACK                    = 0x1052, // 5.4.8 18414 (Wow.exe binary)
     CMSG_MOVE_SET_FLY                            = 0x01F1, // 5.4.8 18414 (Wow.exe binary)
     CMSG_SOCKET_GEMS                             = 0x02CB, // 5.4.8 18414 (Wow.exe binary)
