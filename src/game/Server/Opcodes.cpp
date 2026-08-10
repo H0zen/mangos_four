@@ -1499,8 +1499,34 @@ void InitializeOpcodes()
     // and SIGNUP -- each of which changed only field widths and GUID placement.
     // If a captured body ever contradicts it, these three are where to look.
     DefC(CMSG_CALENDAR_EVENT_MODERATOR_STATUS, "CMSG_CALENDAR_EVENT_MODERATOR_STATUS", STATUS_LOGGEDIN, PROCESS_THREADUNSAFE, &WorldSession::HandleCalendarEventModeratorStatus);
-    DefC(CMSG_CALENDAR_EVENT_REMOVE_INVITE, "CMSG_CALENDAR_EVENT_REMOVE_INVITE", STATUS_LOGGEDIN, PROCESS_THREADUNSAFE, &WorldSession::HandleCalendarEventRemoveInvite);
     DefC(CMSG_CALENDAR_EVENT_STATUS, "CMSG_CALENDAR_EVENT_STATUS", STATUS_LOGGEDIN, PROCESS_THREADUNSAFE, &WorldSession::HandleCalendarEventStatus);
+
+    // HELD, 2026-08-10, on review. These four reach a reply that is still a LEGACY
+    // body AND is not admitted by IsEnterWorldConverted, two levels down where a
+    // handler-level scan does not see it:
+    //
+    //   ADD_EVENT, EVENT_INVITE -> CalendarMgr::AddInvite (Calendar.cpp:420)
+    //        -> SMSG_CALENDAR_EVENT_INVITE_ALERT        (parser sub_704449)
+    //   EVENT_REMOVE_INVITE, COMPLAIN -> CalendarMgr::RemoveInvite (Calendar.cpp:86,89)
+    //        -> SMSG_CALENDAR_EVENT_INVITE_REMOVED       (parser sub_7096B7)
+    //        -> SMSG_CALENDAR_EVENT_INVITE_REMOVED_ALERT (parser sub_6BC0BD)
+    //
+    // Registering them made those replies reachable from client input for the first
+    // time. Outside the login suppression window an unadmitted opcode is not
+    // dropped -- it is SENT, with a pre-MoP body, and this file's own rule is that a
+    // stale body reaching the 18414 client can crash it. That is a worse failure
+    // than the dropped packet these registrations were meant to fix.
+    //
+    // The requests themselves are proven and stay in the tree: ADD_EVENT and
+    // EVENT_INVITE against their writers and builders, REMOVE_INVITE and COMPLAIN
+    // likewise. Only the DefC is held. Restore all four once the three replies above
+    // are rebuilt from their parsers and admitted -- the bridge_548.json parsers are
+    // named, so the route is the same one that produced the rest of this subsystem.
+    //
+    //  DefC(CMSG_CALENDAR_ADD_EVENT, ...)
+    //  DefC(CMSG_CALENDAR_EVENT_INVITE, ...)
+    //  DefC(CMSG_CALENDAR_EVENT_REMOVE_INVITE, ...)
+    //  DefC(CMSG_CALENDAR_COMPLAIN, ...)
 
     // And the complaint. Its request follows the same shape as the three above --
     // writer sub_6669F0 emits eventId and inviteId, then the reported player's GUID
@@ -1511,7 +1537,8 @@ void InitializeOpcodes()
     // MiscHandler.cpp holds CMSG_COMPLAIN (the chat/mail spam report, a different
     // opcode) unregistered partly because this reply was unverified -- the reply
     // side of that objection is now answered, though its own request reader is not.
-    DefC(CMSG_CALENDAR_COMPLAIN, "CMSG_CALENDAR_COMPLAIN", STATUS_LOGGEDIN, PROCESS_THREADUNSAFE, &WorldSession::HandleCalendarComplain);
+    // HELD on review -- see the note above: reply still legacy and unadmitted.
+    // DefC(CMSG_CALENDAR_COMPLAIN, "CMSG_CALENDAR_COMPLAIN", STATUS_LOGGEDIN, PROCESS_THREADUNSAFE, &WorldSession::HandleCalendarComplain);
     DefS(SMSG_COMPLAIN_RESULT, "SMSG_COMPLAIN_RESULT");
 
     // And event creation. Its reader is rebuilt from writer sub_66D4E2, with the
@@ -1531,7 +1558,8 @@ void InitializeOpcodes()
     // Route worth remembering: extracted UI names the Lua setter, the setter's glue
     // leads to the object method, and the packet BUILDER ties object offsets to
     // packet offsets. The writer alone gives layout; the builder gives identity.
-    DefC(CMSG_CALENDAR_ADD_EVENT, "CMSG_CALENDAR_ADD_EVENT", STATUS_LOGGEDIN, PROCESS_THREADUNSAFE, &WorldSession::HandleCalendarAddEvent);
+    // HELD on review -- see the note above: reply still legacy and unadmitted.
+    // DefC(CMSG_CALENDAR_ADD_EVENT, "CMSG_CALENDAR_ADD_EVENT", STATUS_LOGGEDIN, PROCESS_THREADUNSAFE, &WorldSession::HandleCalendarAddEvent);
 
     // And the invite. Request from writer sub_66CA8E: two uint64, a pre-invite bit,
     // a NINE-bit name length (eight bits then one, the same split
@@ -1545,7 +1573,8 @@ void InitializeOpcodes()
     // different invitees, and status 6/8 (SIGNED_UP/TENTATIVE) with the
     // sender-differs bit clear -- a self sign-up, which corroborates both readings.
     // The status time is INTERLEAVED into the GUID byte run, between byte 5 and 2.
-    DefC(CMSG_CALENDAR_EVENT_INVITE, "CMSG_CALENDAR_EVENT_INVITE", STATUS_LOGGEDIN, PROCESS_THREADUNSAFE, &WorldSession::HandleCalendarEventInvite);
+    // HELD on review -- see the note above: reply still legacy and unadmitted.
+    // DefC(CMSG_CALENDAR_EVENT_INVITE, "CMSG_CALENDAR_EVENT_INVITE", STATUS_LOGGEDIN, PROCESS_THREADUNSAFE, &WorldSession::HandleCalendarEventInvite);
     DefS(SMSG_CALENDAR_EVENT_INVITE, "SMSG_CALENDAR_EVENT_INVITE");
 
     // The twelfth and last. Its request was rewritten from writer sub_66D0A3 with

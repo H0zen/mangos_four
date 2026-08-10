@@ -789,12 +789,22 @@ void WorldSession::HandleCalendarEventStatus(WorldPacket& recv_data)
     uint64 ownerInviteId; // isn't it sender's inviteId?
     uint8 status;
 
-    // From the client's writer sub_667F7B: three ids in the pre-MoP order, then the
-    // status BYTE, then the invitee GUID bit-packed at the END. Note the byte sits
-    // AFTER the ids here where CMSG_CALENDAR_EVENT_MODERATOR_STATUS puts its rank
-    // byte FIRST -- MoP randomises that per opcode, so neither can be assumed from
-    // the other.
-    recv_data >> eventId >> inviteId >> ownerInviteId;
+    // From the client's writer sub_667F7B, with the ids NAMED by the client's own
+    // packet builder sub_9E858C (CalendarEventSetStatus -> sub_971DC3 -> sub_9716F2
+    // -> sub_9E858C), which fills this object:
+    //
+    //     +16 <- invite->+0     inviteId
+    //     +24 <- calendar->+40  ownerInviteId
+    //     +32 <- calendar->+0   eventId
+    //
+    // and the writer emits +24, +32, +16. So the wire order is ownerInviteId,
+    // eventId, inviteId -- a three-way rotation away from the pre-MoP order.
+    //
+    // This does NOT keep the legacy scalar order. An earlier pass assumed it did,
+    // on the strength of four sibling opcodes that happen to; RSVP and REMOVE_INVITE
+    // really do, and these two do not. The builder is the authority -- offsets alone
+    // never named these, and the inference was the wrong tool.
+    recv_data >> ownerInviteId >> eventId >> inviteId;
     recv_data >> status;
     recv_data.ReadGuidMask<4, 3, 7, 6, 2, 0, 5, 1>(invitee);
     recv_data.ReadGuidBytes<7, 5, 2, 1, 4, 6, 0, 3>(invitee);
@@ -850,15 +860,23 @@ void WorldSession::HandleCalendarEventModeratorStatus(WorldPacket& recv_data)
     uint64 ownerInviteId; // isn't it sender's inviteId?
     uint8 rank;
 
-    // From the client's writer sub_6657A5: the rank BYTE leads, the three ids
-    // follow, and the invitee GUID is bit-packed at the END -- not a leading
-    // pre-MoP packed GUID, and rank is not a uint32.
+    // From the client's writer sub_6657A5, with the ids NAMED by the client's own
+    // packet builder sub_9E8626 (CalendarEventSetModerator -> sub_971E24 ->
+    // sub_971723 -> sub_9E8626), which fills this object:
     //
-    // The three ids keep their pre-MoP order. That holds for every calendar opcode
-    // proven from its writer so far -- RSVP, REMOVE_EVENT, COPY_EVENT and SIGNUP
-    // all kept the legacy scalar order and changed only widths and GUID placement.
+    //     +16 <- invite->+0     inviteId
+    //     +24 <- calendar->+0   eventId
+    //     +32 <- calendar->+40  ownerInviteId
+    //
+    // and the writer emits the rank byte, then +24, +32, +16. So the wire order is
+    // rank, eventId, ownerInviteId, inviteId -- the last two are TRANSPOSED against
+    // the pre-MoP order.
+    //
+    // An earlier pass assumed the legacy scalar order held here. It does not, and
+    // neither does it for CMSG_CALENDAR_EVENT_STATUS. Use the builder, not the
+    // inference: it is the only thing that names an id the offsets cannot.
     recv_data >> rank;
-    recv_data >> eventId >> inviteId >> ownerInviteId;
+    recv_data >> eventId >> ownerInviteId >> inviteId;
     recv_data.ReadGuidMask<6, 5, 1, 3, 4, 7, 0, 2>(invitee);
     recv_data.ReadGuidBytes<7, 5, 0, 4, 1, 3, 2, 6>(invitee);
     DEBUG_FILTER_LOG(LOG_FILTER_CALENDAR, "EventId [" UI64FMTD "] ownerInviteId [" UI64FMTD "], Invitee ([%s] id: [" UI64FMTD "], rank %u",
