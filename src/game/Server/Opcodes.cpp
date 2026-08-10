@@ -1514,6 +1514,25 @@ void InitializeOpcodes()
     DefC(CMSG_CALENDAR_COMPLAIN, "CMSG_CALENDAR_COMPLAIN", STATUS_LOGGEDIN, PROCESS_THREADUNSAFE, &WorldSession::HandleCalendarComplain);
     DefS(SMSG_COMPLAIN_RESULT, "SMSG_COMPLAIN_RESULT");
 
+    // And event creation. Its reader is rebuilt from writer sub_66D4E2, with the
+    // field NAMES taken from the client's own packet builder sub_9E8EEB -- that
+    // function constructs this packet object on the stack and fills it, so each
+    // stack slot names the offset the writer serialises:
+    //
+    //     +1200 <- ui+1212  maxInvites   +1180 <- ui+1280  flags
+    //     +1172 <- ui+1296  dungeonId    +1176 <- packed   eventTime
+    //     +1170 <- ui+1204  type         +16 title, +145 description
+    //
+    // That settles what the offsets alone could not, and it is a REVERSAL of the
+    // note this replaced: MoP does still send maxInvites -- it is the very field
+    // sub_9E8EEB tests against 100 to raise CALENDAR_ERROR_INVITES_EXCEEDED. What
+    // it drops is `repeatable` and the second packed time.
+    //
+    // Route worth remembering: extracted UI names the Lua setter, the setter's glue
+    // leads to the object method, and the packet BUILDER ties object offsets to
+    // packet offsets. The writer alone gives layout; the builder gives identity.
+    DefC(CMSG_CALENDAR_ADD_EVENT, "CMSG_CALENDAR_ADD_EVENT", STATUS_LOGGEDIN, PROCESS_THREADUNSAFE, &WorldSession::HandleCalendarAddEvent);
+
     // PARKED 2026-08-10: the remaining ten calendar CMSGs stay dormant. The shared
     // blocker is GONE -- SMSG_CALENDAR_COMMAND_RESULT is rebuilt and admitted --
     // and what is left is per-opcode.
@@ -1535,31 +1554,8 @@ void InitializeOpcodes()
     //
     // Reply is fine, blocked on the READER:
     //
-    //   CMSG_CALENDAR_ADD_EVENT              0x0A37  sub_66D4E2
-    //        Needs a full rewrite. The writer is bit-packed: four uint32 and a
-    //        byte, then a bit-packed invite count and description length, per-invite
-    //        eight-bit GUID masks, a title length, a flush, then the GUID bytes and
-    //        BOTH STRINGS LAST. The current reader reads title-first with a pre-MoP
-    //        ReadAsPacked() GUID and shares no field order with it.
-    //
-    //        The field INVENTORY is settled, which is most of the remaining work.
-    //        MopCalendarPackets::BuildCalendarEvent -- already converted, admitted
-    //        and the 18414 reference for an event -- carries exactly flags(u32),
-    //        eventTime(u32), dungeonId(i32), one opaque uint32, type(u8), title and
-    //        description. That is precisely this writer's shape, so MoP DROPPED
-    //        maxInvites and repeatable from the request; their absence is why the
-    //        legacy reader's field count never matched. The extracted client UI
-    //        agrees: the setters are Title, Description, Type, TextureID (the
-    //        dungeon id), Date, Time, RepeatOption, AutoApprove, Locked -- no
-    //        max-invites concept at all.
-    //
-    //        What is NOT settled is which of the four uint32 is which. The writer
-    //        emits object offsets +1200, +1180, +1172, +1176 in that order, which
-    //        is neither ascending nor the SMSG order, and the per-opcode
-    //        randomisation means the reply's order does not carry over. Assigning
-    //        them would be a one-in-twenty-four guess that silently swaps a
-    //        timestamp for a flags word. Needs a captured body, or the Lua
-    //        setter-to-field-offset mapping, before it is written.
+    //   (none -- ADD_EVENT was rewritten from its writer and its own packet
+    //    builder, and is registered above.)
     //   (none -- MODERATOR_STATUS, REMOVE_INVITE and EVENT_STATUS were rewritten
     //    from their writers and are registered above.)
     //

@@ -272,25 +272,78 @@ void WorldSession::HandleCalendarAddEvent(WorldPacket& recv_data)
     ObjectGuid guid = _player->GetObjectGuid();
     DEBUG_LOG("WORLD: Received opcode CMSG_CALENDAR_ADD_EVENT [%s]", guid.GetString().c_str());
 
-    std::string title;
-    std::string description;
-    uint8 type;
-    uint8 repeatable;
+    // Rebuilt from the client's writer sub_66D4E2. The field NAMES come from
+    // CalendarAddEvent's own builder, sub_9E8EEB, which constructs this packet
+    // object on the stack and fills it -- so each stack slot names the offset the
+    // writer then serialises:
+    //
+    //     +1200 <- ui+1212   maxInvites  (the field checked against 100 for
+    //                                     CALENDAR_ERROR_INVITES_EXCEEDED)
+    //     +1180 <- ui+1280   flags
+    //     +1172 <- ui+1296   dungeonId   (CalendarEventSetTextureID's target)
+    //     +1176 <- packed date/time      eventTime
+    //     +1170 <- ui+1204   type
+    //     +16                title       (128 cap)
+    //     +145               description (1024 cap)
+    //     +1184/+1188        invite vector, 16-byte records: guid, status, rank
+    //
+    // Wire order is the writer's: the four uint32 then the type byte, a 22-bit
+    // invite count and an 11-bit description length, ALL the invite GUID masks,
+    // an 8-bit title length, then the per-invite bytes, then title, then
+    // description. Both strings go LAST and neither is NUL-terminated.
+    //
+    // The inherited reader took title and description FIRST as cstrings and read
+    // nine scalars including `repeatable` and a second packed time, neither of
+    // which 5.4.8 sends.
     uint32 maxInvites;
+    uint32 flags;
     int32 dungeonId;
     uint32 eventPackedTime;
-    uint32 unkPackedTime;
-    uint32 flags;
+    uint8 type;
 
-    recv_data >> title;
-    recv_data >> description;
-    recv_data >> type;
-    recv_data >> repeatable;
     recv_data >> maxInvites;
+    recv_data >> flags;
     recv_data >> dungeonId;
     recv_data >> eventPackedTime;
-    recv_data >> unkPackedTime;
-    recv_data >> flags;
+    recv_data >> type;
+
+    uint32 const inviteCount = recv_data.ReadBits(22);
+    uint32 const descriptionLength = recv_data.ReadBits(11);
+
+    if (inviteCount > CALENDAR_MAX_INVITES)
+    {
+        sLog.outError("CMSG_CALENDAR_ADD_EVENT: %s sent %u invites, refusing",
+                      guid.GetString().c_str(), inviteCount);
+        recv_data.rfinish();
+        return;
+    }
+
+    std::vector<ObjectGuid> invitees(inviteCount);
+    for (uint32 i = 0; i < inviteCount; ++i)
+    {
+        recv_data.ReadGuidMask<7, 2, 6, 3, 5, 1, 0, 4>(invitees[i]);
+    }
+
+    uint32 const titleLength = recv_data.ReadBits(8);
+
+    std::vector<uint8> inviteStatus(inviteCount);
+    std::vector<uint8> inviteRank(inviteCount);
+    for (uint32 i = 0; i < inviteCount; ++i)
+    {
+        // The status byte sits between GUID byte 7 and byte 5, and the rank byte
+        // after byte 5 -- the scalars are interleaved into the GUID sequence.
+        recv_data.ReadGuidBytes<4, 2, 3, 1, 0, 6, 7>(invitees[i]);
+        recv_data >> inviteStatus[i];
+        recv_data.ReadGuidBytes<5>(invitees[i]);
+        recv_data >> inviteRank[i];
+    }
+
+    std::string const title = recv_data.ReadString(titleLength);
+    std::string const description = recv_data.ReadString(descriptionLength);
+
+    // 5.4.8 sends neither a repeat option nor a second packed time in this request.
+    uint8 const repeatable = 0;
+    uint32 const unkPackedTime = 0;
 
     eventPackedTime = uint32(LocalTimeToUTCTime(eventPackedTime));
 
@@ -312,19 +365,14 @@ void WorldSession::HandleCalendarAddEvent(WorldPacket& recv_data)
         }
         else
         {
-            uint32 inviteCount;
-            recv_data >> inviteCount;
-
+            // The invites were already consumed above -- they are interleaved into
+            // the bit stream and the GUID byte sequence, so they cannot be read
+            // lazily here as the pre-MoP body allowed.
             for (uint32 i = 0; i < inviteCount; ++i)
             {
-                ObjectGuid invitee;
-                uint8 status = 0;
-                uint8 rank = 0;
-                recv_data >> invitee.ReadAsPacked();
-                recv_data >> status;
-                recv_data >> rank;
-
-                sCalendarMgr.AddInvite(cal, guid, invitee, CalendarInviteStatus(status), CalendarModerationRank(rank), "", time(NULL));
+                sCalendarMgr.AddInvite(cal, guid, invitees[i],
+                                       CalendarInviteStatus(inviteStatus[i]),
+                                       CalendarModerationRank(inviteRank[i]), "", time(NULL));
             }
         }
         sCalendarMgr.SendCalendarEvent(_player, cal, CALENDAR_SENDTYPE_ADD);
