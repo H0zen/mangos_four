@@ -179,6 +179,8 @@ static RefOp const kStartBackward[] = {
     RefOp::FallSin, RefOp::FallCos, RefOp::FallHorizontal, RefOp::FallVertical, RefOp::Pitch,
     RefOp::Timestamp, RefOp::SplineElevation, RefOp::End };
 
+// Fall pair untransposed to match the client's writer; see
+// MovementStructures.h. +124 is cosAngle, +128 is sinAngle.
 static RefOp const kStartStrafeLeft[] = {
     RefOp::PositionY, RefOp::PositionZ, RefOp::PositionX, G(0), RefOp::HasTimestamp,
     G(3), RefOp::HasFlags2, RefOp::HasPitch, RefOp::Raw148, G(2),
@@ -193,9 +195,11 @@ static RefOp const kStartStrafeLeft[] = {
     TB(3), RefOp::TransportO, TB(5), RefOp::TransportTime2, TB(1),
     RefOp::TransportY, TB(4), RefOp::TransportTime, RefOp::TransportSeat, RefOp::TransportX,
     TB(0), TB(7), RefOp::Pitch, RefOp::Timestamp, RefOp::FallTime,
-    RefOp::FallSin, RefOp::FallHorizontal, RefOp::FallCos, RefOp::FallVertical, RefOp::UnknownUInt32,
+    RefOp::FallCos, RefOp::FallHorizontal, RefOp::FallSin, RefOp::FallVertical, RefOp::UnknownUInt32,
     RefOp::SplineElevation, RefOp::PositionO, RefOp::End };
 
+// Fall pair untransposed to match the client's writer; see
+// MovementStructures.h. +124 is cosAngle, +128 is sinAngle.
 static RefOp const kStartStrafeRight[] = {
     RefOp::PositionY, RefOp::PositionX, RefOp::PositionZ, G(0), RefOp::HasFall,
     RefOp::ForceCount, G(7), G(6), G(4), RefOp::HasFlags,
@@ -210,9 +214,11 @@ static RefOp const kStartStrafeRight[] = {
     RefOp::TransportTime2, TB(7), RefOp::TransportTime3, TB(5), TB(6),
     TB(2), TB(0), RefOp::TransportTime, RefOp::TransportO, RefOp::TransportY,
     RefOp::TransportZ, TB(4), RefOp::TransportX, RefOp::Timestamp, RefOp::FallVertical,
-    RefOp::FallSin, RefOp::FallHorizontal, RefOp::FallCos, RefOp::FallTime, RefOp::PositionO,
+    RefOp::FallCos, RefOp::FallHorizontal, RefOp::FallSin, RefOp::FallTime, RefOp::PositionO,
     RefOp::UnknownUInt32, RefOp::SplineElevation, RefOp::End };
 
+// Fall pair untransposed to match the client's writer; see
+// MovementStructures.h. +124 is cosAngle, +128 is sinAngle.
 static RefOp const kStopStrafe[] = {
     RefOp::PositionZ, RefOp::PositionX, RefOp::PositionY, RefOp::HasFall, RefOp::HasOrientation,
     RefOp::HasSplineElevation, RefOp::HasTimestamp, RefOp::HasFlags, RefOp::HasUnknownUInt32, G(6),
@@ -227,9 +233,11 @@ static RefOp const kStopStrafe[] = {
     RefOp::TransportTime, RefOp::TransportY, RefOp::TransportZ, TB(4), RefOp::TransportTime2,
     TB(3), RefOp::TransportSeat, RefOp::TransportX, TB(2), TB(7),
     TB(5), RefOp::TransportO, RefOp::PositionO, RefOp::SplineElevation, RefOp::Timestamp,
-    RefOp::FallSin, RefOp::FallCos, RefOp::FallHorizontal, RefOp::FallTime, RefOp::FallVertical,
+    RefOp::FallCos, RefOp::FallSin, RefOp::FallHorizontal, RefOp::FallTime, RefOp::FallVertical,
     RefOp::Pitch, RefOp::UnknownUInt32, RefOp::End };
 
+// Fall pair untransposed to match the client's writer; see
+// MovementStructures.h. +124 is cosAngle, +128 is sinAngle.
 static RefOp const kJump[] = {
     RefOp::PositionY, RefOp::PositionX, RefOp::PositionZ, G(1), G(7),
     RefOp::HasFlags2, G(5), RefOp::HasSplineElevation, RefOp::HasOrientation, G(6),
@@ -240,13 +248,15 @@ static RefOp const kJump[] = {
     T(6), T(0), T(7), RefOp::HasTransportTime3, RefOp::Flags,
     RefOp::Flags2, RefOp::HasFallDirection, GB(7), GB(1), GB(0),
     RefOp::ForceIds, GB(2), GB(6), GB(3), GB(4),
-    GB(5), RefOp::FallVertical, RefOp::FallCos, RefOp::FallSin, RefOp::FallHorizontal,
+    GB(5), RefOp::FallVertical, RefOp::FallSin, RefOp::FallCos, RefOp::FallHorizontal,
     RefOp::FallTime, TB(5), TB(7), RefOp::TransportSeat, TB(4),
     TB(0), RefOp::TransportZ, TB(6), TB(2), RefOp::TransportY,
     RefOp::TransportTime, RefOp::TransportX, RefOp::TransportTime2, TB(1), TB(3),
     RefOp::TransportTime3, RefOp::TransportO, RefOp::SplineElevation, RefOp::PositionO, RefOp::Pitch,
     RefOp::UnknownUInt32, RefOp::Timestamp, RefOp::End };
 
+// Fall pair untransposed to match the client's writer; see
+// MovementStructures.h. +124 is cosAngle, +128 is sinAngle.
 static RefOp const kStartTurnLeft[] = {
     RefOp::PositionZ, RefOp::PositionX, RefOp::PositionY, RefOp::HasOrientation, G(4),
     G(5), RefOp::Raw148, RefOp::HasTimestamp, RefOp::Raw172, RefOp::Raw149,
@@ -257,13 +267,15 @@ static RefOp const kStartTurnLeft[] = {
     T(7), RefOp::HasTransportTime2, T(0), T(1), RefOp::Flags,
     RefOp::Flags2, RefOp::HasFallDirection, GB(7), GB(3), GB(6),
     GB(4), GB(1), RefOp::ForceIds, GB(5), GB(0),
-    GB(2), RefOp::FallTime, RefOp::FallHorizontal, RefOp::FallSin, RefOp::FallCos,
+    GB(2), RefOp::FallTime, RefOp::FallHorizontal, RefOp::FallCos, RefOp::FallSin,
     RefOp::FallVertical, RefOp::Pitch, RefOp::TransportY, TB(3), RefOp::TransportX,
     RefOp::TransportO, TB(5), RefOp::TransportTime2, RefOp::TransportZ, TB(2),
     TB(1), TB(7), TB(4), TB(0), RefOp::TransportTime3,
     RefOp::TransportSeat, TB(6), RefOp::TransportTime, RefOp::PositionO, RefOp::SplineElevation,
     RefOp::UnknownUInt32, RefOp::Timestamp, RefOp::End };
 
+// Fall pair untransposed to match the client's writer; see
+// MovementStructures.h. +124 is cosAngle, +128 is sinAngle.
 static RefOp const kStartTurnRight[] = {
     RefOp::PositionX, RefOp::PositionZ, RefOp::PositionY, RefOp::Raw148, RefOp::Raw172,
     G(1), G(0), RefOp::HasFlags, RefOp::HasFall, RefOp::HasPitch,
@@ -274,13 +286,15 @@ static RefOp const kStartTurnRight[] = {
     T(4), RefOp::HasTransportTime3, T(0), T(1), RefOp::Flags,
     RefOp::Flags2, RefOp::HasFallDirection, GB(5), GB(1), GB(3),
     GB(0), GB(4), GB(2), GB(6), RefOp::ForceIds,
-    GB(7), RefOp::FallCos, RefOp::FallHorizontal, RefOp::FallSin, RefOp::FallVertical,
+    GB(7), RefOp::FallSin, RefOp::FallHorizontal, RefOp::FallCos, RefOp::FallVertical,
     RefOp::FallTime, RefOp::Pitch, RefOp::TransportTime3, TB(3), RefOp::TransportTime2,
     TB(7), TB(1), RefOp::TransportX, RefOp::TransportSeat, TB(5),
     TB(4), TB(2), TB(0), RefOp::TransportZ, RefOp::TransportTime,
     RefOp::TransportY, TB(6), RefOp::TransportO, RefOp::PositionO, RefOp::Timestamp,
     RefOp::SplineElevation, RefOp::UnknownUInt32, RefOp::End };
 
+// Fall pair untransposed to match the client's writer; see
+// MovementStructures.h. +124 is cosAngle, +128 is sinAngle.
 static RefOp const kStopTurn[] = {
     RefOp::PositionX, RefOp::PositionZ, RefOp::PositionY, RefOp::HasTransport, RefOp::ForceCount,
     RefOp::Raw149, G(4), G(5), RefOp::HasUnknownUInt32, G(3),
@@ -294,8 +308,8 @@ static RefOp const kStopTurn[] = {
     GB(1), RefOp::TransportTime, RefOp::TransportTime3, RefOp::TransportSeat, RefOp::TransportY,
     RefOp::TransportX, RefOp::TransportTime2, TB(4), TB(3), RefOp::TransportO,
     TB(0), RefOp::TransportZ, TB(6), TB(7), TB(5),
-    TB(1), TB(2), RefOp::PositionO, RefOp::Timestamp, RefOp::FallCos,
-    RefOp::FallSin, RefOp::FallHorizontal, RefOp::FallVertical, RefOp::FallTime, RefOp::UnknownUInt32,
+    TB(1), TB(2), RefOp::PositionO, RefOp::Timestamp, RefOp::FallSin,
+    RefOp::FallCos, RefOp::FallHorizontal, RefOp::FallVertical, RefOp::FallTime, RefOp::UnknownUInt32,
     RefOp::SplineElevation, RefOp::Pitch, RefOp::End };
 
 static RefOp const kStop[] = {

@@ -459,6 +459,10 @@ MovementStatusElements MovementHeartBeatSequence[] =
 
 MovementStatusElements MovementJumpSequence[] =
 {
+    // Fall direction pair transposed against the client's writer 0x67545F:
+    // +124 is cosAngle and +128 is sinAngle, anchored on two real 18414
+    // bodies whose jump direction equalled the facing.
+
     MSEPositionY,
     MSEPositionX,
     MSEPositionZ,
@@ -506,8 +510,8 @@ MovementStatusElements MovementJumpSequence[] =
     MSEGuidByte4,
     MSEGuidByte5,
     MSEFallVerticalSpeed,
-    MSEFallCosAngle,
     MSEFallSinAngle,
+    MSEFallCosAngle,
     MSEFallHorizontalSpeed,
     MSEFallTime,
     MSETransportGuidByte5,
@@ -844,6 +848,10 @@ MovementStatusElements MovementStartForwardSequence[] =
 
 MovementStatusElements MovementStartStrafeLeftSequence[] =
 {
+    // Fall direction pair transposed against the client's writer 0x677C20:
+    // +124 is cosAngle and +128 is sinAngle, anchored on two real 18414
+    // bodies whose jump direction equalled the facing.
+
     MSEPositionY,
     MSEPositionZ,
     MSEPositionX,
@@ -909,9 +917,9 @@ MovementStatusElements MovementStartStrafeLeftSequence[] =
     MSEPitch,
     MSETimestamp,
     MSEFallTime,
-    MSEFallSinAngle,
-    MSEFallHorizontalSpeed,
     MSEFallCosAngle,
+    MSEFallHorizontalSpeed,
+    MSEFallSinAngle,
     MSEFallVerticalSpeed,
     MSEUnknownUInt32,
     MSESplineElevation,
@@ -921,6 +929,10 @@ MovementStatusElements MovementStartStrafeLeftSequence[] =
 
 MovementStatusElements MovementStartStrafeRightSequence[] =
 {
+    // Fall direction pair transposed against the client's writer 0x6817D5:
+    // +124 is cosAngle and +128 is sinAngle, anchored on two real 18414
+    // bodies whose jump direction equalled the facing.
+
     MSEPositionY,
     MSEPositionX,
     MSEPositionZ,
@@ -986,9 +998,9 @@ MovementStatusElements MovementStartStrafeRightSequence[] =
     MSETransportPositionX,
     MSETimestamp,
     MSEFallVerticalSpeed,
-    MSEFallSinAngle,
-    MSEFallHorizontalSpeed,
     MSEFallCosAngle,
+    MSEFallHorizontalSpeed,
+    MSEFallSinAngle,
     MSEFallTime,
     MSEPositionO,
     MSEUnknownUInt32,
@@ -998,6 +1010,10 @@ MovementStatusElements MovementStartStrafeRightSequence[] =
 
 MovementStatusElements MovementStartTurnLeftSequence[] =
 {
+    // Fall direction pair transposed against the client's writer 0x67434E:
+    // +124 is cosAngle and +128 is sinAngle, anchored on two real 18414
+    // bodies whose jump direction equalled the facing.
+
     MSEPositionZ,
     MSEPositionX,
     MSEPositionY,
@@ -1046,8 +1062,8 @@ MovementStatusElements MovementStartTurnLeftSequence[] =
     MSEGuidByte2,
     MSEFallTime,
     MSEFallHorizontalSpeed,
-    MSEFallSinAngle,
     MSEFallCosAngle,
+    MSEFallSinAngle,
     MSEFallVerticalSpeed,
     MSEPitch,
     MSETransportPositionY,
@@ -1075,6 +1091,10 @@ MovementStatusElements MovementStartTurnLeftSequence[] =
 
 MovementStatusElements MovementStartTurnRightSequence[] =
 {
+    // Fall direction pair transposed against the client's writer 0x67BB09:
+    // +124 is cosAngle and +128 is sinAngle, anchored on two real 18414
+    // bodies whose jump direction equalled the facing.
+
     MSEPositionX,
     MSEPositionZ,
     MSEPositionY,
@@ -1121,9 +1141,9 @@ MovementStatusElements MovementStartTurnRightSequence[] =
     MSEGuidByte6,
     MSEMovementForceIds,
     MSEGuidByte7,
-    MSEFallCosAngle,
-    MSEFallHorizontalSpeed,
     MSEFallSinAngle,
+    MSEFallHorizontalSpeed,
+    MSEFallCosAngle,
     MSEFallVerticalSpeed,
     MSEFallTime,
     MSEPitch,
@@ -1229,6 +1249,10 @@ MovementStatusElements MovementStopSequence[] =
 
 MovementStatusElements MovementStopStrafeSequence[] =
 {
+    // Fall direction pair transposed against the client's writer 0x678776:
+    // +124 is cosAngle and +128 is sinAngle, anchored on two real 18414
+    // bodies whose jump direction equalled the facing.
+
     MSEPositionZ,
     MSEPositionX,
     MSEPositionY,
@@ -1294,8 +1318,8 @@ MovementStatusElements MovementStopStrafeSequence[] =
     MSEPositionO,
     MSESplineElevation,
     MSETimestamp,
-    MSEFallSinAngle,
     MSEFallCosAngle,
+    MSEFallSinAngle,
     MSEFallHorizontalSpeed,
     MSEFallTime,
     MSEFallVerticalSpeed,
@@ -1306,6 +1330,10 @@ MovementStatusElements MovementStopStrafeSequence[] =
 
 MovementStatusElements MovementStopTurnSequence[] =
 {
+    // Fall direction pair transposed against the client's writer 0x67DD58:
+    // +124 is cosAngle and +128 is sinAngle, anchored on two real 18414
+    // bodies whose jump direction equalled the facing.
+
     MSEPositionX,
     MSEPositionZ,
     MSEPositionY,
@@ -1370,8 +1398,8 @@ MovementStatusElements MovementStopTurnSequence[] =
     MSETransportGuidByte2,
     MSEPositionO,
     MSETimestamp,
-    MSEFallCosAngle,
     MSEFallSinAngle,
+    MSEFallCosAngle,
     MSEFallHorizontalSpeed,
     MSEFallVerticalSpeed,
     MSEFallTime,
