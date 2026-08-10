@@ -448,17 +448,23 @@ void WorldSession::HandleMoveTeleportAckOpcode(WorldPacket& recv_data)
     uint32 clientTime, counter;
     recv_data >> clientTime >> counter;
 
-    // The mover guid follows as a packed guid. The bit/byte permutation below
-    // is NOT wire-confirmed: every character on this realm has a guid under 256,
-    // so only one mask bit is ever set and only the first slot can be observed.
-    // The captured acks carry mask 0x80 with a single trailing byte equal to the
-    // player's guid, which places the first-read bit at byte 0 -- the order below
-    // put it at byte 5, so the parse yielded 0x0000030000000000 and printed as
-    // "Guid: 0". Byte consumption is permutation-independent (one mask byte, then
-    // popcount(mask) bytes), so the remaining seven slots cannot be recovered
-    // from our own traffic and are left as found rather than invented.
-    recv_data.ReadGuidMask<5, 0, 1, 6, 3, 7, 2, 4>(guid);
-    recv_data.ReadGuidBytes<4, 2, 7, 6, 5, 1, 3, 0>(guid);
+    // The mover guid follows as a packed guid, in the order the client writes it.
+    //
+    // This permutation was previously unconfirmable from our own traffic: every
+    // character on this realm has a guid under 256, so only one mask bit is ever
+    // set and only the first slot is observable. It is now taken from the client's
+    // own writer, sub_671762 (thunk sub_69004E, vtable 0xD657DC), which settles
+    // all eight slots:
+    //
+    //   mask  sub_665157 x8 over this+16..23 -> 0, 7, 3, 5, 4, 6, 1, 2
+    //   bytes sub_40F018(v ^ 1) in order     -> 4, 1, 6, 7, 0, 2, 5, 3
+    //
+    // The writer's first mask slot is byte 0, which agrees with the one thing the
+    // capture did prove (mask 0x80 with a single trailing byte equal to the
+    // player's guid). The previous order put that bit at byte 5 and parsed a
+    // sub-256 guid as 0x0000030000000000, printing "Guid: 0".
+    recv_data.ReadGuidMask<0, 7, 3, 5, 4, 6, 1, 2>(guid);
+    recv_data.ReadGuidBytes<4, 1, 6, 7, 0, 2, 5, 3>(guid);
 
     DEBUG_LOG("Guid: %s", guid.GetString().c_str());
     DEBUG_LOG("Counter %u, clientTime %u", counter, clientTime / IN_MILLISECONDS);
@@ -471,14 +477,15 @@ void WorldSession::HandleMoveTeleportAckOpcode(WorldPacket& recv_data)
         return;
     }
 
-    // No guid equality check. It rejected every valid ack -- the parse above
-    // cannot be trusted until the permutation is recovered, and the guard adds
+    // Still no guid equality check, now for one reason rather than two. The parse
+    // above is writer-derived and no longer the obstacle, but the guard adds
     // nothing here: this opcode arrives on the player's own authenticated
     // session, plMover comes from that session, and IsBeingTeleportedNear()
-    // already establishes that a near teleport is outstanding. Rejecting on a
-    // mis-parsed guid meant SetPosition() below never ran, so the server left
-    // the player at the origin while the client had already moved -- no grid
-    // transition, no visibility rebuild, and an empty destination until relog.
+    // already establishes that a near teleport is outstanding. Restoring it would
+    // be a behaviour change on a path whose failure mode is severe -- rejecting a
+    // valid ack meant SetPosition() below never ran, leaving the player at the
+    // origin while the client had already moved: no grid transition, no visibility
+    // rebuild, and an empty destination until relog.
 
     plMover->SetSemaphoreTeleportNear(false);
 
