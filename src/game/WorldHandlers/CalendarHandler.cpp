@@ -318,6 +318,21 @@ void WorldSession::HandleCalendarAddEvent(WorldPacket& recv_data)
         return;
     }
 
+    // The wire widths are wider than anything the client can legitimately produce:
+    // 11 bits allows a description of 2047 where the client's own builder caps it
+    // at 1024, and 8 bits allows a title of 255 against a cap of 128. That gap is
+    // not cosmetic. Both strings are echoed straight back out in the invite and
+    // update alerts, whose CLIENT readers (sub_6F4D55, sub_708569) copy them into
+    // fixed stack-backed packet objects without checking. An oversized value would
+    // therefore be reflected by this server into every recipient's client memory.
+    if (descriptionLength > CALENDAR_MAX_DESCRIPTION_LEN)
+    {
+        sLog.outError("CMSG_CALENDAR_ADD_EVENT: %s sent a %u byte description, refusing",
+                      guid.GetString().c_str(), descriptionLength);
+        recv_data.rfinish();
+        return;
+    }
+
     std::vector<ObjectGuid> invitees(inviteCount);
     for (uint32 i = 0; i < inviteCount; ++i)
     {
@@ -325,6 +340,14 @@ void WorldSession::HandleCalendarAddEvent(WorldPacket& recv_data)
     }
 
     uint32 const titleLength = recv_data.ReadBits(8);
+
+    if (titleLength > CALENDAR_MAX_TITLE_LEN)
+    {
+        sLog.outError("CMSG_CALENDAR_ADD_EVENT: %s sent a %u byte title, refusing",
+                      guid.GetString().c_str(), titleLength);
+        recv_data.rfinish();
+        return;
+    }
 
     std::vector<uint8> inviteStatus(inviteCount);
     std::vector<uint8> inviteRank(inviteCount);
@@ -338,6 +361,17 @@ void WorldSession::HandleCalendarAddEvent(WorldPacket& recv_data)
         recv_data >> inviteRank[i];
     }
 
+    // ReadString(count) returns a SHORT string if the body ends early rather than
+    // failing, so prove the bytes are there before trusting either length.
+    if (recv_data.rpos() + titleLength + descriptionLength > recv_data.size())
+    {
+        sLog.outError("CMSG_CALENDAR_ADD_EVENT: %s claimed %u+%u string bytes with %zu left, refusing",
+                      guid.GetString().c_str(), titleLength, descriptionLength,
+                      recv_data.size() - recv_data.rpos());
+        recv_data.rfinish();
+        return;
+    }
+
     std::string const title = recv_data.ReadString(titleLength);
     std::string const description = recv_data.ReadString(descriptionLength);
 
@@ -345,17 +379,25 @@ void WorldSession::HandleCalendarAddEvent(WorldPacket& recv_data)
     uint8 const repeatable = 0;
     uint32 const unkPackedTime = 0;
 
-    eventPackedTime = uint32(LocalTimeToUTCTime(eventPackedTime));
+    // DECODE before comparing. The client sends a packed calendar bitfield, not a
+    // timestamp: timeBitFieldsToSecs unpacks it, while LocalTimeToUTCTime merely
+    // adds a timezone offset in seconds. Applying that offset to packed bits
+    // corrupts the date, and comparing the packed value against GameTime compares
+    // roughly 2.4e8 against roughly 1.7e9 -- the packed format cannot even reach
+    // current Unix time, so EVERY request was rejected as "in the past" before it
+    // did anything. The validation and any timezone policy belong on the decoded
+    // value.
+    time_t const eventTime = timeBitFieldsToSecs(eventPackedTime);
 
     // prevent events in the past
-    if (time_t(eventPackedTime) < (GameTime::GetGameTime() - time_t(86400L)))
+    if (eventTime < (GameTime::GetGameTime() - time_t(86400L)))
     {
         recv_data.rfinish();
         return;
     }
 
     // 946684800 is 01/01/2000 00:00:00 - default response time
-    CalendarEvent* cal =  sCalendarMgr.AddEvent(_player->GetObjectGuid(), title, description, type, repeatable, maxInvites, dungeonId, timeBitFieldsToSecs(eventPackedTime), timeBitFieldsToSecs(unkPackedTime), flags);
+    CalendarEvent* cal =  sCalendarMgr.AddEvent(_player->GetObjectGuid(), title, description, type, repeatable, maxInvites, dungeonId, eventTime, timeBitFieldsToSecs(unkPackedTime), flags);
 
     if (cal)
     {
@@ -435,6 +477,17 @@ void WorldSession::HandleCalendarUpdateEvent(WorldPacket& recv_data)
     uint32 const descriptionLength = recv_data.ReadBits(11);
     uint32 const titleLength = recv_data.ReadBits(8);
 
+    // Same bound as HandleCalendarAddEvent, and for the same reason: these strings
+    // are echoed back out in the update alert, whose client reader copies them into
+    // a fixed stack-backed object without checking.
+    if (descriptionLength > CALENDAR_MAX_DESCRIPTION_LEN || titleLength > CALENDAR_MAX_TITLE_LEN)
+    {
+        sLog.outError("CMSG_CALENDAR_UPDATE_EVENT: %s sent title %u / description %u, refusing",
+                      guid.GetString().c_str(), titleLength, descriptionLength);
+        recv_data.rfinish();
+        return;
+    }
+
     recv_data.ReadGuidMask<3>(eventGuid);                   // after the lengths
 
     recv_data.ReadGuidBytes<6>(inviteGuid);
@@ -463,10 +516,13 @@ void WorldSession::HandleCalendarUpdateEvent(WorldPacket& recv_data)
     repetitionType = 0;
     UnknownPackedTime = 0;
 
-    eventPackedTime = uint32(LocalTimeToUTCTime(eventPackedTime));
+    // Decode before comparing -- see the note in HandleCalendarAddEvent. The packed
+    // bitfield can never exceed current Unix time, so the old comparison rejected
+    // every update as "in the past".
+    time_t const decodedEventTime = timeBitFieldsToSecs(eventPackedTime);
 
     // prevent events in the past
-    if (time_t(eventPackedTime) < (GameTime::GetGameTime() - time_t(86400L)))
+    if (decodedEventTime < (GameTime::GetGameTime() - time_t(86400L)))
     {
         recv_data.rfinish();
         return;
@@ -550,16 +606,19 @@ void WorldSession::HandleCalendarCopyEvent(WorldPacket& recv_data)
     DEBUG_FILTER_LOG(LOG_FILTER_CALENDAR, "EventId [" UI64FMTD "] inviteId [" UI64FMTD "]",
                      eventId, inviteId);
 
-    packedTime = uint32(LocalTimeToUTCTime(packedTime));
+    // Decode before comparing -- see the note in HandleCalendarAddEvent. The packed
+    // bitfield can never exceed current Unix time, so the old comparison rejected
+    // every copy as "in the past".
+    time_t const copyTime = timeBitFieldsToSecs(packedTime);
 
     // prevent events in the past
-    if (time_t(packedTime) < (GameTime::GetGameTime() - time_t(86400L)))
+    if (copyTime < (GameTime::GetGameTime() - time_t(86400L)))
     {
         recv_data.rfinish();
         return;
     }
 
-    sCalendarMgr.CopyEvent(eventId, timeBitFieldsToSecs(packedTime), guid);
+    sCalendarMgr.CopyEvent(eventId, copyTime, guid);
 }
 
 void WorldSession::HandleCalendarEventInvite(WorldPacket& recv_data)
@@ -1002,20 +1061,29 @@ void CalendarMgr::SendCalendarEventInviteAlert(CalendarInvite const* invite)
     // creator. Guild announcements carry the guild GUID with inviteId 0, personal
     // invites carry inviteId with no guild GUID.
     //
-    // ONE UNRESOLVED POINT, stated rather than hidden: the creator and sender GUIDs
-    // are IDENTICAL in all six captures, so the corpus cannot say which of the two
-    // slots is which. They are assigned in the pre-MoP order, creator first. If an
-    // invite sent by someone other than the event's creator ever shows the wrong
-    // "invited by" name, swap these two. It cannot desync -- both are GUIDs in
-    // fixed slots.
+    // The first and third GUID slots were RESOLVED after the fact, and the first
+    // reading here had them backwards. The captures cannot settle it -- creator
+    // equals sender in all six -- so they were assigned in pre-MoP order, creator
+    // first. The client's consumers say otherwise: the day-event consumer puts the
+    // FIRST guid into its `invitedBy` field for ordinary invitations and the THIRD
+    // for guild signup records, and the full-calendar consumer independently uses
+    // the sender for ordinary invites and the creator for guild-event records.
+    // Blizzard_Calendar.lua exposes that field as `invitedBy`, rendering ordinary
+    // events as "invited by" and announcements as "created by".
+    //
+    // So slot one is the SENDER and slot three the CREATOR, as written below.
+    // Backwards, this shows the wrong name on any invite from someone other than
+    // the event creator -- and no byte fixture built from these captures could
+    // catch it, because in every one of them the two GUIDs are equal.
+    //
     // Guild GUID built the same way CalendarHandler.cpp:84 and Player.cpp:1465
     // already do it, so this field stays consistent with the calendar list and the
     // roster rather than inventing a second convention. Empty when the event is not
     // a guild event, which is what the captures show for personal invites.
-    ObjectGuid const creatorGuid = event->CreatorGuid;
+    ObjectGuid const senderGuid = invite->SenderGuid;   // slot one
     ObjectGuid const guildGuid = event->IsGuildEvent()
         ? ObjectGuid(HIGHGUID_GUILD, event->GuildId) : ObjectGuid();
-    ObjectGuid const senderGuid = invite->SenderGuid;
+    ObjectGuid const creatorGuid = event->CreatorGuid;  // slot three
 
     WorldPacket data(SMSG_CALENDAR_EVENT_INVITE_ALERT, 8 + 4 + 1 + 8 + 4 + 1 + 4 + 1 + 4 + 24 + event->Title.size());
     data << uint64(event->EventId);
@@ -1027,36 +1095,36 @@ void CalendarMgr::SendCalendarEventInviteAlert(CalendarInvite const* invite)
     data << secsToTimeBitFields(event->EventTime);
     data << uint8(invite->Rank);
 
-    data.WriteGuidMask<7>(guildGuid);   data.WriteGuidMask<6>(senderGuid);
+    data.WriteGuidMask<7>(guildGuid);   data.WriteGuidMask<6>(creatorGuid);
     data.WriteGuidMask<4>(guildGuid);   data.WriteGuidMask<0>(guildGuid);
-    data.WriteGuidMask<3>(senderGuid);  data.WriteGuidMask<1>(creatorGuid);
-    data.WriteGuidMask<5>(guildGuid);   data.WriteGuidMask<2>(senderGuid);
-    data.WriteGuidMask<0>(senderGuid);  data.WriteGuidMask<1>(guildGuid);
-    data.WriteGuidMask<5>(senderGuid);  data.WriteGuidMask<6>(guildGuid);
-    data.WriteGuidMask<3>(guildGuid);   data.WriteGuidMask<6>(creatorGuid);
-    data.WriteGuidMask<2>(creatorGuid); data.WriteGuidMask<4>(senderGuid);
-    data.WriteGuidMask<7>(senderGuid);  data.WriteGuidMask<4>(creatorGuid);
-    data.WriteGuidMask<1>(senderGuid);  data.WriteGuidMask<3>(creatorGuid);
-    data.WriteGuidMask<2>(guildGuid);   data.WriteGuidMask<0>(creatorGuid);
+    data.WriteGuidMask<3>(creatorGuid);  data.WriteGuidMask<1>(senderGuid);
+    data.WriteGuidMask<5>(guildGuid);   data.WriteGuidMask<2>(creatorGuid);
+    data.WriteGuidMask<0>(creatorGuid);  data.WriteGuidMask<1>(guildGuid);
+    data.WriteGuidMask<5>(creatorGuid);  data.WriteGuidMask<6>(guildGuid);
+    data.WriteGuidMask<3>(guildGuid);   data.WriteGuidMask<6>(senderGuid);
+    data.WriteGuidMask<2>(senderGuid); data.WriteGuidMask<4>(creatorGuid);
+    data.WriteGuidMask<7>(creatorGuid);  data.WriteGuidMask<4>(senderGuid);
+    data.WriteGuidMask<1>(creatorGuid);  data.WriteGuidMask<3>(senderGuid);
+    data.WriteGuidMask<2>(guildGuid);   data.WriteGuidMask<0>(senderGuid);
     data.WriteBits(event->Title.size(), 8);
-    data.WriteGuidMask<5>(creatorGuid); data.WriteGuidMask<7>(creatorGuid);
+    data.WriteGuidMask<5>(senderGuid); data.WriteGuidMask<7>(senderGuid);
     data.FlushBits();
 
-    data.WriteGuidBytes<5>(senderGuid); data.WriteGuidBytes<6>(guildGuid);
-    data.WriteGuidBytes<0>(guildGuid);  data.WriteGuidBytes<6>(senderGuid);
-    data.WriteGuidBytes<5>(creatorGuid); data.WriteGuidBytes<4>(creatorGuid);
+    data.WriteGuidBytes<5>(creatorGuid); data.WriteGuidBytes<6>(guildGuid);
+    data.WriteGuidBytes<0>(guildGuid);  data.WriteGuidBytes<6>(creatorGuid);
+    data.WriteGuidBytes<5>(senderGuid); data.WriteGuidBytes<4>(senderGuid);
     data.append(event->Title.data(), event->Title.size());
-    data.WriteGuidBytes<0>(senderGuid); data.WriteGuidBytes<1>(senderGuid);
+    data.WriteGuidBytes<0>(creatorGuid); data.WriteGuidBytes<1>(creatorGuid);
     data.WriteGuidBytes<2>(guildGuid);  data.WriteGuidBytes<7>(guildGuid);
-    data.WriteGuidBytes<6>(creatorGuid); data.WriteGuidBytes<1>(guildGuid);
-    data.WriteGuidBytes<2>(senderGuid); data.WriteGuidBytes<3>(creatorGuid);
-    data.WriteGuidBytes<7>(creatorGuid); data.WriteGuidBytes<0>(creatorGuid);
-    data.WriteGuidBytes<3>(senderGuid); data.WriteGuidBytes<2>(creatorGuid);
-    data.WriteGuidBytes<7>(senderGuid); data.WriteGuidBytes<5>(guildGuid);
+    data.WriteGuidBytes<6>(senderGuid); data.WriteGuidBytes<1>(guildGuid);
+    data.WriteGuidBytes<2>(creatorGuid); data.WriteGuidBytes<3>(senderGuid);
+    data.WriteGuidBytes<7>(senderGuid); data.WriteGuidBytes<0>(senderGuid);
+    data.WriteGuidBytes<3>(creatorGuid); data.WriteGuidBytes<2>(senderGuid);
+    data.WriteGuidBytes<7>(creatorGuid); data.WriteGuidBytes<5>(guildGuid);
     data.WriteGuidBytes<4>(guildGuid);  data.WriteGuidBytes<3>(guildGuid);
-    data.WriteGuidBytes<1>(creatorGuid); data.WriteGuidBytes<4>(senderGuid);
+    data.WriteGuidBytes<1>(senderGuid); data.WriteGuidBytes<4>(creatorGuid);
 
-    DEBUG_FILTER_LOG(LOG_FILTER_CALENDAR, "SendCalendarInviteAlert> senderGuid[%s], inviteeGuid[%s], EventId[" UI64FMTD "], Status[%u], InviteId[" UI64FMTD "]",
+    DEBUG_FILTER_LOG(LOG_FILTER_CALENDAR, "SendCalendarInviteAlert> creatorGuid[%s], inviteeGuid[%s], EventId[" UI64FMTD "], Status[%u], InviteId[" UI64FMTD "]",
                      invite->SenderGuid.GetString().c_str(), invite->InviteeGuid.GetString().c_str(), event->EventId, uint32(invite->Status), invite->InviteId);
 
     if (event->IsGuildEvent() || event->IsGuildAnnouncement())
@@ -1213,7 +1281,7 @@ void CalendarMgr::SendCalendarEventRemovedAlert(CalendarEvent const* event)
     //
     //     u64    eventId          sub_660A2A -> sub_40F370
     //     u32    packedTime       sub_40F340
-    //     1 bit  showPendingAlert sub_665262, MSB-first, then flushed
+    //     1 bit  clearPendingAction sub_665262, MSB-first, then flushed
     //
     // The flag is a trailing BIT, not a leading byte. The previous body led with
     // uint8(1) and put the two scalars after it, so all three fields landed in the
@@ -1221,7 +1289,9 @@ void CalendarMgr::SendCalendarEventRemovedAlert(CalendarEvent const* event)
     WorldPacket data(SMSG_CALENDAR_EVENT_REMOVED_ALERT, 8 + 4 + 1);
     data << uint64(event->EventId);
     data << secsToTimeBitFields(event->EventTime);
-    data.WriteBit(1);                                       // show pending alert
+    data.WriteBit(1);                                       // clearPendingAction: SET means the
+                                                        // pending action is RESOLVED -- the client
+                                                        // publishes CALENDAR_ACTION_PENDING(false).
     data.FlushBits();
 
     SendPacketToAllEventRelatives(data, event);
@@ -1294,12 +1364,39 @@ void CalendarMgr::SendCalendarEventInviteRemove(CalendarInvite const* invite, ui
 
     CalendarEvent const* event = invite->GetCalendarEvent();
 
-    WorldPacket data(SMSG_CALENDAR_EVENT_INVITE_REMOVED, 8 + 4 + 4 + 1);
-    data.appendPackGUID(invite->InviteeGuid);
+    // 18414 body, from the client's reader sub_6E61CA (via sub_7096B7, vtable
+    // off_D6AA90). Field identity comes from the client's post-construction
+    // semantic path sub_6FACFA -> 0x977420 -> sub_977008, which is what names them:
+    // +24 is used as the 64-bit event lookup key, the GUID at +40 is compared
+    // against the player and passed to the invite-removal routine, +16 is tested
+    // with 0x400, and a set bit at +32 makes the client publish
+    // CALENDAR_ACTION_PENDING(false).
+    //
+    //     invitee GUID mask <6,7,3,0,2,4,1,5>
+    //     1 bit  clearPendingAction
+    //     invitee GUID bytes 0, 4, 3, 5
+    //     u64    eventId
+    //     invitee GUID bytes 7, 1, 2
+    //     u32    eventFlags
+    //     invitee GUID byte 6
+    //
+    // The scalars are INTERLEAVED into the GUID byte run. The previous body led
+    // with a pre-MoP packed GUID and shares no field position with this.
+    //
+    // The trailing flag is named for what the consumer does with it: a SET bit
+    // clears the pending-action badge. Sending 1 is what this core intended.
+    ObjectGuid const inviteeGuid = invite->InviteeGuid;
+
+    WorldPacket data(SMSG_CALENDAR_EVENT_INVITE_REMOVED, 2 + 8 + 8 + 4);
+    data.WriteGuidMask<6, 7, 3, 0, 2, 4, 1, 5>(inviteeGuid);
+    data.WriteBit(1);                                       // clear pending action
+    data.FlushBits();
+    data.WriteGuidBytes<0, 4, 3, 5>(inviteeGuid);
     data << uint64(event->EventId);
+    data.WriteGuidBytes<7, 1, 2>(inviteeGuid);
     data << uint32(flags);
-    data << uint8(1);       // show pending alert?
-    //data.hexlike();
+    data.WriteGuidBytes<6>(inviteeGuid);
+
     SendPacketToAllEventRelatives(data, event);
 }
 
@@ -1308,12 +1405,23 @@ void CalendarMgr::SendCalendarEventInviteRemoveAlert(Player* player, CalendarEve
     if (player)
     {
         DEBUG_FILTER_LOG(LOG_FILTER_CALENDAR, "SMSG_CALENDAR_EVENT_INVITE_REMOVED_ALERT");
-        WorldPacket data(SMSG_CALENDAR_EVENT_INVITE_REMOVED_ALERT, 8 + 4 + 4 + 1);
-        data << uint64(event->EventId);
-        data << secsToTimeBitFields(event->EventTime);
+        // 18414 body, from the client's reader sub_6B8FBA (via sub_6BC0BD, vtable
+        // off_D6AA18): flags, status, eventId, eventTime -- in that order.
+        //
+        // The two uint32 are told apart by what the client does with them, at
+        // 0x9786A6 (reached via sub_6CA13B -> 0x978B69): the field at record +24 is
+        // pushed straight into the calendar date unpacker sub_9725B2, and the field
+        // at +28 is masked with 0x440. So +24 is the packed eventTime and +28 the
+        // flags -- a distinction nothing in the layout itself could have made, and
+        // one that no length check would ever have caught.
+        //
+        // The previous body wrote all four in the wrong order.
+        WorldPacket data(SMSG_CALENDAR_EVENT_INVITE_REMOVED_ALERT, 4 + 1 + 8 + 4);
         data << uint32(event->Flags);
         data << uint8(status);
-        //data.hexlike();
+        data << uint64(event->EventId);
+        data << secsToTimeBitFields(event->EventTime);
+
         player->SendDirectMessage(&data);
     }
 }
@@ -1404,7 +1512,9 @@ void CalendarMgr::SendCalendarEventUpdateAlert(CalendarEvent const* event, time_
     data << uint64(event->EventId);
     data << secsToTimeBitFields(event->EventTime);
     data << int32(event->DungeonId);
-    data.WriteBit(1);                                       // show pending alert
+    data.WriteBit(1);                                       // clearPendingAction: SET means the
+                                                        // pending action is RESOLVED -- the client
+                                                        // publishes CALENDAR_ACTION_PENDING(false).
     data.WriteBits(event->Description.size(), 11);
     data.WriteBits(event->Title.size(), 8);
     data.FlushBits();

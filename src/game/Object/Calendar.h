@@ -486,6 +486,12 @@ enum CalendarError
     CALENDAR_ERROR_NO_MODERATOR                 = 40
 };
 
+// The client's own builders cap these, so anything longer cannot come from an
+// honest client -- and both strings are echoed back to every recipient, whose
+// client readers copy them into fixed stack-backed objects without checking.
+#define CALENDAR_MAX_TITLE_LEN       128
+#define CALENDAR_MAX_DESCRIPTION_LEN 1024
+
 #define CALENDAR_MAX_EVENTS         30
 #define CALENDAR_MAX_GUILD_EVENTS   100
 #define CALENDAR_MAX_INVITES        100

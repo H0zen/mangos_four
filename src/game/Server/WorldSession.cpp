@@ -371,6 +371,13 @@ static bool IsEnterWorldConverted(uint16 opcode)
         // Rebuilt from reader sub_6F4D55 and verified against ALL SIX captured 18414
         // bodies. Three interleaved GUIDs with the title emitted mid byte-run.
         case SMSG_CALENDAR_EVENT_INVITE_ALERT:       // CalendarMgr::SendCalendarEventInviteAlert
+        // Both rebuilt from their client readers, with the field identities taken
+        // from the client's post-construction consumers -- which is what told the
+        // two uint32 of the alert apart (one feeds the date unpacker, the other is
+        // masked with 0x440). Reachable from REMOVE_EVENT as well as the two
+        // restored below, through CalendarEvent::RemoveAllInvite.
+        case SMSG_CALENDAR_EVENT_INVITE_REMOVED:       // CalendarMgr::SendCalendarEventInviteRemove
+        case SMSG_CALENDAR_EVENT_INVITE_REMOVED_ALERT: // CalendarMgr::SendCalendarEventInviteRemoveAlert
         case SMSG_CLIENT_CONTROL_UPDATE:           // MopControlPackets::BuildClientControlUpdate
         case SMSG_MOVE_SET_ACTIVE_MOVER:           // MopControlPackets::BuildSetActiveMover
         case SMSG_PLAYER_MOVE:                     // MovementInfo relay serializer

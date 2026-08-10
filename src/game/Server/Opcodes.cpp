@@ -1493,11 +1493,14 @@ void InitializeOpcodes()
     // EVENT_STATUS (after the ids). MoP randomises that per opcode, so neither can
     // be inferred from the other.
     //
-    // The three ids keep their pre-MoP ORDER in every case. That is an inference,
-    // and it is stated so it can be challenged: it holds for all four calendar
-    // opcodes already proven from their writers -- RSVP, REMOVE_EVENT, COPY_EVENT
-    // and SIGNUP -- each of which changed only field widths and GUID placement.
-    // If a captured body ever contradicts it, these three are where to look.
+    // The id ORDER above is not inferred from the pre-MoP layout. It was, once,
+    // and that was wrong: review caught EVENT_STATUS and MODERATOR_STATUS both
+    // transposed (fixed at 80cc637d5). Three ids of identical width are exactly the
+    // defect class no length check and no fixture can see. The orders written here
+    // now come from the client's own packet BUILDERS -- sub_9E858C for EVENT_STATUS
+    // and sub_9E8626 for MODERATOR_STATUS -- where each stack slot names the offset
+    // the writer goes on to serialise. The writer gives layout; the builder gives
+    // identity. Never settle a same-width field order from the writer alone.
     DefC(CMSG_CALENDAR_EVENT_MODERATOR_STATUS, "CMSG_CALENDAR_EVENT_MODERATOR_STATUS", STATUS_LOGGEDIN, PROCESS_THREADUNSAFE, &WorldSession::HandleCalendarEventModeratorStatus);
     DefC(CMSG_CALENDAR_EVENT_STATUS, "CMSG_CALENDAR_EVENT_STATUS", STATUS_LOGGEDIN, PROCESS_THREADUNSAFE, &WorldSession::HandleCalendarEventStatus);
 
@@ -1510,28 +1513,30 @@ void InitializeOpcodes()
     DefS(SMSG_CALENDAR_EVENT_INVITE, "SMSG_CALENDAR_EVENT_INVITE");
     DefS(SMSG_CALENDAR_EVENT_INVITE_ALERT, "SMSG_CALENDAR_EVENT_INVITE_ALERT");
 
-    // STILL HELD: EVENT_REMOVE_INVITE and COMPLAIN. Both reach
-    // CalendarMgr::RemoveInvite (Calendar.cpp:86,89), which emits two replies that
-    // are still pre-MoP bodies and unadmitted:
+    // RESTORED. Both reach CalendarMgr::RemoveInvite, whose two replies are now
+    // rebuilt and admitted. Neither has a captured body anywhere in the 18414
+    // corpus, and the builder route does not apply to an inbound packet -- the
+    // field identities came from the client's post-construction CONSUMERS:
     //
-    //   SMSG_CALENDAR_EVENT_INVITE_REMOVED       reader sub_6E61CA via sub_7096B7
-    //       guid mask <6,7,3,0,2,4,1,5>, one bit, bytes 0,4,3,5, a u64, bytes
-    //       7,1,2, a u32, byte 6 -- the scalars are INTERLEAVED into the byte run
-    //   SMSG_CALENDAR_EVENT_INVITE_REMOVED_ALERT reader sub_6B8FBA via sub_6BC0BD
-    //       u32, u8, u64, u32
+    //   SMSG_CALENDAR_EVENT_INVITE_REMOVED   reader sub_6E61CA, named by
+    //       sub_6FACFA -> 0x977420 -> sub_977008: +24 is the event lookup key, the
+    //       GUID at +40 is matched against the player and passed to the removal
+    //       routine, +16 is tested with 0x400 (flags), and a set bit at +32 makes
+    //       the client publish CALENDAR_ACTION_PENDING(false).
+    //   SMSG_CALENDAR_EVENT_INVITE_REMOVED_ALERT  reader sub_6B8FBA, named by
+    //       sub_6CA13B -> 0x978B69 -> 0x9786A6: +24 is pushed into the calendar
+    //       date unpacker sub_9725B2 and +28 is masked with 0x440. THAT is what
+    //       distinguishes the two uint32 -- eventTime from flags -- which the
+    //       layout alone never could, and which no length check would have caught.
     //
-    // Both layouts are decoded; what is missing is field IDENTITY. Neither has a
-    // single captured body in the 18414 corpus, and the builder route does not
-    // apply to an inbound packet. For the second, the u64 is plainly the event id
-    // and the u8 the status, but nothing distinguishes its two u32 -- eventTime
-    // from flags -- and guessing that pair is exactly the mistake that produced the
-    // two transposed id orders fixed at 80cc637d5.
-    //
-    // Restore both once those two replies are settled: either from a capture, or by
-    // naming the fields through the client's consumer of the received object.
-    //
-    //  DefC(CMSG_CALENDAR_EVENT_REMOVE_INVITE, ...)
-    //  DefC(CMSG_CALENDAR_COMPLAIN, ...)
+    // Note this also unblocks CMSG_CALENDAR_REMOVE_EVENT, which reached both of
+    // them transitively through CalendarEvent::RemoveAllInvite ->
+    // RemoveInviteByItr -- a path two levels below the handler that an earlier
+    // reply scan missed while it was already registered.
+    DefC(CMSG_CALENDAR_EVENT_REMOVE_INVITE, "CMSG_CALENDAR_EVENT_REMOVE_INVITE", STATUS_LOGGEDIN, PROCESS_THREADUNSAFE, &WorldSession::HandleCalendarEventRemoveInvite);
+    DefC(CMSG_CALENDAR_COMPLAIN, "CMSG_CALENDAR_COMPLAIN", STATUS_LOGGEDIN, PROCESS_THREADUNSAFE, &WorldSession::HandleCalendarComplain);
+    DefS(SMSG_CALENDAR_EVENT_INVITE_REMOVED, "SMSG_CALENDAR_EVENT_INVITE_REMOVED");
+    DefS(SMSG_CALENDAR_EVENT_INVITE_REMOVED_ALERT, "SMSG_CALENDAR_EVENT_INVITE_REMOVED_ALERT");
 
     // And the complaint. Its request follows the same shape as the three above --
     // writer sub_6669F0 emits eventId and inviteId, then the reported player's GUID
@@ -1542,8 +1547,6 @@ void InitializeOpcodes()
     // MiscHandler.cpp holds CMSG_COMPLAIN (the chat/mail spam report, a different
     // opcode) unregistered partly because this reply was unverified -- the reply
     // side of that objection is now answered, though its own request reader is not.
-    // HELD on review -- see the note above: reply still legacy and unadmitted.
-    // DefC(CMSG_CALENDAR_COMPLAIN, "CMSG_CALENDAR_COMPLAIN", STATUS_LOGGEDIN, PROCESS_THREADUNSAFE, &WorldSession::HandleCalendarComplain);
     DefS(SMSG_COMPLAIN_RESULT, "SMSG_COMPLAIN_RESULT");
 
     // And event creation. Its reader is rebuilt from writer sub_66D4E2, with the
@@ -1588,51 +1591,23 @@ void InitializeOpcodes()
     DefC(CMSG_CALENDAR_UPDATE_EVENT, "CMSG_CALENDAR_UPDATE_EVENT", STATUS_LOGGEDIN, PROCESS_THREADUNSAFE, &WorldSession::HandleCalendarUpdateEvent);
     DefS(SMSG_CALENDAR_EVENT_UPDATED_ALERT, "SMSG_CALENDAR_EVENT_UPDATED_ALERT");
 
-    // PARKED 2026-08-10: the remaining ten calendar CMSGs stay dormant. The shared
-    // blocker is GONE -- SMSG_CALENDAR_COMMAND_RESULT is rebuilt and admitted --
-    // and what is left is per-opcode.
+    // All twelve calendar CMSGs are registered. Two lessons from the pass that
+    // outlive it, because both cost a round of review:
     //
-    // Blocked on an UNCONVERTED REPLY (reader state noted separately):
-    //
-    //   CMSG_CALENDAR_EVENT_INVITE     0x1D8E  sub_66CA8E  reader unproven
-    //        -> SMSG_CALENDAR_EVENT_INVITE
-    //   CMSG_CALENDAR_UPDATE_EVENT     0x1F8D  sub_66D0A3  reader unproven
-    //        -> SMSG_CALENDAR_EVENT_UPDATED_ALERT, whose client reader IS decoded
-    //           (sub_708569 via sub_71B7DA, vtable off_D6AA7C):
-    //             u32 +176, u8 +170, u32 +16, u32 +32, u64 +24, u32 +36, u32 +172,
-    //             1 bit +169, an n-bit length for string B, an 8-bit length for
-    //             string A, then string A and string B raw, in that order.
-    //           Not rebuilt: the server has eleven fields (flags, both times, type,
-    //           dungeon, title, description, repeatable, max invites, unknown time)
-    //           to map onto ten wire values, and the object offsets do not name
-    //           them. Both strings go LAST, which the legacy body does not do.
-    //
-    // Reply is fine, blocked on the READER:
-    //
-    //   (none -- ADD_EVENT was rewritten from its writer and its own packet
-    //    builder, and is registered above.)
-    //   (none -- MODERATOR_STATUS, REMOVE_INVITE and EVENT_STATUS were rewritten
-    //    from their writers and are registered above.)
-    //
-    // Note the reply gate is NOT visible from the handler alone. GUILD_FILTER,
+    // The reply gate is NOT visible from the handler alone. GUILD_FILTER,
     // REMOVE_EVENT and COPY_EVENT emit no SMSG in their own body and look free;
     // they reach their replies one level down, inside CalendarMgr::RemoveEvent,
-    // CalendarMgr::CopyEvent and Guild::MassInviteToEvent. Follow the call.
+    // CalendarMgr::CopyEvent and Guild::MassInviteToEvent. REMOVE_EVENT reaches
+    // two more a level below THAT, through CalendarEvent::RemoveAllInvite ->
+    // RemoveInviteByItr. Follow the call, do not scan the handler.
     //
-    // What IS already done, so nobody redoes it:
-    //   - SMSG_CALENDAR_SEND_CALENDAR/SEND_EVENT/SEND_NUM_PENDING/RAID_LOCKOUT_REMOVED,
-    //     EVENT_INITIAL_INVITE, EVENT_INVITE_STATUS and EVENT_MODERATOR_STATUS are
-    //     converted (MopCalendarPackets) and admitted.
-    //   - REMOVE_EVENT and COPY_EVENT readers are PROVEN against sub_665987:
-    //     uint64 eventId, uint64 inviteId, uint32. Both already match.
-    //   - GUILD_FILTER's reader was WRONG and is fixed in this pass -- three uint8,
-    //     not three uint32; it over-read a three-byte body.
-    //   - ADD_EVENT's reader is legacy and must be rewritten before it is
-    //     registered. sub_66D4E2 is bit-packed: four uint32 and a byte, then a
-    //     bit-packed invite count and description length, per-invite 8-bit GUID
-    //     masks, a title length, a flush, then the GUID bytes and both strings LAST.
-    //     The current reader reads title-first with a pre-MoP ReadAsPacked() GUID
-    //     and bears no resemblance to it.
+    // Layout is not identity. Once a reply's field ORDER is decoded there is
+    // usually still nothing saying which uint32 is which -- and for an inbound
+    // packet the builder route does not apply. The answer is the client's
+    // post-construction CONSUMER of the parsed record: see the note on
+    // INVITE_REMOVED_ALERT above, where +24 going into the date unpacker and +28
+    // being masked with 0x440 is the whole of the evidence separating eventTime
+    // from flags.
     //
     // How SMSG_CALENDAR_COMMAND_RESULT was recovered, because the obvious route is
     // a dead end and the next person should not spend a day on it:
