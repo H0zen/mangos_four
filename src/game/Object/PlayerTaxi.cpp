@@ -509,9 +509,9 @@ bool Player::ActivateTaxiPathTo(std::vector<uint32> const& nodes, Creature* npc 
     if (node->x != 0.0f || node->y != 0.0f || node->z != 0.0f)
     {
         if (node->ContinentID != GetMapId() ||
-                (node->x - GetPositionX()) * (node->x - GetPositionX()) +
-                (node->y - GetPositionY()) * (node->y - GetPositionY()) +
-                (node->z - GetPositionZ()) * (node->z - GetPositionZ()) >
+                (node->x - Where().X()) * (node->x - Where().X()) +
+                (node->y - Where().Y()) * (node->y - Where().Y()) +
+                (node->z - Where().Z()) * (node->z - Where().Z()) >
                 (2 * INTERACTION_DISTANCE) * (2 * INTERACTION_DISTANCE) * (2 * INTERACTION_DISTANCE))
         {
             GetSession()->SendActivateTaxiReply(ERR_TAXITOOFARAWAY);
@@ -694,9 +694,9 @@ void Player::ContinueTaxiFlight()
 
     float distPrev = MAP_SIZE * MAP_SIZE;
     float distNext =
-        (nodeList[0].x - GetPositionX()) * (nodeList[0].x - GetPositionX()) +
-        (nodeList[0].y - GetPositionY()) * (nodeList[0].y - GetPositionY()) +
-        (nodeList[0].z - GetPositionZ()) * (nodeList[0].z - GetPositionZ());
+        (nodeList[0].x - Where().X()) * (nodeList[0].x - Where().X()) +
+        (nodeList[0].y - Where().Y()) * (nodeList[0].y - Where().Y()) +
+        (nodeList[0].z - Where().Z()) * (nodeList[0].z - Where().Z());
 
     for (uint32 i = 1; i < nodeList.size(); ++i)
     {
@@ -712,9 +712,9 @@ void Player::ContinueTaxiFlight()
         distPrev = distNext;
 
         distNext =
-            (node.x - GetPositionX()) * (node.x - GetPositionX()) +
-            (node.y - GetPositionY()) * (node.y - GetPositionY()) +
-            (node.z - GetPositionZ()) * (node.z - GetPositionZ());
+            (node.x - Where().X()) * (node.x - Where().X()) +
+            (node.y - Where().Y()) * (node.y - Where().Y()) +
+            (node.z - Where().Z()) * (node.z - Where().Z());
 
         float distNodes =
             (node.x - prevNode.x) * (node.x - prevNode.x) +

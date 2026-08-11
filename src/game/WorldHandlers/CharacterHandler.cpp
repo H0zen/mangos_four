@@ -890,8 +890,8 @@ void WorldSession::HandlePlayerLogin(LoginQueryHolder* holder)
     WorldPacket data
     (SMSG_LOGIN_VERIFY_WORLD, 20);
     MopWorldEntryPackets::BuildLoginVerifyWorld(data, pCurrChar->GetMapId(),
-        pCurrChar->GetPositionX(), pCurrChar->GetPositionY(),
-        pCurrChar->GetPositionZ(), pCurrChar->GetOrientation());
+        pCurrChar->Where().X(), pCurrChar->Where().Y(),
+        pCurrChar->Where().Z(), pCurrChar->Where().Facing());
     SendPacket(&data);
 
     // -------------------------------------------------------------- PHASE 6c (A)
@@ -1122,7 +1122,7 @@ void WorldSession::HandlePlayerLogin(LoginQueryHolder* holder)
         }
 
         /* We couldn't find an areatrigger to teleport, so just move the player back to their home bind */
-        if (!at || lockStatus != AREA_LOCKSTATUS_OK || !pCurrChar->TeleportTo(at->target_mapId, at->target_X, at->target_Y, at->target_Z, pCurrChar->GetOrientation()))
+        if (!at || lockStatus != AREA_LOCKSTATUS_OK || !pCurrChar->TeleportTo(at->target_mapId, at->target_X, at->target_Y, at->target_Z, pCurrChar->Where().Facing()))
         {
             pCurrChar->TeleportToHomebind();
         }

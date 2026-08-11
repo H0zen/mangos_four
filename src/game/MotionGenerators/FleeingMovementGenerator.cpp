@@ -91,10 +91,10 @@ bool FleeingMovementGenerator<T>::_getPoint(T& owner, float& x, float& y, float&
     float dist_from_caster, angle_to_caster;
     if (Unit* fright = sObjectAccessor.GetUnit(owner, i_frightGuid))
     {
-        dist_from_caster = fright->GetDistance(&owner);
+        dist_from_caster = fright->Where().DistanceTo(owner.Where());
         if (dist_from_caster > 0.2f)
         {
-            angle_to_caster = fright->GetAngle(&owner);
+            angle_to_caster = fright->Where().BearingTo(owner.Where());
         }
         else
         {
@@ -125,7 +125,9 @@ bool FleeingMovementGenerator<T>::_getPoint(T& owner, float& x, float& y, float&
     }
 
     float curr_x = 0.0, curr_y = 0.0, curr_z = 0.0;
-    owner.GetPosition(curr_x, curr_y, curr_z);
+    curr_x = owner.Where().X();
+    curr_y = owner.Where().Y();
+    curr_z = owner.Where().Z();
 
     x = curr_x + dist * cos(angle);
     y = curr_y + dist * sin(angle);

@@ -43,7 +43,7 @@
 
 TransportBase::TransportBase(WorldObject* owner) :
     m_owner(owner),
-    m_lastPosition(owner->GetPositionX(), owner->GetPositionY(), owner->GetPositionZ(), owner->GetOrientation()),
+    m_lastPosition(owner->Where().X(), owner->Where().Y(), owner->Where().Z(), owner->Where().Facing()),
     m_sinO(sin(m_lastPosition.o)),
     m_cosO(cos(m_lastPosition.o)),
     m_updatePositionsTimer(500)
@@ -62,10 +62,10 @@ void TransportBase::Update(uint32 diff)
 {
     if (m_updatePositionsTimer < diff)
     {
-        if (fabs(m_owner->GetPositionX() - m_lastPosition.x) +
-                fabs(m_owner->GetPositionY() - m_lastPosition.y) +
-                fabs(m_owner->GetPositionZ() - m_lastPosition.z) > 1.0f ||
-                NormalizeOrientation(m_owner->GetOrientation() - m_lastPosition.o) > 0.01f)
+        if (fabs(m_owner->Where().X() - m_lastPosition.x) +
+                fabs(m_owner->Where().Y() - m_lastPosition.y) +
+                fabs(m_owner->Where().Z() - m_lastPosition.z) > 1.0f ||
+                NormalizeOrientation(m_owner->Where().Facing() - m_lastPosition.o) > 0.01f)
             UpdateGlobalPositions();
 
         m_updatePositionsTimer = 500;
@@ -79,8 +79,8 @@ void TransportBase::Update(uint32 diff)
 // Update the global positions of all passengers
 void TransportBase::UpdateGlobalPositions()
 {
-    Position pos(m_owner->GetPositionX(), m_owner->GetPositionY(),
-                 m_owner->GetPositionZ(), m_owner->GetOrientation());
+    Position pos(m_owner->Where().X(), m_owner->Where().Y(),
+                 m_owner->Where().Z(), m_owner->Where().Facing());
 
     // Calculate new direction multipliers
     if (NormalizeOrientation(pos.o - m_lastPosition.o) > 0.01f)
@@ -142,11 +142,11 @@ void TransportBase::NormalizeRotatedPosition(float rx, float ry, float& lx, floa
 void TransportBase::CalculateGlobalPositionOf(float lx, float ly, float lz, float lo, float& gx, float& gy, float& gz, float& go) const
 {
     RotateLocalPosition(lx, ly, gx, gy);
-    gx += m_owner->GetPositionX();
-    gy += m_owner->GetPositionY();
+    gx += m_owner->Where().X();
+    gy += m_owner->Where().Y();
 
-    gz = lz + m_owner->GetPositionZ();
-    go = NormalizeOrientation(lo + m_owner->GetOrientation());
+    gz = lz + m_owner->Where().Z();
+    go = NormalizeOrientation(lo + m_owner->Where().Facing());
 }
 
 //  Helper function to check if a unit is boarded onto this transporter (or a transporter boarded onto this) recursively

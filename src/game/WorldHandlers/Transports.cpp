@@ -164,10 +164,10 @@ Transport::Transport() : GameObject(), m_pathTime(0), m_timer(0), m_nextNodeTime
 
 bool Transport::Create(uint32 guidlow, uint32 mapid, float x, float y, float z, float ang, uint8 animprogress, uint16 dynamicHighValue)
 {
-    Relocate(x, y, z, ang);
+    Place().MoveTo(x, y, z, ang);
     // instance id and phaseMask isn't set to values different from std.
 
-    if (!IsPositionValid())
+    if (!IsPlaceable(*this))
     {
         sLog.outError("Transport (GUID: %u) not created. Suggested coordinates isn't valid (X: %f Y: %f)",
                       guidlow, x, y);
@@ -511,7 +511,7 @@ void Transport::MoveToNextWayPoint()
 void Transport::TeleportTransport(uint32 newMapid, float x, float y, float z)
 {
     Map const* oldMap = GetMap();
-    Relocate(x, y, z);
+    Place().MoveTo(x, y, z);
 
     // Player::TeleportTo temporarily unsummons its pet, which removes that pet
     // from this same passenger set. Snapshot players before starting the map
@@ -531,7 +531,7 @@ void Transport::TeleportTransport(uint32 newMapid, float x, float y, float z)
         {
             plr->ResurrectPlayer(1.0);
         }
-        plr->TeleportTo(newMapid, x, y, z, GetOrientation(), TELE_TO_NOT_LEAVE_TRANSPORT);
+        plr->TeleportTo(newMapid, x, y, z, Where().Facing(), TELE_TO_NOT_LEAVE_TRANSPORT);
 
         // WorldPacket data(SMSG_811, 4);
         // data << uint32(0);
@@ -582,10 +582,10 @@ bool Transport::RemovePassenger(Unit* passenger)
 
 void Transport::UpdateCreaturePassengerPositions()
 {
-    float const tx = GetPositionX();
-    float const ty = GetPositionY();
-    float const tz = GetPositionZ();
-    float const transportOrientation = GetOrientation();
+    float const tx = Where().X();
+    float const ty = Where().Y();
+    float const tz = Where().Z();
+    float const transportOrientation = Where().Facing();
     float const cosOrientation = std::cos(transportOrientation);
     float const sinOrientation = std::sin(transportOrientation);
 
@@ -636,7 +636,7 @@ void Transport::Update(uint32 update_diff, uint32 /*p_time*/)
         }
         else
         {
-            Relocate(m_curr->second.x, m_curr->second.y, m_curr->second.z);
+            Place().MoveTo(m_curr->second.x, m_curr->second.y, m_curr->second.z);
             UpdateCreaturePassengerPositions();
         }
 

@@ -323,7 +323,7 @@ void Player::SetFeatherFall(bool enable)
     // start fall from current height
     if (!enable)
     {
-        SetFallInformation(0, GetPositionZ());
+        SetFallInformation(0, Where().Z());
     }
 }
 

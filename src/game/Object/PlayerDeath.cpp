@@ -385,7 +385,7 @@ void Player::RepopAtGraveyard()
     }
     else
     {
-        ClosestGrave = sObjectMgr.GetClosestGraveYard(GetPositionX(), GetPositionY(), GetPositionZ(), GetMapId(), GetTeam());
+        ClosestGrave = sObjectMgr.GetClosestGraveYard(Where().X(), Where().Y(), Where().Z(), GetMapId(), GetTeam());
     }
 
     // stop countdown until repop
@@ -396,7 +396,7 @@ void Player::RepopAtGraveyard()
     if (ClosestGrave)
     {
         bool updateVisibility = IsInWorld() && GetMapId() == ClosestGrave->Continent;
-        TeleportTo(ClosestGrave->Continent, ClosestGrave->Pos_X, ClosestGrave->Pos_Y, ClosestGrave->Pos_Z, GetOrientation());
+        TeleportTo(ClosestGrave->Continent, ClosestGrave->Pos_X, ClosestGrave->Pos_Y, ClosestGrave->Pos_Z, Where().Facing());
         if (IsDead())                                       // not send if alive, because it used in TeleportTo()
         {
             WorldPacket data;

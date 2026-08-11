@@ -406,9 +406,9 @@ void WaypointMovementGenerator<Creature>::BuildSmoothPath(Creature& creature, Wa
         return;
     }
 
-    float startX = creature.GetPositionX();
-    float startY = creature.GetPositionY();
-    float startZ = creature.GetPositionZ();
+    float startX = creature.Where().X();
+    float startY = creature.Where().Y();
+    float startZ = creature.Where().Z();
 
     // Bounding box of the points committed to the smoothed path so far. We keep extending
     // the chunk through consecutive smoothable waypoints until the box would exceed the
@@ -697,17 +697,16 @@ bool WaypointMovementGenerator<Creature>::GetResetPosition(Creature& creature, f
     // its path (its departure point) rather than the last reached waypoint.
     // This removes the visible backtrack where an evading patroller runs
     // back to the previous waypoint and then re-walks the leg it was on.
-    // m_combatStartX/Y/Z is captured for every creature at the start of a new
+    // The combat anchor is captured for every creature at the start of a new
     // battle (Unit::Attack), so a creature that fought and is now evading
     // holds the on-path position it had when it engaged. A zero sentinel
     // means no combat start was recorded; in that case fall back below.
-    float combatX, combatY, combatZ;
-    creature.GetCombatStartPosition(combatX, combatY, combatZ);
-    if (combatX != 0.0f || combatY != 0.0f || combatZ != 0.0f)
+    const Geometry::Vector3& combat = creature.CombatAnchor();
+    if (combat.x != 0.0f || combat.y != 0.0f || combat.z != 0.0f)
     {
-        x = combatX;
-        y = combatY;
-        z = combatZ;
+        x = combat.x;
+        y = combat.y;
+        z = combat.z;
 
         // Face toward the waypoint the creature was heading for, so it keeps
         // moving forward on resume; fall back to current facing if that point
@@ -724,12 +723,12 @@ bool WaypointMovementGenerator<Creature>::GetResetPosition(Creature& creature, f
             }
             else
             {
-                o = creature.GetOrientation();
+                o = creature.Where().Facing();
             }
         }
         else
         {
-            o = creature.GetOrientation();
+            o = creature.Where().Facing();
         }
 
         return true;
@@ -938,8 +937,8 @@ void FlightPathMovementGenerator::Reset(Player& player)
     // node is not silently discarded from a combined multi-leg route.
     if (m_continuousRoute)
     {
-        init.Path().push_back(G3D::Vector3(player.GetPositionX(),
-            player.GetPositionY(), player.GetPositionZ()));
+        init.Path().push_back(G3D::Vector3(player.Where().X(),
+            player.Where().Y(), player.Where().Z()));
     }
 
     for (uint32 i = splineStart; i != end; ++i)

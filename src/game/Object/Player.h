@@ -3495,7 +3495,7 @@ class Player : public Unit
         bool IsUnderWater() const override; // Check if the player is underwater
         bool IsFalling() // Check if the player is falling
         {
-            return GetPositionZ() < m_lastFallZ;
+            return Where().Z() < m_lastFallZ;
         }
 
         void SendInitialPacketsBeforeAddToMap();
@@ -5913,10 +5913,10 @@ class Player : public Unit
         void SetHomebindToLocation(WorldLocation const& loc, uint32 area_id);
 
         // Relocate the player to the homebind location
-        void RelocateToHomebind() { SetLocationMapId(m_homebindMapId); Relocate(m_homebindX, m_homebindY, m_homebindZ); }
+        void RelocateToHomebind() { SetLocationMapId(m_homebindMapId); Place().MoveTo(m_homebindX, m_homebindY, m_homebindZ); }
 
         // Teleport the player to the homebind location
-        bool TeleportToHomebind(uint32 options = 0) { return TeleportTo(m_homebindMapId, m_homebindX, m_homebindY, m_homebindZ, GetOrientation(), options); }
+        bool TeleportToHomebind(uint32 options = 0) { return TeleportTo(m_homebindMapId, m_homebindX, m_homebindY, m_homebindZ, Where().Facing(), options); }
 
         // Get an object by type mask
         Object* GetObjectByTypeMask(ObjectGuid guid, TypeMask typemask);

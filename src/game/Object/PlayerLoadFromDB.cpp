@@ -220,7 +220,7 @@ bool Player::LoadFromDB(ObjectGuid guid, SqlQueryHolder* holder)
 
     // init saved position, and fix it later if problematic
     uint32 transGUID = fields[31].GetUInt32();
-    Relocate(fields[12].GetFloat(), fields[13].GetFloat(), fields[14].GetFloat(), fields[16].GetFloat());
+    Place().MoveTo(fields[12].GetFloat(), fields[13].GetFloat(), fields[14].GetFloat(), fields[16].GetFloat());
     SetLocationMapId(fields[15].GetUInt32());
 
     uint32 difficulty = fields[39].GetUInt32();
@@ -252,10 +252,10 @@ bool Player::LoadFromDB(ObjectGuid guid, SqlQueryHolder* holder)
 
     _LoadBoundInstances(holder->GetResult(PLAYER_LOGIN_QUERY_LOADBOUNDINSTANCES));
 
-    if (!IsPositionValid())
+    if (!IsPlaceable(*this))
     {
         sLog.outError("%s have invalid coordinates (X: %f Y: %f Z: %f O: %f). Teleport to default race/class locations.",
-                      guid.GetString().c_str(), GetPositionX(), GetPositionY(), GetPositionZ(), GetOrientation());
+                      guid.GetString().c_str(), Where().X(), Where().Y(), Where().Z(), Where().Facing());
         RelocateToHomebind();
 
         transGUID = 0;
@@ -295,7 +295,7 @@ bool Player::LoadFromDB(ObjectGuid guid, SqlQueryHolder* holder)
             // move to bg enter point
             const WorldLocation& _loc = GetBattleGroundEntryPoint();
             SetLocationMapId(_loc.mapid);
-            Relocate(_loc.coord_x, _loc.coord_y, _loc.coord_z, _loc.orientation);
+            Place().MoveTo(_loc.coord_x, _loc.coord_y, _loc.coord_z, _loc.orientation);
 
             // We are not in BG anymore
             SetBattleGroundId(0, BATTLEGROUND_TYPE_NONE);
@@ -312,7 +312,7 @@ bool Player::LoadFromDB(ObjectGuid guid, SqlQueryHolder* holder)
         {
             const WorldLocation& _loc = GetBattleGroundEntryPoint();
             SetLocationMapId(_loc.mapid);
-            Relocate(_loc.coord_x, _loc.coord_y, _loc.coord_z, _loc.orientation);
+            Place().MoveTo(_loc.coord_x, _loc.coord_y, _loc.coord_z, _loc.orientation);
 
             // We are not in BG anymore
             SetBattleGroundId(0, BATTLEGROUND_TYPE_NONE);
@@ -326,14 +326,14 @@ bool Player::LoadFromDB(ObjectGuid guid, SqlQueryHolder* holder)
         m_movementInfo.SetTransportData(ObjectGuid(HIGHGUID_MO_TRANSPORT, transGUID), fields[27].GetFloat(), fields[28].GetFloat(), fields[29].GetFloat(), fields[30].GetFloat(), 0, -1);
 
         if (!MaNGOS::IsValidMapCoord(
-                    GetPositionX() + m_movementInfo.GetTransportPos()->x, GetPositionY() + m_movementInfo.GetTransportPos()->y,
-                    GetPositionZ() + m_movementInfo.GetTransportPos()->z, GetOrientation() + m_movementInfo.GetTransportPos()->o) ||
+                    Where().X() + m_movementInfo.GetTransportPos()->x, Where().Y() + m_movementInfo.GetTransportPos()->y,
+                    Where().Z() + m_movementInfo.GetTransportPos()->z, Where().Facing() + m_movementInfo.GetTransportPos()->o) ||
                 // transport size limited
                 m_movementInfo.GetTransportPos()->x > 50 || m_movementInfo.GetTransportPos()->y > 50 || m_movementInfo.GetTransportPos()->z > 50)
         {
             sLog.outError("%s have invalid transport coordinates (X: %f Y: %f Z: %f O: %f). Teleport to default race/class locations.",
-                          guid.GetString().c_str(), GetPositionX() + m_movementInfo.GetTransportPos()->x, GetPositionY() + m_movementInfo.GetTransportPos()->y,
-                          GetPositionZ() + m_movementInfo.GetTransportPos()->z, GetOrientation() + m_movementInfo.GetTransportPos()->o);
+                          guid.GetString().c_str(), Where().X() + m_movementInfo.GetTransportPos()->x, Where().Y() + m_movementInfo.GetTransportPos()->y,
+                          Where().Z() + m_movementInfo.GetTransportPos()->z, Where().Facing() + m_movementInfo.GetTransportPos()->o);
 
             RelocateToHomebind();
 
@@ -399,7 +399,7 @@ bool Player::LoadFromDB(ObjectGuid guid, SqlQueryHolder* holder)
         AreaTrigger const* at = sObjectMgr.GetMapEntranceTrigger(GetMapId());
         if (at)
         {
-            Relocate(at->target_X, at->target_Y, at->target_Z, at->target_Orientation);
+            Place().MoveTo(at->target_X, at->target_Y, at->target_Z, at->target_Orientation);
         }
         else
         {
@@ -611,7 +611,7 @@ bool Player::LoadFromDB(ObjectGuid guid, SqlQueryHolder* holder)
         {
             sLog.outError("Character %u have too short taxi destination list, teleport to original node.", GetGUIDLow());
             SetLocationMapId(nodeEntry->ContinentID);
-            Relocate(nodeEntry->x, nodeEntry->y, nodeEntry->z, 0.0f);
+            Place().MoveTo(nodeEntry->x, nodeEntry->y, nodeEntry->z, 0.0f);
         }
 
         // we can be relocated from taxi and still have an outdated Map pointer!
@@ -635,8 +635,8 @@ bool Player::LoadFromDB(ObjectGuid guid, SqlQueryHolder* holder)
         // flight will started later
     }
 
-    // has to be called after last Relocate() in Player::LoadFromDB
-    SetFallInformation(0, GetPositionZ());
+    // has to be called after the last Place().MoveTo() in Player::LoadFromDB
+    SetFallInformation(0, Where().Z());
 
     _LoadSpellCooldowns(holder->GetResult(PLAYER_LOGIN_QUERY_LOADSPELLCOOLDOWNS));
 

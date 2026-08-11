@@ -40,7 +40,9 @@ void ConfusedMovementGenerator<T>::Initialize(T& unit)
     unit.addUnitState(UNIT_STAT_CONFUSED);
 
     // Set initial position
-    unit.GetPosition(i_x, i_y, i_z);
+    i_x = unit.Where().X();
+    i_y = unit.Where().Y();
+    i_z = unit.Where().Z();
 
     if (!unit.IsAlive() || unit.hasUnitState(UNIT_STAT_NOT_MOVE))
     {
@@ -122,7 +124,7 @@ bool ConfusedMovementGenerator<T>::Update(T& unit, const uint32& diff)
             float y = i_y + 10.0f * (rand_norm_f() - 0.5f);
             float z = i_z;
 
-            unit.UpdateAllowedPositionZ(x, y, z);
+            ClampToAllowedZ(unit, x, y, z);
 
             PathFinder path(&unit);
             path.setPathLengthLimit(30.0f);

@@ -76,7 +76,9 @@ PathFinder::~PathFinder()
 bool PathFinder::calculate(float destX, float destY, float destZ, bool forceDest)
 {
     float x, y, z;
-    m_sourceUnit->GetPosition(x, y, z);
+    x = m_sourceUnit->Where().X();
+    y = m_sourceUnit->Where().Y();
+    z = m_sourceUnit->Where().Z();
 
     return calculate(x, y, z, destX, destY, destZ, forceDest);
 }
@@ -632,7 +634,7 @@ void PathFinder::BuildPointPath(const float* startPoint, const float* endPoint)
 bool PathFinder::BuildSwimShortcut(const Vector3& startPos, const Vector3& endPos)
 {
     TerrainInfo const* terrain = m_sourceUnit->GetTerrain();
-    float radius = m_sourceUnit->GetObjectBoundingRadius();
+    float radius = m_sourceUnit->Where().Extent();
 
     // both ends must be deep enough to actually swim in, not just wading
     if (!terrain->IsSwimmable(startPos.x, startPos.y, startPos.z, radius) ||
@@ -694,7 +696,7 @@ void PathFinder::BuildShortcut()
     {
         float t = float(i) / float(segments);
         Vector3 point = start + (end - start) * t;
-        m_sourceUnit->UpdateAllowedPositionZ(point.x, point.y, point.z);
+        ClampToAllowedZ(*m_sourceUnit, point.x, point.y, point.z);
         m_pathPoints[i] = point;
     }
 
@@ -745,9 +747,9 @@ void PathFinder::updateFilter()
     if (m_sourceUnit->IsInWater() || m_sourceUnit->IsUnderWater())
     {
         uint16 includedFlags = m_filter.getIncludeFlags();
-        includedFlags |= getNavTerrain(m_sourceUnit->GetPositionX(),
-                                       m_sourceUnit->GetPositionY(),
-                                       m_sourceUnit->GetPositionZ());
+        includedFlags |= getNavTerrain(m_sourceUnit->Where().X(),
+                                       m_sourceUnit->Where().Y(),
+                                       m_sourceUnit->Where().Z());
 
         m_filter.setIncludeFlags(includedFlags);
     }
@@ -1140,6 +1142,6 @@ void PathFinder::NormalizePath()
 {
     for (uint32 i = 0; i < m_pathPoints.size(); ++i)
     {
-        m_sourceUnit->UpdateAllowedPositionZ(m_pathPoints[i].x, m_pathPoints[i].y, m_pathPoints[i].z);
+        ClampToAllowedZ(*m_sourceUnit, m_pathPoints[i].x, m_pathPoints[i].y, m_pathPoints[i].z);
     }
 }

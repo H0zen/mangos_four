@@ -133,9 +133,9 @@ void SpellCastTargets::setUnitTarget(Unit* target)
         return;
     }
 
-    m_destX = target->GetPositionX();
-    m_destY = target->GetPositionY();
-    m_destZ = target->GetPositionZ();
+    m_destX = target->Where().X();
+    m_destY = target->Where().Y();
+    m_destZ = target->Where().Z();
     m_unitTarget = target;
     m_unitTargetGUID = target->GetObjectGuid();
     m_targetMask |= TARGET_FLAG_UNIT;
@@ -317,9 +317,9 @@ bool SpellCastTargets::InitializeForCastRequest(Unit* caster, MopSpellPackets::C
     if (request.targetMask == TARGET_FLAG_SELF && caster)
     {
         m_unitTargetGUID = caster->GetObjectGuid();
-        m_destX = caster->GetPositionX();
-        m_destY = caster->GetPositionY();
-        m_destZ = caster->GetPositionZ();
+        m_destX = caster->Where().X();
+        m_destY = caster->Where().Y();
+        m_destZ = caster->Where().Z();
     }
 
     if (caster)
@@ -911,9 +911,9 @@ void SpellCastTargets::read(ByteBuffer& data, Unit* caster)
 
     if (m_targetMask == TARGET_FLAG_SELF)
     {
-        m_destX = caster->GetPositionX();
-        m_destY = caster->GetPositionY();
-        m_destZ = caster->GetPositionZ();
+        m_destX = caster->Where().X();
+        m_destY = caster->Where().Y();
+        m_destZ = caster->Where().Z();
         m_unitTarget = caster;
         m_unitTargetGUID = caster->GetObjectGuid();
         return;

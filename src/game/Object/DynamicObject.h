@@ -66,7 +66,7 @@ class DynamicObject : public WorldObject
         bool IsHostileTo(Unit const* unit) const override;
         bool IsFriendlyTo(Unit const* unit) const override;
 
-        float GetObjectBoundingRadius() const override      // overwrite WorldObject version
+        float ComputeBoundingRadius() const override
         {
             return 0.0f;                                    // dynamic object not have real interact size
         }

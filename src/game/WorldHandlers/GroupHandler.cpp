@@ -1505,8 +1505,8 @@ void WorldSession::BuildPartyMemberStatsChangedPacket(Player* player, WorldPacke
         : uint16(MEMBER_STATUS_ONLINE);
     ByteBuffer payload;
     AppendPartyStatsPayload(payload, player, mask, status,
-        uint16(player->GetZoneId()), uint16(player->GetPositionX()),
-        uint16(player->GetPositionY()), uint16(player->GetPositionZ()), false);
+        uint16(player->GetZoneId()), uint16(player->Where().X()),
+        uint16(player->Where().Y()), uint16(player->Where().Z()), false);
     MopPartyStatsPackets::BuildResponse(*data,
         player->GetObjectGuid().GetRawValue(), mask, false, false, payload);
 }
@@ -1538,9 +1538,9 @@ void WorldSession::HandleRequestPartyMemberStatsOpcode(WorldPacket& recv_data)
     if (player->IsInWorld())
     {
         zone = player->GetZoneId();
-        x = player->GetPositionX();
-        y = player->GetPositionY();
-        z = player->GetPositionZ();
+        x = player->Where().X();
+        y = player->Where().Y();
+        z = player->Where().Z();
     }
     else if (player->IsBeingTeleported())
     {

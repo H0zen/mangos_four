@@ -207,8 +207,9 @@ void WorldSession::HandleMoveWorldportAckOpcode()
     GetPlayer()->ClearPendingEmoteRefresh();
 
     // get start teleport coordinates (will used later in fail case)
-    WorldLocation old_loc;
-    GetPlayer()->GetPosition(old_loc);
+    const WorldLocation old_loc(GetPlayer()->GetMapId(),
+                                GetPlayer()->Where().X(), GetPlayer()->Where().Y(),
+                                GetPlayer()->Where().Z(), GetPlayer()->Where().Facing());
 
     // get the teleport destination
     WorldLocation& loc = GetPlayer()->GetTeleportDest();
@@ -275,7 +276,7 @@ void WorldSession::HandleMoveWorldportAckOpcode()
     }
 
     GetPlayer()->SetMap(map);
-    GetPlayer()->Relocate(loc.coord_x, loc.coord_y, loc.coord_z, loc.orientation);
+    GetPlayer()->Place().MoveTo(loc.coord_x, loc.coord_y, loc.coord_z, loc.orientation);
 
     GetPlayer()->SendInitialPacketsBeforeAddToMap();
     // the CanEnter checks are done in TeleporTo but conditions may change

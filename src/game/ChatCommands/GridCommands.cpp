@@ -170,7 +170,7 @@ bool ChatHandler::HandleGridInfoCommand(char* args)
     }
     else
     {
-        GridPair gp = MaNGOS::ComputeGridPair(player->GetPositionX(), player->GetPositionY());
+        GridPair gp = MaNGOS::ComputeGridPair(player->Where().X(), player->Where().Y());
         gridX = gp.x_coord;
         gridY = gp.y_coord;
     }

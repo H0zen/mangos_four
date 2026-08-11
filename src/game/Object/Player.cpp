@@ -687,7 +687,7 @@ bool Player::Create(uint32 guidlow, const std::string& name, uint8 race, uint8 c
 
     // Set player's initial location
     SetLocationMapId(info->mapId);
-    Relocate(info->positionX, info->positionY, info->positionZ, info->orientation);
+    Place().MoveTo(info->positionX, info->positionY, info->positionZ, info->orientation);
 
     // Set the player's map
     SetMap(sMapMgr.CreateMap(info->mapId, this));
@@ -1342,7 +1342,7 @@ void Player::Update(uint32 update_diff, uint32 p_time)
     // still share the owner's transport.  Preserve them for TeleportTo's
     // temporary-unsummon path instead of deleting them as ordinary strays.
     if (pet && (!GetTransport() || pet->GetTransport() != GetTransport()) &&
-        !pet->IsWithinDistInMap(this, GetMap()->GetVisibilityDistance()) &&
+        !InReach(*pet, *this, GetMap()->GetVisibilityDistance()) &&
         (GetCharmGuid() && (pet->GetObjectGuid() != GetCharmGuid())))
     {
         pet->Unsummon(PET_SAVE_REAGENTS, this);
@@ -1645,10 +1645,10 @@ void Player::SendTeleportPacket(float oldX, float oldY, float oldZ, float oldO)
     WorldPacket data
     (SMSG_MOVE_TELEPORT, 39);
     MopWorldEntryPackets::BuildMoveTeleport(data, guid.GetRawValue(),
-        transportGuid.GetRawValue(), 0, GetPositionX(), GetPositionY(),
-        GetPositionZ(), GetOrientation());
+        transportGuid.GetRawValue(), 0, Where().X(), Where().Y(),
+        Where().Z(), Where().Facing());
 
-    Relocate(oldX, oldY, oldZ, oldO);
+    Place().MoveTo(oldX, oldY, oldZ, oldO);
     SendDirectMessage(&data);
 }
 
@@ -1775,7 +1775,7 @@ bool Player::TeleportTo(uint32 mapid, float x, float y, float z, float orientati
         if (!(options & TELE_TO_NOT_UNSUMMON_PET))
         {
             // same map, only remove pet if out of range for new position
-            if (pet && !pet->IsWithinDist3d(x, y, z, GetMap()->GetVisibilityDistance()))
+            if (pet && !pet->Where().WithinDist(Geometry::Vector3(x, y, z), GetMap()->GetVisibilityDistance()))
             {
                 UnsummonPetTemporaryIfAny();
             }
@@ -1797,9 +1797,11 @@ bool Player::TeleportTo(uint32 mapid, float x, float y, float z, float orientati
         if (!GetSession()->PlayerLogout())
         {
             float oldX, oldY, oldZ;
-            float oldO = GetOrientation();
-            GetPosition(oldX, oldY, oldZ);;
-            Relocate(x, y, z, orientation);
+            float oldO = Where().Facing();
+            oldX = Where().X();
+            oldY = Where().Y();
+            oldZ = Where().Z();
+            Place().MoveTo(x, y, z, orientation);
             SendTeleportPacket(oldX, oldY, oldZ, oldO);
         }
     }
@@ -2137,7 +2139,7 @@ Creature* Player::GetNPCIfCanInteractWith(ObjectGuid guid, uint32 NpcFlagsmask)
     }
 
     // not too far
-    if (!unit->IsWithinDistInMap(this, INTERACTION_DISTANCE))
+    if (!InReach(*unit, *this, INTERACTION_DISTANCE))
     {
         return NULL;
     }
@@ -2174,13 +2176,13 @@ GameObject* Player::GetGameObjectIfCanInteractWith(ObjectGuid guid, uint32 gameo
         if (uint32(go->GetGoType()) == gameobject_type || gameobject_type == MAX_GAMEOBJECT_TYPE)
         {
             float maxdist = go->GetInteractionDistance();
-            if (go->IsWithinDistInMap(this, maxdist) && go->isSpawned())
+            if (InReach(*go, *this, maxdist) && go->isSpawned())
             {
                 return go;
             }
 
             sLog.outError("GetGameObjectIfCanInteractWith: GameObject '%s' [GUID: %u] is too far away from player %s [GUID: %u] to be used by him (distance=%f, maximal %f is allowed)",
-                          go->GetGOInfo()->name,  go->GetGUIDLow(), GetName(), GetGUIDLow(), go->GetDistance(this), maxdist);
+                          go->GetGOInfo()->name,  go->GetGUIDLow(), GetName(), GetGUIDLow(), go->Where().DistanceTo(this->Where()), maxdist);
         }
     }
     return NULL;
@@ -2193,7 +2195,7 @@ GameObject* Player::GetGameObjectIfCanInteractWith(ObjectGuid guid, uint32 gameo
  */
 bool Player::IsUnderWater() const
 {
-    return GetTerrain()->IsUnderWater(GetPositionX(), GetPositionY(), GetPositionZ() + 2);
+    return GetTerrain()->IsUnderWater(Where().X(), Where().Y(), Where().Z() + 2);
 }
 
 /**
@@ -3493,10 +3495,10 @@ bool Player::SetPosition(float x, float y, float z, float orientation, bool tele
 
     Map* m = GetMap();
 
-    const float old_x = GetPositionX();
-    const float old_y = GetPositionY();
-    const float old_z = GetPositionZ();
-    const float old_r = GetOrientation();
+    const float old_x = Where().X();
+    const float old_y = Where().Y();
+    const float old_z = Where().Z();
+    const float old_r = Where().Facing();
 
     if (teleport || old_x != x || old_y != y || old_z != z || old_r != orientation)
     {
@@ -3516,9 +3518,9 @@ bool Player::SetPosition(float x, float y, float z, float orientation, bool tele
 
         // reread after Map::Relocation
         m = GetMap();
-        x = GetPositionX();
-        y = GetPositionY();
-        z = GetPositionZ();
+        x = Where().X();
+        y = Where().Y();
+        z = Where().Z();
 
         // group update
         if (GetGroup() && (old_x != x || old_y != y))
@@ -3548,10 +3550,10 @@ bool Player::SetPosition(float x, float y, float z, float orientation, bool tele
 void Player::SaveRecallPosition()
 {
     m_recallMap = GetMapId();
-    m_recallX = GetPositionX();
-    m_recallY = GetPositionY();
-    m_recallZ = GetPositionZ();
-    m_recallO = GetOrientation();
+    m_recallX = Where().X();
+    m_recallY = Where().Y();
+    m_recallZ = Where().Z();
+    m_recallO = Where().Facing();
 }
 
 /**
@@ -4259,7 +4261,7 @@ void Player::HandleStealthedUnitsDetection()
                 }
                 m_clientGUIDs.insert(i_guid);
 
-                DEBUG_FILTER_LOG(LOG_FILTER_VISIBILITY_CHANGES, "%s is detected in stealth by player %u. Distance = %f", i_guid.GetString().c_str(), GetGUIDLow(), GetDistance(*i));
+                DEBUG_FILTER_LOG(LOG_FILTER_VISIBILITY_CHANGES, "%s is detected in stealth by player %u. Distance = %f", i_guid.GetString().c_str(), GetGUIDLow(), Where().DistanceTo((*i)->Where()));
 
                 // target aura duration for caster show only if target exist at caster client
                 // send data at target visibility change (adding to client)
@@ -4876,7 +4878,7 @@ void Player::SummonIfPossible(bool agree)
 
     GetAchievementMgr().UpdateAchievementCriteria(ACHIEVEMENT_CRITERIA_TYPE_ACCEPTED_SUMMONINGS, 1);
 
-    TeleportTo(m_summon_mapid, m_summon_x, m_summon_y, m_summon_z, GetOrientation());
+    TeleportTo(m_summon_mapid, m_summon_x, m_summon_y, m_summon_z, Where().Facing());
 }
 
 /**
@@ -5132,7 +5134,7 @@ void Player::ResurectUsingRequestData()
     /// Teleport before resurrecting by player, otherwise the player might get attacked from creatures near his corpse
     if (m_resurrectGuid.IsPlayer())
     {
-        TeleportTo(m_resurrectMap, m_resurrectX, m_resurrectY, m_resurrectZ, GetOrientation());
+        TeleportTo(m_resurrectMap, m_resurrectX, m_resurrectY, m_resurrectZ, Where().Facing());
     }
 
     // we cannot resurrect player when we triggered far teleport
@@ -6069,7 +6071,7 @@ void Player::HandleFall(MovementInfo const& movementInfo)
             uint32 damage = (uint32)(damageperc * GetMaxHealth() * sWorld.getConfig(CONFIG_FLOAT_RATE_DAMAGE_FALL));
 
             float height = movementInfo.GetPos()->z;
-            UpdateAllowedPositionZ(movementInfo.GetPos()->x, movementInfo.GetPos()->y, height);
+            ClampToAllowedZ(*this, movementInfo.GetPos()->x, movementInfo.GetPos()->y, height);
 
             if (damage > 0)
             {
@@ -6096,7 +6098,7 @@ void Player::HandleFall(MovementInfo const& movementInfo)
             }
 
             // Z given by moveinfo, LastZ, FallTime, WaterZ, MapZ, Damage, Safefall reduction
-            DEBUG_LOG("FALLDAMAGE z=%f sz=%f pZ=%f FallTime=%d mZ=%f damage=%d SF=%d" , movementInfo.GetPos()->z, height, GetPositionZ(), movementInfo.GetFallTime(), height, damage, safe_fall);
+            DEBUG_LOG("FALLDAMAGE z=%f sz=%f pZ=%f FallTime=%d mZ=%f damage=%d SF=%d" , movementInfo.GetPos()->z, height, Where().Z(), movementInfo.GetFallTime(), height, damage, safe_fall);
         }
     }
 }
@@ -6549,7 +6551,9 @@ void Player::setResurrectRequestData(Unit* caster, uint32 health, uint32 mana)
 {
     m_resurrectGuid = caster->GetObjectGuid();
     m_resurrectMap = caster->GetMapId();
-    caster->GetPosition(m_resurrectX, m_resurrectY, m_resurrectZ);
+    m_resurrectX = caster->Where().X();
+    m_resurrectY = caster->Where().Y();
+    m_resurrectZ = caster->Where().Z();
     m_resurrectHealth = health;
     m_resurrectMana = mana;
     m_resurrectToGhoul = false;

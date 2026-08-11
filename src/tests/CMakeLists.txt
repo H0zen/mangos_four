@@ -41,6 +41,7 @@ set(SRC_GRP_TESTS
     NavBinningTest.cpp
     DynamicCollisionTest.cpp
     PlacementTest.cpp
+    GeometryMathTest.cpp
     # Compiled in, not linked from `game`: game.lib pulls the whole server, down to
     # the database globals that only mangosd defines. These two know nothing of it.
     ${CMAKE_SOURCE_DIR}/src/game/WorldHandlers/DynamicCollision.cpp
@@ -69,6 +70,9 @@ set_target_properties(mangos_tests PROPERTIES FOLDER "tests")
 
 add_test(NAME mangos_tests COMMAND mangos_tests)
 
-# No spatial_boundary test here. It guards the Placement refactor -- no GetPositionX/Y/Z,
-# no GetDistance, Where() instead -- which this core has not adopted, so it fails on the
-# whole object hierarchy by design. It comes back with Placement, not before.
+# The Placement refactor's guard: no GetPositionX/Y/Z, no GetDistance on the hierarchy,
+# Where() instead. Source-level, because it needs no build -- see the file's header.
+add_test(NAME spatial_boundary
+    COMMAND ${CMAKE_COMMAND}
+        -DSOURCE_ROOT=${CMAKE_SOURCE_DIR}
+        -P ${CMAKE_CURRENT_SOURCE_DIR}/CheckSpatialBoundary.cmake)

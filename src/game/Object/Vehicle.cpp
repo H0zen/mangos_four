@@ -148,7 +148,7 @@ void VehicleInfo::Initialize()
     SQLMultiStorage::SQLMSIteratorBounds<VehicleAccessory> bounds = sVehicleAccessoryStorage.getBounds<VehicleAccessory>(m_overwriteNpcEntry);
     for (SQLMultiStorage::SQLMultiSIterator<VehicleAccessory> itr = bounds.first; itr != bounds.second; ++itr)
     {
-        if (Creature* summoned = m_owner->SummonCreature(itr->passengerEntry, m_owner->GetPositionX(), m_owner->GetPositionY(), m_owner->GetPositionZ(), 2 * m_owner->GetOrientation(), TEMPSPAWN_DEAD_DESPAWN, 0))
+        if (Creature* summoned = m_owner->SummonCreature(itr->passengerEntry, m_owner->Where().X(), m_owner->Where().Y(), m_owner->Where().Z(), 2 * m_owner->Where().Facing(), TEMPSPAWN_DEAD_DESPAWN, 0))
         {
             DEBUG_LOG("VehicleInfo(of %s)::Initialize: Load vehicle accessory %s onto seat %u", m_owner->GetGuidStr().c_str(), summoned->GetGuidStr().c_str(), itr->seatId);
             m_accessoryGuids.insert(summoned->GetObjectGuid());
@@ -252,7 +252,7 @@ void VehicleInfo::Board(Unit* passenger, uint8 seat)
 
     // Calculate passengers local position
     float lx, ly, lz, lo;
-    CalculateBoardingPositionOf(passenger->GetPositionX(), passenger->GetPositionY(), passenger->GetPositionZ(), passenger->GetOrientation(), lx, ly, lz, lo);
+    CalculateBoardingPositionOf(passenger->Where().X(), passenger->Where().Y(), passenger->Where().Z(), passenger->Where().Facing(), lx, ly, lz, lo);
 
     BoardPassenger(passenger, lx, ly, lz, lo, seat);        // Use TransportBase to store the passenger
 
@@ -388,7 +388,7 @@ void VehicleInfo::UnBoard(Unit* passenger, bool changeVehicle)
         {
             Player* pPlayer = (Player*)passenger;
             pPlayer->ResummonPetTemporaryUnSummonedIfAny();
-            pPlayer->SetFallInformation(0, pPlayer->GetPositionZ());
+            pPlayer->SetFallInformation(0, pPlayer->Where().Z());
 
             // SMSG_PET_DISMISS_SOUND (?)
         }
@@ -400,7 +400,7 @@ void VehicleInfo::UnBoard(Unit* passenger, bool changeVehicle)
 
         Movement::MoveSplineInit init(*passenger);
         // ToDo: Set proper unboard coordinates
-        init.MoveTo(m_owner->GetPositionX(), m_owner->GetPositionY(), m_owner->GetPositionZ());
+        init.MoveTo(m_owner->Where().X(), m_owner->Where().Y(), m_owner->Where().Z());
         init.SetExitVehicle();
         init.Launch();
 
@@ -502,10 +502,10 @@ Unit* VehicleInfo::GetPassenger(uint8 seat) const
 // Helper function to undo the turning of the vehicle to calculate a relative position of the passenger when boarding
 void VehicleInfo::CalculateBoardingPositionOf(float gx, float gy, float gz, float go, float& lx, float& ly, float& lz, float& lo) const
 {
-    NormalizeRotatedPosition(gx - m_owner->GetPositionX(), gy - m_owner->GetPositionY(), lx, ly);
+    NormalizeRotatedPosition(gx - m_owner->Where().X(), gy - m_owner->Where().Y(), lx, ly);
 
-    lz = gz - m_owner->GetPositionZ();
-    lo = NormalizeOrientation(go - m_owner->GetOrientation());
+    lz = gz - m_owner->Where().Z();
+    lo = NormalizeOrientation(go - m_owner->Where().Facing());
 }
 
 void VehicleInfo::RemoveAccessoriesFromMap()

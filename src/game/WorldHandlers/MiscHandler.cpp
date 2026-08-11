@@ -452,8 +452,8 @@ void WorldSession::HandleLogoutRequestOpcode(WorldPacket & /*recv_data*/)
     // not set flags if player can't free move to prevent lost state at logout cancel
     if (GetPlayer()->CanFreeMove())
     {
-        float height = GetPlayer()->GetMap()->GetHeight(GetPlayer()->GetPhaseMask(), GetPlayer()->GetPositionX(), GetPlayer()->GetPositionY(), GetPlayer()->GetPositionZ());
-        if ((GetPlayer()->GetPositionZ() < height + 0.1f) && !(GetPlayer()->IsInWater()))
+        float height = GetPlayer()->GetMap()->GetHeight(GetPlayer()->GetPhaseMask(), GetPlayer()->Where().X(), GetPlayer()->Where().Y(), GetPlayer()->Where().Z());
+        if ((GetPlayer()->Where().Z() < height + 0.1f) && !(GetPlayer()->IsInWater()))
         {
             GetPlayer()->SetStandState(UNIT_STAND_STATE_SIT);
         }
@@ -813,7 +813,7 @@ void WorldSession::HandleReclaimCorpseOpcode(WorldPacket& recv_data)
         return;
     }
 
-    if (!corpse->IsWithinDistInMap(GetPlayer(), CORPSE_RECLAIM_RADIUS, true))
+    if (!InReach(*corpse, *GetPlayer(), CORPSE_RECLAIM_RADIUS, true))
     {
         return;
     }
@@ -882,7 +882,7 @@ void WorldSession::HandleReturnToGraveyard(WorldPacket& /*recvPacket*/)
         {
             return;
         }
-        ClosestGrave = sObjectMgr.GetClosestGraveYard(corpse->GetPositionX(), corpse->GetPositionY(), corpse->GetPositionZ(), corpse->GetMapId(), pPlayer->GetTeam());
+        ClosestGrave = sObjectMgr.GetClosestGraveYard(corpse->Where().X(), corpse->Where().Y(), corpse->Where().Z(), corpse->GetMapId(), pPlayer->GetTeam());
     }
 
     // if no grave found, stay at the current location
@@ -890,7 +890,7 @@ void WorldSession::HandleReturnToGraveyard(WorldPacket& /*recvPacket*/)
     if (ClosestGrave)
     {
         bool updateVisibility = pPlayer->IsInWorld() && corpse && corpse->GetMapId() == ClosestGrave->Continent;
-        pPlayer->TeleportTo(ClosestGrave->Continent, ClosestGrave->Pos_X, ClosestGrave->Pos_Y, ClosestGrave->Pos_Z, pPlayer->GetOrientation());
+        pPlayer->TeleportTo(ClosestGrave->Continent, ClosestGrave->Pos_X, ClosestGrave->Pos_Y, ClosestGrave->Pos_Z, pPlayer->Where().Facing());
         if (pPlayer->IsDead())                                       // not send if alive, because it used in TeleportTo()
         {
             WorldPacket data;
@@ -951,7 +951,7 @@ void WorldSession::HandleAreaTriggerOpcode(WorldPacket& recv_data)
     const float delta = 5.0f;
 
     // check if player in the range of areatrigger
-    if (!IsPointInAreaTriggerZone(atEntry, player->GetMapId(), player->GetPositionX(), player->GetPositionY(), player->GetPositionZ(), delta))
+    if (!IsPointInAreaTriggerZone(atEntry, player->GetMapId(), player->Where().X(), player->Where().Y(), player->Where().Z(), delta))
     {
         DEBUG_LOG("Player '%s' (GUID: %u) too far, ignore Area Trigger ID: %u", player->GetName(), player->GetGUIDLow(), Trigger_ID);
         return;
@@ -1547,7 +1547,7 @@ void WorldSession::HandleInspectOpcode(WorldPacket& recv_data)
         return;
     }
 
-    if (!_player->IsWithinDistInMap(plr, INSPECT_DISTANCE, false))
+    if (!InReach(*_player, *plr, INSPECT_DISTANCE, false))
     {
         return;
     }
@@ -1650,7 +1650,7 @@ void WorldSession::HandleInspectHonorStatsOpcode(WorldPacket& recv_data)
         return;
     }
 
-    if (!_player->IsWithinDistInMap(player, INSPECT_DISTANCE, false))
+    if (!InReach(*_player, *player, INSPECT_DISTANCE, false))
     {
         return;
     }
@@ -2127,7 +2127,7 @@ void WorldSession::HandleQueryInspectAchievementsOpcode(WorldPacket& recv_data)
         return;
     }
 
-    if (!_player->IsWithinDistInMap(player, INSPECT_DISTANCE, false))
+    if (!InReach(*_player, *player, INSPECT_DISTANCE, false))
     {
         return;
     }

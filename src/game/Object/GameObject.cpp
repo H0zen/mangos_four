@@ -211,11 +211,11 @@ bool GameObject::Create(uint32 guidlow, uint32 name_id, Map* map, uint32 phaseMa
                         const QuaternionData& rotation, uint8 animprogress, GOState go_state)
 {
     MANGOS_ASSERT(map);
-    Relocate(x, y, z, ang);
+    Place().MoveTo(x, y, z, ang);
     SetMap(map);
     SetPhaseMask(phaseMask, false);
 
-    if (!IsPositionValid())
+    if (!IsPlaceable(*this))
     {
         sLog.outError("Gameobject (GUID: %u Entry: %u ) not created. Suggested coordinates are invalid (X: %f Y: %f)", guidlow, name_id, x, y);
         return false;
@@ -433,10 +433,10 @@ void GameObject::SaveToDB(uint32 mapid, uint8 spawnMask, uint32 phaseMask)
     data.id = GetEntry();
     data.mapid = mapid;
     data.phaseMask = phaseMask;
-    data.posX = GetPositionX();
-    data.posY = GetPositionY();
-    data.posZ = GetPositionZ();
-    data.orientation = GetOrientation();
+    data.posX = Where().X();
+    data.posY = Where().Y();
+    data.posZ = Where().Z();
+    data.orientation = Where().Facing();
     data.rotation.x = m_worldRotation.x;
     data.rotation.y = m_worldRotation.y;
     data.rotation.z = m_worldRotation.z;
@@ -454,10 +454,10 @@ void GameObject::SaveToDB(uint32 mapid, uint8 spawnMask, uint32 phaseMask)
        << mapid << ", "
        << uint32(spawnMask) << ","                         // cast to prevent save as symbol
        << uint32(GetPhaseMask()) << ","                    // prevent out of range error
-       << GetPositionX() << ", "
-       << GetPositionY() << ", "
-       << GetPositionZ() << ", "
-       << GetOrientation() << ", "
+       << Where().X() << ", "
+       << Where().Y() << ", "
+       << Where().Z() << ", "
+       << Where().Facing() << ", "
        << m_worldRotation.x << ", "
        << m_worldRotation.y << ", "
        << m_worldRotation.z << ", "
@@ -680,7 +680,7 @@ bool GameObject::IsVisibleForInState(Player const* u, WorldObject const* viewPoi
     }
 
     // Transport always visible at this step implementation
-    if (IsTransport() && IsInMap(u))
+    if (IsTransport() && CanInteract(*this, *u))
     {
         return true;
     }
@@ -734,7 +734,7 @@ bool GameObject::IsVisibleForInState(Player const* u, WorldObject const* viewPoi
             // only rogue have skill for traps detection
             if (Aura* aura = ((Player*)u)->GetAura(2836, EFFECT_INDEX_0))
             {
-                if (roll_chance_i(aura->GetModifier()->m_amount) && u->IsInFront(this, 15.0f))
+                if (roll_chance_i(aura->GetModifier()->m_amount) && InFrontPhased(*u, *this, 15.0f, M_PI_F))
                 {
                     return true;
                 }
@@ -748,7 +748,7 @@ bool GameObject::IsVisibleForInState(Player const* u, WorldObject const* viewPoi
     }
 
     // check distance
-    return IsWithinDistInMap(viewPoint, GetMap()->GetVisibilityDistance() +
+    return InReach(*this, *viewPoint, GetMap()->GetVisibilityDistance() +
                              (inVisibleList ? World::GetVisibleObjectGreyDistance() : 0.0f), false);
 }
 
@@ -883,7 +883,7 @@ void GameObject::SummonLinkedTrapIfAny()
 
     GameObject* linkedGO = new GameObject;
     if (!linkedGO->Create(GetMap()->GenerateLocalLowGuid(HIGHGUID_GAMEOBJECT), linkedEntry, GetMap(),
-                          GetPhaseMask(), GetPositionX(), GetPositionY(), GetPositionZ(), GetOrientation()))
+                          GetPhaseMask(), Where().X(), Where().Y(), Where().Z(), Where().Facing()))
     {
         delete linkedGO;
         return;
@@ -1135,7 +1135,7 @@ void GameObject::SetWorldRotation(float qx, float qy, float qz, float qw)
     // Temporary solution for gameobjects that has no rotation data in DB:
     if (qz == 0.f && qw == 0.f)
     {
-        rotation = Quat::fromAxisAngleRotation(G3D::Vector3::unitZ(), GetOrientation());
+        rotation = Quat::fromAxisAngleRotation(G3D::Vector3::unitZ(), Where().Facing());
     }
 
     rotation.unitize();
@@ -1507,7 +1507,7 @@ void GameObject::SetLootRecipient(Unit* pUnit)
  *
  * @return The default game object radius.
  */
-float GameObject::GetObjectBoundingRadius() const
+float GameObject::ComputeBoundingRadius() const
 {
     // FIXME:
     // 1. This is clearly hack way because we usually need this to check range, but a box just is no ball

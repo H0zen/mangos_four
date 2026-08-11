@@ -177,7 +177,7 @@ void Player2Corpse::Remove(Corpse* corpse)
     }
 
     // build mapid*cellid -> guid_set map
-    CellPair cell_pair = MaNGOS::ComputeCellPair(corpse->GetPositionX(), corpse->GetPositionY());
+    CellPair cell_pair = MaNGOS::ComputeCellPair(corpse->Where().X(), corpse->Where().Y());
     uint32 cell_id = (cell_pair.y_coord * TOTAL_NUMBER_OF_CELLS_PER_MAP) + cell_pair.x_coord;
 
     sObjectMgr.DeleteCorpseCellData(corpse->GetMapId(), cell_id, corpse->GetObjectGuid().GetCounter());
@@ -198,7 +198,7 @@ void Player2Corpse::Insert(Corpse* corpse)
     std::unique_lock<LockType> guard(i_lock);
     m_objectMap[corpse->GetOwnerGuid()] = corpse;
 
-    CellPair cell_pair = MaNGOS::ComputeCellPair(corpse->GetPositionX(), corpse->GetPositionY());
+    CellPair cell_pair = MaNGOS::ComputeCellPair(corpse->Where().X(), corpse->Where().Y());
     uint32 cell_id = (cell_pair.y_coord * TOTAL_NUMBER_OF_CELLS_PER_MAP) + cell_pair.x_coord;
 
     sObjectMgr.AddCorpseCellData(corpse->GetMapId(), cell_id, corpse->GetOwnerGuid().GetCounter(), corpse->GetInstanceId());
@@ -283,7 +283,7 @@ Corpse* ObjectAccessor::ConvertCorpseForPlayer(ObjectGuid player_guid, bool insi
     // ignore bones creating option in case insignia
     if (map && (insignia ||
                 (map->IsBattleGroundOrArena() ? sWorld.getConfig(CONFIG_BOOL_DEATH_BONES_BG_OR_ARENA) : sWorld.getConfig(CONFIG_BOOL_DEATH_BONES_WORLD))) &&
-        !map->IsRemovalGrid(corpse->GetPositionX(), corpse->GetPositionY()))
+        !map->IsRemovalGrid(corpse->Where().X(), corpse->Where().Y()))
     {
         // Create bones, don't change Corpse
         bones = new Corpse;
@@ -298,7 +298,7 @@ Corpse* ObjectAccessor::ConvertCorpseForPlayer(ObjectGuid player_guid, bool insi
         // bones->m_time = m_time;                          // don't overwrite time
         // bones->m_inWorld = m_inWorld;                    // don't overwrite world state
         // bones->m_type = m_type;                          // don't overwrite type
-        bones->Relocate(corpse->GetPositionX(), corpse->GetPositionY(), corpse->GetPositionZ(), corpse->GetOrientation());
+        bones->Place().MoveTo(corpse->Where().X(), corpse->Where().Y(), corpse->Where().Z(), corpse->Where().Facing());
         bones->SetPhaseMask(corpse->GetPhaseMask(), false);
         bones->SetUInt32Value(CORPSE_FIELD_FLAGS, CORPSE_FLAG_UNK2 | CORPSE_FLAG_BONES);
         bones->SetGuidValue(CORPSE_FIELD_OWNER, ObjectGuid());

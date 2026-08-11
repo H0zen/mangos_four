@@ -94,7 +94,7 @@ void WorldSession::HandleAutostoreLootItemOpcode(WorldPacket& recv_data)
 
         /* Checking if the player is in range of the object. */
         if (!go || ((go->GetOwnerGuid() != _player->GetObjectGuid() && go->GetGoType() != GAMEOBJECT_TYPE_FISHINGHOLE) &&
-            !go->IsWithinDistInMap(_player, INTERACTION_DISTANCE)))
+            !InReach(*go, *_player, INTERACTION_DISTANCE)))
         {
             player->SendLootRelease(lguid);
             return;
@@ -131,7 +131,7 @@ void WorldSession::HandleAutostoreLootItemOpcode(WorldPacket& recv_data)
 
         /* Checking if the player is a rogue and if the creature is alive. */
         bool lootAllowed = creature && creature->IsAlive() == (player->getClass() == CLASS_ROGUE && creature->loot.loot_type == LOOT_PICKPOCKETING);
-        if (!lootAllowed || !creature->IsWithinDistInMap(_player, INTERACTION_DISTANCE))
+        if (!lootAllowed || !InReach(*creature, *_player, INTERACTION_DISTANCE))
         {
             player->SendLootRelease(lguid);
             return;
@@ -290,7 +290,7 @@ void WorldSession::HandleLootMoneyOpcode(WorldPacket& recv_data)
             GameObject* pGameObject = GetPlayer()->GetMap()->GetGameObject(guid);
 
             // not check distance for GO in case owned GO (fishing bobber case, for example)
-            if (pGameObject && (pGameObject->GetOwnerGuid() == _player->GetObjectGuid() || pGameObject->IsWithinDistInMap(_player, INTERACTION_DISTANCE)))
+            if (pGameObject && (pGameObject->GetOwnerGuid() == _player->GetObjectGuid() || InReach(*pGameObject, *_player, INTERACTION_DISTANCE)))
             {
                 pLoot = &pGameObject->loot;
             }
@@ -301,7 +301,7 @@ void WorldSession::HandleLootMoneyOpcode(WorldPacket& recv_data)
         {
             Corpse* bones = _player->GetMap()->GetCorpse(guid);
 
-            if (bones && bones->IsWithinDistInMap(_player, INTERACTION_DISTANCE))
+            if (bones && InReach(*bones, *_player, INTERACTION_DISTANCE))
             {
                 pLoot = &bones->loot;
                 shareMoney = false;
@@ -333,7 +333,7 @@ void WorldSession::HandleLootMoneyOpcode(WorldPacket& recv_data)
 
             bool ok_loot = pCreature && pCreature->IsAlive() == (player->getClass() == CLASS_ROGUE && pCreature->lootForPickPocketed);
 
-            if (ok_loot && pCreature->IsWithinDistInMap(_player, INTERACTION_DISTANCE))
+            if (ok_loot && InReach(*pCreature, *_player, INTERACTION_DISTANCE))
             {
                 pLoot = &pCreature->loot;
                 if (pCreature->IsAlive())
@@ -511,7 +511,7 @@ void WorldSession::DoLootRelease(ObjectGuid lguid)
 
         /* Checking if the player is in range of the object. */
         if (!go || ((go->GetOwnerGuid() != _player->GetObjectGuid() && go->GetGoType() != GAMEOBJECT_TYPE_FISHINGHOLE) &&
-            !go->IsWithinDistInMap(_player, INTERACTION_DISTANCE)))
+            !InReach(*go, *_player, INTERACTION_DISTANCE)))
             return;
 
         loot = &go->loot;
@@ -556,7 +556,7 @@ void WorldSession::DoLootRelease(ObjectGuid lguid)
     else if (lguid.IsCorpse()) // ONLY remove insignia at BG
     {
         Corpse* corpse = _player->GetMap()->GetCorpse(lguid);
-        if (!corpse || !corpse->IsWithinDistInMap(_player, INTERACTION_DISTANCE))
+        if (!corpse || !InReach(*corpse, *_player, INTERACTION_DISTANCE))
         {
             return;
         }
@@ -614,7 +614,7 @@ void WorldSession::DoLootRelease(ObjectGuid lguid)
 
         /* Checking if the creature is alive and if the player is a rogue. */
         bool lootAllowed = creature && creature->IsAlive() == (player->getClass() == CLASS_ROGUE && creature->loot.loot_type == LOOT_PICKPOCKETING);
-        if (!lootAllowed || !creature->IsWithinDistInMap(_player, INTERACTION_DISTANCE))
+        if (!lootAllowed || !InReach(*creature, *_player, INTERACTION_DISTANCE))
         {
             return;
         }
@@ -677,7 +677,7 @@ void WorldSession::HandleLootMasterGiveOpcode(WorldPacket& recv_data)
     }
 
     /* Checking if the player is in the same raid as the target and if the player is in the same map as the target. */
-    if (!_player->IsInSameRaidWith(target->ToPlayer()) || !_player->IsInMap(target))
+    if (!_player->IsInSameRaidWith(target->ToPlayer()) || !CanInteract(*_player, *target))
     {
         sLog.outBasic("MasterLootItem: Player %s tried to give an item to ineligible player %s!", GetPlayer()->GetName(), target->GetName());
         return;

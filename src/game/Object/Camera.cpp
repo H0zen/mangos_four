@@ -97,7 +97,7 @@ void Camera::SetView(WorldObject* obj, bool update_far_sight_field /*= true*/)
         return;
     }
 
-    if (!m_owner.IsInMap(obj))
+    if (!CanInteract(m_owner, *obj))
     {
         sLog.outError("Camera::SetView, viewpoint is not in map with camera's owner");
         return;

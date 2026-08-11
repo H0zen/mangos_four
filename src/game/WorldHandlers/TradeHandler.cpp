@@ -338,7 +338,7 @@ void WorldSession::HandleAcceptTradeOpcode(WorldPacket& recvPacket)
     // set before checks to properly undo at problems (it already set in to client)
     my_trade->SetAccepted(true);
 
-    if (!_player->IsWithinDistInMap(trader, TRADE_DISTANCE, false))
+    if (!InReach(*_player, *trader, TRADE_DISTANCE, false))
     {
         SendTradeStatus(TRADE_STATUS_TOO_FAR_AWAY);
         my_trade->SetAccepted(false);
@@ -728,7 +728,7 @@ void WorldSession::HandleInitiateTradeOpcode(WorldPacket& recvPacket)
         return;
     }
 
-    if (!pOther->IsWithinDistInMap(_player, 10.0f, false))
+    if (!InReach(*pOther, *_player, 10.0f, false))
     {
         SendTradeStatus(TRADE_STATUS_TOO_FAR_AWAY);
         return;

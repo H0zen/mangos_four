@@ -42,13 +42,11 @@
 template<>
 RandomMovementGenerator<Creature>::RandomMovementGenerator(const Creature& creature): i_verticalZ(0)
 {
-    float respX, respY, respZ, respO, wander_distance;
-    creature.GetRespawnCoord(respX, respY, respZ, &respO, &wander_distance);
     i_nextMoveTime = TimeTracker(0);
-    i_x = respX;
-    i_y = respY;
-    i_z = respZ;
-    i_radius = wander_distance;
+    i_x = creature.Spawn().X();
+    i_y = creature.Spawn().Y();
+    i_z = creature.Spawn().Z();
+    i_radius = creature.GetRespawnRadius();
     // TODO - add support for flying mobs using some distance
     i_verticalZ = 0.0f;
 }

@@ -173,10 +173,10 @@ void Aura::HandlePeriodicTriggerSpell(bool apply, bool /*Real*/)
                     // No water level means no surface to pool blood on -- the aura is
                     // only reachable while IsInWater, so this is a race, not a normal path.
                     if (const auto surface = target->GetTerrain()->GetWaterLevel(
-                            target->GetPositionX(), target->GetPositionY(), target->GetPositionZ()))
+                            target->Where().X(), target->Where().Y(), target->Where().Z()))
                     {
                         // Spawn Blood Pool
-                        target->CastSpell(target->GetPositionX(), target->GetPositionY(), *surface, 63471, true);
+                        target->CastSpell(target->Where().X(), target->Where().Y(), *surface, 63471, true);
                     }
                 }
 

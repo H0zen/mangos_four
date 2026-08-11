@@ -96,11 +96,11 @@ bool DynamicObject::Create(uint32 guidlow, Unit* caster, uint32 spellId, SpellEf
 {
     WorldObject::_Create(guidlow, HIGHGUID_DYNAMICOBJECT, caster->GetPhaseMask());
     SetMap(caster->GetMap());
-    Relocate(x, y, z, 0);
+    Place().MoveTo(x, y, z, 0);
 
-    if (!IsPositionValid())
+    if (!IsPlaceable(*this))
     {
-        sLog.outError("DynamicObject (spell %u eff %u) not created. Suggested coordinates isn't valid (X: %f Y: %f)", spellId, effIndex, GetPositionX(), GetPositionY());
+        sLog.outError("DynamicObject (spell %u eff %u) not created. Suggested coordinates isn't valid (X: %f Y: %f)", spellId, effIndex, Where().X(), Where().Y());
         return false;
     }
 
@@ -277,7 +277,7 @@ bool DynamicObject::IsVisibleForInState(Player const* u, WorldObject const* view
     }
 
     // normal case
-    return IsWithinDistInMap(viewPoint, GetMap()->GetVisibilityDistance() + (inVisibleList ? World::GetVisibleObjectGreyDistance() : 0.0f), false);
+    return InReach(*this, *viewPoint, GetMap()->GetVisibilityDistance() + (inVisibleList ? World::GetVisibleObjectGreyDistance() : 0.0f), false);
 }
 
 /**

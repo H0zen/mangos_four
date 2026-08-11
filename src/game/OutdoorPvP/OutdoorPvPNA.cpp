@@ -116,7 +116,7 @@ void OutdoorPvPNA::HandlePlayerKillInsideArea(Player* player)
     {
         // check capture point range
         GameObjectInfo const* info = capturePoint->GetGOInfo();
-        if (info && player->IsWithinDistInMap(capturePoint, info->capturePoint.radius))
+        if (info && InReach(*player, *capturePoint, info->capturePoint.radius))
         {
             // check capture point team
             if (player->GetTeam() == m_zoneOwner)
@@ -177,9 +177,8 @@ void OutdoorPvPNA::HandleCreatureDeath(Creature* creature)
     }
 
     // get the location of the dead guard for future respawn
-    float x, y, z, o;
-    creature->GetRespawnCoord(x, y, z, &o);
-    HalaaSoldiersSpawns location = {x, y, z, o};
+    HalaaSoldiersSpawns location = {creature->Spawn().X(), creature->Spawn().Y(),
+                                    creature->Spawn().Z(), creature->Spawn().Facing()};
     m_deadSoldiers.push(location);
 
     // set the respawn timer after the last guard died - 5 min for the first time, or 1 hour if the city is under siege

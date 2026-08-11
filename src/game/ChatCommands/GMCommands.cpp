@@ -153,10 +153,10 @@ bool ChatHandler::HandlePInfoCommand(char* args)
 //    {
 //        uint32 mapId = target->GetMapId();
 //        uint32 zoneId = target->GetZoneId();
-//        float posX = target->GetPositionX();
-//        float posY = target->GetPositionY();
-//        float posZ = target->GetPositionZ();
-//        float orientation = target->GetOrientation();
+//        float posX = target->Where().X();
+//        float posY = target->Where().Y();
+//        float posZ = target->Where().Z();
+//        float orientation = target->Where().Facing();
 //
 //        MapEntry const* mapEntry = sMapStore.LookupEntry(mapId);
 //        AreaTableEntry const* zoneEntry = GetAreaEntryByAreaID(zoneId);

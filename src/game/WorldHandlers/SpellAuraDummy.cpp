@@ -734,13 +734,13 @@ void Aura::HandleAuraDummy(bool apply, bool Real)
             case 42517:                                     // Beam to Zelfrax
             {
                 // expecting target to be a dummy creature
-                Creature* pSummon = target->SummonCreature(23864, 0.0f, 0.0f, 0.0f, target->GetOrientation(), TEMPSPAWN_DEAD_DESPAWN, 0);
+                Creature* pSummon = target->SummonCreature(23864, 0.0f, 0.0f, 0.0f, target->Where().Facing(), TEMPSPAWN_DEAD_DESPAWN, 0);
 
                 Unit* pCaster = GetCaster();
 
                 if (pSummon && pCaster)
                 {
-                    pSummon->GetMotionMaster()->MovePoint(0, pCaster->GetPositionX(), pCaster->GetPositionY(), pCaster->GetPositionZ());
+                    pSummon->GetMotionMaster()->MovePoint(0, pCaster->Where().X(), pCaster->Where().Y(), pCaster->Where().Z());
                 }
 
                 return;

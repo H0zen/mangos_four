@@ -361,13 +361,13 @@ bool CreatureEventAI::ProcessEvent(CreatureEventAIHolder& pHolder, Unit* pAction
             pHolder.UpdateRepeatTimer(m_creature, event.spell_hit.repeatMin, event.spell_hit.repeatMax);
             break;
         case EVENT_T_RANGE:
-            if (!m_creature->IsInCombat() || !m_creature->getVictim() || !m_creature->IsInMap(m_creature->getVictim()))
+            if (!m_creature->IsInCombat() || !m_creature->getVictim() || !CanInteract(*m_creature, *m_creature->getVictim()))
             {
                 return false;
             }
 
             // DISCUSS TODO - Likely replace IsInRange check with CombatReach checks (as used rather for such checks)
-            if (!m_creature->IsInRange(m_creature->getVictim(), (float)event.range.minDist, (float)event.range.maxDist))
+            if (!m_creature->Where().WithinRange(m_creature->getVictim()->Where(), (float)event.range.minDist, (float)event.range.maxDist))
             {
                 return false;
             }
@@ -1322,7 +1322,7 @@ void CreatureEventAI::ProcessAction(CreatureEventAI_Action const& action, uint32
                     m_creature->GetMotionMaster()->MoveIdle();
                     break;
                 case RANDOM_MOTION_TYPE:
-                    m_creature->GetMotionMaster()->MoveRandomAroundPoint(m_creature->GetPositionX(), m_creature->GetPositionY(), m_creature->GetPositionZ(), float(action.changeMovement.wanderDistance));
+                    m_creature->GetMotionMaster()->MoveRandomAroundPoint(m_creature->Where().X(), m_creature->Where().Y(), m_creature->Where().Z(), float(action.changeMovement.wanderDistance));
                     break;
                 case WAYPOINT_MOTION_TYPE:
                     m_creature->GetMotionMaster()->MoveWaypoint();
@@ -1660,7 +1660,7 @@ void CreatureEventAI::MoveInLineOfSight(Unit* who)
                     ((!itr->Event.ooc_los.noHostile) && m_creature->IsHostileTo(who)))
                 {
                     // if range is ok and we are actually in LOS
-                    if (m_creature->IsWithinDistInMap(who, fMaxAllowedRange) && m_creature->IsWithinLOSInMap(who))
+                    if (InReach(*m_creature, *who, fMaxAllowedRange) && HasLineOfSight(*m_creature, *who))
                     {
                         ProcessEvent(*itr, who);
                     }
@@ -1677,13 +1677,13 @@ void CreatureEventAI::MoveInLineOfSight(Unit* who)
     if (m_creature->CanInitiateAttack() && who->IsTargetableForAttack() &&
         m_creature->IsHostileTo(who) && who->isInAccessablePlaceFor(m_creature))
     {
-        if (!m_creature->CanFly() && m_creature->GetDistanceZ(who) > CREATURE_Z_ATTACK_RANGE)
+        if (!m_creature->CanFly() && m_creature->Where().HeightGapTo(who->Where()) > CREATURE_Z_ATTACK_RANGE)
         {
             return;
         }
 
         float attackRadius = m_creature->GetAttackDistance(who);
-        if (m_creature->IsWithinDistInMap(who, attackRadius) && m_creature->IsWithinLOSInMap(who))
+        if (InReach(*m_creature, *who, attackRadius) && HasLineOfSight(*m_creature, *who))
         {
             if (!m_creature->getVictim())
             {
@@ -1786,9 +1786,9 @@ void CreatureEventAI::UpdateAI(const uint32 diff)
         // Update creature dynamic movement position before doing anything else
         if (m_DynamicMovement)
         {
-            if (m_creature->IsWithinLOSInMap(victim))
+            if (HasLineOfSight(*m_creature, *victim))
             {
-                if (m_LastSpellMaxRange && m_creature->IsInRange(victim, 0, (m_LastSpellMaxRange / 1.5f)))
+                if (m_LastSpellMaxRange && m_creature->Where().WithinRange(victim->Where(), 0, (m_LastSpellMaxRange / 1.5f)))
                 {
                     SetCombatMovement(false, true);
                 }
@@ -1802,7 +1802,7 @@ void CreatureEventAI::UpdateAI(const uint32 diff)
                 SetCombatMovement(true, true);
             }
         }
-        else if (m_MeleeEnabled && m_creature->CanReachWithMeleeAttack(victim)
+        else if (m_MeleeEnabled && InMeleeReach(*m_creature, *victim)
             && !(m_creature->GetCreatureInfo()->ExtraFlags & CREATURE_FLAG_EXTRA_NO_MELEE))
         {
             DoMeleeAttackIfReady();
@@ -1818,7 +1818,7 @@ void CreatureEventAI::UpdateAI(const uint32 diff)
  */
 bool CreatureEventAI::IsVisible(Unit* pl) const
 {
-    return m_creature->IsWithinDist(pl, sWorld.getConfig(CONFIG_FLOAT_SIGHT_MONSTER))
+    return m_creature->Where().WithinDist(pl->Where(), sWorld.getConfig(CONFIG_FLOAT_SIGHT_MONSTER))
            && pl->IsVisibleForOrDetect(m_creature, m_creature, true);
 }
 

@@ -380,9 +380,9 @@ void WorldSession::HandleCorpseQueryOpcode(WorldPacket & /*recv_data*/)
         response.found = true;
         response.corpseMapId = corpse->GetMapId();
         response.displayMapId = int32(response.corpseMapId);
-        response.x = corpse->GetPositionX();
-        response.y = corpse->GetPositionY();
-        response.z = corpse->GetPositionZ();
+        response.x = corpse->Where().X();
+        response.y = corpse->Where().Y();
+        response.z = corpse->Where().Z();
 
         // If the corpse is on a different map, show a dungeon entrance when one exists.
         if (response.corpseMapId != _player->GetMapId())

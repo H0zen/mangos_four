@@ -186,6 +186,7 @@ void Object::_Create(uint32 guidlow, uint32 entry, HighGuid guidhigh)
 void Object::SetObjectScale(float newScale)
 {
     SetFloatValue(OBJECT_FIELD_SCALE_X, newScale);
+    OnScaleChanged();
 }
 
 

@@ -1186,10 +1186,10 @@ void LFGMgr::TeleportToDungeon(uint32 dungeonID, Group* pGroup, Player* onlyPlay
         teleportTo != NULL, lfgEntrance != NULL, physicalEntrance != NULL))
     {
         case LFGStatePolicy::EntranceSource::InMapMember:
-            x = teleportTo->GetPositionX();
-            y = teleportTo->GetPositionY();
-            z = teleportTo->GetPositionZ();
-            o = teleportTo->GetOrientation();
+            x = teleportTo->Where().X();
+            y = teleportTo->Where().Y();
+            z = teleportTo->Where().Z();
+            o = teleportTo->Where().Facing();
             break;
         case LFGStatePolicy::EntranceSource::LfgOnly:
             x = lfgEntrance->x;

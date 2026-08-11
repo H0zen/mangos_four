@@ -677,9 +677,9 @@ void CreatureLinkingHolder::ProcessSlave(CreatureLinkingEvent eventType, Creatur
 void CreatureLinkingHolder::SetFollowing(Creature* pWho, Creature* pWhom)
 {
     // Do some calculations
-    float sX, sY, sZ, mX, mY, mZ, mO;
-    pWho->GetRespawnCoord(sX, sY, sZ);
-    pWhom->GetRespawnCoord(mX, mY, mZ, &mO);
+    const float sX = pWho->Spawn().X(), sY = pWho->Spawn().Y();
+    const float mX = pWhom->Spawn().X(), mY = pWhom->Spawn().Y();
+    const float mO = pWhom->Spawn().Facing();
 
     float dx, dy, dz;
     dx = sX - mX;
@@ -689,7 +689,7 @@ void CreatureLinkingHolder::SetFollowing(Creature* pWho, Creature* pWhom)
     float dist = sqrt(dx * dx + dy * dy + dz * dz);
     // REMARK: This code needs the same distance calculation that is used for following
     // Atm this means we have to subtract the bounding radiuses
-    dist = dist - pWho->GetObjectBoundingRadius() - pWhom->GetObjectBoundingRadius();
+    dist = dist - pWho->Where().Extent() - pWhom->Where().Extent();
     if (dist < 0.0f)
     {
         dist = 0.0f;
@@ -705,9 +705,7 @@ void CreatureLinkingHolder::SetFollowing(Creature* pWho, Creature* pWhom)
 // Function to check if a slave belongs to a boss by range-issue
 bool CreatureLinkingHolder::IsSlaveInRangeOfBoss(Creature const* pSlave, Creature const* pBoss, uint16 searchRange) const
 {
-    float sX, sY, sZ;
-    pSlave->GetRespawnCoord(sX, sY, sZ);
-    return IsSlaveInRangeOfBoss(pBoss, sX, sY, searchRange);
+    return IsSlaveInRangeOfBoss(pBoss, pSlave->Spawn().X(), pSlave->Spawn().Y(), searchRange);
 }
 
 /**
@@ -727,8 +725,8 @@ bool CreatureLinkingHolder::IsSlaveInRangeOfBoss(Creature const* pBoss, float sX
     }
 
     // Do some calculations
-    float mX, mY, mZ, dx, dy;
-    pBoss->GetRespawnCoord(mX, mY, mZ);
+    float dx, dy;
+    const float mX = pBoss->Spawn().X(), mY = pBoss->Spawn().Y();
 
     dx = sX - mX;
     dy = sY - mY;
@@ -752,9 +750,8 @@ bool CreatureLinkingHolder::CanSpawn(Creature* pCreature) const
         return true;
     }
 
-    float sx, sy, sz;
-    pCreature->GetRespawnCoord(sx, sy, sz);
-    return CanSpawn(0, pCreature->GetMap(), pInfo, sx, sy);
+    return CanSpawn(0, pCreature->GetMap(), pInfo,
+                    pCreature->Spawn().X(), pCreature->Spawn().Y());
 }
 
 /** Worker function to check if a spawning condition is met

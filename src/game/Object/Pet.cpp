@@ -177,7 +177,7 @@ void Pet::Update(uint32 update_diff, uint32 diff)
             bool const sharesOwnerTransport = m_transport && playerOwner &&
                 playerOwner->GetTransport() == m_transport;
             if (!owner ||
-                (!sharesOwnerTransport && !IsWithinDistInMap(owner, GetMap()->GetVisibilityDistance()) &&
+                (!sharesOwnerTransport && !InReach(*this, *owner, GetMap()->GetVisibilityDistance()) &&
                     (owner->GetCharmGuid() && (owner->GetCharmGuid() != GetObjectGuid()))) ||
                 (isControlled() && !owner->GetPetGuid()))
             {
@@ -231,13 +231,13 @@ void Pet::UpdateTransport(Player* owner)
         m_movementInfo.ClearTransportData();
         DisableSpline();
         GetMotionMaster()->Clear(false);
-        NearTeleportTo(owner->GetPositionX(), owner->GetPositionY(), owner->GetPositionZ(), owner->GetOrientation());
-        SendSplineAnchor(ObjectGuid(), owner->GetPositionX(), owner->GetPositionY(),
-            owner->GetPositionZ(), owner->GetOrientation());
+        NearTeleportTo(owner->Where().X(), owner->Where().Y(), owner->Where().Z(), owner->Where().Facing());
+        SendSplineAnchor(ObjectGuid(), owner->Where().X(), owner->Where().Y(),
+            owner->Where().Z(), owner->Where().Facing());
         return;
     }
 
-    if (m_transport || !ownerTransport || !IsWithinDistInMap(owner, 8.0f))
+    if (m_transport || !ownerTransport || !InReach(*this, *owner, 8.0f))
     {
         return;
     }
@@ -253,10 +253,10 @@ void Pet::UpdateTransport(Player* owner)
     m_transport = ownerTransport;
     ownerTransport->AddPassenger(this);
 
-    float const worldOrientation = owner->GetOrientation();
-    float const worldX = owner->GetPositionX() + std::cos(worldOrientation + PET_FOLLOW_ANGLE) * PET_FOLLOW_DIST;
-    float const worldY = owner->GetPositionY() + std::sin(worldOrientation + PET_FOLLOW_ANGLE) * PET_FOLLOW_DIST;
-    GetMap()->CreatureRelocation(this, worldX, worldY, owner->GetPositionZ(), worldOrientation);
+    float const worldOrientation = owner->Where().Facing();
+    float const worldX = owner->Where().X() + std::cos(worldOrientation + PET_FOLLOW_ANGLE) * PET_FOLLOW_DIST;
+    float const worldY = owner->Where().Y() + std::sin(worldOrientation + PET_FOLLOW_ANGLE) * PET_FOLLOW_DIST;
+    GetMap()->CreatureRelocation(this, worldX, worldY, owner->Where().Z(), worldOrientation);
 
     // Replace the client's world-space follow spline with the same persistent
     // transport-local facing anchor used by retail transported creatures. A
@@ -296,7 +296,7 @@ bool Pet::MoveTransportFollow(Unit* target, float offset, float angle, bool walk
 
     Position const* currentLocal = m_movementInfo.GetTransportPos();
     Position const* ownerLocal = owner->m_movementInfo.GetTransportPos();
-    float const followDistance = offset + GetObjectBoundingRadius() + owner->GetObjectBoundingRadius();
+    float const followDistance = offset + Where().Extent() + owner->Where().Extent();
     float const followAngle = ownerLocal->o + angle;
     float const destinationX = ownerLocal->x + std::cos(followAngle) * followDistance;
     float const destinationY = ownerLocal->y + std::sin(followAngle) * followDistance;
@@ -324,12 +324,12 @@ bool Pet::MoveTransportFollow(Unit* target, float offset, float angle, bool walk
     m_movementInfo.SetTransportData(ownerTransport->GetObjectGuid(), destinationX, destinationY,
         destinationZ, localOrientation, owner->m_movementInfo.GetTransportTime(), -1);
 
-    float const transportOrientation = ownerTransport->GetOrientation();
+    float const transportOrientation = ownerTransport->Where().Facing();
     float const cosOrientation = std::cos(transportOrientation);
     float const sinOrientation = std::sin(transportOrientation);
-    float const worldX = ownerTransport->GetPositionX() + cosOrientation * destinationX - sinOrientation * destinationY;
-    float const worldY = ownerTransport->GetPositionY() + sinOrientation * destinationX + cosOrientation * destinationY;
-    float const worldZ = ownerTransport->GetPositionZ() + destinationZ;
+    float const worldX = ownerTransport->Where().X() + cosOrientation * destinationX - sinOrientation * destinationY;
+    float const worldY = ownerTransport->Where().Y() + sinOrientation * destinationX + cosOrientation * destinationY;
+    float const worldZ = ownerTransport->Where().Z() + destinationZ;
     GetMap()->CreatureRelocation(this, worldX, worldY, worldZ,
         NormalizeOrientation(transportOrientation + localOrientation));
 
@@ -623,7 +623,7 @@ bool Pet::CreateBaseAtCreature(Creature* creature)
         return false;
     }
 
-    CreatureCreatePos pos(creature, creature->GetOrientation());
+    CreatureCreatePos pos(creature, creature->Where().Facing());
 
     uint32 guid = creature->GetMap()->GenerateLocalLowGuid(HIGHGUID_PET);
 
@@ -1112,7 +1112,7 @@ bool Pet::Create(uint32 guidlow, CreatureCreatePos& cPos, CreatureInfo const* ci
 
     cPos.SelectFinalPoint(this);
 
-    if (!cPos.Relocate(this))
+    if (!cPos.PlaceOn(this))
     {
         return false;
     }
@@ -1340,10 +1340,10 @@ void Pet::SetStayPosition(bool stay)
 {
     if (stay)
     {
-        m_stayPosX = GetPositionX();
-        m_stayPosY = GetPositionY();
-        m_stayPosZ = GetPositionZ();
-        m_stayPosO = GetOrientation();
+        m_stayPosX = Where().X();
+        m_stayPosY = Where().Y();
+        m_stayPosZ = Where().Z();
+        m_stayPosO = Where().Facing();
     }
     else
     {

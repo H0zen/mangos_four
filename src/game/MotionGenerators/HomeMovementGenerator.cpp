@@ -64,7 +64,10 @@ void HomeMovementGenerator<Creature>::_setTargetLocation(Creature& owner)
     // If the motion master is empty or cannot get the reset position, use the respawn coordinates
     if (owner.GetMotionMaster()->empty() || !owner.GetMotionMaster()->top()->GetResetPosition(owner, x, y, z, o))
     {
-        owner.GetRespawnCoord(x, y, z, &o);
+        x = owner.Spawn().X();
+        y = owner.Spawn().Y();
+        z = owner.Spawn().Z();
+        o = owner.Spawn().Facing();
     }
 
     init.SetFacing(o);

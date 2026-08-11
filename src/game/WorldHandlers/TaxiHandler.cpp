@@ -69,7 +69,7 @@ void WorldSession::SendTaxiStatus(ObjectGuid guid)
         return;
     }
 
-    uint32 curloc = sObjectMgr.GetNearestTaxiNode(unit->GetPositionX(), unit->GetPositionY(), unit->GetPositionZ(), unit->GetMapId(), GetPlayer()->GetTeam());
+    uint32 curloc = sObjectMgr.GetNearestTaxiNode(unit->Where().X(), unit->Where().Y(), unit->Where().Z(), unit->GetMapId(), GetPlayer()->GetTeam());
 
     // not found nearest
     if (curloc == 0)
@@ -135,7 +135,7 @@ void WorldSession::HandleTaxiQueryAvailableNodes(WorldPacket& recv_data)
 void WorldSession::SendTaxiMenu(Creature* unit)
 {
     // find current node
-    uint32 curloc = sObjectMgr.GetNearestTaxiNode(unit->GetPositionX(), unit->GetPositionY(), unit->GetPositionZ(), unit->GetMapId(), GetPlayer()->GetTeam());
+    uint32 curloc = sObjectMgr.GetNearestTaxiNode(unit->Where().X(), unit->Where().Y(), unit->Where().Z(), unit->GetMapId(), GetPlayer()->GetTeam());
 
     if (curloc == 0)
     {
@@ -222,7 +222,7 @@ bool WorldSession::SendDoFlight(uint32 mountDisplayId, uint32 path,
 bool WorldSession::SendLearnNewTaxiNode(Creature* unit)
 {
     // find current node
-    uint32 curloc = sObjectMgr.GetNearestTaxiNode(unit->GetPositionX(), unit->GetPositionY(), unit->GetPositionZ(), unit->GetMapId(), GetPlayer()->GetTeam());
+    uint32 curloc = sObjectMgr.GetNearestTaxiNode(unit->Where().X(), unit->Where().Y(), unit->Where().Z(), unit->GetMapId(), GetPlayer()->GetTeam());
 
     if (curloc == 0)
     {
@@ -286,7 +286,7 @@ void WorldSession::HandleActivateTaxiExpressOpcode(WorldPacket& recv_data)
     }
 
     uint32 const currentNode = sObjectMgr.GetNearestTaxiNode(
-        npc->GetPositionX(), npc->GetPositionY(), npc->GetPositionZ(),
+        npc->Where().X(), npc->Where().Y(), npc->Where().Z(),
         npc->GetMapId(), GetPlayer()->GetTeam());
     if (currentNode == 0 || request.nodes.front() != currentNode)
     {
@@ -398,7 +398,7 @@ void WorldSession::HandleMoveSplineDoneOpcode(WorldPacket& recv_data)
             flight->SetCurrentNodeAfterTeleport();
             if (!GetPlayer()->TeleportTo(transitionNode.ContinentID,
                     transitionNode.x, transitionNode.y, transitionNode.z,
-                    GetPlayer()->GetOrientation()))
+                    GetPlayer()->Where().Facing()))
             {
                 GetPlayer()->m_taxi.ClearTaxiDestinations();
                 GetPlayer()->GetMotionMaster()->MovementExpired(false);
@@ -515,7 +515,7 @@ void WorldSession::HandleActivateTaxiOpcode(WorldPacket& recv_data)
     }
 
     uint32 currentNode = sObjectMgr.GetNearestTaxiNode(
-        npc->GetPositionX(), npc->GetPositionY(), npc->GetPositionZ(),
+        npc->Where().X(), npc->Where().Y(), npc->Where().Z(),
         npc->GetMapId(), GetPlayer()->GetTeam());
     if (currentNode == 0 || request.sourceNode != currentNode)
     {

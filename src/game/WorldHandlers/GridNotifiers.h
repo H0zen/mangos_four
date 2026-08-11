@@ -578,7 +578,7 @@ namespace MaNGOS
             for (CameraMapType::iterator itr = m.begin(); itr != m.end(); ++itr)
             {
                 Camera* camera = itr->getSource();
-                if (camera->GetBody()->InSamePhase(i_searcher) && camera->GetBody()->IsWithinDist(i_searcher, i_dist))
+                if (camera->GetBody()->InSamePhase(i_searcher) && camera->GetBody()->Where().WithinDist(i_searcher->Where(), i_dist))
                 {
                     i_do(camera->GetOwner());
                 }
@@ -620,7 +620,7 @@ namespace MaNGOS
                         (u->GetDisplayId() != u->GetNativeDisplayId()))
                     return false;
 
-                return i_fobj->IsWithinDistInMap(u, i_range);
+                return InReach(*i_fobj, *u, i_range);
             }
             template<class NOT_INTERESTED> bool operator()(NOT_INTERESTED*) { return false; }
         private:
@@ -639,7 +639,7 @@ namespace MaNGOS
                         u->HasAuraType(SPELL_AURA_GHOST) || (u->GetDisplayId() != u->GetNativeDisplayId()))
                     return false;
 
-                return i_fobj->IsWithinDistInMap(u, i_range);
+                return InReach(*i_fobj, *u, i_range);
             }
             bool operator()(Creature* u)
             {
@@ -648,7 +648,7 @@ namespace MaNGOS
                         (u->GetCreatureTypeMask() & CREATURE_TYPEMASK_MECHANICAL_OR_ELEMENTAL) != 0)
                     return false;
 
-                return i_fobj->IsWithinDistInMap(u, i_range);
+                return InReach(*i_fobj, *u, i_range);
             }
             template<class NOT_INTERESTED> bool operator()(NOT_INTERESTED*) { return false; }
         private:
@@ -668,7 +668,7 @@ namespace MaNGOS
                     return false;
                 }
 
-                return i_fobj->IsWithinDistInMap(u, i_range);
+                return InReach(*i_fobj, *u, i_range);
             }
             bool operator()(Corpse* u);
             bool operator()(Creature* u)
@@ -679,7 +679,7 @@ namespace MaNGOS
                     return false;
                 }
 
-                return i_fobj->IsWithinDistInMap(u, i_range);
+                return InReach(*i_fobj, *u, i_range);
             }
             template<class NOT_INTERESTED> bool operator()(NOT_INTERESTED*) { return false; }
         private:
@@ -721,7 +721,7 @@ namespace MaNGOS
 
                 float dist = (float)goInfo->spellFocus.dist;
 
-                return go->IsWithinDistInMap(i_unit, dist);
+                return InReach(*go, *i_unit, dist);
             }
         private:
             Unit const* i_unit;
@@ -736,9 +736,9 @@ namespace MaNGOS
             WorldObject const& GetFocusObject() const { return i_obj; }
             bool operator()(GameObject* go)
             {
-                if (go->GetGOInfo()->type == GAMEOBJECT_TYPE_FISHINGHOLE && go->isSpawned() && i_obj.IsWithinDistInMap(go, i_range) && i_obj.IsWithinDistInMap(go, (float)go->GetGOInfo()->fishinghole.radius))
+                if (go->GetGOInfo()->type == GAMEOBJECT_TYPE_FISHINGHOLE && go->isSpawned() && InReach(i_obj, *go, i_range) && InReach(i_obj, *go, (float)go->GetGOInfo()->fishinghole.radius))
                 {
-                    i_range = i_obj.GetDistance(go);
+                    i_range = i_obj.Where().DistanceTo(go->Where());
                     return true;
                 }
                 return false;
@@ -760,9 +760,9 @@ namespace MaNGOS
             WorldObject const& GetFocusObject() const { return i_obj; }
             bool operator()(GameObject* go)
             {
-                if (go->GetEntry() == i_entry && i_obj.IsWithinDistInMap(go, i_range))
+                if (go->GetEntry() == i_entry && InReach(i_obj, *go, i_range))
                 {
-                    i_range = i_obj.GetDistance(go);        // use found GO range as new range limit for next check
+                    i_range = i_obj.Where().DistanceTo(go->Where());        // use found GO range as new range limit for next check
                     return true;
                 }
                 return false;
@@ -788,10 +788,10 @@ namespace MaNGOS
 
             bool operator()(GameObject* go)
             {
-                if (go->GetEntry() == i_entry && go->IsWithinDist3d(i_x, i_y, i_z, i_range))
+                if (go->GetEntry() == i_entry && go->Where().WithinDist(Geometry::Vector3(i_x, i_y, i_z), i_range))
                 {
                     // use found GO range as new range limit for next check
-                    i_range = go->GetDistance(i_x, i_y, i_z);
+                    i_range = go->Where().DistanceTo(Geometry::Vector3(i_x, i_y, i_z));
                     return true;
                 }
 
@@ -821,7 +821,7 @@ namespace MaNGOS
 
             bool operator()(GameObject* go)
             {
-                if (go->GetEntry() == i_entry && go->IsWithinDist3d(i_x, i_y, i_z, i_range))
+                if (go->GetEntry() == i_entry && go->Where().WithinDist(Geometry::Vector3(i_x, i_y, i_z), i_range))
                 {
                     return true;
                 }
@@ -854,7 +854,7 @@ namespace MaNGOS
             {
                 if (go->GetGoType() == i_type
                         && (!i_onlyHostile || go->IsHostileTo(&i_obj)) && (!i_onlyFriendly || go->IsFriendlyTo(&i_obj))
-                        && go->IsWithinDist3d(i_x, i_y, i_z, i_range))
+                        && go->Where().WithinDist(Geometry::Vector3(i_x, i_y, i_z), i_range))
                     return true;
 
                 return false;
@@ -882,7 +882,7 @@ namespace MaNGOS
             WorldObject const& GetFocusObject() const { return *i_obj; }
             bool operator()(Unit* u)
             {
-                if (u->IsAlive() && u->IsInCombat() && !i_obj->IsHostileTo(u) && i_obj->IsWithinDistInMap(u, i_range) && u->GetMaxHealth() - u->GetHealth() > i_hp)
+                if (u->IsAlive() && u->IsInCombat() && !i_obj->IsHostileTo(u) && InReach(*i_obj, *u, i_range) && u->GetMaxHealth() - u->GetHealth() > i_hp)
                 {
                     i_hp = u->GetMaxHealth() - u->GetHealth();
                     return true;
@@ -902,7 +902,7 @@ namespace MaNGOS
             WorldObject const& GetFocusObject() const { return *i_obj; }
             bool operator()(Unit* u)
             {
-                if (u->IsAlive() && u->IsInCombat() && !i_obj->IsHostileTo(u) && i_obj->IsWithinDistInMap(u, i_range) &&
+                if (u->IsAlive() && u->IsInCombat() && !i_obj->IsHostileTo(u) && InReach(*i_obj, *u, i_range) &&
                         (u->IsCharmed() || u->IsFrozen() || u->hasUnitState(UNIT_STAT_CAN_NOT_REACT)))
                 {
                     return true;
@@ -921,7 +921,7 @@ namespace MaNGOS
             WorldObject const& GetFocusObject() const { return *i_obj; }
             bool operator()(Unit* u)
             {
-                if (u->IsAlive() && u->IsInCombat() && !i_obj->IsHostileTo(u) && i_obj->IsWithinDistInMap(u, i_range) &&
+                if (u->IsAlive() && u->IsInCombat() && !i_obj->IsHostileTo(u) && InReach(*i_obj, *u, i_range) &&
                     !(u->HasAura(i_spell, EFFECT_INDEX_0) || u->HasAura(i_spell, EFFECT_INDEX_1) || u->HasAura(i_spell, EFFECT_INDEX_2)))
                 {
                     return true;
@@ -945,7 +945,7 @@ namespace MaNGOS
             bool operator()(Unit* u)
             {
                 if (u->IsAlive() && (i_controlledByPlayer ? !i_obj->IsFriendlyTo(u) : i_obj->IsHostileTo(u))
-                    && i_obj->IsWithinDistInMap(u, i_range))
+                    && InReach(*i_obj, *u, i_range))
                 {
                     return true;
                 }
@@ -969,7 +969,7 @@ namespace MaNGOS
             bool operator()(Unit* u)
             {
                 return u->IsAlive()
-                       && i_obj->IsWithinDistInMap(u, i_range)
+                       && InReach(*i_obj, *u, i_range)
                        && !i_funit->IsFriendlyTo(u)
                        && u->IsVisibleForOrDetect(i_funit, i_funit, false);
             }
@@ -986,7 +986,7 @@ namespace MaNGOS
             WorldObject const& GetFocusObject() const { return *i_obj; }
             bool operator()(Unit* u)
             {
-                if (u->IsAlive() && i_obj->IsWithinDistInMap(u, i_range) && i_obj->IsFriendlyTo(u))
+                if (u->IsAlive() && InReach(*i_obj, *u, i_range) && i_obj->IsFriendlyTo(u))
                 {
                     return true;
                 }
@@ -1007,7 +1007,7 @@ namespace MaNGOS
             WorldObject const& GetFocusObject() const { return *i_obj; }
             bool operator()(Unit* u)
             {
-                if (u->IsAlive() && i_obj->IsWithinDistInMap(u, i_range))
+                if (u->IsAlive() && InReach(*i_obj, *u, i_range))
                 {
                     return true;
                 }
@@ -1027,10 +1027,10 @@ namespace MaNGOS
             WorldObject const& GetFocusObject() const { return *i_obj; }
             bool operator()(Unit* u)
             {
-                if (u->IsTargetableForAttack() && i_obj->IsWithinDistInMap(u, i_range) &&
+                if (u->IsTargetableForAttack() && InReach(*i_obj, *u, i_range) &&
                     !i_funit->IsFriendlyTo(u) && u->IsVisibleForOrDetect(i_funit, i_funit, false))
                 {
-                    i_range = i_obj->GetDistance(u);        // use found unit range as new range limit for next check
+                    i_range = i_obj->Where().DistanceTo(u->Where());        // use found unit range as new range limit for next check
                     return true;
                 }
 
@@ -1075,7 +1075,7 @@ namespace MaNGOS
                     return false;
                 }
 
-                if ((i_targetForPlayer ? !i_originalCaster->IsFriendlyTo(u) : i_originalCaster->IsHostileTo(u)) && i_obj->IsWithinDistInMap(u, i_range))
+                if ((i_targetForPlayer ? !i_originalCaster->IsFriendlyTo(u) : i_originalCaster->IsHostileTo(u)) && InReach(*i_obj, *u, i_range))
                 {
                     return true;
                 }
@@ -1112,7 +1112,7 @@ namespace MaNGOS
                     return false;
                 }
 
-                if ((i_targetForPlayer ? !i_obj->IsFriendlyTo(u) : i_obj->IsHostileTo(u)) && i_obj->IsWithinDistInMap(u, i_range))
+                if ((i_targetForPlayer ? !i_obj->IsFriendlyTo(u) : i_obj->IsHostileTo(u)) && InReach(*i_obj, *u, i_range))
                 {
                     return true;
                 }
@@ -1170,7 +1170,7 @@ namespace MaNGOS
             WorldObject const& GetFocusObject() const { return *i_funit; }
             bool operator()(Creature* u)
             {
-                if (u->IsAlive() && u->IsHostileTo(i_funit) && i_funit->IsWithinDistInMap(u, u->GetAttackDistance(i_funit)))
+                if (u->IsAlive() && u->IsHostileTo(i_funit) && InReach(*i_funit, *u, u->GetAttackDistance(i_funit)))
                 {
                     return true;
                 }
@@ -1214,17 +1214,17 @@ namespace MaNGOS
                     return false;
                 }
 
-                if (!i_obj->IsWithinDistInMap(u, i_range))
+                if (!InReach(*i_obj, *u, i_range))
                 {
                     return false;
                 }
 
-                if (!i_obj->IsWithinLOSInMap(u))
+                if (!HasLineOfSight(*i_obj, *u))
                 {
                     return false;
                 }
 
-                i_range = i_obj->GetDistance(u);            // use found unit range as new range limit for next check
+                i_range = i_obj->Where().DistanceTo(u->Where());            // use found unit range as new range limit for next check
                 return true;
             }
             float GetLastRange() const { return i_range; }
@@ -1247,9 +1247,9 @@ namespace MaNGOS
             bool operator()(Creature* u)
             {
                 if (u->GetEntry() == i_entry && ((i_onlyAlive && u->IsAlive()) || (i_onlyDead && u->IsCorpse()) || (!i_onlyAlive && !i_onlyDead))
-                    && (!i_excludeSelf || &i_obj != u) && i_obj.IsWithinDistInMap(u, i_range))
+                    && (!i_excludeSelf || &i_obj != u) && InReach(i_obj, *u, i_range))
                 {
-                    i_range = i_obj.GetDistance(u);         // use found unit range as new range limit for next check
+                    i_range = i_obj.Where().DistanceTo(u->Where());         // use found unit range as new range limit for next check
                     return true;
                 }
                 return false;
@@ -1274,7 +1274,7 @@ namespace MaNGOS
             WorldObject const& GetFocusObject() const { return *m_pObject; }
             bool operator()(Unit* pUnit)
             {
-                if (pUnit->GetEntry() == m_uiEntry && m_pObject->IsWithinDist(pUnit, m_fRange, false))
+                if (pUnit->GetEntry() == m_uiEntry && m_pObject->Where().WithinDist(pUnit->Where(), m_fRange, false))
                 {
                     return true;
                 }
@@ -1300,7 +1300,7 @@ namespace MaNGOS
             WorldObject const& GetFocusObject() const { return *i_obj; }
             bool operator()(Player* u)
             {
-                if (u->IsAlive() && i_obj->IsWithinDistInMap(u, i_range))
+                if (u->IsAlive() && InReach(*i_obj, *u, i_range))
                 {
                     return true;
                 }
@@ -1321,7 +1321,7 @@ namespace MaNGOS
             bool operator()(Player* u)
             {
                 return u->IsAlive()
-                       && i_obj->IsWithinDistInMap(u, i_range)
+                       && InReach(*i_obj, *u, i_range)
                        && u->HasAura(i_spellId);
             }
         private:
@@ -1339,7 +1339,7 @@ namespace MaNGOS
             bool operator()(Player* u)
             {
                 return u->CanUseCapturePoint() &&
-                       i_obj->IsWithinDistInMap(u, i_range);
+                       InReach(*i_obj, *u, i_range);
             }
         private:
             WorldObject const* i_obj;

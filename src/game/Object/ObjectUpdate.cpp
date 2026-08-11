@@ -506,10 +506,10 @@ void Object::BuildCreateUpdateBlockForPlayer(UpdateData* data, Player* target) c
     {
         WorldObject const* worldObject = static_cast<WorldObject const*>(this);
         MopUpdateObject::PositionOnlyMovement movement{};
-        movement.x = worldObject->GetPositionX();
-        movement.y = worldObject->GetPositionY();
-        movement.z = worldObject->GetPositionZ();
-        movement.o = worldObject->GetOrientation();
+        movement.x = worldObject->Where().X();
+        movement.y = worldObject->Where().Y();
+        movement.z = worldObject->Where().Z();
+        movement.o = worldObject->Where().Facing();
 
         const uint32 valueCount = GetTypeId() == TYPEID_CORPSE ?
             MopUpdateObject::CorpseFieldCount : MopUpdateObject::DynamicObjectFieldCount;
@@ -522,10 +522,10 @@ void Object::BuildCreateUpdateBlockForPlayer(UpdateData* data, Player* target) c
         Unit const* unit = static_cast<Unit const*>(this);
         MopUpdateObject::SimpleLivingMovement movement{};
         movement.guid = guid;
-        movement.x = unit->GetPositionX();
-        movement.y = unit->GetPositionY();
-        movement.z = unit->GetPositionZ();
-        movement.o = unit->GetOrientation();
+        movement.x = unit->Where().X();
+        movement.y = unit->Where().Y();
+        movement.z = unit->Where().Z();
+        movement.o = unit->Where().Facing();
         movement.moveTime = GameTime::GetGameTimeMS();
 
         // The nine speeds are sanitised inside AppendSimpleLivingMovement rather
@@ -584,10 +584,10 @@ void Object::BuildCreateUpdateBlockForPlayer(UpdateData* data, Player* target) c
         MopUpdateObject::StationaryGameObjectMovement movement{};
         // MO_TRANSPORT route coordinates are client-interpolated. Its create
         // snapshot supplies the local origin and the shared route clock.
-        movement.x = isMoTransport ? 0.0f : gameObject->GetPositionX();
-        movement.y = isMoTransport ? 0.0f : gameObject->GetPositionY();
-        movement.z = isMoTransport ? 0.0f : gameObject->GetPositionZ();
-        movement.o = gameObject->GetOrientation();
+        movement.x = isMoTransport ? 0.0f : gameObject->Where().X();
+        movement.y = isMoTransport ? 0.0f : gameObject->Where().Y();
+        movement.z = isMoTransport ? 0.0f : gameObject->Where().Z();
+        movement.o = gameObject->Where().Facing();
         movement.transportTime = isMoTransport ? GameTime::GetGameTimeMS() : 0;
         movement.rotation = uint64(gameObject->GetPackedWorldRotation());
         movement.isTransport = isMoTransport;
@@ -1198,7 +1198,7 @@ void Object::BuildMovementUpdate(ByteBuffer* data, uint16 updateFlags) const
             Movement::PacketBuilder::WriteCreateBytes(*unit->movespline, *data);
         }
 
-        *data << float(unit->GetPositionZ());
+        *data << float(unit->Where().Z());
         data->WriteGuidBytes<5>(Guid);
 
         if (hasTransport)
@@ -1229,11 +1229,11 @@ void Object::BuildMovementUpdate(ByteBuffer* data, uint16 updateFlags) const
             data->WriteGuidBytes<1, 6, 2, 4>(tGuid);
         }
 
-        *data << float(unit->GetPositionX());
+        *data << float(unit->Where().X());
         *data << float(unit->GetSpeed(MOVE_PITCH_RATE));
         data->WriteGuidBytes<3, 0>(Guid);
         *data << float(unit->GetSpeed(MOVE_SWIM));
-        *data << float(unit->GetPositionY());
+        *data << float(unit->Where().Y());
         data->WriteGuidBytes<7, 1, 2>(Guid);
         *data << float(unit->GetSpeed(MOVE_WALK));
 
@@ -1245,7 +1245,7 @@ void Object::BuildMovementUpdate(ByteBuffer* data, uint16 updateFlags) const
 
         if (hasOrientation)
         {
-            *data << float(NormalizeOrientation(unit->GetOrientation()));
+            *data << float(NormalizeOrientation(unit->Where().Facing()));
         }
 
         *data << float(unit->GetSpeed(MOVE_RUN));
@@ -1260,7 +1260,7 @@ void Object::BuildMovementUpdate(ByteBuffer* data, uint16 updateFlags) const
 
     if (updateFlags & UPDATEFLAG_VEHICLE)
     {
-        *data << float(NormalizeOrientation(((WorldObject*)this)->GetOrientation()));
+        *data << float(NormalizeOrientation(((WorldObject*)this)->Where().Facing()));
         *data << uint32(((Unit*)this)->GetVehicleInfo()->GetVehicleEntry()->ID); // vehicle id
     }
 
@@ -1319,10 +1319,10 @@ void Object::BuildMovementUpdate(ByteBuffer* data, uint16 updateFlags) const
 
     if (updateFlags & UPDATEFLAG_HAS_POSITION)
     {
-        *data << float(NormalizeOrientation(((WorldObject*)this)->GetOrientation()));
-        *data << float(((WorldObject*)this)->GetPositionX());
-        *data << float(((WorldObject*)this)->GetPositionY());
-        *data << float(((WorldObject*)this)->GetPositionZ());
+        *data << float(NormalizeOrientation(((WorldObject*)this)->Where().Facing()));
+        *data << float(((WorldObject*)this)->Where().X());
+        *data << float(((WorldObject*)this)->Where().Y());
+        *data << float(((WorldObject*)this)->Where().Z());
     }
 
     if (updateFlags & UPDATEFLAG_HAS_ATTACKING_TARGET)

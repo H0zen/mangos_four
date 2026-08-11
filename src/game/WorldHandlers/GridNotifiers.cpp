@@ -243,7 +243,7 @@ void MessageDistDeliverer::Visit(CameraMapType& m)
 
         if ((i_toSelf || owner != &i_player) &&
             (!i_ownTeamOnly || owner->GetTeam() == i_player.GetTeam()) &&
-            (!i_dist || iter->getSource()->GetBody()->IsWithinDist(&i_player, i_dist)))
+            (!i_dist || iter->getSource()->GetBody()->Where().WithinDist(i_player.Where(), i_dist)))
         {
             if (!i_player.InSamePhase(iter->getSource()->GetBody()))
             {
@@ -267,7 +267,7 @@ void ObjectMessageDistDeliverer::Visit(CameraMapType& m)
 {
     for (CameraMapType::iterator iter = m.begin(); iter != m.end(); ++iter)
     {
-        if (!i_dist || iter->getSource()->GetBody()->IsWithinDist(&i_object, i_dist))
+        if (!i_dist || iter->getSource()->GetBody()->Where().WithinDist(i_object.Where(), i_dist))
         {
             if (!i_object.InSamePhase(iter->getSource()->GetBody()))
             {
@@ -325,7 +325,7 @@ bool CannibalizeObjectCheck::operator()(Corpse* u)
         return false;
     }
 
-    if (i_fobj->IsWithinDistInMap(u, i_range))
+    if (InReach(*i_fobj, *u, i_range))
     {
         return true;
     }
@@ -393,13 +393,13 @@ void MaNGOS::CallOfHelpCreatureInRangeDo::operator()(Creature* u)
     }
 
     // too far
-    if (!i_funit->IsWithinDistInMap(u, i_range))
+    if (!InReach(*i_funit, *u, i_range))
     {
         return;
     }
 
     // only if see assisted creature
-    if (!i_funit->IsWithinLOSInMap(u))
+    if (!HasLineOfSight(*i_funit, *u))
     {
         return;
     }
@@ -429,13 +429,13 @@ bool MaNGOS::AnyAssistCreatureInRangeCheck::operator()(Creature* u)
     }
 
     // too far
-    if (!i_funit->IsWithinDistInMap(u, i_range))
+    if (!InReach(*i_funit, *u, i_range))
     {
         return false;
     }
 
     // only if see assisted creature
-    if (!i_funit->IsWithinLOSInMap(u))
+    if (!HasLineOfSight(*i_funit, *u))
     {
         return false;
     }

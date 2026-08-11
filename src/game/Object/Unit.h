@@ -3691,6 +3691,14 @@ enum PowerDefaults
 
 struct SpellProcEventEntry;                                 // used only privately
 
+// Combat reach is a GAME RULE about two units, not a property of either, so it is a
+// free function over both rather than a method one of them owns. The spatial
+// component measures centre to centre; these supply the gap that counts as touching.
+float CombatReachBetween(Unit const& attacker, Unit const& victim, bool forMeleeRange = true,
+                         float flat_mod = 0.0f);
+float CombatDistanceBetween(Unit const& attacker, Unit const& target, bool forMeleeRange);
+bool InMeleeReach(Unit const& attacker, Unit const& victim, float flat_mod = 0.0f);
+
 #define MAX_OBJECT_SLOT 5
 
 class Unit : public WorldObject
@@ -3746,7 +3754,7 @@ class Unit : public WorldObject
          */
         void CleanupsBeforeDelete() override;
 
-        float GetObjectBoundingRadius() const override      // overwrite WorldObject version
+        float ComputeBoundingRadius() const override
         {
             return m_floatValues[UNIT_FIELD_BOUNDINGRADIUS];
         }
@@ -3853,35 +3861,6 @@ class Unit : public WorldObject
             }
         }
 
-        /**
-         * Returns the combined combat reach of two mobs. Can be seen as a radius.
-         * @param pVictim The other unit to add the range for
-         * @param forMeleeRange Whether we should return the combined reach for melee or not
-         * @param flat_mod Increases the returned reach by this value.
-         * @return The combined values of UNIT_FIELD_COMBATREACH for both this unit and the pVictim.
-         * \see EUnitFields
-         * \see GetFloatValue
-         */
-        float GetCombatReach(Unit const* pVictim, bool forMeleeRange = true, float flat_mod = 0.0f) const;
-        /**
-         * Returns the remaining combat distance between two mobs (CombatReach substracted).
-         * Does this by getting the radius of combat/aggro between them and then subtracting their
-         * actual distance between them. Ie: dist between - radius for aggro. If this becomes less
-         * than zero zero is returned and the mobs should probably aggro each other/the player
-         * @param target The target to check against
-         * @param forMeleeRange If we want to check melee range instead
-         * @return The reach between them left until one of the creatures could/should aggro
-         */
-        float GetCombatDistance(Unit const* target, bool forMeleeRange) const;
-        /**
-         * Returns if the Unit can reach a victim with Melee Attack. Does so by using
-         * Unit::GetCombatReach for melee and checking if the distance from the target is less than
-         * the reach.
-         * @param pVictim Who we want to reach with a melee attack.
-         * @param flat_mod The same as sent to Unit::GetCombatReach
-         * @return true if we can reach pVictim with a melee attack
-         */
-        bool CanReachWithMeleeAttack(Unit const* pVictim, float flat_mod = 0.0f) const;
         uint32 m_extraAttacks;
 
         /**
@@ -4935,20 +4914,6 @@ class Unit : public WorldObject
          */
         bool IsTaxiFlying()  const { return hasUnitState(UNIT_STAT_TAXI_FLIGHT); }
 
-        /**
-         * Checks to see if a creature, whilst moving along a path, has reached a specific waypoint, or near to
-         * @param currentPositionX is the creature's current X ordinate in the game world
-         * @param currentPositionY is the creature's current Y ordinate in the game world
-         * @param currentPositionZ is the creature's current Z ordinate in the game world
-         * @param destinationPositionX is the in game ordinate that we wish to check against the creature's current X ordinate (are they the same, or very close?)
-         * @param destinationPositionY is the in game ordinate that we wish to check against the creature's current Y ordinate (are they the same, or very close?)
-         * @param destinationPositionZ is the in game ordinate that we wish to check against the creature's current Z ordinate (are they the same, or very close?)
-         * @param distanceX is the distance from the creature's current X ordinate to the destination X ordinate
-         * @param distanceY is the distance from the creature's current Y ordinate to the destination Y ordinate
-         * @param distanceZ is the distance from the creature's current Z ordinate to the destination Z ordinate
-         *
-         */
-        bool IsNearWaypoint(float currentPositionX, float currentPositionY, float currentPositionZ, float destinationPositionX, float destinationPositionY, float destinationPositionZ, float distanceX, float distanceY, float distanceZ);
 
 
         /**
@@ -5468,6 +5433,9 @@ class Unit : public WorldObject
          * \ref OpcodesList::SMSG_PLAYER_MOVE which will send the new position to all clients etc
          * in the same \ref Cell
          */
+        /// Serialise the movement state with the pose taken from the placement, which is
+        /// the only copy that is always current. See the body.
+        void WriteMovementInfo(WorldPacket& out) const;
         void SendHeartBeat();
 
         /**

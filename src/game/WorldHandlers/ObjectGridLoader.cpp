@@ -135,9 +135,7 @@ ObjectGridRespawnMover::Visit(CreatureMapType& m)
 
         Cell const& cur_cell  = c->GetCurrentCell();
 
-        float resp_x, resp_y, resp_z;
-        c->GetRespawnCoord(resp_x, resp_y, resp_z);
-        CellPair resp_val = MaNGOS::ComputeCellPair(resp_x, resp_y);
+        CellPair resp_val = MaNGOS::ComputeCellPair(c->Spawn().X(), c->Spawn().Y());
         Cell resp_cell(resp_val);
 
         bool needsRelocation = i_cellGranular ? (cur_cell != resp_cell) : cur_cell.DiffGrid(resp_cell);

@@ -119,10 +119,10 @@ void Spell::SpellStart(SpellCastTargets const* targets, Aura* triggeredByAura)
         m_CastItemGuid = m_CastItem->GetObjectGuid();
     }
 
-    m_castPositionX = m_caster->GetPositionX();
-    m_castPositionY = m_caster->GetPositionY();
-    m_castPositionZ = m_caster->GetPositionZ();
-    m_castOrientation = m_caster->GetOrientation();
+    m_castPositionX = m_caster->Where().X();
+    m_castPositionY = m_caster->Where().Y();
+    m_castPositionZ = m_caster->Where().Z();
+    m_castOrientation = m_caster->Where().Facing();
 
     if (triggeredByAura)
     {
@@ -945,7 +945,7 @@ void Spell::update(uint32 difftime)
 
     // check if the player or unit caster has moved before the spell finished (exclude casting on vehicles)
     if (((m_caster->GetTypeId() == TYPEID_PLAYER || m_caster->GetTypeId() == TYPEID_UNIT) && m_timer != 0) &&
-        (m_castPositionX != m_caster->GetPositionX() || m_castPositionY != m_caster->GetPositionY() || m_castPositionZ != m_caster->GetPositionZ()) &&
+        (m_castPositionX != m_caster->Where().X() || m_castPositionY != m_caster->Where().Y() || m_castPositionZ != m_caster->Where().Z()) &&
         ((spellEffect && spellEffect->Effect != SPELL_EFFECT_STUCK) || !((Player*)m_caster)->m_movementInfo.HasMovementFlag(MOVEFLAG_FALLINGFAR)) &&
         !m_caster->HasAffectedAura(SPELL_AURA_ALLOW_CAST_WHILE_MOVING, m_spellInfo))
     {
@@ -1006,7 +1006,7 @@ void Spell::update(uint32 difftime)
                     }
 
                     // check if player has turned if flag is set
-                    if ( spellInterrupts && (spellInterrupts->ChannelInterruptFlags & CHANNEL_FLAG_TURNING) && m_castOrientation != m_caster->GetOrientation() )
+                    if ( spellInterrupts && (spellInterrupts->ChannelInterruptFlags & CHANNEL_FLAG_TURNING) && m_castOrientation != m_caster->Where().Facing() )
                     {
                         cancel();
                     }

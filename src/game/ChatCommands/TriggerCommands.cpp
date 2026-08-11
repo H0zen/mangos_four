@@ -55,7 +55,7 @@ void ChatHandler::ShowTriggerTargetListHelper(uint32 id, AreaTrigger const* at, 
         char dist_buf[50];
         if (!subpart)
         {
-            float dist = m_session->GetPlayer()->GetDistance2d(at->target_X, at->target_Y);
+            float dist = m_session->GetPlayer()->Where().DistanceTo(Geometry::Vector2(at->target_X, at->target_Y));
             char const* distFormat = GetMangosString(LANG_TRIGGER_DIST);
 
             if (!SafeFormatDbStringF(dist_buf, sizeof(dist_buf), distFormat, dist))
@@ -89,7 +89,7 @@ void ChatHandler::ShowTriggerListHelper(AreaTriggerEntry const* atEntry)
 
     if (m_session)
     {
-        float dist = m_session->GetPlayer()->GetDistance2d(atEntry->x, atEntry->y);
+        float dist = m_session->GetPlayer()->Where().DistanceTo(Geometry::Vector2(atEntry->x, atEntry->y));
         char dist_buf[50];
         char const* distFormat = GetMangosString(LANG_TRIGGER_DIST);
 
@@ -173,8 +173,8 @@ bool ChatHandler::HandleTriggerCommand(char* args)
                 continue;
             }
 
-            float dx = atTestEntry->x - pl->GetPositionX();
-            float dy = atTestEntry->y - pl->GetPositionY();
+            float dx = atTestEntry->x - pl->Where().X();
+            float dy = atTestEntry->y - pl->Where().Y();
 
             float test_dist2 = dx * dx + dy * dy;
 
@@ -278,7 +278,7 @@ bool ChatHandler::HandleTriggerActiveCommand(char* /*args*/)
             continue;
         }
 
-        if (!IsPointInAreaTriggerZone(atEntry, pl->GetMapId(), pl->GetPositionX(), pl->GetPositionY(), pl->GetPositionZ()))
+        if (!IsPointInAreaTriggerZone(atEntry, pl->GetMapId(), pl->Where().X(), pl->Where().Y(), pl->Where().Z()))
         {
             continue;
         }
@@ -324,8 +324,8 @@ bool ChatHandler::HandleTriggerNearCommand(char* args)
             continue;
         }
 
-        float dx = atEntry->x - pl->GetPositionX();
-        float dy = atEntry->y - pl->GetPositionY();
+        float dx = atEntry->x - pl->Where().X();
+        float dy = atEntry->y - pl->Where().Y();
 
         if (dx * dx + dy * dy > dist2)
         {
@@ -357,8 +357,8 @@ bool ChatHandler::HandleTriggerNearCommand(char* args)
             continue;
         }
 
-        float dx = at->target_X - pl->GetPositionX();
-        float dy = at->target_Y - pl->GetPositionY();
+        float dx = at->target_X - pl->Where().X();
+        float dy = at->target_Y - pl->Where().Y();
 
         if (dx * dx + dy * dy > dist2)
         {

@@ -353,14 +353,14 @@ bool Unit::UpdateMeleeAttackingState()
     }
 
     uint8 swingError = 0;
-    if (!CanReachWithMeleeAttack(victim))
+    if (!InMeleeReach(*this, *victim))
     {
         setAttackTimer(BASE_ATTACK, 100);
         setAttackTimer(OFF_ATTACK, 100);
         swingError = 1;
     }
     // 120 degrees of radiant range
-    else if (!HasInArc(2 * M_PI_F / 3, victim))
+    else if (!Where().HasInArc(victim->Where(), 2 * M_PI_F / 3))
     {
         setAttackTimer(BASE_ATTACK, 100);
         setAttackTimer(OFF_ATTACK, 100);
@@ -445,12 +445,31 @@ bool Unit::haveOffhandWeapon() const
 /**
  * @brief Sends a heartbeat movement packet for the unit.
  */
+void Unit::WriteMovementInfo(WorldPacket& out) const
+{
+    // THE POSE ON THE WIRE COMES FROM THE PLACEMENT, decided at the instant of writing.
+    // m_movementInfo is filled from movement packets and from CreatureRelocation -- never
+    // by Place().MoveTo(), which is how anything is teleported. Writing that struct as-is
+    // sent the position the unit held BEFORE the move, and the client walked it back.
+    //
+    // This is the one place it is decided. Stamping it in advance at every placement site
+    // is the same fix written thirty times, and one missed site is a silent wrong position.
+    //
+    // 00, 01 and 02 carry a second branch here for a unit standing on a vessel's own map,
+    // which sends deck coordinates as an offset and no world position at all. It arrives
+    // with the TransportMap port; this core still runs the older TransportSystem, where a
+    // boarded unit's pose is already in the map's frame and its offset is carried beside it.
+    MovementInfo ashore = m_movementInfo;
+    ashore.ChangePosition(Where().X(), Where().Y(), Where().Z(), Where().Facing());
+    ashore.Write(out, out.GetOpcode());
+}
+
 void Unit::SendHeartBeat()
 {
     m_movementInfo.UpdateTime(GameTime::GetGameTimeMS());
     m_movementInfo.SetMoverGuid(GetObjectGuid());
     WorldPacket data(SMSG_PLAYER_MOVE, 64);
-    data << m_movementInfo;
+    WriteMovementInfo(data);
     SendMessageToSet(&data, true);
 }
 
@@ -465,17 +484,20 @@ void Unit::resetAttackTimer(WeaponAttackType type)
 }
 
 /**
- * @brief Calculates the combat reach between this unit and a victim.
+ * @brief Calculates the combat reach between two units.
  *
- * @param pVictim The victim being checked.
+ * @param attacker The unit doing the reaching.
+ * @param victim The victim being checked.
  * @param forMeleeRange True to enforce the minimum melee distance.
  * @param flat_mod Additional flat reach modifier.
  * @return The resulting combat reach.
  */
-float Unit::GetCombatReach(Unit const* pVictim, bool forMeleeRange /*=true*/, float flat_mod /*=0.0f*/) const
+float CombatReachBetween(Unit const& attacker, Unit const& victim, bool forMeleeRange /*=true*/,
+                         float flat_mod /*=0.0f*/)
 {
     // The measured values show BASE_MELEE_OFFSET in (1.3224, 1.342)
-    float reach = GetFloatValue(UNIT_FIELD_COMBATREACH) + pVictim->GetFloatValue(UNIT_FIELD_COMBATREACH) +
+    float reach = attacker.GetFloatValue(UNIT_FIELD_COMBATREACH) +
+                  victim.GetFloatValue(UNIT_FIELD_COMBATREACH) +
                   BASE_MELEERANGE_OFFSET + flat_mod;
 
     if (forMeleeRange && reach < ATTACK_DISTANCE)
@@ -493,16 +515,18 @@ float Unit::GetCombatReach(Unit const* pVictim, bool forMeleeRange /*=true*/, fl
  * @param forMeleeRange True to use melee-range reach rules.
  * @return The non-negative combat distance.
  */
-float Unit::GetCombatDistance(Unit const* target, bool forMeleeRange) const
+float CombatDistanceBetween(Unit const& attacker, Unit const& target, bool forMeleeRange)
 {
-    float radius = GetCombatReach(target, forMeleeRange);
+    if (!attacker.Where().ShareFrame(target.Where()))
+    {
+        return Geometry::Placement::Unreachable();
+    }
 
-    float dx = GetPositionX() - target->GetPositionX();
-    float dy = GetPositionY() - target->GetPositionY();
-    float dz = GetPositionZ() - target->GetPositionZ();
-    float dist = sqrt((dx * dx) + (dy * dy) + (dz * dz)) - radius;
-
-    return (dist > 0.0f ? dist : 0.0f);
+    // Combat reach, not the bounding extents: the component measures centre to centre and
+    // the game rule supplies the gap that counts as touching.
+    const float reach = CombatReachBetween(attacker, target, forMeleeRange, 0.0f);
+    const float centres = (attacker.Where().Pos() - target.Where().Pos()).magnitude();
+    return Geometry::Placement::Gap(centres, reach);
 }
 
 /**
@@ -512,18 +536,14 @@ float Unit::GetCombatDistance(Unit const* target, bool forMeleeRange) const
  * @param flat_mod Additional flat reach modifier.
  * @return True if the victim is within melee range; otherwise, false.
  */
-bool Unit::CanReachWithMeleeAttack(Unit const* pVictim, float flat_mod /*= 0.0f*/) const
+bool InMeleeReach(Unit const& attacker, Unit const& victim, float flat_mod /*= 0.0f*/)
 {
-    MANGOS_ASSERT(pVictim);
+    const float reach = CombatReachBetween(attacker, victim, true, flat_mod);
 
-    float reach = GetCombatReach(pVictim, true, flat_mod);
-
-    // This check is not related to bounding radius
-    float dx = GetPositionX() - pVictim->GetPositionX();
-    float dy = GetPositionY() - pVictim->GetPositionY();
-    float dz = GetPositionZ() - pVictim->GetPositionZ();
-
-    return dx * dx + dy * dy + dz * dz < reach * reach;
+    // Combat reach replaces the extents entirely here, so the component is asked about
+    // bare points rather than about two sized objects.
+    return attacker.Where().WithinDist(victim.Where().Pos(), reach) &&
+           attacker.Where().ShareFrame(victim.Where());
 }
 
 /**
@@ -1485,12 +1505,12 @@ void Unit::CastSpell(Unit* Victim, SpellEntry const* spellInfo, bool triggered, 
 
     if (spellInfo->GetTargets() & TARGET_FLAG_DEST_LOCATION)
     {
-        targets.setDestination(Victim->GetPositionX(), Victim->GetPositionY(), Victim->GetPositionZ());
+        targets.setDestination(Victim->Where().X(), Victim->Where().Y(), Victim->Where().Z());
     }
     if (spellInfo->GetTargets() & TARGET_FLAG_SOURCE_LOCATION)
         if (WorldObject* caster = spell->GetCastingObject())
         {
-            targets.setSource(caster->GetPositionX(), caster->GetPositionY(), caster->GetPositionZ());
+            targets.setSource(caster->Where().X(), caster->Where().Y(), caster->Where().Z());
         }
 
     spell->m_CastItem = castItem;
@@ -1598,12 +1618,12 @@ void Unit::CastCustomSpell(Unit* Victim, SpellEntry const* spellInfo, int32 cons
 
     if (spellInfo->GetTargets() & TARGET_FLAG_DEST_LOCATION)
     {
-        targets.setDestination(Victim->GetPositionX(), Victim->GetPositionY(), Victim->GetPositionZ());
+        targets.setDestination(Victim->Where().X(), Victim->Where().Y(), Victim->Where().Z());
     }
     if (spellInfo->GetTargets() & TARGET_FLAG_SOURCE_LOCATION)
         if (WorldObject* caster = spell->GetCastingObject())
         {
-            targets.setSource(caster->GetPositionX(), caster->GetPositionY(), caster->GetPositionZ());
+            targets.setSource(caster->Where().X(), caster->Where().Y(), caster->Where().Z());
         }
 
     spell->SpellStart(&targets, triggeredByAura);
@@ -2279,7 +2299,7 @@ Spell* Unit::FindCurrentSpellBySpellId(uint32 spell_id) const
  */
 void Unit::SetInFront(Unit const* target)
 {
-    SetOrientation(GetAngle(target));
+    Place().Face(Where().BearingTo(target->Where()));
 }
 
 /**
@@ -2308,7 +2328,7 @@ void Unit::SetFacingToObject(WorldObject* pObject)
     }
 
     // TODO: figure out under what conditions creature will move towards object instead of facing it where it currently is.
-    SetFacingTo(GetAngle(pObject));
+    SetFacingTo(Where().BearingTo(pObject->Where()));
 }
 
 /**
@@ -2336,7 +2356,7 @@ bool Unit::isInAccessablePlaceFor(Creature const* c) const
  */
 bool Unit::IsInWater() const
 {
-    return GetTerrain()->IsInWater(GetPositionX(), GetPositionY(), GetPositionZ());
+    return GetTerrain()->IsInWater(Where().X(), Where().Y(), Where().Z());
 }
 
 /**
@@ -2346,7 +2366,7 @@ bool Unit::IsInWater() const
  */
 bool Unit::IsUnderWater() const
 {
-    return GetTerrain()->IsUnderWater(GetPositionX(), GetPositionY(), GetPositionZ());
+    return GetTerrain()->IsUnderWater(Where().X(), Where().Y(), Where().Z());
 }
 
 /**
@@ -2807,7 +2827,7 @@ bool Unit::Attack(Unit* victim, bool meleeAttack)
         // set position before any AI calls/assistance
         if (GetTypeId() == TYPEID_UNIT)
         {
-            ((Creature*)this)->SetCombatStartPosition(GetPositionX(), GetPositionY(), GetPositionZ());
+            ((Creature*)this)->SetCombatAnchor(Where().Pos());
         }
     }
 
@@ -3551,7 +3571,7 @@ Unit* Unit::SelectMagnetTarget(Unit* victim, Spell* spell, SpellEffectIndex eff)
         {
             if (Unit* magnet = (*itr)->GetCaster())
             {
-                if (magnet->IsAlive() && magnet->IsWithinLOSInMap(this) && spell->CheckTarget(magnet, eff))
+                if (magnet->IsAlive() && HasLineOfSight(*magnet, *this) && spell->CheckTarget(magnet, eff))
                 {
                     return magnet;
                 }
@@ -3566,7 +3586,7 @@ Unit* Unit::SelectMagnetTarget(Unit* victim, Spell* spell, SpellEffectIndex eff)
         {
             if (Unit* magnet = (*i)->GetCaster())
             {
-                if (magnet->IsAlive() && magnet->IsWithinLOSInMap(this) && (!spell || spell->CheckTarget(magnet, eff)))
+                if (magnet->IsAlive() && HasLineOfSight(*magnet, *this) && (!spell || spell->CheckTarget(magnet, eff)))
                 {
                     if (roll_chance_i((*i)->GetModifier()->m_amount))
                     {
@@ -3839,82 +3859,6 @@ void Unit::Unmount(bool from_aura)
             SendCollisionHeightUpdate(height);
         }
     }
-}
-
-/**
- * @brief Checks whether a position is close enough to a waypoint destination.
- *
- * @param currentPositionX The current X coordinate.
- * @param currentPositionY The current Y coordinate.
- * @param currentPositionZ The current Z coordinate.
- * @param destinationPostionX The destination X coordinate.
- * @param destinationPostionY The destination Y coordinate.
- * @param destinationPostionZ The destination Z coordinate.
- * @param distanceX The allowed X distance.
- * @param distanceY The allowed Y distance.
- * @param distanceZ The allowed Z distance.
- * @return True if the waypoint is considered reached; otherwise, false.
- */
-bool Unit::IsNearWaypoint(float currentPositionX, float currentPositionY, float currentPositionZ, float destinationPostionX, float destinationPostionY, float destinationPostionZ, float distanceX, float distanceY, float distanceZ)
-{
-    // actual distance between the creature's X ordinate and destination X ordinate
-    float xDifference = 0;
-    // actual distance between the creature's Y ordinate and destination Y ordinate
-    float yDifference = 0;
-    // actual distance between the creature's Z ordinate and destination Y ordinate
-    float zDifference = 0;
-
-    // distanceX == 0, means do not test the distance between the creature's current X ordinate and the destination X ordinate
-    // A test for 0 is used, because it is not worth testing for exact coordinates, seeing as we have to use an integar in the database for the event parameters that holds the cordinates.
-    // Therefore a test for the distance between waypoints does the job more than well enough
-    if (distanceX > 0)
-    {
-        if (currentPositionX > destinationPostionX)
-        {
-            xDifference = currentPositionX - destinationPostionX;
-        }
-        else
-        {
-            xDifference = destinationPostionX - currentPositionX;
-        }
-    }
-    // distanceY == 0, means do not test the distance between the creature's current Y ordinate and the destination Y ordinate
-    if (distanceY > 0)
-    {
-        if (currentPositionY > destinationPostionY)
-        {
-            yDifference = currentPositionY - destinationPostionY;
-        }
-        else
-        {
-            yDifference = destinationPostionY - currentPositionY;
-        }
-    }
-    // distanceZ == 0, means do not test the distance between the creature's current Z ordinate and the destination Z ordinate
-    if (distanceZ > 0)
-    {
-        if (currentPositionZ > destinationPostionZ)
-        {
-            zDifference = currentPositionZ - destinationPostionZ;
-        }
-        else
-        {
-            zDifference = destinationPostionZ - currentPositionZ;
-        }
-    }
-
-    // check based on which ordinates to test the current distance from (distance along the X, and/or Y, and/or Z ordinates)
-    if (((distanceX > 0 && xDifference < distanceX) && (distanceY > 0 && yDifference < distanceY) && (distanceZ > 0 && zDifference < distanceZ)) ||
-        ((distanceX == 0) && (distanceY > 0 && yDifference < distanceY) && (distanceZ > 0 && zDifference < distanceZ)) ||
-        ((distanceX > 0 && xDifference < distanceX) && (distanceY == 0) && (distanceZ > 0 && zDifference < distanceZ)) ||
-        ((distanceX > 0 && xDifference < distanceX) && (distanceY > 0 && yDifference < distanceY) && (distanceZ == 0)) ||
-        ((distanceX > 0 && xDifference < distanceX) && (distanceY == 0) && (distanceZ == 0)) ||
-        ((distanceX == 0) && (distanceY > 0 && yDifference < distanceY) && (distanceZ == 0)) ||
-        ((distanceX == 0) && (distanceY == 0) && (distanceZ > 0 && zDifference < distanceZ))
-        )
-        return true;
-
-    return false;
 }
 
 MountCapabilityEntry const* Unit::GetMountCapability(uint32 mountType) const
@@ -5667,7 +5611,7 @@ void Unit::InterruptMoving(bool forceSendStop /*=false*/)
     {
         Movement::Location loc = movespline->ComputePosition();
         movespline->_Interrupt();
-        Relocate(loc.x, loc.y, loc.z, loc.orientation);
+        Place().MoveTo(loc.x, loc.y, loc.z, loc.orientation);
         isMoving = true;
     }
 
@@ -5900,7 +5844,7 @@ Unit* Unit::SelectRandomUnfriendlyTarget(Unit* except /*= NULL*/, float radius /
     // remove not LoS targets
     for (std::list<Unit*>::iterator tIter = targets.begin(); tIter != targets.end();)
     {
-        if (!IsWithinLOSInMap(*tIter))
+        if (!HasLineOfSight(*this, **tIter))
         {
             std::list<Unit*>::iterator tIter2 = tIter;
             ++tIter;
@@ -5954,7 +5898,7 @@ Unit* Unit::SelectRandomFriendlyTarget(Unit* except /*= NULL*/, float radius /*=
     // remove not LoS targets
     for (std::list<Unit*>::iterator tIter = targets.begin(); tIter != targets.end();)
     {
-        if (!IsWithinLOSInMap(*tIter))
+        if (!HasLineOfSight(*this, **tIter))
         {
             std::list<Unit*>::iterator tIter2 = tIter;
             ++tIter;
@@ -6402,7 +6346,7 @@ void Unit::RestoreOriginalFaction()
 
 void Unit::KnockBackFrom(Unit* target, float horizontalSpeed, float verticalSpeed)
 {
-    float angle = this == target ? GetOrientation() + M_PI_F : target->GetAngle(this);
+    float angle = this == target ? Where().Facing() + M_PI_F : target->Where().BearingTo(this->Where());
     KnockBackWithAngle(angle, horizontalSpeed, verticalSpeed);
 }
 
@@ -6421,12 +6365,14 @@ void Unit::KnockBackWithAngle(float angle, float horizontalSpeed, float vertical
 
         float dis = 2 * moveTimeHalf * horizontalSpeed;
         float ox, oy, oz;
-        GetPosition(ox, oy, oz);
+        ox = Where().X();
+        oy = Where().Y();
+        oz = Where().Z();
         float fx = ox + dis * vcos;
         float fy = oy + dis * vsin;
         float fz = oz + 0.5f;
         GetMap()->GetHitPosition(ox, oy, oz + 0.5f, fx, fy, fz, GetPhaseMask(), -0.5f);
-        UpdateAllowedPositionZ(fx, fy, fz);
+        ClampToAllowedZ(*this, fx, fy, fz);
         GetMotionMaster()->MoveJump(fx, fy, fz, horizontalSpeed, max_height);
     }
 }
@@ -6699,15 +6645,15 @@ void Unit::ScheduleAINotify(uint32 delay)
 void Unit::OnRelocated()
 {
     // switch to use G3D::Vector3 is good idea, maybe
-    float dx = m_last_notified_position.x - GetPositionX();
-    float dy = m_last_notified_position.y - GetPositionY();
-    float dz = m_last_notified_position.z - GetPositionZ();
+    float dx = m_last_notified_position.x - Where().X();
+    float dy = m_last_notified_position.y - Where().Y();
+    float dz = m_last_notified_position.z - Where().Z();
     float distsq = dx * dx + dy * dy + dz * dz;
     if (distsq > World::GetRelocationLowerLimitSq())
     {
-        m_last_notified_position.x = GetPositionX();
-        m_last_notified_position.y = GetPositionY();
-        m_last_notified_position.z = GetPositionZ();
+        m_last_notified_position.x = Where().X();
+        m_last_notified_position.y = Where().Y();
+        m_last_notified_position.z = Where().Z();
 
         GetViewPoint().Call_UpdateVisibilityForOwner();
         UpdateObjectVisibility();
@@ -6966,7 +6912,7 @@ Unit* Unit::TakePossessOf(SpellEntry const* spellEntry, SummonPropertiesEntry co
 
     if (x == 0.0f && y == 0.0f && z == 0.0f)
     {
-        pos = CreatureCreatePos(this, GetOrientation(), CONTACT_DISTANCE, ang);
+        pos = CreatureCreatePos(this, Where().Facing(), CONTACT_DISTANCE, ang);
     }
 
     if (!pCreature->Create(GetMap()->GenerateLocalLowGuid(cinfo->GetHighGuid()), pos, cinfo))
@@ -6978,7 +6924,7 @@ Unit* Unit::TakePossessOf(SpellEntry const* spellEntry, SummonPropertiesEntry co
     Player* player = GetTypeId() == TYPEID_PLAYER ? static_cast<Player*>(this): NULL;
 
     pCreature->setFaction(getFaction());                                // set same faction than player
-    pCreature->SetRespawnCoord(pos);                                    // set spawn coord
+    pCreature->SetSpawn(pos);                                           // set spawn coord
     pCreature->SetCharmerGuid(GetObjectGuid());                         // save guid of the charmer
     pCreature->SetUInt32Value(UNIT_CREATED_BY_SPELL, spellEntry->ID);   // set the spell id used to create this (may be used for removing corresponding aura
     pCreature->SetFlag(UNIT_FIELD_FLAGS, UNIT_FLAG_PLAYER_CONTROLLED);  // set flag for client that mean this unit is controlled by a player
@@ -7129,7 +7075,7 @@ void Unit::ResetControlState(bool attackCharmer /*= true*/)
         if (possessedCreature->IsPet() && possessedCreature->GetObjectGuid() == GetPetGuid())
         {
             // out of range pet dismissed
-            if (!possessedCreature->IsWithinDistInMap(this, possessedCreature->GetMap()->GetVisibilityDistance()))
+            if (!InReach(*possessedCreature, *this, possessedCreature->GetMap()->GetVisibilityDistance()))
             {
                 player->RemovePet(PET_SAVE_REAGENTS);
             }
@@ -7161,7 +7107,7 @@ void Unit::ResetControlState(bool attackCharmer /*= true*/)
         if (possessedCreature->IsPet() && possessedCreature->GetObjectGuid() == GetPetGuid())
         {
             // out of range pet dismissed
-            if (!possessedCreature->IsWithinDistInMap(this, possessedCreature->GetMap()->GetVisibilityDistance()))
+            if (!InReach(*possessedCreature, *this, possessedCreature->GetMap()->GetVisibilityDistance()))
             {
                 player->RemovePet(PET_SAVE_REAGENTS);
             }

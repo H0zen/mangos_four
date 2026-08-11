@@ -85,11 +85,15 @@ bool ChatHandler::HandleDebugLosCommand(char* /*args*/)
     }
 
     float x1, y1, z1;
-    player->GetPosition(x1, y1, z1);
+    x1 = player->Where().X();
+    y1 = player->Where().Y();
+    z1 = player->Where().Z();
     z1 += 2.0f; // mirror Object::IsWithinLOS head-height offset
 
     float x2, y2, z2;
-    target->GetPosition(x2, y2, z2);
+    x2 = target->Where().X();
+    y2 = target->Where().Y();
+    z2 = target->Where().Z();
     z2 += 2.0f;
 
     const uint32 mapId = player->GetMapId();
@@ -205,7 +209,7 @@ bool ChatHandler::HandleDebugSendPoiCommand(char* args)
     }
 
     DETAIL_LOG("Command : POI, NPC = %u, icon = %u flags = %u", target->GetGUIDLow(), icon, flags);
-    pPlayer->PlayerTalkClass->SendPointOfInterest(target->GetPositionX(), target->GetPositionY(), Poi_Icon(icon), flags, 30, "Test POI");
+    pPlayer->PlayerTalkClass->SendPointOfInterest(target->Where().X(), target->Where().Y(), Poi_Icon(icon), flags, 30, "Test POI");
     return true;
 }
 

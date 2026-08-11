@@ -954,7 +954,7 @@ class GameObject : public WorldObject
         void SetDisplayId(uint32 modelId);
         void SetPhaseMask(uint32 newPhaseMask, bool update) override;
 
-        float GetObjectBoundingRadius() const override;     // overwrite WorldObject version
+        float ComputeBoundingRadius() const override;
 
         void Use(Unit* user);
 

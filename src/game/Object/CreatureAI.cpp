@@ -89,7 +89,7 @@ CanCastResult CreatureAI::CanCastSpell(Unit* pTarget, const SpellEntry* pSpell, 
             return CAST_FAIL_POWER;
         }
 
-        if (!pSpell->HasAttribute(SPELL_ATTR_EX2_IGNORE_LOS) && !m_creature->IsWithinLOSInMap(pTarget) && m_creature != pTarget)
+        if (!pSpell->HasAttribute(SPELL_ATTR_EX2_IGNORE_LOS) && !HasLineOfSight(*m_creature, *pTarget) && m_creature != pTarget)
         {
             return CAST_FAIL_NOT_IN_LOS;
         }
@@ -100,7 +100,7 @@ CanCastResult CreatureAI::CanCastSpell(Unit* pTarget, const SpellEntry* pSpell, 
         if (pTarget != m_creature)
         {
             // pTarget is out of range of this spell (also done by Spell::CheckCast())
-            float fDistance = m_creature->GetCombatDistance(pTarget, pSpell->GetRangeIndex() == SPELL_RANGE_IDX_COMBAT);
+            float fDistance = CombatDistanceBetween(*m_creature, *pTarget, pSpell->GetRangeIndex() == SPELL_RANGE_IDX_COMBAT);
 
             if (fDistance > (m_creature->IsHostileTo(pTarget) ? pSpellRange->maxRange : pSpellRange->maxRangeFriendly))
             {

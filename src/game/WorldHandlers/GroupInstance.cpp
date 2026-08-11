@@ -97,7 +97,7 @@ void Group::UpdateLooterGuid(WorldObject* pSource, bool ifneed)
         {
             // not update if only update if need and ok
             Player* looter = sObjectAccessor.FindPlayer(guid_itr->guid);
-            if (looter && looter->IsWithinDist(pSource, sWorld.getConfig(CONFIG_FLOAT_GROUP_XP_DISTANCE), false))
+            if (looter && looter->Where().WithinDist(pSource->Where(), sWorld.getConfig(CONFIG_FLOAT_GROUP_XP_DISTANCE), false))
             {
                 return;
             }
@@ -112,7 +112,7 @@ void Group::UpdateLooterGuid(WorldObject* pSource, bool ifneed)
         {
             if (Player* pl = sObjectAccessor.FindPlayer(itr->guid))
             {
-                if (pl->IsWithinDist(pSource, sWorld.getConfig(CONFIG_FLOAT_GROUP_XP_DISTANCE), false))
+                if (pl->Where().WithinDist(pSource->Where(), sWorld.getConfig(CONFIG_FLOAT_GROUP_XP_DISTANCE), false))
                 {
                     bool refresh = pl->GetLootGuid() == pSource->GetObjectGuid();
 
@@ -135,7 +135,7 @@ void Group::UpdateLooterGuid(WorldObject* pSource, bool ifneed)
     {
         if (Player* pl = sObjectAccessor.FindPlayer(itr->guid))
         {
-            if (pl->IsWithinDist(pSource, sWorld.getConfig(CONFIG_FLOAT_GROUP_XP_DISTANCE), false))
+            if (pl->Where().WithinDist(pSource->Where(), sWorld.getConfig(CONFIG_FLOAT_GROUP_XP_DISTANCE), false))
             {
                 bool refresh = pl->GetLootGuid() == pSource->GetObjectGuid();
 

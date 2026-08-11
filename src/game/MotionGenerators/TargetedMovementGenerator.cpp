@@ -70,7 +70,9 @@ void TargetedMovementGeneratorMedium<T, D>::_setTargetLocation(T& owner, bool up
     // Can happen for example if no path was created on MMGen-Initialize because of the owner being stunned
     if (updateDestination || !i_path)
     {
-        owner.GetPosition(x, y, z);
+        x = owner.Where().X();
+        y = owner.Where().Y();
+        z = owner.Where().Z();
 
         // prevent redundant micro-movement for pets, other followers.
         if (!RequiresNewPosition(owner, x, y, z))
@@ -83,12 +85,12 @@ void TargetedMovementGeneratorMedium<T, D>::_setTargetLocation(T& owner, bool up
         // Chase Movement and angle == 0 case: Chase to current angle
         else if (this->GetMovementGeneratorType() == CHASE_MOTION_TYPE && i_angle == 0.0f)
         {
-            i_target->GetNearPoint(&owner, x, y, z, owner.GetObjectBoundingRadius(), this->GetDynamicTargetDistance(owner, false), i_target->GetAngle(&owner));
+            FindFreeSpotNear(*i_target, &owner, x, y, z, owner.Where().Extent(), this->GetDynamicTargetDistance(owner, false), i_target->Where().BearingTo(owner.Where()));
         }
         // Targeted movement to at i_offset distance from target and i_angle from target facing
         else
         {
-            i_target->GetNearPoint(&owner, x, y, z, owner.GetObjectBoundingRadius(), this->GetDynamicTargetDistance(owner, false), i_target->GetOrientation() + i_angle);
+            FindFreeSpotNear(*i_target, &owner, x, y, z, owner.Where().Extent(), this->GetDynamicTargetDistance(owner, false), i_target->Where().Facing() + i_angle);
         }
     }
     else
@@ -237,7 +239,7 @@ bool TargetedMovementGeneratorMedium<T, D>::Update(T& owner, const uint32& time_
         // semantics: they still get a chase generator queued by AttackStart,
         // but rotating to track a player walking around them is just wrong.
         // Matches the SelectHostileTarget guard in Unit::SelectHostileTarget.
-        if (i_angle == 0.f && !owner.HasInArc(0.01f, i_target.getTarget()) &&
+        if (i_angle == 0.f && !owner.Where().HasInArc(i_target.getTarget()->Where(), 0.01f) &&
             !owner.HasFlag(UNIT_FIELD_FLAGS, UNIT_FLAG_PACIFIED))
         {
             owner.SetInFront(i_target.getTarget());
@@ -307,11 +309,11 @@ bool TargetedMovementGeneratorMedium<T, D>::RequiresNewPosition(T& owner, float 
     if (owner.GetTypeId() == TYPEID_UNIT &&
         (((Creature*)&owner)->CanFly() || ((Creature*)&owner)->IsSwimming()))
     {
-        return !i_target->IsWithinDist3d(x, y, z, this->GetDynamicTargetDistance(owner, true));
+        return !i_target->Where().WithinDist(Geometry::Vector3(x, y, z), this->GetDynamicTargetDistance(owner, true));
     }
     else
     {
-        return !i_target->IsWithinDist2d(x, y, this->GetDynamicTargetDistance(owner, true));
+        return !i_target->Where().WithinDist(Geometry::Vector2(x, y), this->GetDynamicTargetDistance(owner, true));
     }
 }
 
@@ -369,7 +371,7 @@ template<class T>
  */
 void ChaseMovementGenerator<T>::_reachTarget(T& owner)
 {
-    if (owner.CanReachWithMeleeAttack(this->i_target.getTarget()))
+    if (InMeleeReach(owner, *this->i_target.getTarget()))
     {
         owner.Attack(this->i_target.getTarget(), true);
     }
@@ -490,10 +492,10 @@ float ChaseMovementGenerator<T>::GetDynamicTargetDistance(T& owner, bool forRang
 {
     if (!forRangeCheck)
     {
-        return this->i_offset + CHASE_DEFAULT_RANGE_FACTOR * this->i_target->GetCombatReach(&owner);
+        return this->i_offset + CHASE_DEFAULT_RANGE_FACTOR * CombatReachBetween(*this->i_target, owner);
     }
 
-    return CHASE_RECHASE_RANGE_FACTOR * this->i_target->GetCombatReach(&owner) - this->i_target->GetObjectBoundingRadius();
+    return CHASE_RECHASE_RANGE_FACTOR * CombatReachBetween(*this->i_target, owner) - this->i_target->Where().Extent();
 }
 
 /**
@@ -710,11 +712,11 @@ float FollowMovementGenerator<T>::GetDynamicTargetDistance(T& owner, bool forRan
 {
     if (!forRangeCheck)
     {
-        return this->i_offset + owner.GetObjectBoundingRadius() + this->i_target->GetObjectBoundingRadius();
+        return this->i_offset + owner.Where().Extent() + this->i_target->Where().Extent();
     }
 
-    float allowed_dist = sWorld.getConfig(CONFIG_FLOAT_RATE_TARGET_POS_RECALCULATION_RANGE) - this->i_target->GetObjectBoundingRadius();
-    allowed_dist += FOLLOW_RECALCULATE_FACTOR * (owner.GetObjectBoundingRadius() + this->i_target->GetObjectBoundingRadius());
+    float allowed_dist = sWorld.getConfig(CONFIG_FLOAT_RATE_TARGET_POS_RECALCULATION_RANGE) - this->i_target->Where().Extent();
+    allowed_dist += FOLLOW_RECALCULATE_FACTOR * (owner.Where().Extent() + this->i_target->Where().Extent());
     if (this->i_offset > FOLLOW_DIST_GAP_FOR_DIST_FACTOR)
     {
         allowed_dist += FOLLOW_DIST_RECALCULATE_FACTOR * this->i_offset;

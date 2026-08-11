@@ -83,7 +83,7 @@ namespace Movement
         MoveSpline& move_spline = *unit.movespline;
         TransportInfo* transportInfo = unit.GetTransportInfo();
 
-        Location real_position(unit.GetPositionX(), unit.GetPositionY(), unit.GetPositionZ(), unit.GetOrientation());
+        Location real_position(unit.Where().X(), unit.Where().Y(), unit.Where().Z(), unit.Where().Facing());
 
         // If boarded use current local position
         if (transportInfo)
@@ -157,7 +157,7 @@ namespace Movement
 
         TransportInfo* transportInfo = unit.GetTransportInfo();
 
-        Location real_position(unit.GetPositionX(), unit.GetPositionY(), unit.GetPositionZ(), unit.GetOrientation());
+        Location real_position(unit.Where().X(), unit.Where().Y(), unit.Where().Z(), unit.Where().Facing());
 
         // If boarded use current local position
         if (transportInfo)

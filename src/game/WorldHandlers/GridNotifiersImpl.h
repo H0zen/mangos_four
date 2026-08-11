@@ -163,7 +163,7 @@ inline void MaNGOS::DynamicObjectUpdater::VisitHelper(Unit* target)
         return;
     }
 
-    if (!i_dynobject.IsWithinDistInMap(target, i_dynobject.GetRadius()))
+    if (!InReach(i_dynobject, *target, i_dynobject.GetRadius()))
     {
         return;
     }

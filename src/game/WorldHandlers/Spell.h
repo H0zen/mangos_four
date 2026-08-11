@@ -1219,7 +1219,7 @@ namespace MaNGOS
                     continue;
                 }
 
-                if (pPlayer->IsWithinDist3d(i_spell.m_targets.m_destX, i_spell.m_targets.m_destY, i_spell.m_targets.m_destZ, i_radius))
+                if (pPlayer->Where().WithinDist(Geometry::Vector3(i_spell.m_targets.m_destX, i_spell.m_targets.m_destY, i_spell.m_targets.m_destZ), i_radius))
                 {
                     i_data.push_back(pPlayer);
                 }
@@ -1266,8 +1266,8 @@ namespace MaNGOS
                 case PUSH_SELF_CENTER:
                     if (i_castingObject)
                     {
-                        i_centerX = i_castingObject->GetPositionX();
-                        i_centerY = i_castingObject->GetPositionY();
+                        i_centerX = i_castingObject->Where().X();
+                        i_centerY = i_castingObject->Where().Y();
                     }
                     break;
                 case PUSH_DEST_CENTER:
@@ -1283,8 +1283,8 @@ namespace MaNGOS
                 case PUSH_TARGET_CENTER:
                     if (Unit* target = i_spell.m_targets.getUnitTarget())
                     {
-                        i_centerX = target->GetPositionX();
-                        i_centerY = target->GetPositionY();
+                        i_centerX = target->Where().X();
+                        i_centerY = target->Where().Y();
                     }
                     break;
                 default:
@@ -1307,7 +1307,7 @@ namespace MaNGOS
                 // they are no AOE and don't have such a nice SPELL_ATTR flag
                 if ((i_TargetType != SPELL_TARGETS_ALL && !itr->getSource()->IsTargetableForAttack(i_spell.m_spellInfo->HasAttribute(SPELL_ATTR_EX3_CAST_ON_DEAD)))
                     // mostly phase check
-                    || !itr->getSource()->IsInMap(i_originalCaster))
+                    || !CanInteract(*itr->getSource(), *i_originalCaster))
                     {
                         continue;
                     }
@@ -1370,49 +1370,49 @@ namespace MaNGOS
                 switch (i_push_type)
                 {
                     case PUSH_IN_FRONT:
-                        if (i_castingObject->IsInFront((Unit*)(itr->getSource()), i_radius, 2 * M_PI_F / 3))
+                        if (InFrontPhased(*i_castingObject, *(Unit*)(itr->getSource()), i_radius, 2 * M_PI_F / 3))
                         {
                             i_data->push_back(itr->getSource());
                         }
                         break;
                     case PUSH_IN_FRONT_90:
-                        if (i_castingObject->IsInFront((Unit*)(itr->getSource()), i_radius, M_PI_F / 2))
+                        if (InFrontPhased(*i_castingObject, *(Unit*)(itr->getSource()), i_radius, M_PI_F / 2))
                         {
                             i_data->push_back(itr->getSource());
                         }
                         break;
                     case PUSH_IN_FRONT_30:
-                        if (i_castingObject->IsInFront((Unit*)(itr->getSource()), i_radius, M_PI_F / 6))
+                        if (InFrontPhased(*i_castingObject, *(Unit*)(itr->getSource()), i_radius, M_PI_F / 6))
                         {
                             i_data->push_back(itr->getSource());
                         }
                         break;
                     case PUSH_IN_FRONT_15:
-                        if (i_castingObject->IsInFront((Unit*)(itr->getSource()), i_radius, M_PI_F / 12))
+                        if (InFrontPhased(*i_castingObject, *(Unit*)(itr->getSource()), i_radius, M_PI_F / 12))
                         {
                             i_data->push_back(itr->getSource());
                         }
                         break;
                     case PUSH_IN_BACK:
-                        if (i_castingObject->IsInBack((Unit*)(itr->getSource()), i_radius, 2 * M_PI_F / 3))
+                        if (InBackPhased(*i_castingObject, *(Unit*)(itr->getSource()), i_radius, 2 * M_PI_F / 3))
                         {
                             i_data->push_back(itr->getSource());
                         }
                         break;
                     case PUSH_SELF_CENTER:
-                        if (i_castingObject->IsWithinDist((Unit*)(itr->getSource()), i_radius))
+                        if (i_castingObject->Where().WithinDist((Unit*)(itr->getSource())->Where(), i_radius))
                         {
                             i_data->push_back(itr->getSource());
                         }
                         break;
                     case PUSH_DEST_CENTER:
-                        if (itr->getSource()->IsWithinDist3d(i_centerX, i_centerY, i_centerZ, i_radius))
+                        if (itr->getSource()->Where().WithinDist(Geometry::Vector3(i_centerX, i_centerY, i_centerZ), i_radius))
                         {
                             i_data->push_back(itr->getSource());
                         }
                         break;
                     case PUSH_TARGET_CENTER:
-                        if (i_spell.m_targets.getUnitTarget() && i_spell.m_targets.getUnitTarget()->IsWithinDist((Unit*)(itr->getSource()), i_radius))
+                        if (i_spell.m_targets.getUnitTarget() && i_spell.m_targets.getUnitTarget()->Where().WithinDist((Unit*)(itr->getSource())->Where(), i_radius))
                         {
                             i_data->push_back(itr->getSource());
                         }

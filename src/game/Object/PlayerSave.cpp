@@ -179,10 +179,10 @@ void Player::SaveToDB()
     {
         uberInsert.addUInt32(GetMapId());
         uberInsert.addUInt32(uint32(GetDungeonDifficulty()));
-        uberInsert.addFloat(finiteAlways(GetPositionX()));
-        uberInsert.addFloat(finiteAlways(GetPositionY()));
-        uberInsert.addFloat(finiteAlways(GetPositionZ()));
-        uberInsert.addFloat(finiteAlways(GetOrientation()));
+        uberInsert.addFloat(finiteAlways(Where().X()));
+        uberInsert.addFloat(finiteAlways(Where().Y()));
+        uberInsert.addFloat(finiteAlways(Where().Z()));
+        uberInsert.addFloat(finiteAlways(Where().Facing()));
     }
     else
     {
