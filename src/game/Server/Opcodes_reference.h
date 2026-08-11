@@ -175,9 +175,9 @@
  *   TOTAL SMSG rows                   925
  *
  * SUBSYSTEM CONFIDENCE: high=365, low=221, medium=182, none=157
- * STATUS TOTALS: ACTIVE=649, DOC=422, DORMANT=449
- *   SMSG: ACTIVE=358, DOC=270, DORMANT=297
- *   CMSG: ACTIVE=291, DOC=152, DORMANT=152
+ * STATUS TOTALS: ACTIVE=652, DOC=422, DORMANT=446
+ *   SMSG: ACTIVE=359, DOC=270, DORMANT=296
+ *   CMSG: ACTIVE=293, DOC=152, DORMANT=150
  */
 
 // CAVEATS -- read before trusting any single row:
@@ -584,7 +584,7 @@ typedef uint16_t uint16;
  *   SMSG_GUILD_REPUTATION_WEEKLY_CAP               0x1A71  DORMANT  [low-conf]
  *   SMSG_GUILD_BANK_QUERY_TEXT_RESULT              0x1AE0  DORMANT  [low-conf]
  *   SMSG_UNKNOWN_0x1AF0                            0x1AF0  DOC      [low-conf]
- *   SMSG_GUILD_EVENT_LOG                           0x1AF1  DORMANT  [low-conf]
+ *   SMSG_GUILD_EVENT_LOG                           0x1AF1  ACTIVE   [low-conf]
  *   SMSG_GUILD_CHALLENGE_COMPLETED                 0x1AF8  DORMANT  [low-conf]
  *   SMSG_UNKNOWN_0x1B69                            0x1B69  DOC      [low-conf]
  *   SMSG_UNKNOWN_0x1E68                            0x1E68  ACTIVE   [low-conf]  server-binding=SMSG_GUILD_EVENT_DISBANDED
@@ -1646,7 +1646,7 @@ typedef uint16_t uint16;
  *   CMSG_RESET_INSTANCES                           0x0C69  ACTIVE
  *   CMSG_GUILD_INFO_TEXT                           0x0C70  ACTIVE
  *   CMSG_UNKNOWN_0x0C79                            0x0C79  DOC
- *   CMSG_GUILD_SET_RANK                            0x0C7A  DORMANT
+ *   CMSG_GUILD_SET_RANK                            0x0C7A  ACTIVE
  *   CMSG_MESSAGECHAT_GUILD                         0x0CAE  ACTIVE
  *   CMSG_GUILD_REPLACE_GUILD_MASTER                0x0CD0  DOC
  *   CMSG_GUILD_SWITCH_RANK                         0x0CD1  ACTIVE
@@ -1798,7 +1798,7 @@ typedef uint16_t uint16;
  *   CMSG_GROUP_SET_LEADER                          0x15BB  ACTIVE
  *   CMSG_OFFER_PETITION                            0x15BE  ACTIVE
  *   CMSG_LOOT_ROLL                                 0x15C2  ACTIVE
- *   CMSG_GUILD_EVENT_LOG_QUERY                     0x15D9  DORMANT
+ *   CMSG_GUILD_EVENT_LOG_QUERY                     0x15D9  ACTIVE
  *   CMSG_CHALLENGE_MODE_REQUEST_LEADERS            0x15DB  DOC
  *   CMSG_REQUEST_RESEARCH_HISTORY                  0x15E2  DOC
  *   CMSG_UNKNOWN_0x160F                            0x160F  DOC

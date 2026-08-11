@@ -619,6 +619,9 @@ void WorldSession::HandleGuildSetRankOpcode(WorldPacket& recvPacket)
     }
     std::string rankName = recvPacket.ReadString(nameLen);
 
+    DEBUG_LOG("WORLD: Received CMSG_GUILD_SET_RANK rank %u (index %u) rights %u money %u name %s",
+              rankId, rankIndex, rights, moneyPerDay, rankName.c_str());
+
     Guild* guild = sGuildMgr.GetGuildById(GetPlayer()->GetGuildId());
     if (!guild)
     {
@@ -638,6 +641,32 @@ void WorldSession::HandleGuildSetRankOpcode(WorldPacket& recvPacket)
     if (rankIndex >= guild->GetRanksSize())
     {
         return;
+    }
+
+    // The guildmaster rank is not editable. The client's own rank dropdown starts
+    // below it, so a packet naming it did not come from the stock UI -- and
+    // SetRankRights, unlike SetBankMoneyPerDay and SetBankRightsAndSlots, does
+    // not force the guildmaster back to full rights. Without this a leader could
+    // send rights=0 for rank 0 and lock the guild out of its own management.
+    if (rankIndex == GR_GUILDMASTER)
+    {
+        SendGuildCommandResult(GUILD_INVITE_S, "", ERR_GUILD_PERMISSIONS);
+        return;
+    }
+
+    // Match the client's own ceiling. It clamps both of these to 100000 before
+    // sending, so a larger value did not come from the stock UI; storing one
+    // would grant effectively unlimited withdrawal.
+    if (moneyPerDay > GUILD_WITHDRAW_MONEY_CLIENT_MAX)
+    {
+        moneyPerDay = GUILD_WITHDRAW_MONEY_CLIENT_MAX;
+    }
+    for (uint8 tab = 0; tab < GUILD_BANK_MAX_TABS; ++tab)
+    {
+        if (tabSlots[tab] > GUILD_WITHDRAW_SLOTS_CLIENT_MAX)
+        {
+            tabSlots[tab] = GUILD_WITHDRAW_SLOTS_CLIENT_MAX;
+        }
     }
 
     guild->SetRankName(rankIndex, rankName);

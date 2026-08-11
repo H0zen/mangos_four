@@ -877,6 +877,12 @@ enum GuildDefaultRanks
     // When demoting member server does: rank++;!
 };
 
+// The client clamps both the withdraw-gold limit and the per-tab item-withdraw
+// count to this before sending (sub_964EE1 and sub_964F15 in the 18414 client),
+// so a larger value cannot have come from the stock UI.
+#define GUILD_WITHDRAW_MONEY_CLIENT_MAX  100000
+#define GUILD_WITHDRAW_SLOTS_CLIENT_MAX  100000
+
 enum GuildRankRights
 {
     GR_RIGHT_EMPTY              = 0x00000040,
