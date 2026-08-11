@@ -634,6 +634,13 @@ void Player::DestroyItem(uint8 bag, uint8 slot, bool update)
         // other charter. Both sides being direct puts them in the world thread's
         // own order, so a destroy either precedes the read or follows the write.
         //
+        // That ordering is what makes it safe, so note what it rests on: the one
+        // route into DestroyItem from outside the world thread is duration
+        // expiry (Item::UpdateDuration), which returns early unless
+        // ITEM_FIELD_DURATION is set, and no charter has one -- 5863 and the
+        // three arena charters are all Duration 0. Give a charter a duration and
+        // this interleaving reopens.
+        //
         // The item row itself is not dropped until the next inventory save, so a
         // crash in between restores a charter whose petition rows have gone. That
         // is the harmless direction: the item is then inert, and buying another

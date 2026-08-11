@@ -610,15 +610,43 @@ void WorldSession::HandlePetitionSignOpcode(WorldPacket& recv_data)
     // synchronous pool while PExecute only enqueues, so an async insert stays
     // invisible to the next signature's checks -- two signatures in quick
     // succession could both pass, which the schema permits because its key is
-    // (petitionguid, playerguid). Writing directly also lets a failure be
-    // reported as one instead of answering OK for a row that never landed.
-    if (!CharacterDatabase.DirectPExecute("INSERT INTO `petition_sign` (`ownerguid`,`petitionguid`, `playerguid`, `player_account`) VALUES ('%u', '%u', '%u','%u')",
-                                          ownerLowGuid, petitionLowGuid, _player->GetGUIDLow(), GetAccountId()))
+    // (petitionguid, playerguid).
+    //
+    // The insert also has to prove the charter still exists, rather than trusting
+    // the read at the top of this handler. Several paths invalidate a petition
+    // inside a QUEUED transaction -- buying a replacement charter, deleting a
+    // character, joining another guild -- and none of them can be ordered against
+    // this handler. A plain insert could therefore land after the charter had
+    // gone, and petition_sign has no foreign key to catch it: that orphan row
+    // would bar its signer from every other charter through the check above.
+    // Doing it in one statement holds whatever the other paths do and whenever
+    // they commit.
+    if (!CharacterDatabase.DirectPExecute(
+                "INSERT INTO `petition_sign` (`ownerguid`, `petitionguid`, `playerguid`, `player_account`) "
+                "SELECT '%u', '%u', '%u', '%u' FROM DUAL "
+                "WHERE EXISTS (SELECT 1 FROM `petition` WHERE `petitionguid` = '%u')",
+                ownerLowGuid, petitionLowGuid, _player->GetGUIDLow(), GetAccountId(), petitionLowGuid))
     {
         sLog.outError("CMSG_PETITION_SIGN: failed to record %s signing petition %u",
                       _player->GetGuidStr().c_str(), petitionLowGuid);
         return;
     }
+
+    // That statement succeeds whether or not it inserted anything, so confirm
+    // before telling anyone the signature counted. The insert was direct, so it
+    // is already visible to this read.
+    QueryResult* stored = CharacterDatabase.PQuery(
+                              "SELECT 1 FROM `petition_sign` WHERE `petitionguid` = '%u' AND `playerguid` = '%u' LIMIT 1",
+                              petitionLowGuid, _player->GetGUIDLow());
+
+    if (!stored)
+    {
+        DEBUG_LOG("CMSG_PETITION_SIGN: petition %u went away while %s was signing it",
+                  petitionLowGuid, _player->GetGuidStr().c_str());
+        return;
+    }
+
+    delete stored;
 
     DEBUG_LOG("PETITION SIGN: %s by %s", petitionGuid.GetString().c_str(), _player->GetGuidStr().c_str());
 
