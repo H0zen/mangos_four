@@ -386,6 +386,33 @@ namespace MopCalendarPackets
         out.FlushBits();
         WriteGuidBytes(out, instanceGuid, { 6, 1, 7, 3, 4, 5, 0, 2 });
     }
+
+    inline void BuildCalendarRaidLockoutAdded(WorldPacket& out,
+        uint32 difficulty, uint32 mapId, uint32 packedTime, uint32 resetDelay,
+        uint64 instanceGuid)
+    {
+        // SMSG_CALENDAR_RAID_LOCKOUT_ADDED (0x0CAB), from reader sub_6C6E8A --
+        // the sibling of the removal above, and left on its pre-MoP body when
+        // that one was converted. Nothing about the old shape survived: it led
+        // with the packed time, wrote four bare dwords, and sent the save as a
+        // plain uint64, for 24 bytes against the 23 every capture carries.
+        //
+        // The scalars are INTERLEAVED into the GUID byte run, so the writes
+        // below cannot be reordered for tidiness. Ten 18414 captures agree, and
+        // the field identities are self-evident in them: maps 550/650/755 pair
+        // with difficulties 4/2/2, which is 25-man raid, heroic dungeon, heroic
+        // dungeon -- correct for each of those maps and for no other reading.
+        WriteGuidMask(out, instanceGuid, { 3, 1, 2, 0, 4, 7, 5, 6 });
+        out.FlushBits();
+        WriteGuidBytes(out, instanceGuid, { 6 });
+        out << difficulty;
+        WriteGuidBytes(out, instanceGuid, { 0, 4, 5, 3, 2 });
+        out << mapId;
+        WriteGuidBytes(out, instanceGuid, { 1 });
+        out << packedTime;
+        out << resetDelay;
+        WriteGuidBytes(out, instanceGuid, { 7 });
+    }
 }
 
 enum CalendarEventType

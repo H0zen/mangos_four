@@ -189,6 +189,54 @@ static void test_raid_lockout_removed_matches_retail_bodies()
 }
 
 
+/// SMSG_CALENDAR_RAID_LOCKOUT_ADDED against three real 18414 bodies --
+/// capture-000006 seq 29771, capture-000035 seq 22399 and capture-000132
+/// seq 32865, catalogue 2BE10C89. All ten captures of this opcode are 23 bytes
+/// and all three below are consumed exactly by the client's reader sub_6C6E8A.
+///
+/// This is the case a fixture is for. The old body was the inherited pre-MoP
+/// one -- packed time first, four bare dwords, a plain uint64 save -- and it is
+/// 24 bytes against retail's 23. Nothing in the server could see that: the
+/// opcode is not reachable from any CMSG, so no handler test covers it, and it
+/// was excluded from IsEnterWorldConverted, so a live client silently never
+/// received it at all.
+static void test_raid_lockout_added_matches_retail_bodies()
+{
+    // difficulty 2 / map 755 -- Lost City of the Tol'vir, heroic dungeon.
+    WorldPacket a(SMSG_CALENDAR_RAID_LOCKOUT_ADDED, 23);
+    MopCalendarPackets::BuildCalendarRaidLockoutAdded(
+        a, 2, 755, 0x0E634C0E, 60302, UINT64_C(0x1F44000010386A76));
+    CHECK(a.GetOpcode() == SMSG_CALENDAR_RAID_LOCKOUT_ADDED);
+    CHECK(Equal(a, {
+        0xF5, 0x45, 0x02, 0x00, 0x00, 0x00, 0x77, 0x11,
+        0x39, 0xF3, 0x02, 0x00, 0x00, 0x6B, 0x0E, 0x4C,
+        0x63, 0x0E, 0x8E, 0xEB, 0x00, 0x00, 0x1E,
+    }));
+
+    // difficulty 2 / map 650 -- Trial of the Champion, heroic dungeon.
+    WorldPacket b(SMSG_CALENDAR_RAID_LOCKOUT_ADDED, 23);
+    MopCalendarPackets::BuildCalendarRaidLockoutAdded(
+        b, 2, 650, 0x0E634B2E, 72783, UINT64_C(0x1F4400001037FD0E));
+    CHECK(Equal(b, {
+        0xF5, 0x45, 0x02, 0x00, 0x00, 0x00, 0x0F, 0x11,
+        0x36, 0x8A, 0x02, 0x00, 0x00, 0xFC, 0x2E, 0x4B,
+        0x63, 0x0E, 0x4F, 0x1C, 0x01, 0x00, 0x1E,
+    }));
+
+    // difficulty 4 / map 550 -- The Eye, 25-man raid. The differing difficulty
+    // against an identically-shaped body is what fixes the two dwords either
+    // side of the GUID run as difficulty then map, and not the reverse.
+    WorldPacket c(SMSG_CALENDAR_RAID_LOCKOUT_ADDED, 23);
+    MopCalendarPackets::BuildCalendarRaidLockoutAdded(
+        c, 4, 550, 0x0E83358D, 297977, UINT64_C(0x1F4600000728611F));
+    CHECK(Equal(c, {
+        0xF5, 0x47, 0x04, 0x00, 0x00, 0x00, 0x1E, 0x06,
+        0x29, 0x26, 0x02, 0x00, 0x00, 0x60, 0x8D, 0x35,
+        0x83, 0x0E, 0xF9, 0x8B, 0x04, 0x00, 0x1E,
+    }));
+}
+
+
 /// SMSG_CALENDAR_EVENT_INVITE against two real 18414 bodies -- capture-000444
 /// seq 262179 and capture-000696 seq 290114, catalogue 2BE10C89. Both are 30 bytes
 /// and both are consumed exactly by the client's reader sub_6C3312.
@@ -377,6 +425,7 @@ int main(int /*argc*/, char** /*argv*/)
     test_populated_calendar_list();
     test_populated_selected_event();
     test_raid_lockout_removed_matches_retail_bodies();
+    test_raid_lockout_added_matches_retail_bodies();
     test_event_invite_matches_retail_bodies();
     test_event_invite_alert_matches_retail_bodies();
 

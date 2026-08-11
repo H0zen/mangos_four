@@ -509,6 +509,21 @@ void WorldSession::HandleCalendarUpdateEvent(WorldPacket& recv_data)
     recv_data.ReadGuidBytes<2>(inviteGuid);
     recv_data.ReadGuidBytes<7>(eventGuid);
 
+    // ReadString(count) stops at the end of the body and returns SHORT rather than
+    // throwing, so a truncated body yields a truncated string. Normally the GUID
+    // bytes after each string would overrun and throw first -- but they are only
+    // read for mask bits the client SET, so a client that clears the trailing bits
+    // gets a silently truncated title or description stored and echoed back out in
+    // the update alert. Cheaper to assert the exact invariant than to count bytes
+    // ahead of a run that is interleaved with conditional reads.
+    if (title.size() != titleLength || description.size() != descriptionLength)
+    {
+        sLog.outError("CMSG_CALENDAR_UPDATE_EVENT: %s sent a short body -- title %zu/%u, description %zu/%u",
+                      guid.GetString().c_str(), title.size(), titleLength, description.size(), descriptionLength);
+        recv_data.rfinish();
+        return;
+    }
+
     eventId = eventGuid.GetRawValue();
     inviteId = inviteGuid.GetRawValue();
 
@@ -1573,16 +1588,15 @@ void CalendarMgr::SendCalendarRaidLockoutAdd(Player* player, DungeonPersistentSt
     DEBUG_LOG("SMSG_CALENDAR_RAID_LOCKOUT_ADDED [%s]", player->GetObjectGuid().GetString().c_str());
     time_t currTime = time(NULL);
 
-    WorldPacket data(SMSG_CALENDAR_RAID_LOCKOUT_ADDED, 4 + 4 + 4 + 4 + 8);
-    data << secsToTimeBitFields(currTime);
-    data << uint32(save->GetMapId());
+    WorldPacket data(SMSG_CALENDAR_RAID_LOCKOUT_ADDED, 23);
     // RAW client DifficultyID, map-aware -- see ToClientDifficultyForMap. isRaid derived
     // rather than hardcoded, matching the sibling sites; it decides only the fallback.
     MapEntry const* addMap = save->GetMapEntry();
-    data << uint32(ToClientDifficultyForMap(save->GetMapId(), save->GetDifficulty(),
-                                            addMap && addMap->IsRaid()));
-    data << uint32(save->GetResetTime() - currTime);
-    data << uint64(save->GetInstanceId());
-    //data.hexlike();
+    MopCalendarPackets::BuildCalendarRaidLockoutAdded(data,
+        ToClientDifficultyForMap(save->GetMapId(), save->GetDifficulty(),
+                                 addMap && addMap->IsRaid()),
+        save->GetMapId(), secsToTimeBitFields(currTime),
+        uint32(save->GetResetTime() - currTime),
+        save->GetInstanceGuid().GetRawValue());
     player->SendDirectMessage(&data);
 }

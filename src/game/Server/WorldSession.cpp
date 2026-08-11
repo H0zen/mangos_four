@@ -548,6 +548,10 @@ static bool IsEnterWorldConverted(uint16 opcode)
         case SMSG_RECEIVED_MAIL:                     // one float delivery delay
         case SMSG_GM_TICKET_STATUS_UPDATE:           // one uint32; GM-ticket module route
         case SMSG_CALENDAR_RAID_LOCKOUT_REMOVED:     // MopCalendarPackets::BuildCalendarRaidLockoutRemoved
+        // Its sibling, missed when the removal was converted -- and doubly
+        // invisible, since it is reachable from no CMSG (only from Map.cpp on
+        // instance bind) and was excluded here, so nothing ever sent it.
+        case SMSG_CALENDAR_RAID_LOCKOUT_ADDED:       // MopCalendarPackets::BuildCalendarRaidLockoutAdded
         case SMSG_CANCEL_COMBAT:                   // Empty reader; terminal clears local-player combat state
         case SMSG_CANCEL_AUTO_REPEAT:              // packed unit GUID; Unit_C leaf 0x819546 clears auto-repeat
         case SMSG_AI_REACTION:                     // packed unit GUID plus reaction; Unit_C.cpp leaf 0x80AD80
