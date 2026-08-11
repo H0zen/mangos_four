@@ -67,12 +67,16 @@
 //                                 conditional on it, so the empty form is just
 //                                 uint32 + one bit.
 //   then, if present:
-//     10 bit-packed lengths (sub_691684) for ten string slots at +4316, stride 64
+//     10 x 6-BIT lengths (sub_691684) for ten string slots at +4316, stride 64
 //     bit +34, bit +36
-//     a bit-packed length (sub_69BAFD)  -> +168
+//     a 12-BIT length (sub_69BAFD = 8 bits << 4 | sub_6915FD's 4)  -> +168
 //     bits +32, +39, +35, +38, +37
-//     a bit-packed length (sub_6650D3)  -> +40
+//     a 7-BIT length (sub_6650D3)  -> +40
 //     bit +33
+//   The three widths are coherent with what they must carry: a 7-bit title
+//   (max 127), a 12-bit body text (max 4095) and ten short 6-bit name slots
+//   (max 63). Known width table so far: sub_664F47 7, sub_6650D3 7, sub_691684 6,
+//   sub_6915FD 4, sub_69BAFD 12, sub_66529C 8, sub_6A29A8 21.
 //   The bits at +32..39 are one GUID's eight presence bits, so its mask order is
 //   2, 4, <len>, 0, 7, 3, 6, 5, <len>, 1 -- two string lengths sit INSIDE the
 //   mask run, as CMSG_PETITION_BUY's does.
@@ -88,9 +92,6 @@
 // Lua at all and must be named from the consumer that fills the record
 // sub_62EB8B caches. No capture exists anywhere in the 18414 corpus, so the
 // consumer is the only oracle. Do NOT map these from the pre-MoP field order.
-//
-// The two bit-packed length widths (sub_691684, sub_69BAFD, sub_6650D3) also
-// still need reading; only sub_664F47 (7 bits) and sub_6A29A8 (21) are known.
 
 /**
  * @brief Serialises SMSG_PETITION_SHOW_SIGNATURES for the 18414 client.
