@@ -252,7 +252,17 @@ bool Guild::AddMember(ObjectGuid plGuid, uint32 plRank)
 
     // remove all player signs from another petitions
     // this will be prevent attempt joining player to many guilds and corrupt guild data integrity
-    Player::RemovePetitionsAndSigns(plGuid);
+    //
+    // Refuse the join if that could not be done. Publishing the membership while
+    // a signature survives is the state that lets another charter count a signer
+    // it can never admit, and the join is the last point at which saying no is
+    // still free.
+    if (!Player::RemovePetitionsAndSigns(plGuid))
+    {
+        sLog.outError("Guild::AddMember: refusing to add %s to guild %u, its petition signatures could not be cleared",
+                      plGuid.GetString().c_str(), m_Id);
+        return false;
+    }
 
     uint32 lowguid = plGuid.GetCounter();
 

@@ -893,18 +893,54 @@ void WorldSession::HandleTurnInPetitionOpcode(WorldPacket& recv_data)
     result = CharacterDatabase.PQuery("SELECT `playerguid` FROM `petition_sign` WHERE `petitionguid` = '%u'", petitionGuid.GetCounter());
     uint8 signs = result ? (uint8)result->GetRowCount() : 0;
 
+    std::vector<ObjectGuid> signers;
+    signers.reserve(signs);
+
+    if (result)
+    {
+        do
+        {
+            if (uint32 signLowGuid = result->Fetch()[0].GetUInt32())
+            {
+                signers.push_back(ObjectGuid(HIGHGUID_PLAYER, signLowGuid));
+            }
+        }
+        while (result->NextRow());
+
+        delete result;
+        result = NULL;
+    }
+
+    // The row count is not the membership. Guild::AddMember legitimately refuses
+    // a signer who has joined a guild since signing, or whose character no longer
+    // exists, and by the time it does so the charter has been destroyed and the
+    // guild registered -- leaving a guild standing on fewer members than it was
+    // required to collect, with nothing to undo. Establish who can actually be
+    // admitted while refusing is still free. At most nine signers, so the cost is
+    // a handful of lookups on a rare packet.
+    uint32 eligible = 0;
+
+    for (ObjectGuid const& signGuid : signers)
+    {
+        Player* signer = sObjectMgr.GetPlayer(signGuid);
+        uint32 const signerGuildId = signer ? signer->GetGuildId() : Player::GetGuildIdFromDB(signGuid);
+
+        if (signerGuildId == 0)
+        {
+            ++eligible;
+        }
+    }
+
     uint32 count = sWorld.getConfig(CONFIG_UINT32_MIN_PETITION_SIGNS);
-    if (signs < count)
+    if (eligible < count)
     {
         _player->SendPetitionTurnInResult(PETITION_TURN_NEED_MORE_SIGNATURES);  // need more signatures...
-        delete result;
         return;
     }
 
     if (sGuildMgr.GetGuildByName(name))
     {
         _player->SendPetitionTurnInResult(PETITION_TURN_GUILD_NAME_INVALID);
-        delete result;
         return;
     }
 
@@ -912,7 +948,6 @@ void WorldSession::HandleTurnInPetitionOpcode(WorldPacket& recv_data)
     Item* item = _player->GetItemByGuid(petitionGuid);
     if (!item)
     {
-        delete result;
         return;
     }
 
@@ -925,7 +960,6 @@ void WorldSession::HandleTurnInPetitionOpcode(WorldPacket& recv_data)
     if (!guild->Create(_player, name))
     {
         delete guild;
-        delete result;
         return;
     }
 
@@ -935,35 +969,23 @@ void WorldSession::HandleTurnInPetitionOpcode(WorldPacket& recv_data)
     // add members
     uint32 admitted = 0;
 
-    for (uint8 i = 0; i < signs; ++i)
+    for (ObjectGuid const& signGuid : signers)
     {
-        Field* fields = result->Fetch();
-
-        ObjectGuid signGuid = ObjectGuid(HIGHGUID_PLAYER, fields[0].GetUInt32());
-        if (!signGuid)
-        {
-            continue;
-        }
-
         if (guild->AddMember(signGuid, guild->GetLowestRank()))
         {
             ++admitted;
         }
-
-        result->NextRow();
     }
 
-    // A signature that admits nobody -- the signer joined a guild since signing,
-    // say -- would otherwise leave a guild standing on fewer members than the
-    // charter was required to collect, silently. The guild exists by this point,
-    // so this reports rather than refuses.
+    // The preflight above established that enough signers could be admitted, so
+    // a shortfall here means one stopped being eligible in between. Nothing can
+    // be undone at this point -- the charter is destroyed and the guild
+    // registered -- so it is reported.
     if (admitted < count)
     {
-        sLog.outError("TURN IN PETITION: guild '%s' created by %s from %u signatures but only %u members were admitted",
-                      name.c_str(), _player->GetGuidStr().c_str(), uint32(signs), admitted);
+        sLog.outError("TURN IN PETITION: guild '%s' created by %s from %u signatures, %u eligible at preflight, but only %u members were admitted",
+                      name.c_str(), _player->GetGuidStr().c_str(), uint32(signs), eligible, admitted);
     }
-
-    delete result;
 
     // DestroyItem above already dropped both of these directly, so this affects
     // no rows. It is kept deliberately: it is the turn-in path's own statement of

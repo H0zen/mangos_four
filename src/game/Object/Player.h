@@ -4955,7 +4955,7 @@ class Player : public Unit
         static uint32 GetRankFromDB(ObjectGuid guid);
         int GetGuildIdInvited() const { return m_GuildIdInvited; }
         ObjectGuid GetGuildInviterGuid() const { return m_GuildInviterGuid; }
-        static void RemovePetitionsAndSigns(ObjectGuid guid);
+        static bool RemovePetitionsAndSigns(ObjectGuid guid);
         void SendPetitionSignResult(ObjectGuid petitionGuid, Player* player, uint32 result);
         void SendPetitionTurnInResult(uint32 result);
 

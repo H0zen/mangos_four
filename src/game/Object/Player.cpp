@@ -4177,9 +4177,10 @@ void Player::SendProficiency(ItemClass itemClass, uint32 itemSubclassMask)
  *
  * @param guid The player GUID whose petition data should be removed.
  */
-void Player::RemovePetitionsAndSigns(ObjectGuid guid)
+bool Player::RemovePetitionsAndSigns(ObjectGuid guid)
 {
     uint32 lowguid = guid.GetCounter();
+    bool cleared = true;
 
     QueryResult* result = NULL;
     result = CharacterDatabase.PQuery("SELECT `ownerguid`,`petitionguid` FROM `petition_sign` WHERE `playerguid` = '%u'", lowguid);
@@ -4208,7 +4209,11 @@ void Player::RemovePetitionsAndSigns(ObjectGuid guid)
         // memory: with the delete still pending, another charter's turn-in counts
         // this signature, fails to admit its now-guilded owner, and creates a
         // guild short of the signatures it was required to have.
-        CharacterDatabase.DirectPExecute("DELETE FROM `petition_sign` WHERE `playerguid` = '%u'", lowguid);
+        if (!CharacterDatabase.DirectPExecute("DELETE FROM `petition_sign` WHERE `playerguid` = '%u'", lowguid))
+        {
+            sLog.outError("RemovePetitionsAndSigns: could not clear the signatures made by %u", lowguid);
+            cleared = false;
+        }
     }
 
     CharacterDatabase.BeginTransaction();
@@ -4220,7 +4225,10 @@ void Player::RemovePetitionsAndSigns(ObjectGuid guid)
     if (!CharacterDatabase.CommitTransactionDirect())
     {
         sLog.outError("RemovePetitionsAndSigns: could not clear petitions owned by %u", lowguid);
+        cleared = false;
     }
+
+    return cleared;
 }
 
 /**
