@@ -698,35 +698,6 @@ void InitializeOpcodes()
     // starts from evidence rather than from a fresh enumeration. Bank opcodes are
     // excluded deliberately and are not listed.
     //
-    //   CMSG_GUILD_SET_RANK 0x0C7A -- writer sub_C866DC (thunk sub_C84EA8).
-    //     The MoP replacement for the 0x1024 handler this wave deleted. Wire
-    //     order: uint32 from object +92, then EIGHT pairs (+104+4i, +136+4i),
-    //     then +96, +20, +100, +16, then a 7-bit name length and the name.
-    //     No GUIDs. Zero captures in any build, so the builder route is the only
-    //     evidence -- and sub_9679B8 (GuildBankTabItemWithdraw) supplies it by
-    //     filling every slot:
-    //       +16  the rank INDEX
-    //       +104+4i / +136+4i  per tab, sub_964F49 then sub_964FBF. Which is
-    //            which is settled: the Lua setter SetGuildBankTabItemWithdraw
-    //            writes sub_964FBF's array (dword_11F0028, clamped to 100000),
-    //            so the pair is (tab RIGHTS, tab SLOTS-PER-DAY) in that order.
-    //       +92, +96, +20/+100  three distinct getters over the client's 37-dword
-    //            rank record -- sub_964DEB (record +4), sub_964E9F (+12) and
-    //            sub_964E7D (+0, written TWICE, to both +20 and +100).
-    //
-    //     STILL AMBIGUOUS: which of those three is rank Rights and which is
-    //     BankMoneyPerDay. RankInfo holds only those two, so one of the three is
-    //     something this core does not model. Naming them needs the Lua getters
-    //     (GuildControlGetRankFlags and the withdraw-gold limit) traced to the
-    //     same record offsets -- a short job, but not one to guess at: both are
-    //     uint32 and a swap would silently grant the wrong permissions.
-    //
-    //     HandleGuildSetRankOpcode also still reads the wrong packet entirely --
-    //     a rank id and two bit-packed GUIDs, i.e. a member rank ASSIGNMENT. It
-    //     needs rewriting to the layout above and pointing at SetRankName,
-    //     SetRankRights, SetBankMoneyPerDay and SetBankRightsAndSlots, all of
-    //     which already exist.
-    //
     //   CMSG_GUILD_DISBAND 0x0D73 -- NOW REGISTERED, see below. The claim here
     //     that no handler existed was wrong.
     //
@@ -765,6 +736,13 @@ void InitializeOpcodes()
     // (writer nullsub_2) and the handler correctly reads nothing.
     DefC(CMSG_GUILD_EVENT_LOG_QUERY, "CMSG_GUILD_EVENT_LOG_QUERY", STATUS_LOGGEDIN, PROCESS_THREADUNSAFE, &WorldSession::HandleGuildEventLogQueryOpcode);
     DefS(SMSG_GUILD_EVENT_LOG, "SMSG_GUILD_EVENT_LOG");
+
+    // SET_RANK, rebuilt from writer sub_C866DC with every field named by the
+    // builder sub_9679B8 -- no capture of this opcode exists in any build.
+    // Gated on guild leader, not HasRankRight: the packet can grant any right
+    // to any rank, so a lesser gate would let a sender grant themselves all of
+    // them. Replies are Query, QueryRanks and Roster, all admitted.
+    DefC(CMSG_GUILD_SET_RANK, "CMSG_GUILD_SET_RANK", STATUS_LOGGEDIN, PROCESS_THREADUNSAFE, &WorldSession::HandleGuildSetRankOpcode);
 
     DefC(CMSG_GUILD_DISBAND, "CMSG_GUILD_DISBAND", STATUS_LOGGEDIN, PROCESS_THREADUNSAFE, &WorldSession::HandleGuildDisbandOpcode);
 

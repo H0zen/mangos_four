@@ -580,31 +580,44 @@ void WorldSession::HandleGuildDemoteOpcode(WorldPacket& recvPacket)
 
 void WorldSession::HandleGuildSetRankOpcode(WorldPacket& recvPacket)
 {
-    uint32 newRankId;
-    std::string plName;
-    ObjectGuid targetGuid, invokerGuid;
+    // Rebuilt from writer sub_C866DC (thunk sub_C84EA8). The previous reader took
+    // a rank id and two bit-packed GUIDs -- a member rank ASSIGNMENT -- which is
+    // a different packet entirely. This one DEFINES a rank.
+    //
+    // No capture of this opcode exists in any build, so every field is named by
+    // the builder route, from sub_9679B8 which fills the object the writer
+    // serialises:
+    //   the eight pairs are (tab RIGHTS, tab SLOTS-PER-DAY) -- the Lua setter
+    //     SetGuildBankTabItemWithdraw writes the second array, clamped to 100000;
+    //   rights is the field GuildControlGetRankFlags reads (client record +0),
+    //     and the writer emits it TWICE, at +20 and +100;
+    //   money-per-day is the field SetGuildBankWithdrawGoldLimit writes
+    //     (record +12), emitted at +96.
+    uint32 rankId, rights, moneyPerDay;
+    uint32 tabRights[GUILD_BANK_MAX_TABS] = {};
+    uint32 tabSlots[GUILD_BANK_MAX_TABS] = {};
 
-    recvPacket >> newRankId;
-    recvPacket.ReadGuidMask<1, 7>(targetGuid);
-    recvPacket.ReadGuidMask<4, 2>(invokerGuid);
-    recvPacket.ReadGuidMask<4, 5, 6>(targetGuid);
-    recvPacket.ReadGuidMask<1, 7>(invokerGuid);
-    recvPacket.ReadGuidMask<2, 3, 0>(targetGuid);
-    recvPacket.ReadGuidMask<6, 3, 0, 5>(invokerGuid);
+    recvPacket >> rankId;                                   // client rank identifier
+    for (uint8 tab = 0; tab < GUILD_BANK_MAX_TABS; ++tab)
+    {
+        recvPacket >> tabRights[tab];
+        recvPacket >> tabSlots[tab];
+    }
+    recvPacket >> moneyPerDay;
+    recvPacket >> rights;
+    recvPacket.read_skip<uint32>();                         // rights again, +100
+    uint32 rankIndex;
+    recvPacket >> rankIndex;
 
-    recvPacket.ReadGuidBytes<0>(targetGuid);
-    recvPacket.ReadGuidBytes<1, 3, 5>(invokerGuid);
-    recvPacket.ReadGuidBytes<7, 3>(targetGuid);
-    recvPacket.ReadGuidBytes<0>(invokerGuid);
-    recvPacket.ReadGuidBytes<1>(targetGuid);
-    recvPacket.ReadGuidBytes<6>(invokerGuid);
-    recvPacket.ReadGuidBytes<2, 5, 4>(targetGuid);
-    recvPacket.ReadGuidBytes<2, 4>(invokerGuid);
-    recvPacket.ReadGuidBytes<6>(targetGuid);
-    recvPacket.ReadGuidBytes<7>(invokerGuid);
-
-    DEBUG_LOG("WORLD: Received CMSG_GUILD_SET_RANK guid1 %s guid2 %s rank %u",
-        targetGuid.GetString().c_str(), invokerGuid.GetString().c_str(), newRankId);
+    uint32 const nameLen = recvPacket.ReadBits(7);
+    if (recvPacket.rpos() + nameLen > recvPacket.size())
+    {
+        sLog.outError("CMSG_GUILD_SET_RANK: %s sent a %u byte rank name with %zu remaining, refusing",
+                      GetPlayer()->GetGuidStr().c_str(), nameLen, recvPacket.size() - recvPacket.rpos());
+        recvPacket.rfinish();
+        return;
+    }
+    std::string rankName = recvPacket.ReadString(nameLen);
 
     Guild* guild = sGuildMgr.GetGuildById(GetPlayer()->GetGuildId());
     if (!guild)
@@ -613,62 +626,31 @@ void WorldSession::HandleGuildSetRankOpcode(WorldPacket& recvPacket)
         return;
     }
 
-    if (!sObjectMgr.GetPlayerNameByGUID(targetGuid, plName))
-    {
-        return;
-    }
-
-    MemberSlot* slot = guild->GetMemberSlot(targetGuid);
-    if (!slot)
-    {
-        SendGuildCommandResult(GUILD_INVITE_S, plName, ERR_GUILD_PLAYER_NOT_IN_GUILD_S);
-        return;
-    }
-
-    if (slot->guid == GetPlayer()->GetObjectGuid())
-    {
-        SendGuildCommandResult(GUILD_INVITE_S, "", ERR_GUILD_NAME_INVALID);
-        return;
-    }
-
-    if (slot->RankId == newRankId || newRankId >= guild->GetRanksSize())
-    {
-        return;
-    }
-
-    bool promote = newRankId < slot->RankId;
-    if (!guild->HasRankRight(GetPlayer()->GetRank(), promote ? GR_RIGHT_PROMOTE : GR_RIGHT_DEMOTE))
+    // Only the leader may redefine ranks. HasRankRight is not enough here: this
+    // packet can grant any right to any rank, so anyone able to send it could
+    // grant themselves everything.
+    if (GetPlayer()->GetObjectGuid() != guild->GetLeaderGuid())
     {
         SendGuildCommandResult(GUILD_INVITE_S, "", ERR_GUILD_PERMISSIONS);
         return;
     }
 
-    if (promote)
+    if (rankIndex >= guild->GetRanksSize())
     {
-        // allow to promote only to lower rank than member's rank
-        // and only to rank not higher that invoker's
-        if (GetPlayer()->GetRank() + 1 >= slot->RankId || newRankId <=  GetPlayer()->GetRank())
-        {
-            SendGuildCommandResult(GUILD_INVITE_S, plName, ERR_GUILD_RANK_TOO_HIGH_S);
-            return;
-        }
-    }
-    else
-    {
-        // do not allow to demote same or higher rank
-        if (GetPlayer()->GetRank() >= slot->RankId)
-        {
-            SendGuildCommandResult(GUILD_INVITE_S, plName, ERR_GUILD_RANK_TOO_HIGH_S);
-            return;
-        }
+        return;
     }
 
-    slot->ChangeRank(newRankId);
-    // Put record into guild log
-    guild->LogGuildEvent(promote ? GUILD_EVENT_LOG_PROMOTE_PLAYER : GUILD_EVENT_LOG_DEMOTE_PLAYER, GetPlayer()->GetObjectGuid(), slot->guid, newRankId);
+    guild->SetRankName(rankIndex, rankName);
+    guild->SetRankRights(rankIndex, rights);
+    guild->SetBankMoneyPerDay(rankIndex, moneyPerDay);
+    for (uint8 tab = 0; tab < GUILD_BANK_MAX_TABS; ++tab)
+    {
+        guild->SetBankRightsAndSlots(rankIndex, tab, tabRights[tab], tabSlots[tab], true);
+    }
 
-    guild->BroadcastMemberRankUpdate(_player->GetObjectGuid(), slot->guid,
-        newRankId, promote);
+    guild->Query(this);
+    guild->QueryRanks(this);
+    guild->Roster(this);
 }
 
 void WorldSession::HandleGuildSwitchRankOpcode(WorldPacket& recvPacket)
