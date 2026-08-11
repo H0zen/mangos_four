@@ -389,12 +389,11 @@ void WorldSession::HandleCalendarAddEvent(WorldPacket& recv_data)
     // value.
     time_t const eventTime = timeBitFieldsToSecs(eventPackedTime);
 
-    // prevent events in the past
-    if (eventTime < (GameTime::GetGameTime() - time_t(86400L)))
-    {
-        recv_data.rfinish();
-        return;
-    }
+    // No past-event guard here. CalendarMgr::AddEvent already validates the date
+    // and answers with CALENDAR_ERROR_INVALID_DATE, alongside its title, guild
+    // and quota checks; a second guard in the handler could only duplicate that
+    // less well, because it returns SILENTLY and the client is left waiting with
+    // no error to show. Same reasoning as mangostwo/server#210.
 
     // 946684800 is 01/01/2000 00:00:00 - default response time
     CalendarEvent* cal =  sCalendarMgr.AddEvent(_player->GetObjectGuid(), title, description, type, repeatable, maxInvites, dungeonId, eventTime, timeBitFieldsToSecs(unkPackedTime), flags);
@@ -536,13 +535,6 @@ void WorldSession::HandleCalendarUpdateEvent(WorldPacket& recv_data)
     // every update as "in the past".
     time_t const decodedEventTime = timeBitFieldsToSecs(eventPackedTime);
 
-    // prevent events in the past
-    if (decodedEventTime < (GameTime::GetGameTime() - time_t(86400L)))
-    {
-        recv_data.rfinish();
-        return;
-    }
-
     DEBUG_FILTER_LOG(LOG_FILTER_CALENDAR, "EventId [" UI64FMTD "], InviteId [" UI64FMTD "] Title %s, Description %s, type %u "
                      "Repeatable %u, MaxInvites %u, Dungeon ID %d, Flags %u", eventId, inviteId, title.c_str(),
                      description.c_str(), uint32(type), uint32(repetitionType), maxInvites, dungeonId, flags);
@@ -566,11 +558,22 @@ void WorldSession::HandleCalendarUpdateEvent(WorldPacket& recv_data)
             }
         }
 
+        // Past-event check belongs HERE, not before the lookup: ahead of the
+        // event-exists and permission checks it answers a non-owner -- or a
+        // request for an event that does not exist -- with a date error, telling
+        // them which is which. It also has to SAY something; the version this
+        // replaces returned silently and left the client waiting.
+        if (decodedEventTime < (GameTime::GetGameTime() - time_t(86400L)))
+        {
+            sCalendarMgr.SendCalendarCommandResult(_player, CALENDAR_ERROR_INVALID_DATE);
+            return;
+        }
+
         oldEventTime = event->EventTime;
 
         event->Type = CalendarEventType(type);
         event->Flags = flags;
-        event->EventTime = timeBitFieldsToSecs(eventPackedTime);
+        event->EventTime = decodedEventTime;
         event->UnknownTime = timeBitFieldsToSecs(UnknownPackedTime);
         event->DungeonId = dungeonId;
         event->Title = title;
@@ -626,13 +629,9 @@ void WorldSession::HandleCalendarCopyEvent(WorldPacket& recv_data)
     // every copy as "in the past".
     time_t const copyTime = timeBitFieldsToSecs(packedTime);
 
-    // prevent events in the past
-    if (copyTime < (GameTime::GetGameTime() - time_t(86400L)))
-    {
-        recv_data.rfinish();
-        return;
-    }
-
+    // As with the add path: CopyEvent delegates to AddEvent, which validates the
+    // date and replies with CALENDAR_ERROR_INVALID_DATE. A silent handler-side
+    // guard here would only pre-empt that with no feedback to the client.
     sCalendarMgr.CopyEvent(eventId, copyTime, guid);
 }
 

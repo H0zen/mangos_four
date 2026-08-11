@@ -496,6 +496,12 @@ time_t timeBitFieldsToSecs(uint32 packedDate)
     lt.tm_mday = ((packedDate >> 14) & 0x3F) + 1;
     lt.tm_mon = (packedDate >> 20) & 0xF;
     lt.tm_year = ((packedDate >> 24) & 0x1F) + 100;
+    // -1 lets mktime resolve DST for this date. The memset above had forced 0,
+    // i.e. standard time always -- while the encode side, secsToTimeBitFields,
+    // uses localtime() and does honour DST. That asymmetry meant decode was not
+    // the inverse of encode: a summer event entered at 00:00 came back as 01:00
+    // on a DST-observing server. Same fix as mangostwo/server#210.
+    lt.tm_isdst = -1;
 
     return time_t(mktime(&lt));
 }
