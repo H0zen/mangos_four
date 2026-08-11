@@ -755,8 +755,14 @@ void InitializeOpcodes()
     //   SendPetitionTurnInResult -> SMSG_TURN_IN_PETITION_RESULTS  (4-bit body)
     //   Guild::AddMember -> RemovePetitionsAndSigns
     //                    -> SMSG_PETITION_QUERY_RESPONSE
+    //   DestroyItem (the charter is consumed) -> Item::DestroyForPlayer
+    //                    -> SMSG_DESTROY_OBJECT
     //
-    // Both converted, both admitted. Reader sub_689A90, a lone bit-packed GUID.
+    // All three converted, all three admitted. The third was found by review
+    // after I had already corrected the trace once -- worth noting that even a
+    // deliberate re-trace missed it, because it leaves through the item layer
+    // rather than the guild or petition ones. Reader sub_689A90, a lone
+    // bit-packed GUID.
     DefC(CMSG_TURN_IN_PETITION, "CMSG_TURN_IN_PETITION", STATUS_LOGGEDIN, PROCESS_THREADUNSAFE, &WorldSession::HandleTurnInPetitionOpcode);
     DefS(SMSG_PETITION_SHOWLIST, "SMSG_PETITION_SHOWLIST");
     DefS(SMSG_PETITION_SHOW_SIGNATURES, "SMSG_PETITION_SHOW_SIGNATURES");

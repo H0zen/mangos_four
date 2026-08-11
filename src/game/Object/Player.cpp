@@ -6611,7 +6611,17 @@ void Player::DoInteraction(ObjectGuid const& interactObjGuid)
 //     appends a signer, sub_96373C resets the block, and sub_962C09 /
 //     sub_96311E / sub_962F5E are the SignPetition, OfferPetition and
 //     RenamePetition builders. None consumes this reply;
-//   - the corpus: zero rows for 0x06AE in 18414, in either direction.
+//   - the corpus: zero rows for 0x06AE in 18414, in either direction;
+//   - the extracted client UI: no Lua reference to a sign-result event at all;
+//   - string cross-references to ERR_PETITION_SIGNED_S and its siblings: the
+//     client resolves those by runtime ID rather than by address, so there is
+//     no static xref to walk back from.
+//
+// The last two were added by review, which re-walked the whole list and reached
+// the same conclusion independently. It also pinned down why the trampoline is
+// a dead end rather than merely awkward: sub_6C5C7A computes its handler as
+// [0x10970B4] minus sub_662769(0xF4E0F0), and sub_662769 calls two virtual
+// methods and applies a runtime ROL. There is nothing to resolve statically.
 //
 // Both GUIDs are eight bytes, so guessing has a 50% chance of naming the wrong
 // player in the message the signer sees -- and the packet would be exactly the
