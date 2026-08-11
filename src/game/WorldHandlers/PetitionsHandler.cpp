@@ -536,6 +536,22 @@ void WorldSession::HandlePetitionSignOpcode(WorldPacket& recv_data)
         return;
     }
 
+    // Nothing in this packet binds it to an offer. The petition GUID is a
+    // client-supplied item GUID and item GUIDs are enumerable, so a charter can
+    // be named without ever having been shown one. Signing legitimately always
+    // follows CMSG_OFFER_PETITION, which already requires the owner to be within
+    // TRADE_DISTANCE of the signer, so holding the same bound here is what a real
+    // client can produce anyway and stops a forged packet signing any charter on
+    // the realm from anywhere. The owner is needed below for the success
+    // notification in any case.
+    Player* owner = sObjectMgr.GetPlayer(ownerGuid);
+    if (!owner || !_player->IsWithinDistInMap(owner, TRADE_DISTANCE, false))
+    {
+        DEBUG_LOG("CMSG_PETITION_SIGN: %s tried to sign petition %u whose owner %s is offline or out of range",
+                  _player->GetGuidStr().c_str(), petitionLowGuid, ownerGuid.GetString().c_str());
+        return;
+    }
+
     // not let enemies sign guild charter
     if (!sWorld.getConfig(CONFIG_BOOL_ALLOW_TWO_SIDE_INTERACTION_GUILD) &&
             GetPlayer()->GetTeam() != sObjectMgr.GetPlayerTeamByGUID(ownerGuid))
@@ -608,10 +624,7 @@ void WorldSession::HandlePetitionSignOpcode(WorldPacket& recv_data)
     // to sub_9634D4, which appends the signer and announces
     // ERR_PETITION_SIGNED_S. A failure forwarded here would put a signature the
     // database does not have into the owner's charter.
-    if (Player* owner = sObjectMgr.GetPlayer(ownerGuid))
-    {
-        owner->SendPetitionSignResult(petitionGuid, _player, PETITION_SIGN_OK);
-    }
+    owner->SendPetitionSignResult(petitionGuid, _player, PETITION_SIGN_OK);
 }
 
 /**
