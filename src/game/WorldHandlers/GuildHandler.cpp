@@ -38,7 +38,6 @@
  * - CMSG_GUILD_DISBAND: Disband guild
  * - CMSG_GUILD_LEADER: Transfer guild leadership
  * - CMSG_GUILD_MOTD: Set guild message of the day
- * - CMSG_GUILD_RANK: Modify guild ranks
  * - CMSG_GUILD_ADD_RANK: Add guild rank
  * - CMSG_GUILD_DELETE_RANK: Delete guild rank
  * - CMSG_GUILD_DEMOTE: Demote guild member
@@ -928,70 +927,6 @@ void WorldSession::HandleGuildSetNoteOpcode(WorldPacket& recvPacket)
     guild->Roster(this);
 }
 
-/**
- * @brief Updates guild rank names and permissions.
- *
- * @param recvPacket The received opcode packet.
- */
-void WorldSession::HandleGuildRankOpcode(WorldPacket& recvPacket)
-{
-    std::string rankname;
-    uint32 rankId;
-    uint32 rights, MoneyPerDay;
-
-    DEBUG_LOG("WORLD: Received opcode CMSG_GUILD_RANK");
-
-    Guild* guild = sGuildMgr.GetGuildById(GetPlayer()->GetGuildId());
-    if (!guild)
-    {
-        recvPacket.rfinish();                               // set to end to avoid warnings spam
-        SendGuildCommandResult(GUILD_CREATE_S, "", ERR_GUILD_PLAYER_NOT_IN_GUILD);
-        return;
-    }
-
-    if (GetPlayer()->GetObjectGuid() != guild->GetLeaderGuid())
-    {
-        recvPacket.rfinish();                               // set to end to avoid warnings spam
-        SendGuildCommandResult(GUILD_INVITE_S, "", ERR_GUILD_PERMISSIONS);
-        return;
-    }
-
-    recvPacket >> Unused<uint32>();     // unk
-    recvPacket >> Unused<uint32>();     // old rights
-    recvPacket >> rights;
-
-    uint32 BankRights[GUILD_BANK_MAX_TABS];
-    uint32 BankSlotPerDay[GUILD_BANK_MAX_TABS];
-    for (int i = 0; i < GUILD_BANK_MAX_TABS; ++i)
-    {
-        recvPacket >> BankRights[i];
-        recvPacket >> BankSlotPerDay[i];
-    }
-
-    recvPacket >> MoneyPerDay;
-    recvPacket >> rankId;
-    rankname = recvPacket.ReadString(recvPacket.ReadBits(7));
-
-    DEBUG_LOG("WORLD: Changed RankName to %s , Rights to 0x%.4X", rankname.c_str(), rights);
-
-    for (int i = 0; i < GUILD_BANK_MAX_TABS; ++i)
-    {
-        guild->SetBankRightsAndSlots(rankId, uint8(i), uint16(BankRights[i] & 0xFF), uint16(BankSlotPerDay[i]), true);
-    }
-
-    guild->SetBankMoneyPerDay(rankId, MoneyPerDay);
-    guild->SetRankName(rankId, rankname);
-
-    if (rankId == GR_GUILDMASTER)                           // prevent loss leader rights
-    {
-        rights = GR_RIGHT_ALL;
-    }
-
-    guild->SetRankRights(rankId, rights);
-
-    guild->Query(this);
-    guild->Roster();                                        // broadcast for tab rights update
-}
 
 /**
  * @brief Adds a new guild rank.

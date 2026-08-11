@@ -569,6 +569,10 @@ enum OpcodesList
     SMSG_GOSSIP_POI                              = 0x0785,    // 5.4.8 18414 (Wow.exe dynamic slot 229; handler 0x9639BC)
     CMSG_CHAT_IGNORED                            = 0x048A, // 5.4.8 18414 (Wow.exe binary)
     SMSG_GM_PLAYER_INFO                          = 0x102B,    // 5.4.8 18414 (Wow.exe leaf; name single-source fork)
+    // Confirmed absent from 5.4.8, three ways: no thunk writes 0x1024 anywhere in
+    // Wow.exe.lst, the 18414 corpus has zero rows for it in either direction, and
+    // the value survives here only as a pre-MoP declaration. Its handler was dead
+    // 4.3.4 code and has been removed. Kept declared so the value is not reused.
     CMSG_GUILD_RANK                              = 0x1024, // not in 5.4.8 (legacy)
     CMSG_GUILD_ADD_RANK                          = 0x047A, // 5.4.8 18414 (Wow.exe binary)
     CMSG_GUILD_DEL_RANK                          = 0x0D79, // 5.4.8 18414 (Wow.exe binary)
