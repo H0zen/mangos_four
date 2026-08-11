@@ -203,7 +203,26 @@ bool Guild::Create(Player* leader, std::string gname)
     }
 #endif /* ENABLE_ELUNA */
 
-    return AddMember(m_LeaderGuid, (uint32)GR_GUILDMASTER);
+    if (!AddMember(m_LeaderGuid, (uint32)GR_GUILDMASTER))
+    {
+        // The guild and its ranks are written above, before there is any way to
+        // know whether the founder can be admitted, so a refusal has to take them
+        // back out. Reporting failure while leaving the rows behind creates a
+        // guild nobody belongs to and no caller knows about.
+        CharacterDatabase.BeginTransaction();
+        CharacterDatabase.PExecute("DELETE FROM `guild` WHERE `guildid` = '%u'", m_Id);
+        CharacterDatabase.PExecute("DELETE FROM `guild_rank` WHERE `guildid` = '%u'", m_Id);
+        CharacterDatabase.PExecute("DELETE FROM `guild_member` WHERE `guildid` = '%u'", m_Id);
+
+        if (!CharacterDatabase.CommitTransactionDirect())
+        {
+            sLog.outError("Guild::Create: guild %u was not founded and its rows could not be removed", m_Id);
+        }
+
+        return false;
+    }
+
+    return true;
 }
 
 /**

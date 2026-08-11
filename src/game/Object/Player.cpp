@@ -4203,17 +4203,23 @@ bool Player::RemovePetitionsAndSigns(ObjectGuid guid)
         while (result->NextRow());
 
         delete result;
+    }
 
-        // Direct, because a queued delete is not ordered against a later direct
-        // read. Guild::AddMember calls this and then publishes the membership in
-        // memory: with the delete still pending, another charter's turn-in counts
-        // this signature, fails to admit its now-guilded owner, and creates a
-        // guild short of the signatures it was required to have.
-        if (!CharacterDatabase.DirectPExecute("DELETE FROM `petition_sign` WHERE `playerguid` = '%u'", lowguid))
-        {
-            sLog.outError("RemovePetitionsAndSigns: could not clear the signatures made by %u", lowguid);
-            cleared = false;
-        }
+    // Outside the block above on purpose. PQuery returns NULL both for no rows
+    // and for a failed query, so running the delete only when it returned rows
+    // means a failed SELECT silently skips the delete -- and this would then
+    // report success while a signature survived, which is the exact state
+    // Guild::AddMember relies on being gone.
+    //
+    // Direct, because a queued delete is not ordered against a later direct read.
+    // AddMember calls this and then publishes the membership in memory: with the
+    // delete still pending, another charter's turn-in counts this signature,
+    // fails to admit its now-guilded owner, and creates a guild short of the
+    // signatures it was required to have.
+    if (!CharacterDatabase.DirectPExecute("DELETE FROM `petition_sign` WHERE `playerguid` = '%u'", lowguid))
+    {
+        sLog.outError("RemovePetitionsAndSigns: could not clear the signatures made by %u", lowguid);
+        cleared = false;
     }
 
     CharacterDatabase.BeginTransaction();

@@ -923,9 +923,22 @@ void WorldSession::HandleTurnInPetitionOpcode(WorldPacket& recv_data)
     for (ObjectGuid const& signGuid : signers)
     {
         Player* signer = sObjectMgr.GetPlayer(signGuid);
-        uint32 const signerGuildId = signer ? signer->GetGuildId() : Player::GetGuildIdFromDB(signGuid);
 
-        if (signerGuildId == 0)
+        if (signer)
+        {
+            if (signer->GetGuildId() == 0)
+            {
+                ++eligible;
+            }
+
+            continue;
+        }
+
+        // Offline, so match what AddMember will do with them: it wants a
+        // character that still exists as well as one not already in a guild.
+        std::string signerName;
+
+        if (Player::GetGuildIdFromDB(signGuid) == 0 && sObjectMgr.GetPlayerNameByGUID(signGuid, signerName))
         {
             ++eligible;
         }
@@ -953,15 +966,25 @@ void WorldSession::HandleTurnInPetitionOpcode(WorldPacket& recv_data)
 
     // OK!
 
-    // delete charter item
-    _player->DestroyItem(item->GetBagSlot(), item->GetSlot(), true);
-
+    // Create the guild BEFORE spending the charter. Create admits the founder
+    // through AddMember, which now refuses if that player's signatures could not
+    // be cleared, so this can fail for reasons beyond a name collision -- and
+    // destroying the charter first left the player with neither charter nor
+    // guild and no reply. Ordered this way they keep the charter and are told.
+    // Not a full undo: the same cleanup may already have removed this petition's
+    // rows before failing, which leaves the item without them.
     Guild* guild = new Guild;
     if (!guild->Create(_player, name))
     {
         delete guild;
+        sLog.outError("TURN IN PETITION: %s could not found guild '%s'",
+                      _player->GetGuidStr().c_str(), name.c_str());
+        _player->SendPetitionTurnInResult(PETITION_TURN_GUILD_NAME_INVALID);
         return;
     }
+
+    // delete charter item
+    _player->DestroyItem(item->GetBagSlot(), item->GetSlot(), true);
 
     // register guild and add guildmaster
     sGuildMgr.AddGuild(guild);
