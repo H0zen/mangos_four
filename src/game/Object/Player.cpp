@@ -6594,46 +6594,85 @@ void Player::DoInteraction(ObjectGuid const& interactObjGuid)
 }
 
 
-// PARKED -- SMSG_PETITION_SIGN_RESULTS 0x06AE. The last unconverted petition
-// reply, and the reason CMSG_PETITION_SIGN stays unregistered.
+// SMSG_PETITION_SIGN_RESULTS 0x06AE, from reader sub_6FB9AF (parser sub_7000D1,
+// vtable off_D6A590). No capture of this opcode exists in any build, and its
+// consumer is not reachable from the vtable -- the only xref there is the
+// constructor, and the trampoline dispatches through a runtime XOR+ROL indirect.
 //
-// LAYOUT is fully decoded from reader sub_6FB9AF (parser sub_7000D1, vtable
-// off_D6A590): two GUIDs at object +16 and +32 with sixteen INTERLEAVED mask
-// bits, then a 4-BIT result, then sixteen interleaved bytes.
-//
-// IDENTITY is not, and every static route has been tried and eliminated:
-//   - the vtable: the only xref to off_D6A590 is the constructor;
-//   - the trampoline sub_6C5C7A: dispatches through a runtime-XOR indirect that
-//     cannot be resolved statically, the same construct that blocked
-//     SMSG_PETITION_SHOWLIST until its consumer was found another way;
-//   - the petition UI globals: every function touching qword_11E9F18 and its
-//     neighbours is accounted for -- sub_9633C0 opens a petition, sub_9634D4
-//     appends a signer, sub_96373C resets the block, and sub_962C09 /
-//     sub_96311E / sub_962F5E are the SignPetition, OfferPetition and
-//     RenamePetition builders. None consumes this reply;
-//   - the corpus: zero rows for 0x06AE in 18414, in either direction;
-//   - the extracted client UI: no Lua reference to a sign-result event at all;
-//   - string cross-references to ERR_PETITION_SIGNED_S and its siblings: the
-//     client resolves those by runtime ID rather than by address, so there is
-//     no static xref to walk back from.
-//
-// The last two were added by review, which re-walked the whole list and reached
-// the same conclusion independently. It also pinned down why the trampoline is
-// a dead end rather than merely awkward: sub_6C5C7A computes its handler as
-// [0x10970B4] minus sub_662769(0xF4E0F0), and sub_662769 calls two virtual
-// methods and applies a runtime ROL. There is nothing to resolve statically.
-//
-// Both GUIDs are eight bytes, so guessing has a 50% chance of naming the wrong
-// player in the message the signer sees -- and the packet would be exactly the
-// right length either way. This needs a live client: sign a charter and observe
-// which name appears. That is a cheaper experiment than any further static
-// work, and it is the only remaining source of evidence.
+// The consumer was found another way, at 0x963598, which nothing references
+// statically either but is anchored to this packet by its own reads: it switches
+// on record +24, which is where this reader puts the 4-bit result, and passes
+// record +32/+36 to the add-signer routine sub_9634D4 as the pair matched
+// against the petition signer list -- after first comparing it with the local
+// player, so "if the signer is not me, add them". That names +32 as the SIGNER
+// and leaves +16 as the petition. Both GUIDs are eight bytes, so nothing about
+// the layout could have distinguished them.
+/// Maps this core's PetitionSigns enum onto the 18414 wire codes.
+///
+/// The enum is pre-MoP and its values are NOT what the client reads. The switch
+/// at 0x963598 gives the real taxonomy -- notably SUCCESS is 7, not 0, so
+/// sending the enum directly made every successful signature fall into the
+/// client's "Petition error" default. Two of the failure codes are worse than
+/// unhandled: the enum's CANT_SIGN_OWN (3) and RESTRICTED_ACCOUNT (11) are each
+/// other's meaning on the wire, so the untranslated pair showed the wrong
+/// message rather than none.
+///
+/// Each case below is the CGGameUI::DisplayError id the client raises for that
+/// value, read from the error table at off_F5C278 (stride 20):
+static uint32 PetitionSignResultToWire(uint32 result)
+{
+    switch (result)
+    {
+        case PETITION_SIGN_RESTRICTED_ACCOUNT:   return 3;  // 0x174 ERR_PETITION_RESTRICTED_ACCOUNT
+        case PETITION_SIGN_NOT_SAME_SERVER:      return 5;  // 0x179 ERR_PETITION_NOT_SAME_SERVER
+        case PETITION_SIGN_ALREADY_SIGNED:       return 6;  // 0x173 ERR_PETITION_ALREADY_SIGNED
+        case PETITION_SIGN_OK:                   return 7;  // 0x170 ERR_PETITION_SIGNED, plus event 0x112
+        case PETITION_SIGN_ALREADY_SIGNED_OTHER: return 8;  // 0x175 ERR_PETITION_ALREADY_SIGNED_OTHER
+        case PETITION_SIGN_CANT_SIGN_OWN:        return 11; // 0x177 ERR_PETITION_CREATOR
+        case PETITION_SIGN_ALREADY_IN_GUILD:     return 12; // 0x176 ERR_PETITION_IN_GUILD
+        case PETITION_SIGN_PETITION_FULL:        return 14; // 0x17A ERR_PETITION_FULL
+        // Unreachable -- the enum has exactly the eight values above. Any value
+        // the client does not handle prints its generic "Petition error".
+        default:                                 return 0;
+    }
+}
+
 void Player::SendPetitionSignResult(ObjectGuid petitionGuid, Player* player, uint32 result)
 {
-    WorldPacket data(SMSG_PETITION_SIGN_RESULTS, 8 + 8 + 4);
-    data << petitionGuid;
-    data << player->GetObjectGuid();
-    data << uint32(result);
+    ObjectGuid const signerGuid = player->GetObjectGuid();
+
+    WorldPacket data(SMSG_PETITION_SIGN_RESULTS, 2 + 8 + 8 + 1);
+
+    data.WriteGuidMask<2>(signerGuid);
+    data.WriteGuidMask<0>(signerGuid);
+    data.WriteGuidMask<0>(petitionGuid);
+    data.WriteGuidMask<1>(signerGuid);
+    data.WriteGuidMask<5>(petitionGuid);
+    data.WriteGuidMask<2>(petitionGuid);
+    data.WriteGuidMask<4>(petitionGuid);
+    data.WriteGuidMask<6>(signerGuid);
+    data.WriteGuidMask<1>(petitionGuid);
+    data.WriteGuidMask<6>(petitionGuid);
+    data.WriteGuidMask<4>(signerGuid);
+    data.WriteGuidMask<3>(petitionGuid);
+    data.WriteGuidMask<5>(signerGuid);
+    data.WriteGuidMask<3>(signerGuid);
+    data.WriteGuidMask<7>(petitionGuid);
+    data.WriteGuidMask<7>(signerGuid);
+
+    data.WriteBits(PetitionSignResultToWire(result), 4);    // +24, translated
+    data.FlushBits();
+
+    data.WriteGuidBytes<0, 5>(petitionGuid);
+    data.WriteGuidBytes<3, 0>(signerGuid);
+    data.WriteGuidBytes<3>(petitionGuid);
+    data.WriteGuidBytes<2, 6, 4, 1>(signerGuid);
+    data.WriteGuidBytes<6, 7>(petitionGuid);
+    data.WriteGuidBytes<7>(signerGuid);
+    data.WriteGuidBytes<2, 1>(petitionGuid);
+    data.WriteGuidBytes<5>(signerGuid);
+    data.WriteGuidBytes<4>(petitionGuid);
+
     GetSession()->SendPacket(&data);
 }
 

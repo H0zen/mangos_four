@@ -754,16 +754,12 @@ void InitializeOpcodes()
     // thunk, slot +4 the body writer); the layout is confirmed in IDA and
     // Binary Ninja independently, which agree on every slot.
     //
-    // FIVE are registered. Two are NOT, and the reason is the reply gate rather
-    // than the reader:
-    //
-    //   CMSG_PETITION_SIGN 0x06DA reaches SMSG_PETITION_SIGN_RESULTS, which is
-    //     still pre-MoP. Its layout is decoded but both its GUIDs are eight
-    //     bytes and its consumer is not reachable from its vtable, so identity
-    //     is unsettled. See Player::SendPetitionSignResult.
-    //   CMSG_TURN_IN_PETITION 0x0673 creates a guild or arena team, so its
-    //     reply surface is the whole guild subsystem rather than the one result
-    //     packet -- that belongs to the guild wave, not this one.
+    // All seven are registered. The last two waited on their reply gate rather
+    // than their reader: CMSG_PETITION_SIGN until SMSG_PETITION_SIGN_RESULTS'
+    // consumer was found at 0x963598 -- which settles both eight-byte GUIDs and
+    // the result taxonomy, where success is 7 and not this core's 0 -- and
+    // CMSG_TURN_IN_PETITION until the guild wave, its reply surface being the
+    // guild subsystem rather than one result packet.
     //
     // No petition opcode has a single capture anywhere in the 18414 corpus, so
     // every field identity below rests on the client binary alone: the builder
@@ -811,6 +807,12 @@ void InitializeOpcodes()
     // direct versus deferred, not reachable versus not.
     //
     // Reader sub_689A90, a lone bit-packed GUID.
+    // SIGN, unblocked once its reply's consumer was found at 0x963598 -- see the
+    // note above Player::SendPetitionSignResult. Petition GUID at record +16,
+    // signer at +32, 4-bit result at +24.
+    DefC(CMSG_PETITION_SIGN, "CMSG_PETITION_SIGN", STATUS_LOGGEDIN, PROCESS_THREADUNSAFE, &WorldSession::HandlePetitionSignOpcode);
+    DefS(SMSG_PETITION_SIGN_RESULTS, "SMSG_PETITION_SIGN_RESULTS");
+
     DefC(CMSG_TURN_IN_PETITION, "CMSG_TURN_IN_PETITION", STATUS_LOGGEDIN, PROCESS_THREADUNSAFE, &WorldSession::HandleTurnInPetitionOpcode);
     DefS(SMSG_PETITION_SHOWLIST, "SMSG_PETITION_SHOWLIST");
     DefS(SMSG_PETITION_SHOW_SIGNATURES, "SMSG_PETITION_SHOW_SIGNATURES");

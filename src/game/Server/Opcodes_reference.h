@@ -175,9 +175,9 @@
  *   TOTAL SMSG rows                   925
  *
  * SUBSYSTEM CONFIDENCE: high=365, low=221, medium=182, none=157
- * STATUS TOTALS: ACTIVE=652, DOC=422, DORMANT=446
- *   SMSG: ACTIVE=359, DOC=270, DORMANT=296
- *   CMSG: ACTIVE=293, DOC=152, DORMANT=150
+ * STATUS TOTALS: ACTIVE=654, DOC=422, DORMANT=444
+ *   SMSG: ACTIVE=360, DOC=270, DORMANT=295
+ *   CMSG: ACTIVE=294, DOC=152, DORMANT=149
  */
 
 // CAVEATS -- read before trusting any single row:
@@ -541,7 +541,7 @@ typedef uint16_t uint16;
  *   SMSG_PETITION_SHOW_SIGNATURES                  0x00AA  ACTIVE   [low-conf]
  *   SMSG_GOSSIP_MESSAGE                            0x0244  ACTIVE
  *   SMSG_GOSSIP_COMPLETE                           0x034E  ACTIVE   [high-conf]
- *   SMSG_PETITION_SIGN_RESULTS                     0x06AE  DORMANT  [low-conf]
+ *   SMSG_PETITION_SIGN_RESULTS                     0x06AE  ACTIVE   [low-conf]
  *   SMSG_GUILD_MOVE_STARTING                       0x0AE1  DORMANT  [low-conf]  [name: binary-derived]
  *   SMSG_GUILD_MOVE_COMPLETE                       0x0BE8  DORMANT  [low-conf]  [name: binary-derived]
  *   SMSG_UNKNOWN_0x0EF9                            0x0EF9  DOC      [low-conf]
@@ -1520,7 +1520,7 @@ typedef uint16_t uint16;
  *   CMSG_TRANSMOGRIFY_ITEMS                        0x06D7  DOC
  *   CMSG_GAMEOBJ_USE                               0x06D8  ACTIVE   [high-conf]
  *   CMSG_GAMEOBJ_REPORT_USE                        0x06D9  ACTIVE   [high-conf]
- *   CMSG_PETITION_SIGN                             0x06DA  DORMANT
+ *   CMSG_PETITION_SIGN                             0x06DA  ACTIVE
  *   CMSG_OPT_OUT_OF_LOOT                           0x06E0  DORMANT
  *   CMSG_REQUEST_CEMETERY_LIST                     0x06E4  ACTIVE
  *   CMSG_SAVE_CUF_PROFILES                         0x06E6  DOC

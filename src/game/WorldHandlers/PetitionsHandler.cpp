@@ -530,6 +530,9 @@ void WorldSession::HandlePetitionSignOpcode(WorldPacket& recv_data)
 
     if (ownerGuid == _player->GetObjectGuid())
     {
+        // The client has a message for this (ERR_PETITION_CREATOR); dropping the
+        // packet leaves the charter frame waiting instead.
+        _player->SendPetitionSignResult(petitionGuid, _player, PETITION_SIGN_CANT_SIGN_OWN);
         return;
     }
 

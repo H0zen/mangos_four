@@ -555,9 +555,8 @@ static bool IsEnterWorldConverted(uint16 opcode)
 
         // Petitions. All four rebuilt from their client readers; none has a
         // capture anywhere in the corpus, so every field identity here rests on
-        // the consumer route. SMSG_PETITION_SIGN_RESULTS is deliberately absent
-        // -- it is still a pre-MoP body, which is why CMSG_PETITION_SIGN stays
-        // unregistered. See the note above Player::SendPetitionSignResult.
+        // the consumer route -- including SMSG_PETITION_SIGN_RESULTS, whose
+        // consumer was finally located at 0x963598.
         // Guild. Its body was a NUL-terminated string and a uint8 where 18414
         // wants a 6-bit length, a bit, the name bytes and a realm address.
         // Rebuilt from reader sub_6A6843 at this commit: 21-bit count, and all
@@ -566,6 +565,7 @@ static bool IsEnterWorldConverted(uint16 opcode)
 
         case SMSG_GUILD_DECLINE:                     // Player::SendGuildDeclined
 
+        case SMSG_PETITION_SIGN_RESULTS:             // Player::SendPetitionSignResult
         case SMSG_PETITION_SHOWLIST:                 // SendPetitionShowList
         case SMSG_PETITION_SHOW_SIGNATURES:          // BuildPetitionShowSignatures
         case SMSG_PETITION_QUERY_RESPONSE:           // BuildPetitionQueryResponse
