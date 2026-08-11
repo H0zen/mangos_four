@@ -710,9 +710,8 @@ void InitializeOpcodes()
     //     rank permissions and per-tab bank rights instead of moving one member,
     //     and the tab rights are guild-bank surface, which is out of scope here.
     //
-    //   CMSG_GUILD_DISBAND 0x0D73 -- writer nullsub_2, so the body is EMPTY.
-    //     No dedicated handler exists; Guild::Disband is only reached today from
-    //     the leave and remove paths.
+    //   CMSG_GUILD_DISBAND 0x0D73 -- NOW REGISTERED, see below. The claim here
+    //     that no handler existed was wrong.
     //
     //   CMSG_GUILD_EVENT_LOG_QUERY 0x15D9 -- writer nullsub_2, body EMPTY, and
     //     HandleGuildEventLogQueryOpcode correctly reads nothing. Its reply
@@ -741,6 +740,21 @@ void InitializeOpcodes()
     // it at record +137, and sub_C87393 copies the record to packet +16 -- landing
     // it at +153, the byte the writer emits. A set bit is the PUBLIC note.
     // Reaches only SendGuildCommandResult and Roster, both admitted.
+    // DISBAND, which the audit above wrongly called handler-less. Review caught
+    // that: HandleGuildDisbandOpcode has existed all along, and it was one DefC
+    // away from working -- the same shape as CMSG_GUILD_LEAVE, already
+    // registered. All four gates pass. Writer nullsub_2, so the body is empty
+    // and the handler correctly reads nothing. Value has a single claimant. Its
+    // replies are SendGuildCommandResult and, through Guild::Disband,
+    // SMSG_GUILD_EVENT_DISBANDED and SMSG_GUILD_EVENT_PLAYER_LEFT -- all
+    // admitted and converted.
+    //
+    // The `Disband(); delete guild;` in the handler is safe and matches the
+    // three call sites already live: Guild::Disband calls
+    // sGuildMgr.RemoveGuild(m_Id) before returning, so nothing is left pointing
+    // at the freed object.
+    DefC(CMSG_GUILD_DISBAND, "CMSG_GUILD_DISBAND", STATUS_LOGGEDIN, PROCESS_THREADUNSAFE, &WorldSession::HandleGuildDisbandOpcode);
+
     DefC(CMSG_GUILD_SET_NOTE, "CMSG_GUILD_SET_NOTE", STATUS_LOGGEDIN, PROCESS_THREADUNSAFE, &WorldSession::HandleGuildSetNoteOpcode);
 
     // Petitions -- the guild/arena charter flow, dormant in this tree until now.
