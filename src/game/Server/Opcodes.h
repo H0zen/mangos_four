@@ -174,6 +174,16 @@ enum OpcodesList
     CMSG_GUILD_MOTD                              = 0x1473, // 5.4.8 18414 (Wow.exe binary)
     SMSG_GUILD_COMMAND_RESULT                    = 0x0EF1,    // 5.4.8 18414 (Wow.exe leaf; name reference-consensus)
     CMSG_GUILD_AUTO_DECLINE_TOGGLE               = 0x2034, // not in 5.4.8 (legacy)
+    // Deliberately NOT registered. Thunk sub_6860AD, writer sub_688B4B (vtable
+    // slot +4; slot +12 carries the 0x00C84A3D signature), and that writer emits
+    // exactly ONE BIT -- the toggle state. It is a settings toggle, not a
+    // per-invite decline, so routing it to HandleGuildDeclineOpcode would treat
+    // "stop asking me" as "decline this invitation". Needs its own handler.
+    //
+    // An earlier note here named sub_688F62 as the writer. That was wrong: it is
+    // CMSG_ACTIVATETAXI's (0x03C9), and the error came from converting the slot
+    // value 6851403 to hex by hand as 0x68908B instead of 0x688B4B. Use the
+    // converter, not your head -- a slip like that reads as a plausible address.
     CMSG_GUILD_AUTO_DECLINE                      = 0x06CB, // 5.4.8 18414 (Wow.exe binary, via CMSG_AUTO_DECLINE_GUILD_INVITES)
     CMSG_GUILD_QUERY_RANKS                       = 0x0D50, // 5.4.8 18414 (Wow.exe binary)
     SMSG_GUILD_QUERY_RANKS_RESULT                = 0x0A79,    // 5.4.8 18414 (Wow.exe leaf; name reference-consensus; fuzzy via SMSG_GUILD_RANKS)
