@@ -372,12 +372,21 @@ void WorldSession::HandlePetitionShowSignOpcode(WorldPacket& recv_data)
     // solve (possible) some strange compile problems with explicit use GUID_LOPART(petitionguid) at some GCC versions (wrong code optimization in compiler?)
     uint32 petitionguid_low = petitionguid.GetCounter();
 
-    QueryResult* result = CharacterDatabase.PQuery("SELECT 1 FROM `petition` WHERE `petitionguid` = '%u'", petitionguid_low);
+    // Ask for the OWNER, not merely whether the petition exists. The owner GUID
+    // is what the client's consumer compares against the local player to decide
+    // isOriginator, so sending the requester's own GUID -- as this did -- tells
+    // everyone who opens a charter that they created it, and shows them the
+    // owner's controls instead of the sign button. That is wrong in the ordinary
+    // case of an invitee opening an offered charter, not only under a forged
+    // request.
+    QueryResult* result = CharacterDatabase.PQuery("SELECT `ownerguid` FROM `petition` WHERE `petitionguid` = '%u'", petitionguid_low);
     if (!result)
     {
         sLog.outError("any petition on server...");
         return;
     }
+
+    ObjectGuid const ownerGuid = ObjectGuid(HIGHGUID_PLAYER, result->Fetch()[0].GetUInt32());
     delete result;
 
     // if has guild => error, return;
@@ -407,7 +416,7 @@ void WorldSession::HandlePetitionShowSignOpcode(WorldPacket& recv_data)
     }
     delete result;
 
-    BuildPetitionShowSignatures(data, petitionguid, _player->GetObjectGuid(),
+    BuildPetitionShowSignatures(data, petitionguid, ownerGuid,
                                 petitionguid_low, signers);
     SendPacket(&data);
 }
