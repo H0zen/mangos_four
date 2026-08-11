@@ -716,12 +716,23 @@ void InitializeOpcodes()
     //
     //   CMSG_GUILD_EVENT_LOG_QUERY 0x15D9 -- writer nullsub_2, body EMPTY, and
     //     HandleGuildEventLogQueryOpcode correctly reads nothing. Its reply
-    //     SMSG_GUILD_EVENT_LOG is bit-packed and looks converted, but it has
-    //     neither a DefS nor a send-gate entry, and nobody has checked it against
-    //     the client's reader or a capture. Registering on the strength of
-    //     "looks converted" is exactly how CMSG_GUILD_INVITE stayed broken
-    //     through two review rounds. Prove the reply first; this is the cheapest
-    //     of the four to finish.
+    //     SMSG_GUILD_EVENT_LOG is bit-packed, which made it LOOK converted --
+    //     and it is wrong. Checked against reader sub_6A6843 (parser sub_6A7485,
+    //     vtable off_D65FE4): the count is a 21-bit field (sub_6A29A8) where
+    //     Guild::DisplayGuildEventLog writes 23, and not one of the sixteen
+    //     per-entry mask bits is in the right place.
+    //
+    //     Entry stride 24: bytes 0-7 guid1, 8-15 guid2, +16 uint32, +20 and +21
+    //     single bytes. Mask order:
+    //       g1 6,1  g2 5,1,3,0,4  g1 4  g2 7  g1 0,2,7,3,5  g2 2,6
+    //     Byte order:
+    //       g1 5,4  g2 6  g1 2  g2 4  <byte +20>  g2 0  g1 7,3  g2 5,2  g1 0
+    //       <uint32 +16>  g1 1,6  g2 7,1  <byte +21>  g2 3
+    //
+    //     So this opcode stays dormant and its reply needs rebuilding first.
+    //     Recorded because it is the clearest vindication in this wave of not
+    //     registering on appearance: bit-packed is not converted, and this one
+    //     would have shipped a body wrong in seventeen places.
     //
     //   CMSG_GUILD_ACHIEVEMENT_MEMBERS 0x1470 -- thunk sub_C84A42. No handler at
     //     all. Achievement surface rather than ranks or roster.
