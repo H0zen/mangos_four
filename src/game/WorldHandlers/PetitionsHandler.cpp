@@ -559,28 +559,35 @@ void WorldSession::HandlePetitionSignOpcode(WorldPacket& recv_data)
         return;
     }
 
-    // client doesn't allow to sign petition two times by one character, but not check sign by another character from same account
-    // not allow sign another player from already sign player account
-    result = CharacterDatabase.PQuery("SELECT `playerguid`, `petitionguid` FROM `petition_sign` WHERE `player_account` = '%u'", GetAccountId());
+    // The client stops a character signing the same charter twice, but not a
+    // second character on the same account, so both checks belong here. Each has
+    // to ask the database its own question: this used to select every signature
+    // the account held and judge from whichever row came back first, which let
+    // an alt sign a charter the account had already signed whenever an unrelated
+    // signature happened to sort ahead of it -- enough to clear the minimum
+    // signature count from one account.
+    result = CharacterDatabase.PQuery(
+                 "SELECT 1 FROM `petition_sign` WHERE `player_account` = '%u' AND `petitionguid` = '%u' LIMIT 1",
+                 GetAccountId(), petitionLowGuid);
 
     if (result)
     {
-        fields = result->Fetch();
-        ObjectGuid playerGuid = ObjectGuid(HIGHGUID_PLAYER, fields[0].GetUInt32());
-        uint32 otherPetition = fields[1].GetUInt32();
         delete result;
-        if (otherPetition == petitionGuid.GetCounter())
-        {
-            // close at signer side
-            _player->SendPetitionSignResult(petitionGuid, _player, PETITION_SIGN_ALREADY_SIGNED);
-            return;
-        }
-        else if (playerGuid == _player->GetObjectGuid())
-        {
-            // close at signer side
-            _player->SendPetitionSignResult(petitionGuid, _player, PETITION_SIGN_ALREADY_SIGNED_OTHER);
-            return;
-        }
+        // "You have already signed that charter." -- close at signer side
+        _player->SendPetitionSignResult(petitionGuid, _player, PETITION_SIGN_ALREADY_SIGNED);
+        return;
+    }
+
+    result = CharacterDatabase.PQuery(
+                 "SELECT 1 FROM `petition_sign` WHERE `playerguid` = '%u' AND `petitionguid` <> '%u' LIMIT 1",
+                 _player->GetGUIDLow(), petitionLowGuid);
+
+    if (result)
+    {
+        delete result;
+        // "You've already signed another guild charter." -- close at signer side
+        _player->SendPetitionSignResult(petitionGuid, _player, PETITION_SIGN_ALREADY_SIGNED_OTHER);
+        return;
     }
 
     CharacterDatabase.PExecute("INSERT INTO `petition_sign` (`ownerguid`,`petitionguid`, `playerguid`, `player_account`) VALUES ('%u', '%u', '%u','%u')",
