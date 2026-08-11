@@ -3772,9 +3772,24 @@ uint32 Player::GetTalentResetCost()    const
 
 void Player::SendGuildDeclined(std::string name, bool autodecline)
 {
-    WorldPacket data(SMSG_GUILD_DECLINE, 10);
-    data << name;
-    data << uint8(autodecline);
+    // Reader sub_6A1EA2 (parser sub_6A383E, vtable off_D65DA0): a 6-BIT name
+    // length, one bit for the auto-decline flag, then the name bytes and a
+    // trailing uint32. The pre-MoP body sent a NUL-terminated string and a
+    // uint8, and omitted the dword entirely.
+    //
+    // The dword is the decliner's realm address. It is the only uint32 in the
+    // packet, so there is no same-width ambiguity about WHERE it goes; what it
+    // carries is identified by shape rather than by a consumer -- it sits
+    // directly after a player name, which is exactly where MoP puts a realm
+    // address in every other name-bearing packet, SMSG_CONTACT_LIST included.
+    // realmID keeps it consistent with the only two other places this core
+    // writes one (SocialMgr and Guild.cpp).
+    WorldPacket data(SMSG_GUILD_DECLINE, 1 + name.size() + 4);
+    data.WriteBits(name.size(), 6);
+    data.WriteBit(autodecline);
+    data.FlushBits();
+    data.WriteStringData(name);
+    data << uint32(realmID);
     GetSession()->SendPacket(&data);
 }
 

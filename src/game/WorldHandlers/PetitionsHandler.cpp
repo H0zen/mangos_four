@@ -670,13 +670,42 @@ void WorldSession::HandleOfferPetitionOpcode(WorldPacket& recv_data)
         return;
     }
 
-    /// Get petition type and check
-    QueryResult* result = CharacterDatabase.PQuery("SELECT 1 FROM `petition` WHERE `petitionguid` = '%u'", petitionGuid.GetCounter());
+    // Both GUIDs in this packet come from the client, and until this opcode was
+    // registered nothing could reach the checks below. Two things therefore have
+    // to be established here rather than assumed.
+    //
+    // First, that the sender actually OWNS the petition. The old query asked only
+    // whether the petition existed, so any client could name someone else's
+    // charter and have the signature list delivered under its own name.
+    QueryResult* result = CharacterDatabase.PQuery("SELECT `ownerguid` FROM `petition` WHERE `petitionguid` = '%u'", petitionGuid.GetCounter());
     if (!result)
     {
         return;
     }
+
+    uint32 const ownerLowGuid = result->Fetch()[0].GetUInt32();
     delete result;
+
+    if (ownerLowGuid != _player->GetGUIDLow())
+    {
+        sLog.outError("CMSG_OFFER_PETITION: %s offered petition %u owned by %u, refusing",
+                      _player->GetGuidStr().c_str(), petitionGuid.GetCounter(), ownerLowGuid);
+        return;
+    }
+
+    // Second, that the target is somewhere this player could actually have
+    // offered it. FindPlayer resolves ANY online character on the realm, so
+    // without this a forged packet reaches players on other maps and continents.
+    // The client's own builder resolves its target as an in-world unit and
+    // level-checks it, so requiring proximity matches what it can legitimately
+    // produce; TRADE_DISTANCE is the same bound the trade handler uses for the
+    // equivalent "hand something to the player in front of me" interaction.
+    if (!_player->IsWithinDistInMap(player, TRADE_DISTANCE, false))
+    {
+        DEBUG_LOG("CMSG_OFFER_PETITION: %s offered petition %u to out-of-range %s",
+                  _player->GetGuidStr().c_str(), petitionGuid.GetCounter(), playerGuid.GetString().c_str());
+        return;
+    }
 
     DEBUG_LOG("OFFER PETITION: petition %s to %s", petitionGuid.GetString().c_str(), playerGuid.GetString().c_str());
 

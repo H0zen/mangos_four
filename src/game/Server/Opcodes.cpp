@@ -647,6 +647,19 @@ void InitializeOpcodes()
     DefS(SMSG_CALENDAR_RAID_LOCKOUT_REMOVED, "SMSG_CALENDAR_RAID_LOCKOUT_REMOVED");
     DefS(SMSG_CALENDAR_RAID_LOCKOUT_ADDED, "SMSG_CALENDAR_RAID_LOCKOUT_ADDED");
 
+    // Guild -- first of the ranks-and-roster wave. CMSG_GUILD_DECLINE 0x147B
+    // (thunk sub_C84A64) shares its writer with CMSG_GUILD_LEAVE, which looked
+    // like an identity problem until the writer turned out to be nullsub_2, a
+    // bare `retn 4`: both bodies are EMPTY, so there is nothing to attribute and
+    // both existing handlers already read nothing. Only the reply needed work.
+    //
+    // Its reply SMSG_GUILD_DECLINE is rebuilt from reader sub_6A1EA2 and
+    // admitted. GUILD_LEAVE is NOT registered with it -- it reaches
+    // Guild::Disband, BroadcastMemberLeft and LogGuildEvent, so its reply
+    // surface is the guild event machinery rather than one packet.
+    DefC(CMSG_GUILD_DECLINE, "CMSG_GUILD_DECLINE", STATUS_LOGGEDIN, PROCESS_THREADUNSAFE, &WorldSession::HandleGuildDeclineOpcode);
+    DefS(SMSG_GUILD_DECLINE, "SMSG_GUILD_DECLINE");
+
     // Petitions -- the guild/arena charter flow, dormant in this tree until now.
     // All seven readers were rebuilt from the client's own writers, reached
     // through the vtable whose slot +12 holds 0x00C84A3D (slot +8 the opcode
