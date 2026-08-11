@@ -6676,13 +6676,36 @@ void Player::SendPetitionSignResult(ObjectGuid petitionGuid, Player* player, uin
     GetSession()->SendPacket(&data);
 }
 
+/// Maps this core's PetitionTurns enum onto the 18414 wire codes.
+///
+/// Same trap as PetitionSignResultToWire, and the values are different again:
+/// the consumer at 0x962D2B (dispatch case 77 -> parser sub_6E2712 -> handler
+/// sub_6ECA10) switches on the result and every one of this enum's five values
+/// was wrong. Success was the worst -- 0 is not a case, so completing a charter
+/// printed the generic "Petition error" instead of raising the guild-created
+/// event -- but GUILD_NAME_INVALID was worse than useless, landing on the
+/// "already in a guild" message.
+static uint32 PetitionTurnResultToWire(uint32 result)
+{
+    switch (result)
+    {
+        case PETITION_TURN_GUILD_PERMISSIONS:    return 3;  // 0x064 ERR_GUILD_PERMISSIONS
+        case PETITION_TURN_OK:                   return 7;  // no message; fires event 0x104
+        case PETITION_TURN_NEED_MORE_SIGNATURES: return 9;  // 0x178 ERR_PETITION_NOT_ENOUGH_SIGNATURES
+        case PETITION_TURN_ALREADY_IN_GUILD:     return 12; // 0x176 ERR_PETITION_IN_GUILD
+        case PETITION_TURN_GUILD_NAME_INVALID:   return 13; // 0x17C ERR_GUILD_NAME_INVALID
+        // Unreachable -- the enum has exactly the five values above.
+        default:                                 return 0;
+    }
+}
+
 void Player::SendPetitionTurnInResult(uint32 result)
 {
     // Reader sub_6EC08F (parser sub_6E2712, vtable off_D697D0) reads a single
     // 4-BIT field and nothing else -- a one byte body, where the pre-MoP one
-    // sent a uint32. Every PETITION_TURN_* code is 0..12, so they all fit.
+    // sent a uint32. Every wire code above is 3..13, so they all fit.
     WorldPacket data(SMSG_TURN_IN_PETITION_RESULTS, 1);
-    data.WriteBits(result, 4);
+    data.WriteBits(PetitionTurnResultToWire(result), 4);
     data.FlushBits();
     GetSession()->SendPacket(&data);
 }
