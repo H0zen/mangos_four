@@ -660,6 +660,22 @@ void InitializeOpcodes()
     DefC(CMSG_GUILD_DECLINE, "CMSG_GUILD_DECLINE", STATUS_LOGGEDIN, PROCESS_THREADUNSAFE, &WorldSession::HandleGuildDeclineOpcode);
     DefS(SMSG_GUILD_DECLINE, "SMSG_GUILD_DECLINE");
 
+    // The rank-change trio. All three already had bit-packed readers, so they
+    // looked converted; none matched its writer, and all three were corrected at
+    // f7b65a42c from sub_C85476, sub_C86553 and sub_C868E0. Their permutations
+    // differ from each other -- MoP randomises per opcode, so no sibling's order
+    // may be carried across even between packets of identical shape.
+    //
+    // Registered now because their whole reply surface was ALREADY converted and
+    // admitted, at every depth: SendGuildCommandResult -> SMSG_GUILD_COMMAND_RESULT;
+    // BroadcastMemberRankUpdate -> SMSG_GUILD_RANKS_UPDATE; and for REMOVE also
+    // BroadcastMemberRemoved -> SMSG_GUILD_EVENT_PLAYER_LEFT and, through
+    // DelMember, Disband -> SMSG_GUILD_EVENT_DISBANDED. LogGuildEvent touches
+    // only the database.
+    DefC(CMSG_GUILD_PROMOTE, "CMSG_GUILD_PROMOTE", STATUS_LOGGEDIN, PROCESS_THREADUNSAFE, &WorldSession::HandleGuildPromoteOpcode);
+    DefC(CMSG_GUILD_DEMOTE, "CMSG_GUILD_DEMOTE", STATUS_LOGGEDIN, PROCESS_THREADUNSAFE, &WorldSession::HandleGuildDemoteOpcode);
+    DefC(CMSG_GUILD_REMOVE, "CMSG_GUILD_REMOVE", STATUS_LOGGEDIN, PROCESS_THREADUNSAFE, &WorldSession::HandleGuildRemoveOpcode);
+
     // Petitions -- the guild/arena charter flow, dormant in this tree until now.
     // All seven readers were rebuilt from the client's own writers, reached
     // through the vtable whose slot +12 holds 0x00C84A3D (slot +8 the opcode
