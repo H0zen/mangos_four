@@ -853,7 +853,10 @@ void WorldSession::HandleGuildMOTDOpcode(WorldPacket& recvPacket)
 {
     DEBUG_LOG("WORLD: Received opcode CMSG_GUILD_MOTD");
 
-    std::string MOTD = recvPacket.ReadString(recvPacket.ReadBits(11));
+    // Writer sub_C872E6 -> sub_66B79F: sub_665185 writes the top EIGHT bits and
+    // sub_664CD1 the low TWO, so the length field is 10 bits, not 11. Reading one
+    // bit too many shifts the length and desynchronises the string after it.
+    std::string MOTD = recvPacket.ReadString(recvPacket.ReadBits(10));
 
     Guild* guild = sGuildMgr.GetGuildById(GetPlayer()->GetGuildId());
     if (!guild)
@@ -886,15 +889,26 @@ void WorldSession::HandleGuildSetNoteOpcode(WorldPacket& recvPacket)
     std::string name, note;
     ObjectGuid targetGuid;
 
-    recvPacket.ReadGuidMask<1, 4, 5, 3, 0, 7>(targetGuid);
-    officer = !recvPacket.ReadBit();
-    recvPacket.ReadGuidMask<6>(targetGuid);
+    // Writer sub_C85C5A (thunk sub_C84BDA). The previous reader had the bit order,
+    // the length's position and the byte order all different from this. The note
+    // LENGTH is a full 8 bits (sub_665185 writes a whole byte) and sits after the
+    // first mask bit, not near the end; the flag sits INSIDE the mask run; and the
+    // string goes out in the middle of the byte run, not after it.
+    recvPacket.ReadGuidMask<1>(targetGuid);
     noteLen = recvPacket.ReadBits(8);
-    recvPacket.ReadGuidMask<2>(targetGuid);
+    recvPacket.ReadGuidMask<4, 2>(targetGuid);
+    // POLARITY UNVERIFIED. The writer emits object +153 straight through, so the
+    // bit's sense is whatever that field holds, and only the client's builder can
+    // say whether it is "officer" or "public". The negation below is inherited and
+    // is preserved rather than guessed at -- if live testing shows notes landing in
+    // the wrong column, this is the line. The opcode stays unregistered until it is
+    // settled.
+    officer = !recvPacket.ReadBit();
+    recvPacket.ReadGuidMask<3, 5, 0, 6, 7>(targetGuid);
 
-    recvPacket.ReadGuidBytes<4, 5, 0, 3, 1, 6, 7>(targetGuid);
+    recvPacket.ReadGuidBytes<5, 1, 6>(targetGuid);
     note = recvPacket.ReadString(noteLen);
-    recvPacket.ReadGuidBytes<2>(targetGuid);
+    recvPacket.ReadGuidBytes<0, 7, 4, 3, 2>(targetGuid);
 
     Guild* guild = sGuildMgr.GetGuildById(GetPlayer()->GetGuildId());
     if (!guild)
@@ -1039,7 +1053,9 @@ void WorldSession::HandleGuildChangeInfoTextOpcode(WorldPacket& recvPacket)
 {
     DEBUG_LOG("WORLD: Received opcode CMSG_GUILD_INFO_TEXT");
 
-    std::string GINFO = recvPacket.ReadString(recvPacket.ReadBits(12));
+    // Writer sub_C87297 -> sub_66B7DA: eight bits via sub_665185 plus three via
+    // sub_664D4F, so 11 bits and not 12.
+    std::string GINFO = recvPacket.ReadString(recvPacket.ReadBits(11));
 
     Guild* guild = sGuildMgr.GetGuildById(GetPlayer()->GetGuildId());
     if (!guild)
