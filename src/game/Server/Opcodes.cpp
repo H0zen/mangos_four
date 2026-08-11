@@ -1187,8 +1187,39 @@ void InitializeOpcodes()
     DefS(SMSG_PET_LEARNED_SPELL, "SMSG_PET_LEARNED_SPELL");
     DefS(SMSG_PET_REMOVED_SPELL, "SMSG_PET_REMOVED_SPELL");
 
-    // Live 18414 guild invite: 9-bit player-name length followed by raw bytes.
-    DefC(CMSG_GUILD_INVITE, "CMSG_GUILD_INVITE", STATUS_LOGGEDIN, PROCESS_THREADUNSAFE, &WorldSession::HandleGuildInviteOpcode);
+    // UNREGISTERED. Its request reader is fine -- a 9-bit player-name length then
+    // raw bytes -- but its reply SMSG_GUILD_INVITE 0x0F71 fails gates 3 and 4, so
+    // by this file's own standard it cannot stay registered. It was registered
+    // before the 2026-08-11 wave and was never re-checked; "already registered"
+    // turned out to mean "never held to the four gates".
+    //
+    // Gate 4: there is no DefS(SMSG_GUILD_INVITE) and no IsEnterWorldConverted
+    // case, so WorldSession::SendPacket drops the reply -- AFTER the handler has
+    // already set the invitee's SetGuildIdInvited. The invitee therefore never
+    // sees the popup and guild invitations do not work at all today.
+    //
+    // Gate 3: the body is pre-MoP. It writes six raw uint32 before any bits; a
+    // real 18414 capture has the inviter's NAME at offset 10.
+    //
+    // The layout IS recovered, from reader sub_69E959 (parser sub_6A0BF8, vtable
+    // off_D65F94), and verified byte-exact against capture-000499 seq 777 --
+    // 65 of 65 bytes consumed, yielding name "Dodge", guild "Divine Wrath", an
+    // empty old-guild name, guild GUID high 0x1FF4 and a zero old-guild GUID.
+    // Bit section, in order:
+    //   A4, <7-bit lenGuildName>, B4, A6, B2, B1, B5, B7, A0, B3, A5, B6,
+    //   <6-bit lenInviterName>, A1, A3, B0, A2, <7-bit lenOldGuildName>, A7
+    // where A is the new guild GUID at +16 and B the old guild GUID at +136.
+    // Byte section: A1, u32, A4, inviterName, u32, B7, A0, A2, u32, B2, B5,
+    //   u32, u32, A7, A3, B4, u32, guildName, u32, u32, B0, oldGuildName, A5,
+    //   u32, B1, A6, B3, B6.
+    //
+    // What is NOT settled is the identity of the NINE uint32. The handler
+    // currently sends level, borderStyle, borderColor, emblemStyle,
+    // backgroundColor and emblemColor -- six values for nine slots, all the same
+    // width. Ten captures exist for this opcode, so correlating fields that
+    // differ between them is the way in; do not map them from the pre-MoP order.
+    //
+    //  DefC(CMSG_GUILD_INVITE, ...)  -- restore once the reply is rebuilt.
 
     // Guild event packets split from the pre-MoP generic guild-event packet.
     DefS(SMSG_GUILD_EVENT_MOTD, "SMSG_GUILD_EVENT_MOTD");
