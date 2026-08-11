@@ -897,12 +897,19 @@ void WorldSession::HandleGuildSetNoteOpcode(WorldPacket& recvPacket)
     recvPacket.ReadGuidMask<1>(targetGuid);
     noteLen = recvPacket.ReadBits(8);
     recvPacket.ReadGuidMask<4, 2>(targetGuid);
-    // POLARITY UNVERIFIED. The writer emits object +153 straight through, so the
-    // bit's sense is whatever that field holds, and only the client's builder can
-    // say whether it is "officer" or "public". The negation below is inherited and
-    // is preserved rather than guessed at -- if live testing shows notes landing in
-    // the wrong column, this is the line. The opcode stays unregistered until it is
-    // settled.
+    // Polarity settled by the builder route, since the writer only passes object
+    // +153 through and cannot say what it means. Two Lua entry points build this
+    // packet and differ in exactly one argument: GuildRosterSetPublicNote
+    // (sub_968C4E) calls sub_C85A76 with 1, GuildRosterSetOfficerNote
+    // (sub_968D56) with 0 -- and they read from different member-record offsets,
+    // +698 and +827, which corroborates the pairing. sub_C85A76 stores that
+    // argument at record +137, and sub_C87393 copies the record to packet +16,
+    // landing it at +153: exactly the byte the writer emits as this bit.
+    //
+    // So a SET bit means the PUBLIC note. The inherited negation below is
+    // therefore correct, which is worth having proven rather than assumed --
+    // getting it backwards would have filed every note into the wrong column,
+    // silently, in a packet of exactly the right length.
     officer = !recvPacket.ReadBit();
     recvPacket.ReadGuidMask<3, 5, 0, 6, 7>(targetGuid);
 

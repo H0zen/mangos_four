@@ -702,11 +702,14 @@ void InitializeOpcodes()
     DefC(CMSG_GUILD_MOTD, "CMSG_GUILD_MOTD", STATUS_LOGGEDIN, PROCESS_THREADUNSAFE, &WorldSession::HandleGuildMOTDOpcode);
     DefC(CMSG_GUILD_INFO_TEXT, "CMSG_GUILD_INFO_TEXT", STATUS_LOGGEDIN, PROCESS_THREADUNSAFE, &WorldSession::HandleGuildChangeInfoTextOpcode);
 
-    // NOT registered: CMSG_GUILD_SET_NOTE. Its layout is corrected but it
-    // carries a public/officer flag whose polarity only the client's builder can
-    // settle -- the writer passes object +153 straight through, so the bit means
-    // whatever that field holds. Getting it backwards files every note into the
-    // wrong column, silently and with a correct-length packet.
+    // SET_NOTE, once its flag polarity was settled by the builder route rather
+    // than guessed. The writer only passes object +153 through, so it cannot say
+    // what the bit means; the two Lua entry points can. GuildRosterSetPublicNote
+    // passes 1 and GuildRosterSetOfficerNote passes 0 to sub_C85A76, which stores
+    // it at record +137, and sub_C87393 copies the record to packet +16 -- landing
+    // it at +153, the byte the writer emits. A set bit is the PUBLIC note.
+    // Reaches only SendGuildCommandResult and Roster, both admitted.
+    DefC(CMSG_GUILD_SET_NOTE, "CMSG_GUILD_SET_NOTE", STATUS_LOGGEDIN, PROCESS_THREADUNSAFE, &WorldSession::HandleGuildSetNoteOpcode);
 
     // Petitions -- the guild/arena charter flow, dormant in this tree until now.
     // All seven readers were rebuilt from the client's own writers, reached
