@@ -6579,6 +6579,16 @@ void Player::DoInteraction(ObjectGuid const& interactObjGuid)
 }
 
 
+// PARKED -- SMSG_PETITION_SIGN_RESULTS 0x06AE is still the pre-MoP body, which
+// is why CMSG_PETITION_SIGN stays unregistered. Reader sub_6FB9AF (parser
+// sub_7000D1, vtable off_D6A590) gives the layout: two GUIDs at object +16 and
+// +32 with sixteen INTERLEAVED mask bits, then a 4-BIT result, then sixteen
+// interleaved bytes. Both GUIDs are eight bytes so layout cannot tell the
+// petition from the signer, and unlike the other petition replies this one's
+// consumer is not reachable from its vtable -- the only xref to off_D6A590 is
+// the constructor, and the trampoline dispatches through a runtime-XOR
+// indirect. Find the consumer another way before rebuilding; do NOT assume the
+// pre-MoP order of petition-then-signer.
 void Player::SendPetitionSignResult(ObjectGuid petitionGuid, Player* player, uint32 result)
 {
     WorldPacket data(SMSG_PETITION_SIGN_RESULTS, 8 + 8 + 4);
@@ -6590,7 +6600,11 @@ void Player::SendPetitionSignResult(ObjectGuid petitionGuid, Player* player, uin
 
 void Player::SendPetitionTurnInResult(uint32 result)
 {
-    WorldPacket data(SMSG_TURN_IN_PETITION_RESULTS, 4);
-    data << uint32(result);
+    // Reader sub_6EC08F (parser sub_6E2712, vtable off_D697D0) reads a single
+    // 4-BIT field and nothing else -- a one byte body, where the pre-MoP one
+    // sent a uint32. Every PETITION_TURN_* code is 0..12, so they all fit.
+    WorldPacket data(SMSG_TURN_IN_PETITION_RESULTS, 1);
+    data.WriteBits(result, 4);
+    data.FlushBits();
     GetSession()->SendPacket(&data);
 }

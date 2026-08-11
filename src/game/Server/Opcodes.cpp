@@ -646,6 +646,41 @@ void InitializeOpcodes()
     DefS(SMSG_GM_TICKET_STATUS_UPDATE, "SMSG_GM_TICKET_STATUS_UPDATE");
     DefS(SMSG_CALENDAR_RAID_LOCKOUT_REMOVED, "SMSG_CALENDAR_RAID_LOCKOUT_REMOVED");
     DefS(SMSG_CALENDAR_RAID_LOCKOUT_ADDED, "SMSG_CALENDAR_RAID_LOCKOUT_ADDED");
+
+    // Petitions -- the guild/arena charter flow, dormant in this tree until now.
+    // All seven readers were rebuilt from the client's own writers, reached
+    // through the vtable whose slot +12 holds 0x00C84A3D (slot +8 the opcode
+    // thunk, slot +4 the body writer); the layout is confirmed in IDA and
+    // Binary Ninja independently, which agree on every slot.
+    //
+    // FIVE are registered. Two are NOT, and the reason is the reply gate rather
+    // than the reader:
+    //
+    //   CMSG_PETITION_SIGN 0x06DA reaches SMSG_PETITION_SIGN_RESULTS, which is
+    //     still pre-MoP. Its layout is decoded but both its GUIDs are eight
+    //     bytes and its consumer is not reachable from its vtable, so identity
+    //     is unsettled. See Player::SendPetitionSignResult.
+    //   CMSG_TURN_IN_PETITION 0x0673 creates a guild or arena team, so its
+    //     reply surface is the whole guild subsystem rather than the one result
+    //     packet -- that belongs to the guild wave, not this one.
+    //
+    // No petition opcode has a single capture anywhere in the 18414 corpus, so
+    // every field identity below rests on the client binary alone: the builder
+    // route for what the client sends, the consumer route for what it receives.
+    // Three that could not have been inferred from the pre-MoP bodies:
+    // PETITION_SIGN puts its byte FIRST; PETITION_BUY collapsed to a name plus a
+    // vendor GUID with a 7-bit length written inside the mask run; and
+    // OFFER_PETITION's two GUIDs are distinguished only by its builder, which
+    // level-checks the target and rejects it with error 375 when it is you.
+    DefC(CMSG_PETITION_SHOWLIST, "CMSG_PETITION_SHOWLIST", STATUS_LOGGEDIN, PROCESS_THREADUNSAFE, &WorldSession::HandlePetitionShowListOpcode);
+    DefC(CMSG_PETITION_QUERY, "CMSG_PETITION_QUERY", STATUS_LOGGEDIN, PROCESS_THREADUNSAFE, &WorldSession::HandlePetitionQueryOpcode);
+    DefC(CMSG_PETITION_SHOW_SIGNATURES, "CMSG_PETITION_SHOW_SIGNATURES", STATUS_LOGGEDIN, PROCESS_THREADUNSAFE, &WorldSession::HandlePetitionShowSignOpcode);
+    DefC(CMSG_OFFER_PETITION, "CMSG_OFFER_PETITION", STATUS_LOGGEDIN, PROCESS_THREADUNSAFE, &WorldSession::HandleOfferPetitionOpcode);
+    DefC(CMSG_PETITION_BUY, "CMSG_PETITION_BUY", STATUS_LOGGEDIN, PROCESS_THREADUNSAFE, &WorldSession::HandlePetitionBuyOpcode);
+    DefS(SMSG_PETITION_SHOWLIST, "SMSG_PETITION_SHOWLIST");
+    DefS(SMSG_PETITION_SHOW_SIGNATURES, "SMSG_PETITION_SHOW_SIGNATURES");
+    DefS(SMSG_PETITION_QUERY_RESPONSE, "SMSG_PETITION_QUERY_RESPONSE");
+    DefS(SMSG_TURN_IN_PETITION_RESULTS, "SMSG_TURN_IN_PETITION_RESULTS");
     DefS(SMSG_CANCEL_COMBAT, "SMSG_CANCEL_COMBAT");
     DefS(SMSG_CANCEL_AUTO_REPEAT, "SMSG_CANCEL_AUTO_REPEAT");
     DefS(SMSG_AI_REACTION, "SMSG_AI_REACTION");

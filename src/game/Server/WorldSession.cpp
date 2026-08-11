@@ -552,6 +552,16 @@ static bool IsEnterWorldConverted(uint16 opcode)
         // invisible, since it is reachable from no CMSG (only from Map.cpp on
         // instance bind) and was excluded here, so nothing ever sent it.
         case SMSG_CALENDAR_RAID_LOCKOUT_ADDED:       // MopCalendarPackets::BuildCalendarRaidLockoutAdded
+
+        // Petitions. All four rebuilt from their client readers; none has a
+        // capture anywhere in the corpus, so every field identity here rests on
+        // the consumer route. SMSG_PETITION_SIGN_RESULTS is deliberately absent
+        // -- it is still a pre-MoP body, which is why CMSG_PETITION_SIGN stays
+        // unregistered. See the note above Player::SendPetitionSignResult.
+        case SMSG_PETITION_SHOWLIST:                 // SendPetitionShowList
+        case SMSG_PETITION_SHOW_SIGNATURES:          // BuildPetitionShowSignatures
+        case SMSG_PETITION_QUERY_RESPONSE:           // BuildPetitionQueryResponse
+        case SMSG_TURN_IN_PETITION_RESULTS:          // Player::SendPetitionTurnInResult
         case SMSG_CANCEL_COMBAT:                   // Empty reader; terminal clears local-player combat state
         case SMSG_CANCEL_AUTO_REPEAT:              // packed unit GUID; Unit_C leaf 0x819546 clears auto-repeat
         case SMSG_AI_REACTION:                     // packed unit GUID plus reaction; Unit_C.cpp leaf 0x80AD80

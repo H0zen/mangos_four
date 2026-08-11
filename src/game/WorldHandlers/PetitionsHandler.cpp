@@ -93,6 +93,79 @@
 // sub_62EB8B caches. No capture exists anywhere in the 18414 corpus, so the
 // consumer is the only oracle. Do NOT map these from the pre-MoP field order.
 
+enum PetitionType
+{
+    PETITION_TYPE_GUILD = 0,                                // GetPetitionInfo() returns "guild"
+    PETITION_TYPE_ARENA = 1,                                // ...and "arena"; anything else "other"
+};
+
+/**
+ * @brief Serialises SMSG_PETITION_QUERY_RESPONSE for the 18414 client.
+ *
+ * Reader sub_70BD8D (parser sub_713976, vtable off_D697E4).
+ *
+ * Field identity came from GetPetitionInfo() (sub_962D86), which reads a CACHED
+ * record rather than the packet record -- but the two are the same structure
+ * offset by a constant 24 bytes, and that holds across four independent fields:
+ * title +16/+40, body text +144/+168, originator GUID +8/+32 and the signature
+ * pair +4240,+4244 / +4264,+4268. Under that mapping the client's seven exposed
+ * values land as: petition type at +4308 (0 guild, 1 arena, else "other"),
+ * title at +40, body text at +168, max signatures at +4268, the originator GUID
+ * at +32 (also compared against the local player to decide isOriginator), and
+ * min signatures at +4264.
+ *
+ * The remaining dwords are the same slots the pre-MoP body filled with zeroes
+ * and the client does not surface through Lua; they stay zero here. Widths that
+ * are NOT guessable: the title length is 7 bits, the body text 12, and the ten
+ * trailing name slots 6 each.
+ */
+static void BuildPetitionQueryResponse(WorldPacket& data, uint32 petitionId,
+                                       ObjectGuid ownerGuid, std::string const& title,
+                                       uint32 minSignatures, uint32 maxSignatures,
+                                       uint32 petitionType)
+{
+    std::string const bodyText;                             // MoP leaves this empty
+
+    data << uint32(petitionId);
+    data.WriteBit(1);                                       // record present
+
+    for (int i = 0; i < 10; ++i)
+    {
+        data.WriteBits(0, 6);                               // ten unused name slots
+    }
+
+    data.WriteGuidMask<2, 4>(ownerGuid);
+    data.WriteBits(bodyText.size(), 12);
+    data.WriteGuidMask<0, 7, 3, 6, 5>(ownerGuid);
+    data.WriteBits(title.size(), 7);
+    data.WriteGuidMask<1>(ownerGuid);
+    data.FlushBits();
+
+    data.WriteGuidBytes<5>(ownerGuid);
+    data << uint32(0);
+    data.WriteStringData(title);
+    data << uint32(0);
+    data.WriteStringData(bodyText);
+    data.WriteGuidBytes<4>(ownerGuid);
+    data << uint32(maxSignatures);
+    data.WriteGuidBytes<6>(ownerGuid);
+    data << uint32(0);
+    data << uint32(minSignatures);
+    // the ten name slots are all zero-length, so nothing follows for them
+    data.WriteGuidBytes<1, 7, 0>(ownerGuid);
+    data << uint32(0);
+    data << uint32(0);
+    data.WriteGuidBytes<2>(ownerGuid);
+    data << uint32(0);
+    data << uint16(0);
+    data << uint32(petitionType);
+    data.WriteGuidBytes<3>(ownerGuid);
+    data << uint32(0);
+    data << uint32(0);
+    data << uint32(0);
+    data << uint32(0);
+}
+
 /**
  * @brief Serialises SMSG_PETITION_SHOW_SIGNATURES for the 18414 client.
  *
@@ -426,31 +499,15 @@ void WorldSession::SendPetitionQueryOpcode(ObjectGuid petitionguid)
         return;
     }
 
-    WorldPacket data(SMSG_PETITION_QUERY_RESPONSE, (4 + 8 + name.size() + 1 + 1 + 4 * 12 + 2 + 10));
-    data << uint32(petitionLowGuid);                        // guild/team guid (in mangos always same as GUID_LOPART(petition guid)
-    data << ObjectGuid(ownerGuid);                          // charter owner guid
-    data << name;                                           // name (guild/arena team)
-    data << uint8(0);                                       // some string
-    data << uint32(4);
-    data << uint32(4);
-    data << uint32(0);                                      // bypass client - side limitation, a different value is needed here for each petition
-    data << uint32(0);                                      // 5
-    data << uint32(0);                                      // 6
-    data << uint32(0);                                      // 7
-    data << uint32(0);                                      // 8
-    data << uint16(0);                                      // 9 2 bytes field
-    data << uint32(0);                                      // 10
-    data << uint32(0);                                      // 11
-    data << uint32(0);                                      // 13 count of next strings?
+    // The signature requirement the SERVER actually enforces, at the turn-in gate
+    // below. The pre-MoP body hardcoded 4 here while that gate defaults to 9, so
+    // the client was told a number its own server contradicted -- the charter
+    // would read as ready and then be refused. Send what is enforced.
+    uint32 const requiredSigns = sWorld.getConfig(CONFIG_UINT32_MIN_PETITION_SIGNS);
 
-    for (int i = 0; i < 10; ++i)
-    {
-        data << uint8(0);                                   // some string
-    }
-
-    data << uint32(0);                                      // 14
-    data << uint32(0);                                      // 15 0 - guild, 1 - arena team
-
+    WorldPacket data(SMSG_PETITION_QUERY_RESPONSE, 4 + 1 + 8 + name.size() + 64);
+    BuildPetitionQueryResponse(data, petitionLowGuid, ownerGuid, name,
+                               requiredSigns, requiredSigns, PETITION_TYPE_GUILD);
     SendPacket(&data);
 }
 
