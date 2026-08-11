@@ -209,12 +209,18 @@ bool Guild::Create(Player* leader, std::string gname)
         // know whether the founder can be admitted, so a refusal has to take them
         // back out. Reporting failure while leaving the rows behind creates a
         // guild nobody belongs to and no caller knows about.
+        //
+        // Queued, deliberately. Everything this undoes was queued too, and the
+        // pool runs its queue in order -- committing this one directly would let
+        // the removal overtake the writes it is removing and leave exactly the
+        // orphan it exists to prevent. Nothing reads this guild in the meantime:
+        // it was never registered with sGuildMgr and the caller discards it.
         CharacterDatabase.BeginTransaction();
         CharacterDatabase.PExecute("DELETE FROM `guild` WHERE `guildid` = '%u'", m_Id);
         CharacterDatabase.PExecute("DELETE FROM `guild_rank` WHERE `guildid` = '%u'", m_Id);
         CharacterDatabase.PExecute("DELETE FROM `guild_member` WHERE `guildid` = '%u'", m_Id);
 
-        if (!CharacterDatabase.CommitTransactionDirect())
+        if (!CharacterDatabase.CommitTransaction())
         {
             sLog.outError("Guild::Create: guild %u was not founded and its rows could not be removed", m_Id);
         }

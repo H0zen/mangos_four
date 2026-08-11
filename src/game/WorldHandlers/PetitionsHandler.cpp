@@ -934,14 +934,35 @@ void WorldSession::HandleTurnInPetitionOpcode(WorldPacket& recv_data)
             continue;
         }
 
-        // Offline, so match what AddMember will do with them: it wants a
-        // character that still exists as well as one not already in a guild.
-        std::string signerName;
-
-        if (Player::GetGuildIdFromDB(signGuid) == 0 && sObjectMgr.GetPlayerNameByGUID(signGuid, signerName))
+        // Offline, so ask exactly what AddMember asks: a character that still
+        // exists, is not already in a guild, and whose stored level and class it
+        // will accept. Anything looser counts a signer it then refuses, after the
+        // charter has been spent.
+        if (Player::GetGuildIdFromDB(signGuid) != 0)
         {
-            ++eligible;
+            continue;
         }
+
+        QueryResult* signerRow = CharacterDatabase.PQuery("SELECT `level`, `class` FROM `characters` WHERE `guid` = '%u'",
+                                                          signGuid.GetCounter());
+
+        if (!signerRow)
+        {
+            continue;
+        }
+
+        Field* signerFields = signerRow->Fetch();
+        uint8 const signerLevel = signerFields[0].GetUInt8();
+        uint8 const signerClass = signerFields[1].GetUInt8();
+        delete signerRow;
+
+        if (signerLevel < 1 || signerLevel > STRONG_MAX_LEVEL ||
+            !((1 << (signerClass - 1)) & CLASSMASK_ALL_PLAYABLE))
+        {
+            continue;
+        }
+
+        ++eligible;
     }
 
     uint32 count = sWorld.getConfig(CONFIG_UINT32_MIN_PETITION_SIGNS);
@@ -983,8 +1004,22 @@ void WorldSession::HandleTurnInPetitionOpcode(WorldPacket& recv_data)
         return;
     }
 
-    // delete charter item
-    _player->DestroyItem(item->GetBagSlot(), item->GetSlot(), true);
+    // Re-resolve the charter. Create runs Eluna's OnCreate and OnMemberAdd hooks,
+    // and a script may remove items from the player's bags there -- a charter
+    // still in ITEM_NEW state is deleted outright, so the pointer taken before
+    // Create can be dangling, and its bag and slot stale even if it is not.
+    item = _player->GetItemByGuid(petitionGuid);
+
+    if (item)
+    {
+        // delete charter item
+        _player->DestroyItem(item->GetBagSlot(), item->GetSlot(), true);
+    }
+    else
+    {
+        sLog.outError("TURN IN PETITION: charter %u was gone before it could be spent; guild '%s' was still founded",
+                      petitionGuid.GetCounter(), name.c_str());
+    }
 
     // register guild and add guildmaster
     sGuildMgr.AddGuild(guild);
@@ -1010,10 +1045,11 @@ void WorldSession::HandleTurnInPetitionOpcode(WorldPacket& recv_data)
                       name.c_str(), _player->GetGuidStr().c_str(), uint32(signs), eligible, admitted);
     }
 
-    // DestroyItem above already dropped both of these directly, so this affects
-    // no rows. It is kept deliberately: it is the turn-in path's own statement of
-    // what it requires, and it does not depend on a charter-flag check in the
-    // item code staying where it is.
+    // Both are already gone, and it is Create that dropped them first, not
+    // DestroyItem: admitting the founder clears the petitions he owns, and this
+    // charter is one of them. This is kept deliberately even so -- it is the
+    // turn-in path stating what it requires, rather than inheriting it from a
+    // charter-flag check in the item code and a side effect of guild joining.
     CharacterDatabase.BeginTransaction();
     CharacterDatabase.PExecute("DELETE FROM `petition` WHERE `petitionguid` = '%u'", petitionGuid.GetCounter());
     CharacterDatabase.PExecute("DELETE FROM `petition_sign` WHERE `petitionguid` = '%u'", petitionGuid.GetCounter());
