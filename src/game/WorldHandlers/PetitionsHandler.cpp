@@ -56,6 +56,37 @@
 #define GUILD_CHARTER               5863
 #define CHARTER_DISPLAY_ID          16161
 
+// PARKED -- the last two petition replies, and why the seven CMSGs stay dormant.
+//
+// All seven readers are rebuilt from the client's writers (34a09a033) and
+// SMSG_PETITION_SHOWLIST from its reader with the cost proven by its consumer
+// (776464628). Registration still waits on these two, because a correct reader
+// behind an unconverted reply is exactly what the four gates exist to stop.
+//
+// SMSG_PETITION_SHOW_SIGNATURES 0x00AA -- reader sub_72B793 (parser sub_73263F,
+//     vtable off_D6B990). Layout is DECODED:
+//       15 header mask bits, then a 21-BIT signer count (sub_6A29A8: two 8-bit
+//       chunks at shifts 13 and 5 plus a 5-bit tail), then per signer an 8-bit
+//       GUID mask <2,0,4,7,5,1,6,3>; then ONE more header mask bit -- object
+//       +50, deferred until after every per-entry mask, which is the detail a
+//       block-structured rebuild would get wrong; then per signer the bytes
+//       <6,0,1,3,2,5,7,4> and a uint32; then the header bytes with a uint32
+//       interleaved after the fifth.
+//     What is MISSING is identity. The two header GUIDs at object +40 and +48
+//     are both eight bytes, so layout cannot tell them apart. The consumer
+//     sub_9633C0 is the right end of the trail -- it takes a petition GUID into
+//     qword_11E9F18 (the same global CMSG_OFFER_PETITION's builder reads) and a
+//     separate owner GUID into dword_11E9F20/24 -- but the hop that maps those
+//     two parameters onto record +40 and +48 is not yet done. Do that before
+//     rebuilding; do NOT infer it from the pre-MoP field order.
+//
+// SMSG_PETITION_QUERY_RESPONSE 0x1083 -- parser sub_713976, not yet followed to
+//     its reader. GetPetitionInfo() names the fields it must carry: petitionType,
+//     title, bodyText, maxSignatures, originatorName, isOriginator, minSignatures.
+//
+// Neither opcode has a single capture anywhere in the 18414 corpus, so the
+// consumer route is the only oracle for both.
+
 /**
  * @brief Handles charter purchase and petition creation.
  *
