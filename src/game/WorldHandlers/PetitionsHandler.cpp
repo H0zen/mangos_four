@@ -56,43 +56,6 @@
 #define GUILD_CHARTER               5863
 #define CHARTER_DISPLAY_ID          16161
 
-// PARKED -- SMSG_PETITION_QUERY_RESPONSE 0x1083. Reader sub_70BD8D (parser
-// sub_713976, vtable off_D697E4). The seven petition CMSGs stay dormant until
-// this is converted: a correct reader behind an unconverted reply is exactly
-// what the four registration gates exist to stop.
-//
-// LAYOUT is decoded. Structure, in wire order:
-//   uint32                      -> +16, read BEFORE any bit; the petition id
-//   1 bit                       -> +20, "record present". Everything below is
-//                                 conditional on it, so the empty form is just
-//                                 uint32 + one bit.
-//   then, if present:
-//     10 x 6-BIT lengths (sub_691684) for ten string slots at +4316, stride 64
-//     bit +34, bit +36
-//     a 12-BIT length (sub_69BAFD = 8 bits << 4 | sub_6915FD's 4)  -> +168
-//     bits +32, +39, +35, +38, +37
-//     a 7-BIT length (sub_6650D3)  -> +40
-//     bit +33
-//   The three widths are coherent with what they must carry: a 7-bit title
-//   (max 127), a 12-bit body text (max 4095) and ten short 6-bit name slots
-//   (max 63). Known width table so far: sub_664F47 7, sub_6650D3 7, sub_691684 6,
-//   sub_6915FD 4, sub_69BAFD 12, sub_66529C 8, sub_6A29A8 21.
-//   The bits at +32..39 are one GUID's eight presence bits, so its mask order is
-//   2, 4, <len>, 0, 7, 3, 6, 5, <len>, 1 -- two string lengths sit INSIDE the
-//   mask run, as CMSG_PETITION_BUY's does.
-//   Byte section: GUID byte 5, uint32, the +40 string, uint32, the +168 string,
-//   byte 4, uint32, byte 6, uint32, uint32, the ten strings, bytes 1, 7, 0,
-//   uint32, uint32, byte 2, uint32, a UINT16 (sub_40F30E), uint32, byte 3, then
-//   four more uint32.
-//
-// What is MISSING is identity, and it is the hard kind: roughly a dozen uint32
-// of identical width. GetPetitionInfo() names only seven values the client
-// exposes -- petitionType, title, bodyText, maxSignatures, originatorName,
-// isOriginator, minSignatures -- so most of these dwords are not reachable from
-// Lua at all and must be named from the consumer that fills the record
-// sub_62EB8B caches. No capture exists anywhere in the 18414 corpus, so the
-// consumer is the only oracle. Do NOT map these from the pre-MoP field order.
-
 enum PetitionType
 {
     PETITION_TYPE_GUILD = 0,                                // GetPetitionInfo() returns "guild"
@@ -115,9 +78,14 @@ enum PetitionType
  * min signatures at +4264.
  *
  * The remaining dwords are the same slots the pre-MoP body filled with zeroes
- * and the client does not surface through Lua; they stay zero here. Widths that
- * are NOT guessable: the title length is 7 bits, the body text 12, and the ten
- * trailing name slots 6 each.
+ * and the client does not surface through Lua; they stay zero here.
+ *
+ * The bit-field widths are not guessable and cost real time to re-derive, so
+ * the ones recovered across this wave are recorded here: title 7 (sub_6650D3),
+ * body text 12 (sub_69BAFD = sub_66529C's 8 << 4 | sub_6915FD's 4), the ten
+ * name slots 6 each (sub_691684), CMSG_PETITION_BUY's name 7 (sub_664F47),
+ * SMSG_PETITION_SHOW_SIGNATURES' signer count 21 (sub_6A29A8), and
+ * SMSG_TURN_IN_PETITION_RESULTS' whole body 4 (sub_6915FD).
  */
 static void BuildPetitionQueryResponse(WorldPacket& data, uint32 petitionId,
                                        ObjectGuid ownerGuid, std::string const& title,
