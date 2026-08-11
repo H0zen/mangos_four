@@ -56,36 +56,111 @@
 #define GUILD_CHARTER               5863
 #define CHARTER_DISPLAY_ID          16161
 
-// PARKED -- the last two petition replies, and why the seven CMSGs stay dormant.
+// PARKED -- SMSG_PETITION_QUERY_RESPONSE 0x1083. Reader sub_70BD8D (parser
+// sub_713976, vtable off_D697E4). The seven petition CMSGs stay dormant until
+// this is converted: a correct reader behind an unconverted reply is exactly
+// what the four registration gates exist to stop.
 //
-// All seven readers are rebuilt from the client's writers (34a09a033) and
-// SMSG_PETITION_SHOWLIST from its reader with the cost proven by its consumer
-// (776464628). Registration still waits on these two, because a correct reader
-// behind an unconverted reply is exactly what the four gates exist to stop.
+// LAYOUT is decoded. Structure, in wire order:
+//   uint32                      -> +16, read BEFORE any bit; the petition id
+//   1 bit                       -> +20, "record present". Everything below is
+//                                 conditional on it, so the empty form is just
+//                                 uint32 + one bit.
+//   then, if present:
+//     10 bit-packed lengths (sub_691684) for ten string slots at +4316, stride 64
+//     bit +34, bit +36
+//     a bit-packed length (sub_69BAFD)  -> +168
+//     bits +32, +39, +35, +38, +37
+//     a bit-packed length (sub_6650D3)  -> +40
+//     bit +33
+//   The bits at +32..39 are one GUID's eight presence bits, so its mask order is
+//   2, 4, <len>, 0, 7, 3, 6, 5, <len>, 1 -- two string lengths sit INSIDE the
+//   mask run, as CMSG_PETITION_BUY's does.
+//   Byte section: GUID byte 5, uint32, the +40 string, uint32, the +168 string,
+//   byte 4, uint32, byte 6, uint32, uint32, the ten strings, bytes 1, 7, 0,
+//   uint32, uint32, byte 2, uint32, a UINT16 (sub_40F30E), uint32, byte 3, then
+//   four more uint32.
 //
-// SMSG_PETITION_SHOW_SIGNATURES 0x00AA -- reader sub_72B793 (parser sub_73263F,
-//     vtable off_D6B990). Layout is DECODED:
-//       15 header mask bits, then a 21-BIT signer count (sub_6A29A8: two 8-bit
-//       chunks at shifts 13 and 5 plus a 5-bit tail), then per signer an 8-bit
-//       GUID mask <2,0,4,7,5,1,6,3>; then ONE more header mask bit -- object
-//       +50, deferred until after every per-entry mask, which is the detail a
-//       block-structured rebuild would get wrong; then per signer the bytes
-//       <6,0,1,3,2,5,7,4> and a uint32; then the header bytes with a uint32
-//       interleaved after the fifth.
-//     What is MISSING is identity. The two header GUIDs at object +40 and +48
-//     are both eight bytes, so layout cannot tell them apart. The consumer
-//     sub_9633C0 is the right end of the trail -- it takes a petition GUID into
-//     qword_11E9F18 (the same global CMSG_OFFER_PETITION's builder reads) and a
-//     separate owner GUID into dword_11E9F20/24 -- but the hop that maps those
-//     two parameters onto record +40 and +48 is not yet done. Do that before
-//     rebuilding; do NOT infer it from the pre-MoP field order.
+// What is MISSING is identity, and it is the hard kind: roughly a dozen uint32
+// of identical width. GetPetitionInfo() names only seven values the client
+// exposes -- petitionType, title, bodyText, maxSignatures, originatorName,
+// isOriginator, minSignatures -- so most of these dwords are not reachable from
+// Lua at all and must be named from the consumer that fills the record
+// sub_62EB8B caches. No capture exists anywhere in the 18414 corpus, so the
+// consumer is the only oracle. Do NOT map these from the pre-MoP field order.
 //
-// SMSG_PETITION_QUERY_RESPONSE 0x1083 -- parser sub_713976, not yet followed to
-//     its reader. GetPetitionInfo() names the fields it must carry: petitionType,
-//     title, bodyText, maxSignatures, originatorName, isOriginator, minSignatures.
-//
-// Neither opcode has a single capture anywhere in the 18414 corpus, so the
-// consumer route is the only oracle for both.
+// The two bit-packed length widths (sub_691684, sub_69BAFD, sub_6650D3) also
+// still need reading; only sub_664F47 (7 bits) and sub_6A29A8 (21) are known.
+
+/**
+ * @brief Serialises SMSG_PETITION_SHOW_SIGNATURES for the 18414 client.
+ *
+ * Reader sub_72B793 (parser sub_73263F, vtable off_D6B990). Two things here are
+ * not guessable from the pre-MoP body and are not negotiable:
+ *
+ * The signer count is a 21-BIT field, not a uint8 -- sub_6A29A8 assembles it
+ * from two 8-bit chunks at shifts 13 and 5 plus a 5-bit tail.
+ *
+ * One header mask bit -- the petition GUID's byte 2 -- is deferred until AFTER
+ * every per-signer mask has been written. A rebuild that emits the two header
+ * masks as a block, which is the obvious shape, puts that bit fifteen positions
+ * too early and desynchronises every byte that follows.
+ *
+ * Field identity comes from the consumer, since no capture of this opcode exists
+ * in the corpus. The call site at 0x963727 passes record +48 as the petition GUID
+ * (into qword_11E9F18, the same global CMSG_OFFER_PETITION's builder reads), and
+ * record +40 as a separate owner GUID (into dword_11E9F20/24). The test just
+ * above it compares record +40 against the local player to decide isOriginator,
+ * which confirms +40 is the owner independently. Record +16 is the key
+ * sub_62EB8B uses against the petition-text cache -- the petition id.
+ */
+static void BuildPetitionShowSignatures(WorldPacket& data, ObjectGuid petitionGuid,
+                                        ObjectGuid ownerGuid, uint32 petitionId,
+                                        std::vector<ObjectGuid> const& signers)
+{
+    data.WriteGuidMask<1>(ownerGuid);
+    data.WriteGuidMask<3>(petitionGuid);
+    data.WriteGuidMask<3>(ownerGuid);
+    data.WriteGuidMask<4>(petitionGuid);
+    data.WriteGuidMask<0>(petitionGuid);
+    data.WriteGuidMask<7>(ownerGuid);
+    data.WriteGuidMask<5>(ownerGuid);
+    data.WriteGuidMask<1>(petitionGuid);
+    data.WriteGuidMask<5>(petitionGuid);
+    data.WriteGuidMask<7>(petitionGuid);
+    data.WriteGuidMask<0>(ownerGuid);
+    data.WriteGuidMask<6>(ownerGuid);
+    data.WriteGuidMask<6>(petitionGuid);
+    data.WriteGuidMask<2>(ownerGuid);
+    data.WriteGuidMask<4>(ownerGuid);
+
+    data.WriteBits(signers.size(), 21);
+
+    for (ObjectGuid const& signer : signers)
+    {
+        data.WriteGuidMask<2, 0, 4, 7, 5, 1, 6, 3>(signer);
+    }
+
+    // The deferred header bit. See the note above -- it belongs here, not with
+    // the other fifteen.
+    data.WriteGuidMask<2>(petitionGuid);
+    data.FlushBits();
+
+    for (ObjectGuid const& signer : signers)
+    {
+        data.WriteGuidBytes<6, 0, 1, 3, 2, 5, 7, 4>(signer);
+        data << uint32(0);                                  // per-signer, always 0
+    }
+
+    data.WriteGuidBytes<6, 5, 4>(petitionGuid);
+    data.WriteGuidBytes<4>(ownerGuid);
+    data.WriteGuidBytes<1>(petitionGuid);
+    data << uint32(petitionId);
+    data.WriteGuidBytes<2, 3, 7>(petitionGuid);
+    data.WriteGuidBytes<5, 6, 3, 7, 1, 0>(ownerGuid);
+    data.WriteGuidBytes<0>(petitionGuid);
+    data.WriteGuidBytes<2>(ownerGuid);
+}
 
 /**
  * @brief Handles charter purchase and petition creation.
@@ -279,23 +354,19 @@ void WorldSession::HandlePetitionShowSignOpcode(WorldPacket& recv_data)
 
     DEBUG_LOG("CMSG_PETITION_SHOW_SIGNATURES petition: %s", petitionguid.GetString().c_str());
 
-    WorldPacket data(SMSG_PETITION_SHOW_SIGNATURES, (8 + 8 + 4 + 1 + signs * 12));
-    data << petitionguid;                                   // petition guid
-    data << _player->GetObjectGuid();                       // owner guid
-    data << uint32(petitionguid_low);                       // guild guid (in mangos always same as GUID_LOPART(petitionguid)
-    data << uint8(signs);                                   // sign's count
-
+    WorldPacket data(SMSG_PETITION_SHOW_SIGNATURES, 5 + 16 + 4 + signs * 13);
+    std::vector<ObjectGuid> signers;
+    signers.reserve(signs);
     for (uint8 i = 1; i <= signs; ++i)
     {
         Field* fields2 = result->Fetch();
-        ObjectGuid signerGuid = ObjectGuid(HIGHGUID_PLAYER, fields2[0].GetUInt32());
-
-        data << signerGuid;                                 // Player GUID
-        data << uint32(0);                                  // there 0 ...
-
+        signers.push_back(ObjectGuid(HIGHGUID_PLAYER, fields2[0].GetUInt32()));
         result->NextRow();
     }
     delete result;
+
+    BuildPetitionShowSignatures(data, petitionguid, _player->GetObjectGuid(),
+                                petitionguid_low, signers);
     SendPacket(&data);
 }
 
@@ -611,24 +682,20 @@ void WorldSession::HandleOfferPetitionOpcode(WorldPacket& recv_data)
     }
 
     /// Send response
-    WorldPacket data(SMSG_PETITION_SHOW_SIGNATURES, (8 + 8 + 4 + signs + signs * 12));
-    data << petitionGuid;                                   // petition guid
-    data << _player->GetObjectGuid();                       // owner guid
-    data << uint32(petitionGuid.GetCounter());              // guild guid (in mangos always same as low part of petition guid)
-    data << uint8(signs);                                   // sign's count
-
+    WorldPacket data(SMSG_PETITION_SHOW_SIGNATURES, 5 + 16 + 4 + signs * 13);
+    std::vector<ObjectGuid> signers;
+    signers.reserve(signs);
     for (uint8 i = 1; i <= signs; ++i)
     {
         Field* fields2 = result->Fetch();
-        ObjectGuid signerGuid = ObjectGuid(HIGHGUID_PLAYER, fields2[0].GetUInt32());
-
-        data << signerGuid;                                 // Player GUID
-        data << uint32(0);                                  // there 0 ...
-
+        signers.push_back(ObjectGuid(HIGHGUID_PLAYER, fields2[0].GetUInt32()));
         result->NextRow();
     }
 
     delete result;
+
+    BuildPetitionShowSignatures(data, petitionGuid, _player->GetObjectGuid(),
+                                petitionGuid.GetCounter(), signers);
     player->GetSession()->SendPacket(&data);
 }
 
