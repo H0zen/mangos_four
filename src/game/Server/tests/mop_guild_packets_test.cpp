@@ -277,6 +277,30 @@ static void test_guild_query_response()
 /// GUID bytes are present, so between them they exercise the length field, the
 /// interleaved string and a different popcount.
 ///
+/// KNOWN LIMIT, measured rather than assumed. All four captured bodies share the
+/// presence mask 11110001 -- bytes 0,1,2,3,7 present, 4,5,6 absent, because a
+/// player GUID zeroes the high three. An exhaustive mutation sweep over this
+/// fixture gives:
+///
+///   mask swaps   13 of 28 still pass -- every swap WITHIN {0,1,2,3,7} and
+///                every swap within {4,5,6}, since swapping two positions that
+///                carry the same presence value is a no-op on the wire
+///   byte swaps    7 of 28 still pass -- 1<->5, 1<->6, 3<->4, 4<->5, 4<->6,
+///                4<->7, 5<->6, each involving an absent byte
+///   length width  0 of 32 pass
+///   flag polarity fails correctly
+///
+/// So this fixture proves the GUID is assembled from the right bytes in the
+/// right order for every position the captures can distinguish, and nothing
+/// beyond that. More captures cannot help: all four share the mask. Closing the
+/// remainder needs a body with a different presence pattern -- a non-player
+/// GUID, or a synthetic fixture built from the writer rather than a capture.
+///
+/// Worth stating plainly because the first version of this fixture asserted only
+/// that the GUID was non-empty, and was described as a real detector on the
+/// strength of catching one length-changing mutation. Measuring the whole
+/// mutation space is what turns that claim into a number.
+///
 /// This fixture is here because the shipped reader was wrong in THREE ways at
 /// once -- bit order, the position of the note length, and the byte order -- and
 /// every one of those leaves a plausible-looking packet. A test that restated

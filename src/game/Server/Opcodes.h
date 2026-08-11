@@ -175,15 +175,26 @@ enum OpcodesList
     SMSG_GUILD_COMMAND_RESULT                    = 0x0EF1,    // 5.4.8 18414 (Wow.exe leaf; name reference-consensus)
     CMSG_GUILD_AUTO_DECLINE_TOGGLE               = 0x2034, // not in 5.4.8 (legacy)
     // Deliberately NOT registered. Thunk sub_6860AD, writer sub_688B4B (vtable
-    // slot +4; slot +12 carries the 0x00C84A3D signature), and that writer emits
-    // exactly ONE BIT -- the toggle state. It is a settings toggle, not a
-    // per-invite decline, so routing it to HandleGuildDeclineOpcode would treat
-    // "stop asking me" as "decline this invitation". Needs its own handler.
+    // 0xD64428: slot +4 the writer, +8 the thunk, +12 the 0x00C84A3D signature).
+    // That writer emits exactly ONE BIT -- the toggle state. It is a settings
+    // toggle, not a per-invite decline, so routing it to
+    // HandleGuildDeclineOpcode would treat "stop asking me" as "decline this
+    // invitation". It needs its own handler.
     //
-    // An earlier note here named sub_688F62 as the writer. That was wrong: it is
-    // CMSG_ACTIVATETAXI's (0x03C9), and the error came from converting the slot
-    // value 6851403 to hex by hand as 0x68908B instead of 0x688B4B. Use the
-    // converter, not your head -- a slip like that reads as a plausible address.
+    // sub_688B4B is SHARED: 18 vtables point at it, because it is the generic
+    // "write one bit from +16" writer. So for this opcode the writer does not
+    // identify the packet -- only the thunk does. That breaks the property the
+    // petition wave relied on, where every writer had exactly one xref, and it
+    // is why two reviewers reached opposite conclusions here: one identified
+    // sub_688B4B correctly, the other found the same function serving the LFG
+    // boot-vote vtable at 0xD63364 and concluded it therefore was not this
+    // opcode's. Both observations were true; sharing makes it both.
+    //
+    // Two earlier attributions in this note were wrong and are recorded so the
+    // trace is not repeated: sub_688F62 is CMSG_ACTIVATETAXI's (0x03C9), reached
+    // by converting 6851403 to hex by hand as 0x68908B instead of 0x688B4B; and
+    // sub_C84A3D is not a body writer at all, it is the signature constant every
+    // one of these vtables carries at slot +12.
     CMSG_GUILD_AUTO_DECLINE                      = 0x06CB, // 5.4.8 18414 (Wow.exe binary, via CMSG_AUTO_DECLINE_GUILD_INVITES)
     CMSG_GUILD_QUERY_RANKS                       = 0x0D50, // 5.4.8 18414 (Wow.exe binary)
     SMSG_GUILD_QUERY_RANKS_RESULT                = 0x0A79,    // 5.4.8 18414 (Wow.exe leaf; name reference-consensus; fuzzy via SMSG_GUILD_RANKS)

@@ -125,18 +125,26 @@ void WorldSession::HandleGuildCreateOpcode(WorldPacket& recvPacket)
  */
 void WorldSession::SendGuildInvite(Player* player, bool alreadyInGuild /*= false*/)
 {
-    Guild* guild = sGuildMgr.GetGuildById(GetPlayer()->GetGuildId());
-    if (!guild)
-    {
-        return;
-    }
-
-    player->SetGuildIdInvited(GetPlayer()->GetGuildId());
-
-    WorldPacket data(SMSG_GUILD_INVITE, (8 + 10));          // guess size
-    data << GetPlayer()->GetName();
-    data << guild->GetName();
-    player->GetSession()->SendPacket(&data);                                  // unk
+    // PARKED alongside CMSG_GUILD_INVITE. This is the second way into the same
+    // broken reply and it is NOT dead code: Eluna exposes it to Lua as
+    // Player:SendGuildInvite, and SCRIPT_LIB_ELUNA defaults ON, so unregistering
+    // the opcode did not close this path.
+    //
+    // What it used to do was worse than the handler's version -- two raw
+    // cstrings, a body pre-dating even the six-uint32 one -- and it set
+    // SetGuildIdInvited before sending. Since SMSG_GUILD_INVITE is not admitted
+    // to IsEnterWorldConverted the packet was dropped every time, so the only
+    // observable effect was leaving the target flagged as invited to a guild
+    // whose invitation they could never see or act on.
+    //
+    // Refusing outright is better than half-working: a script author gets a log
+    // line instead of a target stuck in an invited state. Restore this together
+    // with the opcode, once the reply is rebuilt from reader sub_69E959 -- the
+    // layout is recorded at the registration site in Opcodes.cpp.
+    sLog.outError("WorldSession::SendGuildInvite: refused for %s -- SMSG_GUILD_INVITE "
+                  "is not converted for 5.4.8 and is dropped by the send gate. "
+                  "Guild invitations are unavailable until it is rebuilt.",
+                  player ? player->GetGuidStr().c_str() : "<null>");
 }
 
 /**

@@ -1203,8 +1203,10 @@ void InitializeOpcodes()
     //
     // The layout IS recovered, from reader sub_69E959 (parser sub_6A0BF8, vtable
     // off_D65F94), and verified byte-exact against capture-000499 seq 777 --
-    // 65 of 65 bytes consumed, yielding name "Dodge", guild "Divine Wrath", an
-    // empty old-guild name, guild GUID high 0x1FF4 and a zero old-guild GUID.
+    // 65 of 65 bytes consumed, yielding an inviter name of SIX UTF-8 bytes
+    // (44 C3 B8 64 67 65, "D-o-slash-d-g-e"; the 6-bit length field reads 6, not
+    // 5, so do not treat it as ASCII), guild "Divine Wrath", an empty old-guild
+    // name, guild GUID high 0x1FF4 and a zero old-guild GUID.
     // Bit section, in order:
     //   A4, <7-bit lenGuildName>, B4, A6, B2, B1, B5, B7, A0, B3, A5, B6,
     //   <6-bit lenInviterName>, A1, A3, B0, A2, <7-bit lenOldGuildName>, A7
