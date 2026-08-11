@@ -6631,8 +6631,9 @@ static uint32 PetitionSignResultToWire(uint32 result)
         case PETITION_SIGN_CANT_SIGN_OWN:        return 11; // 0x177 ERR_PETITION_CREATOR
         case PETITION_SIGN_ALREADY_IN_GUILD:     return 12; // 0x176 ERR_PETITION_IN_GUILD
         case PETITION_SIGN_PETITION_FULL:        return 14; // 0x17A ERR_PETITION_FULL
-        // Unreachable -- the enum has exactly the eight values above. Any value
-        // the client does not handle prints its generic "Petition error".
+        // Unreachable -- the enum has exactly the eight values above. An
+        // unhandled value is not a player-visible error: the client prints
+        // "Petition error" to the console and raises no UI error and no event.
         default:                                 return 0;
     }
 }
@@ -6694,7 +6695,8 @@ static uint32 PetitionTurnResultToWire(uint32 result)
         case PETITION_TURN_NEED_MORE_SIGNATURES: return 9;  // 0x178 ERR_PETITION_NOT_ENOUGH_SIGNATURES
         case PETITION_TURN_ALREADY_IN_GUILD:     return 12; // 0x176 ERR_PETITION_IN_GUILD
         case PETITION_TURN_GUILD_NAME_INVALID:   return 13; // 0x17C ERR_GUILD_NAME_INVALID
-        // Unreachable -- the enum has exactly the five values above.
+        // Unreachable -- the enum has exactly the five values above, and an
+        // unhandled one reaches the same console-only path as the sign reply.
         default:                                 return 0;
     }
 }

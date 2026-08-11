@@ -573,24 +573,12 @@ void WorldSession::HandlePetitionSignOpcode(WorldPacket& recv_data)
         {
             // close at signer side
             _player->SendPetitionSignResult(petitionGuid, _player, PETITION_SIGN_ALREADY_SIGNED);
-
-            // update for owner if online
-            if (Player* owner = sObjectMgr.GetPlayer(ownerGuid))
-            {
-                owner->SendPetitionSignResult(petitionGuid, _player, PETITION_SIGN_ALREADY_SIGNED);
-            }
             return;
         }
         else if (playerGuid == _player->GetObjectGuid())
         {
             // close at signer side
             _player->SendPetitionSignResult(petitionGuid, _player, PETITION_SIGN_ALREADY_SIGNED_OTHER);
-
-            // update for owner if online
-            if (Player* owner = sObjectMgr.GetPlayer(ownerGuid))
-            {
-                owner->SendPetitionSignResult(petitionGuid, _player, PETITION_SIGN_ALREADY_SIGNED_OTHER);
-            }
             return;
         }
     }
@@ -608,7 +596,11 @@ void WorldSession::HandlePetitionSignOpcode(WorldPacket& recv_data)
     // if (item)
     //    item->SetUInt32Value(ITEM_FIELD_ENCHANTMENT_1_1+1, signs);
 
-    // update for owner if online
+    // Only the successful signature is sent to the owner. The client's consumer
+    // never looks at the result when the signer is not itself: it goes straight
+    // to sub_9634D4, which appends the signer and announces
+    // ERR_PETITION_SIGNED_S. A failure forwarded here would put a signature the
+    // database does not have into the owner's charter.
     if (Player* owner = sObjectMgr.GetPlayer(ownerGuid))
     {
         owner->SendPetitionSignResult(petitionGuid, _player, PETITION_SIGN_OK);
