@@ -743,11 +743,20 @@ void InitializeOpcodes()
     DefC(CMSG_PETITION_BUY, "CMSG_PETITION_BUY", STATUS_LOGGEDIN, PROCESS_THREADUNSAFE, &WorldSession::HandlePetitionBuyOpcode);
 
     // TURN_IN, held back earlier on the assumption that creating a guild dragged
-    // in the whole guild reply surface. It does not: Guild::Create and
-    // Guild::AddMember send no packet at all, and the handler's only reply is
-    // SendPetitionTurnInResult -> SMSG_TURN_IN_PETITION_RESULTS, rebuilt as a
-    // single 4-bit field and admitted. Reader sub_689A90, a lone bit-packed GUID.
-    // The caution was worth taking at the time; it just turned out not to bind.
+    // in the whole guild reply surface. It does not -- but not for the reason
+    // first written here, which said Guild::Create and Guild::AddMember "send no
+    // packet at all". They do, two levels down: AddMember calls
+    // Player::RemovePetitionsAndSigns, which calls SendPetitionQueryOpcode and
+    // emits SMSG_PETITION_QUERY_RESPONSE to the owner of any petition the new
+    // member had signed. That opcode is rebuilt and admitted, so the conclusion
+    // survives -- but the first trace stopped one level short, which is exactly
+    // the failure this checklist warns about. Traced properly, the full set is:
+    //
+    //   SendPetitionTurnInResult -> SMSG_TURN_IN_PETITION_RESULTS  (4-bit body)
+    //   Guild::AddMember -> RemovePetitionsAndSigns
+    //                    -> SMSG_PETITION_QUERY_RESPONSE
+    //
+    // Both converted, both admitted. Reader sub_689A90, a lone bit-packed GUID.
     DefC(CMSG_TURN_IN_PETITION, "CMSG_TURN_IN_PETITION", STATUS_LOGGEDIN, PROCESS_THREADUNSAFE, &WorldSession::HandleTurnInPetitionOpcode);
     DefS(SMSG_PETITION_SHOWLIST, "SMSG_PETITION_SHOWLIST");
     DefS(SMSG_PETITION_SHOW_SIGNATURES, "SMSG_PETITION_SHOW_SIGNATURES");
