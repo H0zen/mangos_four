@@ -61,6 +61,10 @@
 
 #define MAX_STEALTH_DETECT_RANGE    45.0f
 
+/// How far past a hull's own radius a reported step-ashore is still believed to be one.
+/// Beyond it the number in the packet is not a place he could have walked to.
+#define DECK_EDGE_MARGIN            10.0f
+
 /**
  * @brief Temporary spawn type enumeration
  *
@@ -792,6 +796,11 @@ class WorldObject : public Object
 
         void SetMap(Map* map);
         Map* GetMap() const { MANGOS_ASSERT(m_currMap); return m_currMap; }
+
+        /// The map, or NULL, for the paths that legitimately run on an object which never
+        /// reached one -- a destructor after LoadFromDB failed, above all. GetMap() asserts
+        /// there, so `if (GetMap())` is not a guard, it is the crash.
+        Map* FindMap() const { return m_currMap; }
         // used to check all object's GetMap() calls when object is not in world!
         void ResetMap();
 

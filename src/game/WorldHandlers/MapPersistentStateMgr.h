@@ -65,7 +65,14 @@ class MapPersistentState
 {
         friend class MapPersistentStateManager;
     protected:
-        MapPersistentState(uint16 MapId, uint32 InstanceId, Difficulty difficulty);
+        // uint32, NOT uint16. A vessel's deck is a map like any other and gets a
+        // persistent state in the Map constructor -- with a MINTED id of
+        // VESSEL_MAP_BASE + goEntry. 1020808 & 0xFFFF = 37768, GetMapEntry() finds
+        // nothing under that, and every caller that dereferences it crashes. Killing
+        // anything on a deck is enough to reach it: the respawn bookkeeping runs through
+        // the persistent state. 01, 02 and this core all carried the narrow field; 00 is
+        // the one that widened it.
+        MapPersistentState(uint32 MapId, uint32 InstanceId, Difficulty difficulty);
 
     public:
 
@@ -161,7 +168,7 @@ class WorldPersistentState : public MapPersistentState
            - any new non-instanceable map created
            - respawn data loading for non-instanceable map
         */
-        explicit WorldPersistentState(uint16 MapId) : MapPersistentState(MapId, 0, REGULAR_DIFFICULTY) {}
+        explicit WorldPersistentState(uint32 MapId) : MapPersistentState(MapId, 0, REGULAR_DIFFICULTY) {}
 
         ~WorldPersistentState() {}
 
@@ -189,7 +196,7 @@ class DungeonPersistentState : public MapPersistentState
            - any new instance is being generated
            - the first time a player bound to InstanceId logs in
            - when a group bound to the instance is loaded */
-        DungeonPersistentState(uint16 MapId, uint32 InstanceId, Difficulty difficulty, time_t resetTime, bool canReset, uint32 completedEncountersMask);
+        DungeonPersistentState(uint32 MapId, uint32 InstanceId, Difficulty difficulty, time_t resetTime, bool canReset, uint32 completedEncountersMask);
 
         ~DungeonPersistentState();
 
@@ -263,7 +270,7 @@ class BattleGroundPersistentState : public MapPersistentState
         /* Created either when:
            - any new BG/arena is being generated
         */
-        BattleGroundPersistentState(uint16 MapId, uint32 InstanceId, Difficulty difficulty)
+        BattleGroundPersistentState(uint32 MapId, uint32 InstanceId, Difficulty difficulty)
             : MapPersistentState(MapId, InstanceId, difficulty) {}
 
         ~BattleGroundPersistentState() {}

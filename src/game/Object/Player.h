@@ -5872,6 +5872,29 @@ class Player : public Unit
         ObjectGuid const& GetFarSightGuid() const { return GetGuidValue(PLAYER_FARSIGHT); }
 
         // Get the transport for the player
+        /// The map a boarded player really stands on: his vessel's deck, or -- when the
+        /// baker left her no hull, so she carries nobody -- the water she sails, which is at
+        /// least a place that exists.
+        Map* BoardingMap() const;
+
+        /// The map id the CLIENT is rendering, which is what every update packet must be
+        /// stamped with. Aboard, that is the water the vessel sails: the client was never
+        /// told the deck's id and has no terrain for it.
+        uint32 GetClientMapId() const;
+
+        /// Where he is IN THE WORLD: aboard, the map the ship sails and her own pose.
+        /// A hull carries no area table and sails away from anything left on it, so every
+        /// world question -- graveyard, zone, area trigger -- is asked from here.
+        void GetWorldAnchor(uint32& mapId, float& x, float& y, float& z) const;
+
+        /// The terrain that answers WORLD questions: exploration, area flags, indoor.
+        TerrainInfo const* AnchorTerrain() const;
+
+        /// Set across a Map::Remove/Add pair that moves a player between a deck and the
+        /// water she sails, so the visibility pass can tell that step from a real teleport.
+        bool IsCrossingVessel() const { return m_vesselCrossing; }
+        void SetCrossingVessel(bool crossing) { m_vesselCrossing = crossing; }
+
         Transport* GetTransport() const { return m_transport; }
 
         // Set the transport for the player
@@ -6499,6 +6522,7 @@ class Player : public Unit
 
         // Transports
         Transport* m_transport; // Player transport
+        bool m_vesselCrossing;
 
         uint32 m_freeTalentPoints;
         uint32 m_resetTalentsCost;

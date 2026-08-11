@@ -23,30 +23,76 @@
  * and lore are copyrighted by Blizzard Entertainment, Inc.
  */
 
-#include "Common.h"
+#include "Platform/Define.h"
+#include <algorithm>
+#include <cmath>
+#include <cstdio>
+#include <mutex>
+#include <string>
+#include <unordered_map>
+#include <unordered_set>
+#include <vector>
+#include <set>
 
 #include "Transports.h"
+#include "TransportMap.h"
+#include "Map.h"
 #include "MapManager.h"
 #include "ObjectMgr.h"
 #include "ObjectGuid.h"
-#include "Creature.h"
-#include "Player.h"
 #include "Path.h"
 #include "GameTime.h"
+#include "terrain/TileSerializer.hpp"
+#include <list>
 
-#include "WorldPacket.h"
 #include "DBCStores.h"
 #include "ProgressBar.h"
 #include "ScriptMgr.h"
+
+/**
+ * @brief Register every vessel's map id with sMapStore, and nothing else.
+ *
+ * SEPARATE FROM LoadTransports, and it has to be. The spawn tables load long before the
+ * transports do, and a `creature` row whose map is a minted deck id is DROPPED at that
+ * point as pointing at a map sMapStore has never heard of -- so the crew a vessel is
+ * supposed to carry is gone before the vessel is built. This runs first and only mints the
+ * ids; Transport::RegisterVesselMap is idempotent, so LoadTransports still calls it too.
+ */
+void MapManager::RegisterVesselMaps()
+{
+    QueryResult* result = WorldDatabase.Query("SELECT `entry`, `name` FROM `transports`");
+    if (!result)
+    {
+        return;
+    }
+
+    uint32 count = 0;
+    do
+    {
+        Field* fields = result->Fetch();
+        const uint32 entry = fields[0].GetUInt32();
+        const std::string name = fields[1].GetCppString();
+
+        Transport::RegisterVesselMap(entry, name.c_str());
+        ++count;
+    }
+    while (result->NextRow());
+
+    delete result;
+
+    sLog.outString(">> %u vessel map id(s) registered before the spawn tables", count);
+}
 
 /**
  * @brief Loads and initializes all configured global transports.
  */
 void MapManager::LoadTransports()
 {
+
     QueryResult* result = WorldDatabase.Query("SELECT `entry`, `name`, `period` FROM `transports`");
 
     uint32 count = 0;
+    uint32 mapped = 0;
 
     if (!result)
     {
@@ -112,8 +158,12 @@ void MapManager::LoadTransports()
             continue;
         }
 
+        // A map for this vessel, resolved from the client or minted, before Create asks for
+        // it.
+        Transport::RegisterVesselMap(entry, name.c_str());
+
         // creates the Gameobject
-        if (!t->Create(entry, mapid, x, y, z, o, GO_ANIMPROGRESS_DEFAULT, 0))
+        if (!t->Create(entry, mapid, x, y, z, o, GO_ANIMPROGRESS_DEFAULT))
         {
             delete t;
             continue;
@@ -129,6 +179,32 @@ void MapManager::LoadTransports()
         // If we someday decide to use the grid to track transports, here:
         t->SetMap(sMapMgr.CreateMap(mapid, t));
 
+        // INTO THE WORLD'S GRID, as an ordinary object in a cell of the map it sails. That
+        // is what ticks it in phase one, what lets the shore's own visibility sweep find
+        // it, and what makes IsInWorld() true -- without which SharesWorld, InReach and
+        // every searcher built on them refuse to see the vessel at all, which is what left
+        // the relay gathering nobody.
+        //
+        // Active as well, so the water it is crossing stays awake with no player near it.
+        // In the world -- IsInWorld() true, so SharesWorld and every searcher built on it
+        // can see the vessel -- and active, so the water it crosses stays awake. Not filed
+        // in a cell: nothing in this core relocates a game object's cell, and the tick it
+        // needs comes from the map's own update instead.
+        t->AddToWorld();
+        t->SetActiveObjectState(true);
+        t->GetMap()->AddToActive(t);
+
+        t->PinRouteGrids();
+
+        // The failure is reported by Create, which can tell a missing Map.dbc row from a
+        // map that would not open; here we only count what succeeded.
+        if (t->AsMap())
+        {
+            ++mapped;
+            DETAIL_LOG("Transport %u '%s' is map %u", entry, name.c_str(),
+                       t->VesselMapId());
+        }
+
         // t->GetMap()->Add<GameObject>((GameObject *)t);
         ++count;
     }
@@ -136,7 +212,7 @@ void MapManager::LoadTransports()
     delete result;
 
     sLog.outString();
-    sLog.outString(">> Loaded %u transports", count);
+    sLog.outString(">> Loaded %u transports, %u with a map of their own", count, mapped);
 
     // check transport data DB integrity
     result = WorldDatabase.Query("SELECT `gameobject`.`guid`,`gameobject`.`id`,`transports`.`name` FROM `gameobject`,`transports` WHERE `gameobject`.`id` = `transports`.`entry`");
@@ -157,12 +233,21 @@ void MapManager::LoadTransports()
     }
 }
 
-Transport::Transport() : GameObject(), m_pathTime(0), m_timer(0), m_nextNodeTime(0), m_period(0)
+Transport::Transport() : GameObject()
 {
-    m_updateFlag = UPDATEFLAG_TRANSPORT | UPDATEFLAG_HAS_POSITION | UPDATEFLAG_ROTATION;
+    // PERMANENTLY, in the constructor, not per-create: a lift (type 11) gets the transport
+    // bit from the create switch instead, so do not assume a single origin when tracing it.
+    //
+    // 5.4.8's flag set: no LOWGUID/HIGHGUID -- those are the older wire's, and 04 has
+    // ROTATION where TBC had LOWGUID. The rotation FIELD is part of the 18414 layout and
+    // is written unconditionally by the encoder, but for a hull its value means nothing:
+    // the client draws the ship itself from TransportAnimation.dbc, which this server never
+    // loads. Her create block carries a zero position and a real facing, and the route
+    // phase does the rest.
+    m_updateFlag = (UPDATEFLAG_TRANSPORT | UPDATEFLAG_HAS_POSITION | UPDATEFLAG_ROTATION);
 }
 
-bool Transport::Create(uint32 guidlow, uint32 mapid, float x, float y, float z, float ang, uint8 animprogress, uint16 dynamicHighValue)
+bool Transport::Create(uint32 guidlow, uint32 mapid, float x, float y, float z, float ang, uint32 animprogress)
 {
     Place().MoveTo(x, y, z, ang);
     // instance id and phaseMask isn't set to values different from std.
@@ -204,15 +289,223 @@ bool Transport::Create(uint32 guidlow, uint32 mapid, float x, float y, float z, 
     SetGoArtKit(0);
     SetGoAnimProgress(animprogress);
 
-    // low part always 0, dynamicHighValue is some kind of progression (not implemented)
-    SetUInt16Value(GAMEOBJECT_DYNAMIC, 0, 0);
-    SetUInt16Value(GAMEOBJECT_DYNAMIC, 1, dynamicHighValue);
-
     SetName(goinfo->name);
-    SetWorldRotationAngles(ang, 0.0f, 0.0f);
-    SetTransportPathRotation(QuaternionData(0.0f, 0.0f, 0.0f, 1.0f));
+
+    // THE VESSEL IS A MAP. Blizzard gave her a Map.dbc row and no terrain for it; the baker
+    // fills that in from the hull's own model, so from here she answers height, collision and
+    // routing through the ordinary engines. Model space is that map's space, which is why
+    // nothing in the chain applies a transform.
+    if (const uint32 mapId = VesselMapIdOf(goinfo->id))
+    {
+        m_map = sMapMgr.CreateMap(mapId, this)->AsTransport();
+
+        // A map that could not be commissioned is kept all the same: it is still the relay,
+        // and it is what refuses to take anyone aboard.
+        if (m_map)
+        {
+            m_map->Commission();
+        }
+    }
+    else
+    {
+        sLog.outErrorDb("Transport %u (%s, display %u) has no map of its own.",
+                        goinfo->id, goinfo->name, goinfo->displayId);
+    }
 
     return true;
+}
+
+void Transport::PinRouteGrids()
+{
+    // THE ROUTE'S GRIDS, LOADED AT START-UP AND NEVER LET GO. The vessel is an active object
+    // in them, so what the relay finds ashore is whatever those cells hold -- and a cell that
+    // had expired holds nothing, silently, and only once she was already sailing past it.
+    uint32 pinned = 0;
+    for (WayPointMap::value_type const& node : m_WayPoints)
+    {
+        if (Map* sailed = sMapMgr.CreateMap(node.second.mapid, this))
+        {
+            sailed->ForceLoadGrid(node.second.x, node.second.y);
+            ++pinned;
+        }
+    }
+
+    DETAIL_LOG("Transport %u '%s': %u route node(s) pinned.", GetEntry(), GetName(), pinned);
+}
+
+Transport* Transport::GetTransport(Map const* map, ObjectGuid guid)
+{
+    if (!map || !guid)
+    {
+        return NULL;
+    }
+
+    MapManager::TransportsByMapType::const_iterator vessels =
+        sMapMgr.m_TransportsByMap.find(map->GetId());
+    if (vessels == sMapMgr.m_TransportsByMap.end())
+    {
+        return NULL;
+    }
+
+    for (Transport* vessel : vessels->second)
+    {
+        if (vessel->GetObjectGuid() == guid)
+        {
+            return vessel;
+        }
+    }
+
+    return NULL;
+}
+
+namespace
+{
+    /// Resolved once per vessel entry and then authoritative: the store it is derived from
+    /// is MUTATED below (minted rows are injected into it), so re-deriving would see a
+    /// different world each time.
+    std::unordered_map<uint32, uint32> s_vesselMapByEntry;
+    std::unordered_set<uint32> s_vesselMapIds;
+
+    /// Blizzard's own naming: a vessel's map directory is "Transport<goEntry>". Built once,
+    /// before anything is injected.
+    std::unordered_map<uint32, uint32> const& ShippedVesselMaps()
+    {
+        static const std::unordered_map<uint32, uint32> shipped = []
+        {
+            std::unordered_map<uint32, uint32> byEntry;
+            for (uint32 i = 0; i < sMapStore.GetNumRows(); ++i)
+            {
+                MapEntry const* entry = sMapStore.LookupEntry(i);
+                // DBCString is a pointer to a per-locale array on this wire, so the
+                // directory name is the first slot rather than the field itself.
+                if (!entry || !entry->Directory || !entry->Directory[0])
+                {
+                    continue;
+                }
+
+                uint32 owner = 0;
+                if (std::sscanf(entry->Directory[0], "Transport%u", &owner) == 1 && owner)
+                {
+                    byEntry[owner] = entry->ID;
+                }
+            }
+            return byEntry;
+        }();
+        return shipped;
+    }
+}
+
+void Transport::RegisterVesselMap(uint32 goEntry, char const* vesselName)
+{
+    if (s_vesselMapByEntry.find(goEntry) != s_vesselMapByEntry.end())
+    {
+        return;
+    }
+
+    std::unordered_map<uint32, uint32> const& shipped = ShippedVesselMaps();
+    const auto found = shipped.find(goEntry);
+
+    if (found != shipped.end())
+    {
+        s_vesselMapByEntry[goEntry] = found->second;
+        s_vesselMapIds.insert(found->second);
+        return;
+    }
+
+    // No row of Blizzard's for this hull -- plenty of legitimate ships have none, and some
+    // of the rows that do exist are named for a route, which names no vessel we can key on.
+    // The hull is in the client all the same, so it gets a map of its own: an id minted
+    // here and a Map.dbc entry injected to carry it. Nothing on the wire carries this.
+    const uint32 minted = world::terrain::MintedVesselMapId(goEntry);
+
+    // The strings outlive the row, and DBCString points AT an array rather than being one,
+    // so each gets a locale table of its own that is never freed. A handful of vessels, once
+    // at start-up: leaking them deliberately is cheaper than owning them.
+    static std::list<std::string> s_names;
+    s_names.push_back(vesselName ? vesselName : "Vessel");
+
+    char const** nameTable = new char const*[MAX_LOCALE];
+    for (uint32 i = 0; i < MAX_LOCALE; ++i)
+    {
+        nameTable[i] = s_names.back().c_str();
+    }
+
+    static char const* s_emptyDirectory[MAX_LOCALE] = { };
+
+    MapEntry* row = new MapEntry();
+    row->ID = minted;
+    row->Directory = s_emptyDirectory;
+    row->InstanceType = MAP_COMMON;
+    row->AreaTableID = 0;
+    row->LoadingScreenID = 0;
+    row->CorpseMapID = -1;
+    row->ExpansionID = 0;
+    row->MapName_lang = nameTable;
+
+    sMapStore.SetEntry(minted, row);
+
+    s_vesselMapByEntry[goEntry] = minted;
+    s_vesselMapIds.insert(minted);
+
+    DETAIL_LOG("Transport %u '%s' has no Map.dbc row; map %u minted.", goEntry,
+               vesselName ? vesselName : "", minted);
+}
+
+uint32 Transport::VesselMapIdOf(uint32 goEntry)
+{
+    const auto found = s_vesselMapByEntry.find(goEntry);
+    return found != s_vesselMapByEntry.end() ? found->second : 0;
+}
+
+bool Transport::IsVesselMapId(uint32 mapId)
+{
+    return s_vesselMapIds.find(mapId) != s_vesselMapIds.end();
+}
+
+Transport* Transport::VesselOf(WorldObject const& obj)
+{
+    // DERIVED, NEVER STORED. Being aboard is not a fact anyone records: it is what having
+    // this map means. A creature summoned at sea, a crew member read from `creature`, a
+    // player who walked up the gangplank -- all the same answer, from the same question,
+    // with nothing to keep in step.
+    //
+    // A lift passenger and a vehicle rider are NOT here: their map is the world's, and the
+    // seat transform is the vehicle system's business, not this one's.
+    Map* map = obj.GetMap();
+    TransportMap* hull = map ? map->AsTransport() : NULL;
+    return hull ? hull->Vessel() : NULL;
+}
+
+void Transport::WithdrawFromWorld()
+{
+    // Guarded because both teardown paths call it, and the second runs after the maps have
+    // been deleted -- GetMap() would then point at freed memory.
+    if (m_withdrawn)
+    {
+        return;
+    }
+    m_withdrawn = true;
+    m_crossing = false;
+
+    // Nothing else does this. A vessel is in no cell, so no grid unload reaches it, and the
+    // map that owns it is deleted before the vessel is -- ~Object then asserts on an object
+    // still flagged in-world, against a map that no longer exists.
+    if (m_map)
+    {
+        m_map->ReleaseCrew();
+    }
+
+    if (Map* sailed = GetMap())
+    {
+        sailed->RemoveFromActive(this);
+    }
+
+    if (IsInWorld())
+    {
+        RemoveFromWorld();
+    }
+
+    m_map = NULL;
 }
 
 struct keyFrame
@@ -271,11 +564,6 @@ bool Transport::GenerateWaypoints(uint32 pathid, std::set<uint32>& mapids)
 
     int lastStop = -1;
     int firstStop = -1;
-
-    if (keyFrames.empty())
-    {
-        return false;
-    }
 
     // first cell is arrived at by teleportation :S
     keyFrames[0].distFromPrev = 0;
@@ -399,7 +687,7 @@ bool Transport::GenerateWaypoints(uint32 pathid, std::set<uint32>& mapids)
                     newY = keyFrames[i].node->y + (keyFrames[i + 1].node->y - keyFrames[i].node->y) * d / keyFrames[i + 1].distFromPrev;
                     newZ = keyFrames[i].node->z + (keyFrames[i + 1].node->z - keyFrames[i].node->z) * d / keyFrames[i + 1].distFromPrev;
 
-                    teleport = false;
+                    bool teleport = false;
                     if (keyFrames[i].node->ContinentID != cM)
                     {
                         teleport = true;
@@ -407,7 +695,7 @@ bool Transport::GenerateWaypoints(uint32 pathid, std::set<uint32>& mapids)
                     }
 
                     //                    sLog.outString("T: %d, D: %f, x: %f, y: %f, z: %f", t, d, newX, newY, newZ);
-                    pos = WayPoint(keyFrames[i].node->ContinentID, newX, newY, newZ, teleport);
+                    WayPoint pos(keyFrames[i].node->ContinentID, newX, newY, newZ, teleport);
                     if (teleport)
                     {
                         m_WayPoints[t] = pos;
@@ -459,7 +747,7 @@ bool Transport::GenerateWaypoints(uint32 pathid, std::set<uint32>& mapids)
             cM = keyFrames[i + 1].node->ContinentID;
         }
 
-        pos = WayPoint(keyFrames[i + 1].node->ContinentID, keyFrames[i + 1].node->x, keyFrames[i + 1].node->y, keyFrames[i + 1].node->z, teleport,
+        WayPoint pos(keyFrames[i + 1].node->ContinentID, keyFrames[i + 1].node->x, keyFrames[i + 1].node->y, keyFrames[i + 1].node->z, teleport,
                      keyFrames[i + 1].node->ArrivalEventID, keyFrames[i + 1].node->DepartureEventID);
 
         //        sLog.outString("T: %d, x: %f, y: %f, z: %f, t:%d", t, pos.x, pos.y, pos.z, teleport);
@@ -482,6 +770,23 @@ bool Transport::GenerateWaypoints(uint32 pathid, std::set<uint32>& mapids)
     m_pathTime = timer;
 
     m_nextNodeTime = m_curr->first;
+
+    // How wrong the estimate is allowed to be. The pose snaps from node to node and is
+    // never interpolated, so at worst it sits half a segment away from where the client
+    // draws the hull. Every proximity question about this vessel is widened by that.
+    m_nodeSlack = 0.0f;
+    for (WayPointMap::const_iterator it = m_WayPoints.begin(); it != m_WayPoints.end(); ++it)
+    {
+        WayPointMap::const_iterator nxt = it;
+        if (++nxt == m_WayPoints.end() || nxt->second.mapid != it->second.mapid)
+        {
+            continue;
+        }
+
+        const float dx = nxt->second.x - it->second.x;
+        const float dy = nxt->second.y - it->second.y;
+        m_nodeSlack = std::max(m_nodeSlack, std::sqrt(dx * dx + dy * dy) * 0.5f);
+    }
 
     return true;
 }
@@ -510,153 +815,160 @@ void Transport::MoveToNextWayPoint()
  */
 void Transport::TeleportTransport(uint32 newMapid, float x, float y, float z)
 {
-    Map const* oldMap = GetMap();
+    Map* oldMap = GetMap();
+
+    // The route decided WHEN; what crossing means for anyone standing on her is not this
+    // object's business and never was. Her own map is told and owns every consequence.
     Place().MoveTo(x, y, z);
 
-    // Player::TeleportTo temporarily unsummons its pet, which removes that pet
-    // from this same passenger set. Snapshot players before starting the map
-    // transfer so that mutation cannot invalidate the traversal.
-    std::vector<Player*> playersToTeleport;
-    for (Unit* unit : m_passengers)
-    {
-        if (Player* player = unit ? unit->ToPlayer() : NULL)
-        {
-            playersToTeleport.push_back(player);
-        }
-    }
-
-    for (Player* plr : playersToTeleport)
-    {
-        if (plr->IsDead() && !plr->HasFlag(PLAYER_FLAGS, PLAYER_FLAGS_GHOST))
-        {
-            plr->ResurrectPlayer(1.0);
-        }
-        plr->TeleportTo(newMapid, x, y, z, Where().Facing(), TELE_TO_NOT_LEAVE_TRANSPORT);
-
-        // WorldPacket data(SMSG_811, 4);
-        // data << uint32(0);
-        // plr->GetSession()->SendPacket(&data);
-    }
-
-    // we need to create and save new Map object with 'newMapid' because if not done -> lead to invalid Map object reference...
-    // player far teleport would try to create same instance, but we need it NOW for transport...
-    // correct me if I'm wrong O.o
-    Map* newMap = sMapMgr.CreateMap(newMapid, this);
-    SetMap(newMap);
-
-    if (oldMap != newMap)
-    {
-        UpdateForMap(oldMap);
-        UpdateForMap(newMap);
-    }
-}
-
-bool Transport::AddPassenger(Unit* passenger)
-{
-    if (!passenger)
-    {
-        return false;
-    }
-
-    if (m_passengers.find(passenger) == m_passengers.end())
-    {
-        DETAIL_LOG("Unit %s boarded transport %s.", passenger->GetGuidStr().c_str(), GetName());
-        m_passengers.insert(passenger);
-    }
-    return true;
-}
-
-bool Transport::RemovePassenger(Unit* passenger)
-{
-    if (!passenger)
-    {
-        return false;
-    }
-
-    if (m_passengers.erase(passenger))
-    {
-        DETAIL_LOG("Unit %s removed from transport %s.", passenger->GetGuidStr().c_str(), GetName());
-    }
-    return true;
-}
-
-void Transport::UpdateCreaturePassengerPositions()
-{
-    float const tx = Where().X();
-    float const ty = Where().Y();
-    float const tz = Where().Z();
-    float const transportOrientation = Where().Facing();
-    float const cosOrientation = std::cos(transportOrientation);
-    float const sinOrientation = std::sin(transportOrientation);
-
-    for (Unit* unit : m_passengers)
-    {
-        Creature* creature = unit ? unit->ToCreature() : NULL;
-        if (!creature || !creature->IsInWorld() || creature->GetMap() != GetMap() ||
-            creature->m_movementInfo.GetTransportGuid() != GetObjectGuid())
-        {
-            continue;
-        }
-
-        Position const* local = creature->m_movementInfo.GetTransportPos();
-        float const worldX = tx + cosOrientation * local->x - sinOrientation * local->y;
-        float const worldY = ty + sinOrientation * local->x + cosOrientation * local->y;
-        float const worldZ = tz + local->z;
-        float const worldO = transportOrientation + local->o;
-        GetMap()->CreatureRelocation(creature, worldX, worldY, worldZ, worldO);
-    }
-}
-
-/**
- * @brief Updates global transport position along its generated path.
- *
- * @param update_diff The elapsed update time.
- * @param p_time The current path time parameter.
- */
-void Transport::Update(uint32 update_diff, uint32 /*p_time*/)
-{
-    if (m_WayPoints.size() <= 1)
+    // A node flagged for teleport that does not leave this map: nothing changes for anyone.
+    // Her passengers' coordinates are her own map's and do not move, and the client draws
+    // the jump itself out of the path progress.
+    if (!oldMap || oldMap->GetId() == newMapid)
     {
         return;
     }
 
-    m_timer = GameTime::GetGameTimeMS() % m_period;
-    while (((m_timer - m_curr->first) % m_pathTime) > ((m_next->first - m_curr->first) % m_pathTime))
+    // AND NOT ONE STEP FURTHER ON THIS THREAD. Crossing writes into another map's active
+    // list, object store and player list, and that map may be running right now on another
+    // core. Worse, half a crossing is a vessel that reports a map she is no longer on: the
+    // passengers arriving from her own map were handed the OTHER continent's ships, and their
+    // clients then tried to sail them along paths that do not exist there.
+    //
+    // So the route only says GO. All of it happens at once, at the barrier.
+    m_crossingTo = newMapid;
+    m_crossingX = x;
+    m_crossingY = y;
+    m_crossingZ = z;
+    m_crossing = true;
+}
+
+void Transport::CompleteCrossing()
+{
+    if (!m_crossing)
     {
-        DoEventIfAny(*m_curr, true);
+        return;
+    }
 
-        MoveToNextWayPoint();
+    m_crossing = false;
 
-        DoEventIfAny(*m_curr, false);
+    const uint32 newMapid = m_crossingTo;
+    m_crossingTo = 0;
 
-        // first check help in case client-server transport coordinates de-synchronization
-        if (m_curr->second.mapid != GetMapId() || m_curr->second.teleport)
+    Map* oldMap = GetMap();
+    Map* newMap = sMapMgr.CreateMap(newMapid, this);
+    if (!oldMap || !newMap || oldMap == newMap)
+    {
+        return;
+    }
+
+    // THIS SIDE FIRST, while she is still on it: the shore loses her, and her passengers are
+    // started on their way. The transfer packet they get names the map they are leaving,
+    // which one line later would already be the map they are going to.
+    if (m_map)
+    {
+        // The node's own coordinates, not the pose. Same number the client's path is built
+        // from, so nobody is put down anywhere the ship is not.
+        m_map->VesselLeavingWorld(oldMap, newMapid, m_crossingX, m_crossingY, m_crossingZ,
+                                  Where().Facing());
+    }
+
+    // Off the old grid properly: a game object left in a cell of a map it is no longer on is
+    // a dangling entry the next visit of that cell walks straight into.
+    oldMap->RemoveFromActive(this);
+    RemoveFromWorld();
+
+    SetMap(newMap);
+
+    AddToWorld();
+    newMap->AddToActive(this);
+
+    if (m_map)
+    {
+        m_map->VesselEnteredWorld(newMap);
+    }
+}
+
+/**
+ * @brief Advances the vessel along her route, then runs her deck.
+ *
+ * @param update_diff Unused: the route is keyed off absolute time, not elapsed time.
+ * @param p_time The tick of the world map she sails.
+ */
+void Transport::Update(uint32 /*update_diff*/, uint32 p_time)
+{
+    // Between two world maps: she belongs to neither until the barrier hands her over, and
+    // her own map does not tick without her.
+    if (m_crossing)
+    {
+        return;
+    }
+
+    // The route clock, and nothing else. This vessel is never redrawn, never repositioned
+    // and never composed with anything: her pose is advanced only so that the cell sweep in
+    // her own map's tick knows WHICH GRID of the world to look in for the objects ashore.
+    // What the client is sent is the path progress below and her entry, and it draws her
+    // itself, from an animation the server does not have.
+    if (m_WayPoints.size() > 1)
+    {
+        // Absolute wall-clock, NOT milliseconds since this process started. The phase of a
+        // route has to survive a restart: keyed off uptime, every vessel on the server sails
+        // from the beginning of its path each time we come up, while the client -- which
+        // interpolates the hull from the value we hand it -- draws her somewhere else
+        // entirely, and the two then argue about a ship neither has.
+        const uint32 mapBefore = GetMapId();
+
+        m_timer = uint32(GameTime::GetGameTimeMS() % m_period);
+        while (((m_timer - m_curr->first) % m_pathTime) > ((m_next->first - m_curr->first) % m_pathTime))
         {
-            TeleportTransport(m_curr->second.mapid, m_curr->second.x, m_curr->second.y, m_curr->second.z);
+            DoEventIfAny(*m_curr, true);
+
+            MoveToNextWayPoint();
+
+            DoEventIfAny(*m_curr, false);
+
+            // THE TIME OF THE TRANSFER. The one thing the route has to decide: this node
+            // belongs to another world map, so the ship changes which map she sails, and
+            // everyone aboard follows.
+            if (m_curr->second.mapid != GetMapId() || m_curr->second.teleport)
+            {
+                TeleportTransport(m_curr->second.mapid, m_curr->second.x, m_curr->second.y, m_curr->second.z);
+            }
+            else
+            {
+                Place().MoveTo(m_curr->second.x, m_curr->second.y, m_curr->second.z);
+            }
+
+            m_nextNodeTime = m_curr->first;
+
+            if (m_curr == m_WayPoints.begin())
+            {
+                DETAIL_FILTER_LOG(LOG_FILTER_TRANSPORT_MOVES, " ************ BEGIN ************** %s", GetName());
+            }
+
+            DETAIL_FILTER_LOG(LOG_FILTER_TRANSPORT_MOVES, "%s moved to %f %f %f %d", GetName(), m_curr->second.x, m_curr->second.y, m_curr->second.z, m_curr->second.mapid);
         }
-        else
+
+        // A seam moved us, and everything below belongs to the new map's tick.
+        if (GetMapId() != mapBefore)
         {
-            Place().MoveTo(m_curr->second.x, m_curr->second.y, m_curr->second.z);
-            UpdateCreaturePassengerPositions();
+            return;
         }
+    }
 
-        /*
-        for(UnitSet::const_iterator itr = m_passengers.begin(); itr != m_passengers.end();)
-        {
-            UnitSet::const_iterator it2 = itr;
-            ++itr;
-            //(*it2)->SetPosition( m_curr->second.x + (*it2)->GetTransOffsetX(), m_curr->second.y + (*it2)->GetTransOffsetY(), m_curr->second.z + (*it2)->GetTransOffsetZ(), (*it2)->GetTransOffsetO() );
-        }
-        */
-
-        m_nextNodeTime = m_curr->first;
-
-        if (m_curr == m_WayPoints.begin())
-        {
-            DETAIL_FILTER_LOG(LOG_FILTER_TRANSPORT_MOVES, " ************ BEGIN ************** %s", GetName());
-        }
-
-        DETAIL_FILTER_LOG(LOG_FILTER_TRANSPORT_MOVES, "%s moved to %f %f %f %d", GetName(), m_curr->second.x, m_curr->second.y, m_curr->second.z, m_curr->second.mapid);
+    // LAST, AND IT MUST STAY LAST. The ship's own map runs nested inside this tick, on the
+    // thread of the world map she sails and after that map has finished walking its own
+    // containers -- which is what lets everything it sends go straight out, with no queue
+    // and no tick of latency.
+    //
+    // The TICK of the map she sails, not this vessel's own elapsed time. A deck is a map,
+    // and a map's diff paces splines, weather and grid state; handing it a catch-up value
+    // would jump all three forward after a crossing, while everyone aboard would ALSO be
+    // catching up through their own counters. The two are not the same number whenever the
+    // vessel skipped a tick, and only one of them is a tick.
+    if (m_map)
+    {
+        m_map->Update(p_time);
     }
 }
 
@@ -665,62 +977,6 @@ void Transport::Update(uint32 update_diff, uint32 /*p_time*/)
  *
  * @param targetMap The map whose players should receive transport visibility updates.
  */
-void Transport::UpdateForMap(Map const* targetMap)
-{
-    Map::PlayerList const& pl = targetMap->GetPlayers();
-    if (pl.isEmpty())
-    {
-        return;
-    }
-
-    if (GetMapId() == targetMap->GetId())
-    {
-        for (Map::PlayerList::const_iterator itr = pl.begin(); itr != pl.end(); ++itr)
-        {
-            if (this != itr->getSource()->GetTransport())
-            {
-                UpdateData transData(targetMap->GetId());
-                BuildCreateUpdateBlockForPlayer(&transData, itr->getSource());
-                if (!transData.HasData())
-                {
-                    continue;
-                }
-                WorldPacket packet;
-                transData.BuildPacket(&packet);
-
-                // Prevent sending transport maps in player update object
-                if (packet.read<uint16>(0) != itr->getSource()->GetMapId())
-                {
-                    continue;
-                }
-
-                itr->getSource()->SendDirectMessage(&packet);
-            }
-        }
-    }
-    else
-    {
-        UpdateData transData(targetMap->GetId());
-        BuildOutOfRangeUpdateBlock(&transData);
-        WorldPacket out_packet;
-        transData.BuildPacket(&out_packet);
-
-        for (Map::PlayerList::const_iterator itr = pl.begin(); itr != pl.end(); ++itr)
-        {
-            if (this != itr->getSource()->GetTransport())
-            {
-                // Prevent sending transport maps in player update object
-                if (out_packet.read<uint16>(0) != itr->getSource()->GetMapId())
-                {
-                    continue;
-                }
-
-                itr->getSource()->SendDirectMessage(&out_packet);
-            }
-        }
-    }
-}
-
 void Transport::DoEventIfAny(WayPointMap::value_type const& node, bool departure)
 {
     if (uint32 eventid = departure ? node.second.departureEventID : node.second.arrivalEventID)

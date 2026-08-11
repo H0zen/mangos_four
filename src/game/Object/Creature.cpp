@@ -24,6 +24,7 @@
  */
 
 #include "Creature.h"
+#include "TransportMap.h"
 #include "LivingWorldAnchorPolicy.h"
 #include "Database/DatabaseEnv.h"
 #include "WorldPacket.h"
@@ -275,6 +276,14 @@ void Creature::AddToWorld()
 
     Unit::AddToWorld();
 
+    // Index it on the vessel whose deck this map is. NOT a registration -- being aboard is
+    // what having this map MEANS, and every consumer derives it. This list exists only so
+    // the seam can hand out destroy blocks in the right order.
+    if (TransportMap* hull = GetMap()->AsTransport())
+    {
+        hull->EnlistCrew(this);
+    }
+
     // Make active if required
     if (sWorld.isForceLoadMap(GetMapId()) ||
         (GetCreatureInfo()->ExtraFlags & CREATURE_FLAG_EXTRA_ACTIVE) ||
@@ -302,8 +311,39 @@ void Creature::AddToWorld()
 /**
  * @brief Removes the creature from the world and object store.
  */
+/**
+ * @brief Drops the crew index before the object goes away.
+ *
+ * LoadHelper does `new Creature` -> LoadFromDB fails -> `delete obj`, on an object that
+ * never reached a map, and it is also the path a dismissed pet takes. FindMap() rather
+ * than GetMap(), which asserts on m_currMap rather than returning NULL. Idempotent, so it
+ * is safe alongside the RemoveFromWorld hook and the vessel's own explicit unboards.
+ */
+void Creature::CleanupsBeforeDelete()
+{
+    if (Map* on = FindMap())
+    {
+        if (TransportMap* hull = on->AsTransport())
+        {
+            hull->DelistCrew(this);
+        }
+    }
+
+    Unit::CleanupsBeforeDelete();
+}
+
 void Creature::RemoveFromWorld()
 {
+    // Off the vessel's crew index. NOT an unboarding -- being aboard is what having this
+    // map MEANS -- but the index holds a raw pointer and must not outlive the creature.
+    if (IsInWorld() && GetMap())
+    {
+        if (TransportMap* hull = GetMap()->AsTransport())
+        {
+            hull->DelistCrew(this);
+        }
+    }
+
 #ifdef ENABLE_ELUNA
     if (IsInWorld())
     {

@@ -24,6 +24,7 @@
  */
 
 #include "Player.h"
+#include "TransportMap.h"
 #include "Language.h"
 #include "Database/DatabaseEnv.h"
 #include "Log.h"
@@ -186,26 +187,22 @@ inline void BeforeVisibilityDestroy<Creature>(Creature* t, Player* p)
     }
 }
 
+/**
+ * @brief Are these two standing on the same vessel?
+ *
+ * Under the deck-as-a-map model that is one question, not three: a vessel's deck IS a map,
+ * so sharing her is sharing it, and a player, a pet and a crew member are all answered the
+ * same way with no per-type case and no passenger roster to consult.
+ */
 static bool SharesTransportWithPlayer(Player* player, WorldObject* target)
 {
-    Transport* transport = player ? player->GetTransport() : NULL;
-    if (!transport || !target)
+    if (!player || !target)
     {
         return false;
     }
 
-    if (target->GetTypeId() == TYPEID_PLAYER)
-    {
-        return static_cast<Player*>(target)->GetTransport() == transport;
-    }
-
-    if (target->GetTypeId() == TYPEID_UNIT)
-    {
-        Creature* creature = static_cast<Creature*>(target);
-        return creature->IsPet() && static_cast<Pet*>(creature)->GetTransport() == transport;
-    }
-
-    return false;
+    Map const* on = player->FindMap();
+    return on && on->AsTransport() && target->FindMap() == on;
 }
 
 /**

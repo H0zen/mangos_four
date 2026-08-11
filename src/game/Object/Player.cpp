@@ -56,6 +56,7 @@
 #include "Pet.h"
 #include "Util.h"
 #include "Transports.h"
+#include "TransportMap.h"
 #include "Weather.h"
 #include "BattleGround/BattleGround.h"
 #include "BattleGround/BattleGroundMgr.h"
@@ -309,6 +310,7 @@ UpdateMask Player::updateVisualBits;
 Player::Player(WorldSession* session): Unit(), m_mover(this), m_camera(this), m_petMgr(this), m_achievementMgr(this), m_reputationMgr(this), m_glyphMgr(this), m_honorMgr(this), m_currencyMgr(this), m_runeMgr(this), m_spellCooldownMgr(this), m_phaseController(*this)
 {
     m_transport = 0;
+    m_vesselCrossing = false;
 
     m_speakTime = 0;
     m_speakCount = 0;
@@ -579,11 +581,8 @@ Player::~Player()
     // Delete the player's talk class
     delete PlayerTalkClass;
 
-    // Remove the player from any transport they are on
-    if (m_transport)
-    {
-        m_transport->RemovePassenger(this);
-    }
+    // Nothing to unregister: a vessel keeps no passenger list. Being aboard IS standing on
+    // her map, and the map lets go of him like any other.
 
     // Delete all item set effects
     for (size_t x = 0; x < ItemSetEff.size(); ++x)
@@ -1341,8 +1340,7 @@ void Player::Update(uint32 update_diff, uint32 p_time)
     // are therefore briefly far away in world coordinates even though they
     // still share the owner's transport.  Preserve them for TeleportTo's
     // temporary-unsummon path instead of deleting them as ordinary strays.
-    if (pet && (!GetTransport() || pet->GetTransport() != GetTransport()) &&
-        !InReach(*pet, *this, GetMap()->GetVisibilityDistance()) &&
+    if (pet && !InReach(*pet, *this, GetMap()->GetVisibilityDistance()) &&
         (GetCharmGuid() && (pet->GetObjectGuid() != GetCharmGuid())))
     {
         pet->Unsummon(PET_SAVE_REAGENTS, this);
@@ -1737,7 +1735,6 @@ bool Player::TeleportTo(uint32 mapid, float x, float y, float z, float orientati
     // if we were on a transport, leave
     if (!(options & TELE_TO_NOT_LEAVE_TRANSPORT) && m_transport)
     {
-        m_transport->RemovePassenger(this);
         m_transport = NULL;
         m_movementInfo.ClearTransportData();
     }
@@ -6611,4 +6608,70 @@ void Player::SendPetitionTurnInResult(uint32 result)
     data.WriteBits(result, 4);
     data.FlushBits();
     GetSession()->SendPacket(&data);
+}
+
+void Player::GetWorldAnchor(uint32& mapId, float& x, float& y, float& z) const
+{
+    if (Transport* vessel = Transport::VesselOf(*this))
+    {
+        if (Map* sailing = vessel->GetMap())
+        {
+            mapId = sailing->GetId();
+            x = vessel->Where().X();
+            y = vessel->Where().Y();
+            z = vessel->Where().Z();
+            return;
+        }
+    }
+
+    mapId = GetMapId();
+    x = Where().X();
+    y = Where().Y();
+    z = Where().Z();
+}
+
+/**
+ * @brief The terrain that answers WORLD questions for this player: exploration, area
+ *        flags, indoor/outdoor, area triggers.
+ *
+ * Aboard a vessel that is the terrain of the map the ship sails, not the deck's. A deck
+ * map is a hull with no area table -- the client never shipped one -- so asking it yields
+ * area flag 0 and "discovered unknown area" for every step taken on deck.
+ */
+TerrainInfo const* Player::AnchorTerrain() const
+{
+    if (Transport* vessel = Transport::VesselOf(*this))
+    {
+        if (Map* sailing = vessel->GetMap())
+        {
+            return sailing->GetTerrain();
+        }
+    }
+
+    return GetTerrain();
+}
+
+uint32 Player::GetClientMapId() const
+{
+    if (Map const* on = FindMap())
+    {
+        if (TransportMap const* hull = on->AsTransport())
+        {
+            if (Transport* vessel = hull->Vessel())
+            {
+                return vessel->GetMapId();
+            }
+        }
+    }
+
+    return GetMapId();
+}
+
+Map* Player::BoardingMap() const
+{
+    TransportMap* hull = m_transport ? m_transport->AsMap() : NULL;
+
+    // Uncommissioned -- the baker left her no hull -- and she carries nobody: he stays on the
+    // water, which is at least a place that exists.
+    return (hull && hull->IsCommissioned()) ? hull : GetMap();
 }

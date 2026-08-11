@@ -76,30 +76,18 @@ void VisibleChangesNotifier::Visit(CameraMapType& m)
 void VisibleNotifier::Notify()
 {
     Player& player = *i_camera.GetOwner();
-    // at this moment i_clientGUIDs have guids that not iterate at grid level checks
-    // but exist one case when this possible and object not out of range: transports
-    if (Transport* transport = player.GetTransport())
-    {
-        for (Transport::UnitSet::const_iterator itr = transport->GetPassengers().begin(); itr != transport->GetPassengers().end(); ++itr)
-        {
-            Unit* passenger = *itr;
-            if (!passenger || i_clientGUIDs.find(passenger->GetObjectGuid()) == i_clientGUIDs.end())
-            {
-                continue;
-            }
-
-            // Players require reciprocal visibility. Other unit passengers are
-            // already known to the client and only need the transport exception
-            // below; re-running normal distance visibility can unsummon a pet
-            // whose world position is temporarily outside the active grid.
-            if (Player* otherPlayer = passenger->ToPlayer())
-            {
-                otherPlayer->UpdateVisibilityOf(otherPlayer, &player);
-                player.UpdateVisibilityOf(&player, otherPlayer, i_data, i_visibleNow);
-            }
-            i_clientGUIDs.erase(passenger->GetObjectGuid());
-        }
-    }
+    // NO PASSENGER SPECIAL CASE, and its absence is the point. A vessel's deck is a map:
+    // whoever stands on it sits in an ordinary cell and is found by the ordinary sweep, so
+    // there is nothing here to rescue from the elimination set. The old branch existed
+    // because passengers were carried by the game object with a world position that drifted
+    // out of the active grid -- it re-ran visibility by hand, erased guids from the
+    // elimination set, and left the server's record and the client's copy disagreeing.
+    // That disagreement is what a player saw as a pet or a fellow passenger left drawn
+    // where nothing stands.
+    //
+    // What must NEVER be in this set is the vessel herself and her crew: they ride the
+    // map-membership channel (AnnounceVessel/RetractVessel), and this sweep destroys
+    // whatever it does not re-find.
 
     // generate outOfRange for not iterate objects
     i_data.AddOutOfRangeGUID(i_clientGUIDs);

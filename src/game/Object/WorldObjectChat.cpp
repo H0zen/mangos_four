@@ -23,6 +23,7 @@
  * and lore are copyrighted by Blizzard Entertainment, Inc.
  */
 
+#include "TransportMap.h"
 #include "Object.h"
 #include "GameObject.h"
 #include "SharedDefines.h"
@@ -289,12 +290,101 @@ void WorldObject::MonsterText(MangosStringLocale const* textData, Unit const* ta
  * @param data The packet to send.
  * @param bToSelf Unused self-delivery flag.
  */
+namespace
+{
+    /**
+     * @brief Send `data` across a vessel's boundary, both directions.
+     *
+     * @param from   The object that is speaking.
+     * @param dist   The broadcast range, or 0 for an unranged one.
+     * @param ranged Whether `dist` means anything.
+     * @return True when `from` is on a deck, in which case the ordinary broadcast has
+     *         already reached everyone on that map and there is nothing else to do.
+     *
+     * THE DISTANCE TEST IS AT GRID GRANULARITY, and that is not a compromise -- it is the
+     * best statement that can be made truthfully. The server does not know where the hull
+     * is: its pose is a `GameTime % period` estimate that snaps between waypoints while the
+     * client interpolates the real curve. What IS known is which square she is in, and by
+     * how much that square can be wrong: NodeSlack() is half the longest gap between two
+     * consecutive nodes, so estimate +/- (NodeSlack + HullRadius) provably contains her.
+     * Testing against that is exact about a coarse thing, rather than precise about a
+     * number that is not true.
+     */
+    bool RelayAcrossVessels(WorldObject const* from, WorldPacket* data, float dist, bool ranged)
+    {
+        Map* on = from->GetMap();
+
+        // OUTBOUND. The people ashore are on another map and no cell of theirs will ever
+        // hold this deckhand, so the same packet goes out again to the watchers the vessel
+        // gathered at the top of this tick. Sent immediately: the deck runs INSIDE the tick
+        // of the map it sails, on that map's own thread, so there is nothing to wait for.
+        //
+        // The gathering itself was already bounded by visibility + hull + slack, so the
+        // range test has been applied once and does not need repeating here.
+        if (on->AsTransport())
+        {
+            for (Player* observer : on->ExternalObservers())
+            {
+                if (observer && observer->GetSession())
+                {
+                    observer->GetSession()->SendPacket(data);
+                }
+            }
+
+            return true;
+        }
+
+        // INBOUND. Whatever happens on the water a ship is crossing has to reach the people
+        // standing on her: they are on another map and no cell of theirs will ever hold the
+        // thing that spoke, and a passenger who is told nothing watches a harbour of statues.
+        MapManager::TransportsByMapType::const_iterator vessels =
+            sMapMgr.m_TransportsByMap.find(from->GetMapId());
+        if (vessels == sMapMgr.m_TransportsByMap.end())
+        {
+            return false;
+        }
+
+        for (Transport* vessel : vessels->second)
+        {
+            TransportMap* hull = vessel->AsMap();
+            if (!hull || vessel->GetMap() != on)
+            {
+                continue;
+            }
+
+            // The grid the vessel is in, widened by everything the estimate can be wrong by.
+            // Inside it she may be anywhere; outside it she cannot be.
+            if (ranged && !vessel->Where().WithinDist(
+                    from->Where(), dist + hull->HullRadius() + vessel->NodeSlack(), false))
+            {
+                continue;
+            }
+
+            Map::PlayerList const& aboard = hull->GetPlayers();
+            for (Map::PlayerList::const_iterator itr = aboard.begin(); itr != aboard.end(); ++itr)
+            {
+                Player* passenger = itr->getSource();
+                if (passenger && passenger->GetSession())
+                {
+                    passenger->GetSession()->SendPacket(data);
+                }
+            }
+        }
+
+        return false;
+    }
+}
+
 void WorldObject::SendMessageToSet(WorldPacket* data, bool /*bToSelf*/) const
 {
     // if object is in world, map for it already created!
     if (IsInWorld())
     {
+        // A boarded unit's audience is EVERYONE ON ITS OWN MAP -- which is the deck, and
+        // which is exactly where the passengers are. That is the point of the vessel being
+        // a map: the ordinary broadcast already reaches the people standing next to him.
         GetMap()->MessageBroadcast(this, data);
+        RelayAcrossVessels(this, data, 0.0f, false);
     }
 }
 
@@ -311,6 +401,7 @@ void WorldObject::SendMessageToSetInRange(WorldPacket* data, float dist, bool /*
     if (IsInWorld())
     {
         GetMap()->MessageDistBroadcast(this, data, dist);
+        RelayAcrossVessels(this, data, dist, true);
     }
 }
 

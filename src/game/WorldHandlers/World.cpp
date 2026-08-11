@@ -432,6 +432,12 @@ void World::SetInitialWorldSettings()
     sLog.outString("Loading Points Of Interest Data...");
     sObjectMgr.LoadPointsOfInterest();
 
+    // BEFORE the spawn tables. A crew row's map is a vessel's own id, and sMapStore has
+    // never heard of it until the vessels are registered -- LoadCreatures would drop every
+    // one of them as pointing at a map that does not exist, long before LoadTransports runs.
+    sLog.outString("Registering vessel map ids...");
+    sMapMgr.RegisterVesselMaps();
+
     sLog.outString("Loading Creature Data...");
     sObjectMgr.LoadCreatures();
 

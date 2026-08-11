@@ -3258,6 +3258,15 @@ enum CreatureTypeFlags
     CREATURE_TYPEFLAGS_QUEST_BOSS       = 0x80000000,       // Lua_UnitIsQuestBoss
 };
 
+/// THE TWO BITS THAT KILL A CLIENT ABOARD A MOVING SHIP -- UNK21 and UNK23 above, and it
+/// takes BOTH. Either one alone is harmless, proven by sailing each on its own. Together,
+/// every client that can see the creature dies in its render path the moment the vessel gets
+/// under way; stationary, nothing happens, because the client only walks a transport's
+/// attachments while it is moving. They reach the client in SMSG_CREATURE_QUERY_RESPONSE,
+/// cached per ENTRY, so this cannot be papered over per creature on the wire -- the creature
+/// simply does not sail.
+#define CREATURE_TYPEFLAGS_TRANSPORT_FORBIDDEN     0x00500000
+
 enum CreatureEliteType
 {
     CREATURE_ELITE_NORMAL          = 0,

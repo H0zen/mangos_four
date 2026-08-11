@@ -132,11 +132,18 @@ class MapManager : public MaNGOS::Singleton<MapManager>
 
         void LoadTransports();
 
+        /// Every vessel's map id registered with sMapStore BEFORE the spawn tables load, or
+        /// every crew row is dropped as pointing at a map that does not exist.
+        void RegisterVesselMaps();
+
+        /// Destroy every vessel and its crew. Must run while the maps are still alive.
+        void DestroyTransports();
+
         typedef std::set<Transport*> TransportSet;
         TransportSet m_Transports;
 
-        typedef std::map<uint32, TransportSet> TransportMap;
-        TransportMap m_TransportsByMap;
+        typedef std::map<uint32, TransportSet> TransportsByMapType;
+        TransportsByMapType m_TransportsByMap;
 
         void InitializeVisibilityDistanceInfo();
 

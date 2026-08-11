@@ -358,7 +358,6 @@ bool Player::LoadFromDB(ObjectGuid guid, SqlQueryHolder* holder)
                 }
 
                 m_transport = *iter;
-                m_transport->AddPassenger(this);
                 SetLocationMapId(m_transport->GetMapId());
                 break;
             }

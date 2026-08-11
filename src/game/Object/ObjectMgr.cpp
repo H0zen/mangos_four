@@ -3239,7 +3239,7 @@ ObjectMgr::LivingWorldStartupStats ObjectMgr::LoadActiveEntities(Map* _map)
 
     if (collectLivingWorldStats)
     {
-        MapManager::TransportMap::const_iterator transportMapItr = sMapMgr.m_TransportsByMap.find(_map->GetId());
+        MapManager::TransportsByMapType::const_iterator transportMapItr = sMapMgr.m_TransportsByMap.find(_map->GetId());
         if (transportMapItr != sMapMgr.m_TransportsByMap.end())
         {
             mapTransportCount = uint32(transportMapItr->second.size());

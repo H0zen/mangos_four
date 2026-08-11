@@ -588,7 +588,13 @@ void Object::BuildCreateUpdateBlockForPlayer(UpdateData* data, Player* target) c
         movement.y = isMoTransport ? 0.0f : gameObject->Where().Y();
         movement.z = isMoTransport ? 0.0f : gameObject->Where().Z();
         movement.o = gameObject->Where().Facing();
-        movement.transportTime = isMoTransport ? GameTime::GetGameTimeMS() : 0;
+        // THE PHASE, not the clock. The client does not take the modulo itself: it wants
+        // how far along her route she is, and that is ours to compute. Hand it a raw wall
+        // clock and the hull stops animating altogether -- a dead ship, with everyone
+        // standing on her frozen too.
+        movement.transportTime = isMoTransport
+            ? static_cast<Transport const*>(gameObject)->GetPathProgress()
+            : 0;
         movement.rotation = uint64(gameObject->GetPackedWorldRotation());
         movement.isTransport = isMoTransport;
 

@@ -116,6 +116,25 @@ class TypeUnorderedMapContainer
             return TypeUnorderedMapContainer::find(i_elements, hdl, (SPECIFIC_TYPE*)NULL);
         }
 
+        template<class SPECIFIC_TYPE>
+        /**
+         * @brief EVERYTHING OF ONE KIND that is stored here.
+         *
+         * find() answers "is this guid present"; this answers "what of this kind is
+         * present", which is a different question and the one a reconciler asks -- the deck
+         * minion sweep needs every pet standing on a map, whether or not it is crew and
+         * whether or not anything still owns it.
+         *
+         * @return const std::unordered_map<KEY_TYPE, SPECIFIC_TYPE*>
+         */
+        std::unordered_map<KEY_TYPE, SPECIFIC_TYPE*> const& GetElements() const
+        {
+            static const std::unordered_map<KEY_TYPE, SPECIFIC_TYPE*> none;
+            std::unordered_map<KEY_TYPE, SPECIFIC_TYPE*> const* found =
+                TypeUnorderedMapContainer::elements(i_elements, (SPECIFIC_TYPE*)NULL);
+            return found ? *found : none;
+        }
+
     private:
 
         ContainerUnorderedMap<OBJECT_TYPES, KEY_TYPE> i_elements; /**< TODO */
@@ -194,6 +213,41 @@ class TypeUnorderedMapContainer
         }
 
         // Find helpers
+        template<class SPECIFIC_TYPE>
+        /**
+         * @brief The map of one kind, or NULL when this leaf is not it. Mirrors find():
+         *        head first, then the tail, so a type anywhere in the list is reached.
+         */
+        static std::unordered_map<KEY_TYPE, SPECIFIC_TYPE*> const* elements(
+            ContainerUnorderedMap<SPECIFIC_TYPE, KEY_TYPE> const& container, SPECIFIC_TYPE* /*obj*/)
+        {
+            return &container._element;
+        }
+
+        template<class SPECIFIC_TYPE>
+        static std::unordered_map<KEY_TYPE, SPECIFIC_TYPE*> const* elements(
+            ContainerUnorderedMap<TypeNull, KEY_TYPE> const& /*container*/, SPECIFIC_TYPE* /*obj*/)
+        {
+            return NULL;
+        }
+
+        template<class SPECIFIC_TYPE, class T>
+        static std::unordered_map<KEY_TYPE, SPECIFIC_TYPE*> const* elements(
+            ContainerUnorderedMap<T, KEY_TYPE> const& /*container*/, SPECIFIC_TYPE* /*obj*/)
+        {
+            return NULL;
+        }
+
+        template<class SPECIFIC_TYPE, class H, class T>
+        static std::unordered_map<KEY_TYPE, SPECIFIC_TYPE*> const* elements(
+            ContainerUnorderedMap< TypeList<H, T>, KEY_TYPE > const& container, SPECIFIC_TYPE* /*obj*/)
+        {
+            std::unordered_map<KEY_TYPE, SPECIFIC_TYPE*> const* ret =
+                TypeUnorderedMapContainer::elements(container._elements, (SPECIFIC_TYPE*)NULL);
+            return ret ? ret
+                       : TypeUnorderedMapContainer::elements(container._TailElements, (SPECIFIC_TYPE*)NULL);
+        }
+
         template<class SPECIFIC_TYPE>
         /**
          * @brief

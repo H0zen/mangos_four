@@ -23,6 +23,7 @@
  * and lore are copyrighted by Blizzard Entertainment, Inc.
  */
 
+#include "TransportMap.h"
 #include "Player.h"
 #include "Language.h"
 #include "Database/DatabaseEnv.h"
@@ -177,12 +178,42 @@ void Player::SaveToDB()
 
     if (!IsBeingTeleported())
     {
-        uberInsert.addUInt32(GetMapId());
+        // A CHARACTER ABOARD IS SAVED ONTO THE MAP THE SHIP SAILS, never onto the deck.
+        // Written once, a deck map id in this column is unloadable for ever: the client is
+        // handed a map it has no terrain for, dies in CMap::LoadWdt(), and the character is
+        // stuck at the loading screen with no way back in. Where he actually stands is the
+        // deck position saved in the transport columns below, and that one survives intact.
+        //
+        // The vessel is taken from the boarding relationship when it is intact, and from
+        // the map otherwise: a GM `.tele` onto a hull puts him there with no transport set.
+        uint32 savedMap = GetMapId();
+        float savedX = Where().X(), savedY = Where().Y();
+        float savedZ = Where().Z(), savedO = Where().Facing();
+
+        Transport* vessel = m_transport;
+        if (!vessel && FindMap())
+        {
+            if (TransportMap* hull = FindMap()->AsTransport())
+            {
+                vessel = hull->Vessel();
+            }
+        }
+
+        if (vessel)
+        {
+            savedMap = vessel->GetMapId();
+            savedX = vessel->Where().X();
+            savedY = vessel->Where().Y();
+            savedZ = vessel->Where().Z();
+            savedO = vessel->Where().Facing();
+        }
+
+        uberInsert.addUInt32(savedMap);
         uberInsert.addUInt32(uint32(GetDungeonDifficulty()));
-        uberInsert.addFloat(finiteAlways(Where().X()));
-        uberInsert.addFloat(finiteAlways(Where().Y()));
-        uberInsert.addFloat(finiteAlways(Where().Z()));
-        uberInsert.addFloat(finiteAlways(Where().Facing()));
+        uberInsert.addFloat(finiteAlways(savedX));
+        uberInsert.addFloat(finiteAlways(savedY));
+        uberInsert.addFloat(finiteAlways(savedZ));
+        uberInsert.addFloat(finiteAlways(savedO));
     }
     else
     {
@@ -219,10 +250,19 @@ void Player::SaveToDB()
     }
     uberInsert.addString(ss);
 
-    uberInsert.addFloat(finiteAlways(m_movementInfo.GetTransportPos()->x));
-    uberInsert.addFloat(finiteAlways(m_movementInfo.GetTransportPos()->y));
-    uberInsert.addFloat(finiteAlways(m_movementInfo.GetTransportPos()->z));
-    uberInsert.addFloat(finiteAlways(m_movementInfo.GetTransportPos()->o));
+    // WHERE HE ACTUALLY STANDS. Aboard, that is his position on the deck map -- the offset
+    // in his last movement packet is a copy of it that can be a tick stale, or absent
+    // altogether at logout.
+    Position deck = *m_movementInfo.GetTransportPos();
+    if (FindMap() && FindMap()->AsTransport())
+    {
+        deck = Position(Where().X(), Where().Y(), Where().Z(), Where().Facing());
+    }
+
+    uberInsert.addFloat(finiteAlways(deck.x));
+    uberInsert.addFloat(finiteAlways(deck.y));
+    uberInsert.addFloat(finiteAlways(deck.z));
+    uberInsert.addFloat(finiteAlways(deck.o));
     if (m_transport)
     {
         uberInsert.addUInt32(m_transport->GetGUIDLow());

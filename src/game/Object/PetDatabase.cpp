@@ -335,20 +335,6 @@ bool Pet::LoadPetFromDB(Player* owner, uint32 petentry, uint32 petnumber, bool c
         SetDeathState(JUST_DIED);
     }
 
-    Transport* ownerTransport = owner->GetTransport();
-    if (ownerTransport)
-    {
-        Position const* ownerLocal = owner->m_movementInfo.GetTransportPos();
-        float const localOrientation = ownerLocal->o;
-        float const localX = ownerLocal->x + std::cos(localOrientation + PET_FOLLOW_ANGLE) * PET_FOLLOW_DIST;
-        float const localY = ownerLocal->y + std::sin(localOrientation + PET_FOLLOW_ANGLE) * PET_FOLLOW_DIST;
-        m_movementInfo.SetTransportData(ownerTransport->GetObjectGuid(), localX, localY,
-            ownerLocal->z, localOrientation, owner->m_movementInfo.GetTransportTime(), -1);
-        m_transport = ownerTransport;
-        ownerTransport->AddPassenger(this);
-        DisableSpline();
-    }
-
     map->Add((Creature*)this);
     AIM_Initialize();
 

@@ -23,6 +23,7 @@
  * and lore are copyrighted by Blizzard Entertainment, Inc.
  */
 
+#include "TransportMap.h"
 #include "Pet.h"
 #include "Database/DatabaseEnv.h"
 #include "Log.h"
@@ -50,7 +51,7 @@ Pet::Pet(PetType type) :
     m_resetTalentsCost(0), m_resetTalentsTime(0), m_usedTalentCount(0),
     m_removed(false),  m_petType(type), m_duration(0),
     m_bonusdamage(0), m_petSlot(-1), m_auraUpdateMask(0), m_loading(false),
-    m_declinedname(NULL), m_transport(NULL), m_petModeFlags(PET_MODE_DEFAULT), m_retreating(false),
+    m_declinedname(NULL), m_petModeFlags(PET_MODE_DEFAULT), m_retreating(false),
     m_stayPosSet(false), m_stayPosX(0), m_stayPosY(0), m_stayPosZ(0), m_stayPosO(0),
     m_opener(0), m_openerMinRange(0), m_openerMaxRange(0)
 {
@@ -94,13 +95,6 @@ void Pet::AddToWorld()
  */
 void Pet::RemoveFromWorld()
 {
-    if (m_transport)
-    {
-        m_transport->RemovePassenger(this);
-        m_transport = NULL;
-        m_movementInfo.ClearTransportData();
-    }
-
     ///- Remove the pet from the accessor
     if (IsInWorld())
     {
@@ -174,10 +168,16 @@ void Pet::Update(uint32 update_diff, uint32 diff)
             // unsummon pet that lost owner
             Unit* owner = GetOwner();
             Player* playerOwner = owner ? owner->ToPlayer() : NULL;
-            bool const sharesOwnerTransport = m_transport && playerOwner &&
-                playerOwner->GetTransport() == m_transport;
+            // A master and his pet on opposite sides of a deck boundary are on two maps,
+            // so every range test between them fails closed -- and the reconciler that is
+            // about to draw the pet across runs at the top of the vessel's next tick. Do
+            // not dismiss it in that window; there is nothing wrong with it.
+            bool const crossingDeck = owner && owner->FindMap() != FindMap() &&
+                                      ((FindMap() && FindMap()->AsTransport()) ||
+                                       (owner->FindMap() && owner->FindMap()->AsTransport()));
+
             if (!owner ||
-                (!sharesOwnerTransport && !InReach(*this, *owner, GetMap()->GetVisibilityDistance()) &&
+                (!crossingDeck && !InReach(*this, *owner, GetMap()->GetVisibilityDistance()) &&
                     (owner->GetCharmGuid() && (owner->GetCharmGuid() != GetObjectGuid()))) ||
                 (isControlled() && !owner->GetPetGuid()))
             {
@@ -196,7 +196,6 @@ void Pet::Update(uint32 update_diff, uint32 diff)
 
             if (playerOwner)
             {
-                UpdateTransport(playerOwner);
             }
 
             if (m_duration > 0)
@@ -218,136 +217,6 @@ void Pet::Update(uint32 update_diff, uint32 diff)
     }
 
     Creature::Update(update_diff, diff);
-}
-
-void Pet::UpdateTransport(Player* owner)
-{
-    Transport* ownerTransport = owner ? owner->GetTransport() : NULL;
-
-    if (m_transport && m_transport != ownerTransport)
-    {
-        m_transport->RemovePassenger(this);
-        m_transport = NULL;
-        m_movementInfo.ClearTransportData();
-        DisableSpline();
-        GetMotionMaster()->Clear(false);
-        NearTeleportTo(owner->Where().X(), owner->Where().Y(), owner->Where().Z(), owner->Where().Facing());
-        SendSplineAnchor(ObjectGuid(), owner->Where().X(), owner->Where().Y(),
-            owner->Where().Z(), owner->Where().Facing());
-        return;
-    }
-
-    if (m_transport || !ownerTransport || !InReach(*this, *owner, 8.0f))
-    {
-        return;
-    }
-
-    Position const* ownerLocal = owner->m_movementInfo.GetTransportPos();
-    float const localOrientation = ownerLocal->o;
-    float const localX = ownerLocal->x + std::cos(localOrientation + PET_FOLLOW_ANGLE) * PET_FOLLOW_DIST;
-    float const localY = ownerLocal->y + std::sin(localOrientation + PET_FOLLOW_ANGLE) * PET_FOLLOW_DIST;
-    DisableSpline();
-    GetMotionMaster()->Clear(false);
-    m_movementInfo.SetTransportData(ownerTransport->GetObjectGuid(), localX, localY,
-        ownerLocal->z, localOrientation, owner->m_movementInfo.GetTransportTime(), -1);
-    m_transport = ownerTransport;
-    ownerTransport->AddPassenger(this);
-
-    float const worldOrientation = owner->Where().Facing();
-    float const worldX = owner->Where().X() + std::cos(worldOrientation + PET_FOLLOW_ANGLE) * PET_FOLLOW_DIST;
-    float const worldY = owner->Where().Y() + std::sin(worldOrientation + PET_FOLLOW_ANGLE) * PET_FOLLOW_DIST;
-    GetMap()->CreatureRelocation(this, worldX, worldY, owner->Where().Z(), worldOrientation);
-
-    // Replace the client's world-space follow spline with the same persistent
-    // transport-local facing anchor used by retail transported creatures. A
-    // zero-duration stop only cancels the old spline; its transport context is
-    // discarded immediately and the pet snaps back to the old world endpoint.
-    SendSplineAnchor(ownerTransport->GetObjectGuid(), localX, localY,
-        ownerLocal->z, localOrientation);
-}
-
-void Pet::SendSplineAnchor(ObjectGuid transportGuid, float x, float y, float z, float orientation)
-{
-    Movement::MonsterMoveData move;
-    move.position = Geometry::Vector3(x, y, z);
-    move.splineId = Movement::MoveSplineInit::GenerateSplineId();
-    move.type = Movement::MonsterMoveFacingAngle;
-    move.moverGuid = GetObjectGuid();
-    move.transportGuid = transportGuid;
-    move.transportSeat = -1;
-    move.facingAngle = orientation;
-    move.uncompressedPath.push_back(move.position);
-
-    WorldPacket data(SMSG_MONSTER_MOVE, 64);
-    Movement::PacketBuilder::WriteMonsterMove(move, data);
-    SendMessageToSet(&data, true);
-}
-
-bool Pet::MoveTransportFollow(Unit* target, float offset, float angle, bool walking, bool& moved)
-{
-    moved = false;
-
-    Player* owner = target ? target->ToPlayer() : NULL;
-    Transport* ownerTransport = owner ? owner->GetTransport() : NULL;
-    if (!ownerTransport || ownerTransport != m_transport)
-    {
-        return false;
-    }
-
-    Position const* currentLocal = m_movementInfo.GetTransportPos();
-    Position const* ownerLocal = owner->m_movementInfo.GetTransportPos();
-    float const followDistance = offset + Where().Extent() + owner->Where().Extent();
-    float const followAngle = ownerLocal->o + angle;
-    float const destinationX = ownerLocal->x + std::cos(followAngle) * followDistance;
-    float const destinationY = ownerLocal->y + std::sin(followAngle) * followDistance;
-    float const destinationZ = ownerLocal->z;
-    float const deltaX = destinationX - currentLocal->x;
-    float const deltaY = destinationY - currentLocal->y;
-    float const deltaZ = destinationZ - currentLocal->z;
-    float const distance = std::sqrt(deltaX * deltaX + deltaY * deltaY + deltaZ * deltaZ);
-    if (distance < 0.5f)
-    {
-        return true;
-    }
-
-    float const speed = GetSpeed(walking ? MOVE_WALK : MOVE_RUN);
-    if (speed <= 0.0f)
-    {
-        return true;
-    }
-
-    float const localOrientation = std::atan2(deltaY, deltaX);
-    uint32 const duration = uint32(distance / speed * 1000.0f);
-    Geometry::Vector3 const start(currentLocal->x, currentLocal->y, currentLocal->z);
-    Geometry::Vector3 const destination(destinationX, destinationY, destinationZ);
-
-    m_movementInfo.SetTransportData(ownerTransport->GetObjectGuid(), destinationX, destinationY,
-        destinationZ, localOrientation, owner->m_movementInfo.GetTransportTime(), -1);
-
-    float const transportOrientation = ownerTransport->Where().Facing();
-    float const cosOrientation = std::cos(transportOrientation);
-    float const sinOrientation = std::sin(transportOrientation);
-    float const worldX = ownerTransport->Where().X() + cosOrientation * destinationX - sinOrientation * destinationY;
-    float const worldY = ownerTransport->Where().Y() + sinOrientation * destinationX + cosOrientation * destinationY;
-    float const worldZ = ownerTransport->Where().Z() + destinationZ;
-    GetMap()->CreatureRelocation(this, worldX, worldY, worldZ,
-        NormalizeOrientation(transportOrientation + localOrientation));
-
-    Movement::MonsterMoveData move;
-    move.position = start;
-    move.splineId = Movement::MoveSplineInit::GenerateSplineId();
-    move.type = Movement::MonsterMoveNormal;
-    move.moverGuid = GetObjectGuid();
-    move.transportGuid = ownerTransport->GetObjectGuid();
-    move.transportSeat = -1;
-    move.duration = duration;
-    move.uncompressedPath.push_back(destination);
-
-    WorldPacket data(SMSG_MONSTER_MOVE, 80);
-    Movement::PacketBuilder::WriteMonsterMove(move, data);
-    SendMessageToSet(&data, true);
-    moved = true;
-    return true;
 }
 
 /**
@@ -522,13 +391,6 @@ void Pet::Unsummon(PetSaveMode mode, Unit* owner /*= NULL*/)
                 }
                 break;
         }
-    }
-
-    if (m_transport)
-    {
-        m_transport->RemovePassenger(this);
-        m_transport = NULL;
-        m_movementInfo.ClearTransportData();
     }
 
     SavePetToDB(mode);

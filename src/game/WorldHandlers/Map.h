@@ -87,6 +87,7 @@ class WorldPacket;
 class InstanceData;
 class Group;
 class MapPersistentState;
+class TransportMap;
 class WorldPersistentState;
 class DungeonPersistentState;
 class BattleGroundPersistentState;
@@ -267,6 +268,12 @@ class Map : public GridRefManager<NGridType>
         bool IsBattleGround() const { return i_mapEntry && i_mapEntry->IsBattleGround(); }
         bool IsBattleArena() const { return i_mapEntry && i_mapEntry->IsBattleArena(); }
         bool IsBattleGroundOrArena() const { return i_mapEntry && i_mapEntry->IsBattleGroundOrArena(); }
+
+        /// This map AS A VESSEL, or NULL. Asked of the map itself rather than of its id, so
+        /// the answer comes from what the map IS -- and the caller gets the thing it wanted
+        /// rather than a boolean plus a downcast.
+        virtual TransportMap* AsTransport() { return NULL; }
+        virtual TransportMap const* AsTransport() const { return NULL; }
         bool IsContinent() const { return i_mapEntry && i_mapEntry->IsContinent(); }
 
         // can't be NULL for loaded map
@@ -336,6 +343,21 @@ class Map : public GridRefManager<NGridType>
 
         // get corresponding TerrainData object for this particular map
         const TerrainInfo* GetTerrain() const { return m_TerrainData; }
+
+        /**
+         * @brief Players who are NOT on this map but must receive what is broadcast on it.
+         *
+         * Only a deck map has them, refreshed by the vessel at the top of its tick. This is
+         * a BROADCAST channel, not a visibility one: a spline, an emote, a spell go -- the
+         * things a crew member says when nobody's visibility pass happens to be running.
+         * Who can SEE the deck is decided by each viewer's own sweep, which reaches across
+         * the boundary itself.
+         */
+        std::vector<Player*> const& ExternalObservers() const { return m_externalObservers; }
+        void SetExternalObservers(std::vector<Player*>&& observers)
+        {
+            m_externalObservers = std::move(observers);
+        }
 
         void CreateInstanceData(bool load);
         InstanceData* GetInstanceData() const { return i_data; }
@@ -429,6 +451,19 @@ class Map : public GridRefManager<NGridType>
         LuaVal lua_data = LuaVal({});
 #endif /* ENABLE_ELUNA */
 
+    protected:
+        // A deck map IS a Map and overrides Add(Player*), so the grid machinery Map::Add
+        // uses has to be reachable from the subclass. Protected, not public: this is the
+        // map's own plumbing and nothing outside the hierarchy may drive it.
+        void EnsureGridLoadedAtEnter(Cell const&, Player* player = nullptr);
+        void PromoteEnvelopeNeighboursToFull(uint32 gridX, uint32 gridY);
+        NGridType* getNGrid(uint32 x, uint32 y) const
+        {
+            MANGOS_ASSERT(x < MAX_NUMBER_OF_GRIDS);
+            MANGOS_ASSERT(y < MAX_NUMBER_OF_GRIDS);
+            return i_grids[x][y];
+        }
+
     private:
         void LoadMapAndVMap(int gx, int gy);
 
@@ -440,7 +475,6 @@ class Map : public GridRefManager<NGridType>
         void SendRemoveTransports(Player* player);
 
         bool CreatureCellRelocation(Creature* creature, const Cell &new_cell);
-        void PromoteEnvelopeNeighboursToFull(uint32 gridX, uint32 gridY);
         void MaybePromoteEnvelopeGridForPlayer(uint32 gridX, uint32 gridY);
 
         bool loaded(const GridPair&) const;
@@ -449,19 +483,12 @@ class Map : public GridRefManager<NGridType>
         bool EnsureCellEnvelopeLoaded(const Cell& centerCell);
         void UnloadCell(NGridType* grid, uint32 cellX, uint32 cellY);
         void ProcessPendingCellUnloads();
-        void EnsureGridLoadedAtEnter(Cell const&, Player* player = nullptr);
 
         void buildNGridLinkage(NGridType* pNGridType) { pNGridType->link(this); }
 
         template<class T> void AddType(T* obj);
         template<class T> void RemoveType(T* obj, bool);
 
-        NGridType* getNGrid(uint32 x, uint32 y) const
-        {
-            MANGOS_ASSERT(x < MAX_NUMBER_OF_GRIDS);
-            MANGOS_ASSERT(y < MAX_NUMBER_OF_GRIDS);
-            return i_grids[x][y];
-        }
 
         bool isGridObjectDataLoaded(uint32 x, uint32 y) const { return getNGrid(x, y)->isGridObjectDataLoaded(); }
         void setGridObjectDataLoaded(bool pLoaded, uint32 x, uint32 y) { getNGrid(x, y)->setGridObjectDataLoaded(pLoaded); }
@@ -474,6 +501,9 @@ class Map : public GridRefManager<NGridType>
 
     protected:
         MapEntry const* i_mapEntry;
+
+        /// Players off this map who must hear it -- see ExternalObservers().
+        std::vector<Player*> m_externalObservers;
         uint8 i_spawnMode;
         uint32 i_id;
         uint32 i_InstanceId;

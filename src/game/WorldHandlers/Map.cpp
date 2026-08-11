@@ -55,6 +55,7 @@
 #include "InstanceData.h"
 #include "GridNotifiersImpl.h"
 #include "Transports.h"
+#include "TransportMap.h"
 #include "ObjectAccessor.h"
 #include "ObjectMgr.h"
 #include "World.h"
@@ -1090,6 +1091,29 @@ void Map::Update(const uint32& t_diff)
     }
 
     m_weatherSystem->UpdateWeathers(t_diff);
+
+    // LAST ACT, and it must stay last: every vessel sailing this map takes its tick here,
+    // and that tick runs the vessel's deck map nested inside it. A deckhand's spell can
+    // drop a dynamic object ashore and a passenger can step off onto this map, so the deck
+    // must not run until this map has finished walking its own containers.
+    //
+    // Not through the grid's ObjectUpdater, though the vessel is a world object: a game
+    // object never relocates its cell in this core, so a ship would advance once, drift
+    // out of the cell it was filed in and never be visited again -- which is a ship that
+    // sits at its first waypoint for ever.
+    MapManager::TransportsByMapType::const_iterator sailing =
+        sMapMgr.m_TransportsByMap.find(GetId());
+    if (sailing != sMapMgr.m_TransportsByMap.end())
+    {
+        for (Transport* vessel : sailing->second)
+        {
+            if (vessel->GetMap() == this)
+            {
+                WorldObject::UpdateHelper helper(vessel);
+                helper.Update(t_diff);
+            }
+        }
+    }
 }
 
 /**
@@ -1858,10 +1882,46 @@ const char* Map::GetMapName() const
  */
 void Map::UpdateObjectVisibility(WorldObject* obj, Cell cell, CellPair cellpair)
 {
+    // MID-CROSSING HE IS OFF BOTH MAPS FOR AN INSTANT, and out of world means invisible:
+    // notifying now DESTROYS him for everyone who is about to be handed him back unchanged.
+    // That is the whole of "the man on the pier watched me vanish when I stepped aboard and
+    // reappear only once I moved" -- and the same in reverse coming ashore. The client needs
+    // none of it: the change of transport rides the movement broadcast.
+    if (obj->GetTypeId() == TYPEID_PLAYER && ((Player*)obj)->IsCrossingVessel())
+    {
+        return;
+    }
+
     cell.SetNoCreate();
     MaNGOS::VisibleChangesNotifier notifier(*obj);
     TypeContainerVisitor<MaNGOS::VisibleChangesNotifier, WorldTypeMapContainer > player_notifier(notifier);
     cell.Visit(cellpair, player_notifier, *this, *obj, GetVisibilityDistance());
+
+    // The object-side mirror of Camera's relay: a deck and its shore are two maps, and a
+    // cell visit of one reaches no camera on the other. Without this the people ashore are
+    // never told about anything that happens aboard until they themselves move.
+    //
+    // PASSENGERS ONLY: creating through this path stamps m_clientGUIDs, and the crew are
+    // deliberately kept out of it -- that would hand them to the distance-based elimination
+    // and empty the deck the first time her waypoint estimate flickered out of reach.
+    TransportMap const* hull = AsTransport();
+    if (!hull || obj->GetTypeId() != TYPEID_PLAYER)
+    {
+        return;
+    }
+
+    // Not mid-seam, as TransportMap::Add also refuses: she still names the map she is
+    // leaving, whose watchers are about to lose her outright.
+    Transport* vessel = hull->Vessel();
+    Map* const sailed = (vessel && !vessel->IsCrossing()) ? vessel->GetMap() : NULL;
+    if (!sailed)
+    {
+        return;
+    }
+
+    Cell::VisitWorldObjects(vessel->Where().X(), vessel->Where().Y(), sailed, notifier,
+                            sailed->GetVisibilityDistance() + hull->HullRadius() +
+                            vessel->NodeSlack());
 }
 
 /**
@@ -2107,43 +2167,39 @@ void Map::SendInitSelf(Player* player)
  */
 void Map::SendInitTransports(Player* player)
 {
-    // Hack to send out transports
-    MapManager::TransportMap& tmap = sMapMgr.m_TransportsByMap;
+    // A player joining a map takes possession of every vessel on it -- one of the four
+    // events that carry transport visibility. No distance, no grid: you share her map, you
+    // have her. The client sails her into view from the path itself.
+    //
+    // ON A DECK, the only vessel that matters is the one this map IS. Vessels are filed
+    // under the WORLD map they sail, so the lookup below finds nothing here -- and a player
+    // logging in aboard was handed no hull at all, which is a man standing in mid-air.
+    if (TransportMap* hull = AsTransport())
+    {
+        TransportMap::AnnounceVessel(hull->Vessel(), player);
+        return;
+    }
 
-    // no transports at map
-    if (tmap.find(player->GetMapId()) == tmap.end())
+    // Keyed on i_id, the map DOING the sending, not on the player's own map id: during a
+    // teleport those are not the same. And looked up with find() rather than operator[],
+    // which INSERTS an empty set into a container every map on the server shares.
+    MapManager::TransportsByMapType::const_iterator vessels = sMapMgr.m_TransportsByMap.find(i_id);
+    if (vessels == sMapMgr.m_TransportsByMap.end())
     {
         return;
     }
 
-    UpdateData transData(player->GetMapId());
-
-    MapManager::TransportSet& tset = tmap[player->GetMapId()];
-
-    for (MapManager::TransportSet::const_iterator i = tset.begin(); i != tset.end(); ++i)
+    for (Transport* vessel : vessels->second)
     {
-        // send data for current transport in other place
-        if ((*i) != player->GetTransport() && (*i)->GetMapId() == i_id)
+        // Our own vessel came from SendInitSelf, ahead of our own body, so we already
+        // stand on something by the time our block lands. Skip it here.
+        if (vessel == player->GetTransport() || vessel->GetMapId() != i_id)
         {
-            (*i)->BuildCreateUpdateBlockForPlayer(&transData, player);
+            continue;
         }
+
+        TransportMap::AnnounceVessel(vessel, player);
     }
-
-    if (!transData.HasData())
-    {
-        return;
-    }
-
-    WorldPacket packet;
-    transData.BuildPacket(&packet);
-
-    // Prevent sending transport maps in player update object
-    if (packet.ReadUInt16() != player->GetMapId())
-    {
-        return;
-    }
-
-    player->GetSession()->SendPacket(&packet);
 }
 
 /**
@@ -2153,35 +2209,26 @@ void Map::SendInitTransports(Player* player)
  */
 void Map::SendRemoveTransports(Player* player)
 {
-    // Hack to send out transports
-    MapManager::TransportMap& tmap = sMapMgr.m_TransportsByMap;
-
-    // no transports at map
-    if (tmap.find(player->GetMapId()) == tmap.end())
+    MapManager::TransportsByMapType::const_iterator vessels =
+        sMapMgr.m_TransportsByMap.find(player->GetMapId());
+    if (vessels == sMapMgr.m_TransportsByMap.end())
     {
         return;
     }
 
-    UpdateData transData(player->GetMapId());
-
-    MapManager::TransportSet& tset = tmap[player->GetMapId()];
+    UpdateData transData(uint16(player->GetClientMapId()));
 
     // except used transport
-    for (MapManager::TransportSet::const_iterator i = tset.begin(); i != tset.end(); ++i)
-        if ((*i) != player->GetTransport() && (*i)->GetMapId() != i_id)
+    for (Transport* vessel : vessels->second)
+    {
+        if (vessel != player->GetTransport() && vessel->GetMapId() != i_id)
         {
-            (*i)->BuildOutOfRangeUpdateBlock(&transData);
+            vessel->BuildOutOfRangeUpdateBlock(&transData);
         }
+    }
 
     WorldPacket packet;
     transData.BuildPacket(&packet);
-
-    // Prevent sending transport maps in player update object
-    if (packet.ReadUInt16() != player->GetMapId())
-    {
-        return;
-    }
-
     player->GetSession()->SendPacket(&packet);
 }
 

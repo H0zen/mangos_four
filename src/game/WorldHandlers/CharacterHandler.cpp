@@ -41,6 +41,7 @@
  */
 
 #include "Common.h"
+#include "TransportMap.h"
 #include "Database/DatabaseEnv.h"
 #include "WorldPacket.h"
 #include "SharedDefines.h"
@@ -1111,7 +1112,10 @@ void WorldSession::HandlePlayerLogin(LoginQueryHolder* holder)
     }
 
     /* This code is run if we can not add the player to the map for some reason */
-    if (lockStatus != AREA_LOCKSTATUS_OK || !pCurrChar->GetMap()->Add(pCurrChar))
+    // BoardingMap, not GetMap: a character saved aboard is restored onto the vessel's own
+    // map, from the deck offset his save carries. His client was sent the WATER she sails --
+    // it has no terrain for a deck id and dies in CMap::LoadWdt() if it is ever told one.
+    if (lockStatus != AREA_LOCKSTATUS_OK || !pCurrChar->BoardingMap()->Add(pCurrChar))
     {
         pCurrChar->SetCinematicFlyover(nullptr);
         /* Attempt to find an areatrigger to teleport the player for us */
