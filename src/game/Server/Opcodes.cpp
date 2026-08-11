@@ -750,7 +750,7 @@ void InitializeOpcodes()
     // emits SMSG_PETITION_QUERY_RESPONSE to the owner of any petition the new
     // member had signed. That opcode is rebuilt and admitted, so the conclusion
     // survives -- but the first trace stopped one level short, which is exactly
-    // the failure this checklist warns about. Traced properly, the full set is:
+    // the failure this checklist warns about. The DIRECT sends are:
     //
     //   SendPetitionTurnInResult -> SMSG_TURN_IN_PETITION_RESULTS  (4-bit body)
     //   Guild::AddMember -> RemovePetitionsAndSigns
@@ -761,8 +761,19 @@ void InitializeOpcodes()
     // All three converted, all three admitted. The third was found by review
     // after I had already corrected the trace once -- worth noting that even a
     // deliberate re-trace missed it, because it leaves through the item layer
-    // rather than the guild or petition ones. Reader sub_689A90, a lone
-    // bit-packed GUID.
+    // rather than the guild or petition ones.
+    //
+    // Beyond those, the handler mutates player fields -- DestroyItem clears
+    // PLAYER_FIELD_INV_SLOT_HEAD for the charter's slot, AddMember sets guild id
+    // and rank -- and those reach the client DEFERRED, as SMSG_UPDATE_OBJECT on
+    // the next map tick rather than as a send from this call. That opcode is
+    // MoP-serialised and admitted. It is spelled out because the wording here
+    // previously said "the full set", which is a stronger claim than a list of
+    // direct sends can carry: by the field-update route almost every handler in
+    // the server reaches SMSG_UPDATE_OBJECT, so what matters for the send gate is
+    // direct versus deferred, not reachable versus not.
+    //
+    // Reader sub_689A90, a lone bit-packed GUID.
     DefC(CMSG_TURN_IN_PETITION, "CMSG_TURN_IN_PETITION", STATUS_LOGGEDIN, PROCESS_THREADUNSAFE, &WorldSession::HandleTurnInPetitionOpcode);
     DefS(SMSG_PETITION_SHOWLIST, "SMSG_PETITION_SHOWLIST");
     DefS(SMSG_PETITION_SHOW_SIGNATURES, "SMSG_PETITION_SHOW_SIGNATURES");
