@@ -6594,16 +6594,30 @@ void Player::DoInteraction(ObjectGuid const& interactObjGuid)
 }
 
 
-// PARKED -- SMSG_PETITION_SIGN_RESULTS 0x06AE is still the pre-MoP body, which
-// is why CMSG_PETITION_SIGN stays unregistered. Reader sub_6FB9AF (parser
-// sub_7000D1, vtable off_D6A590) gives the layout: two GUIDs at object +16 and
-// +32 with sixteen INTERLEAVED mask bits, then a 4-BIT result, then sixteen
-// interleaved bytes. Both GUIDs are eight bytes so layout cannot tell the
-// petition from the signer, and unlike the other petition replies this one's
-// consumer is not reachable from its vtable -- the only xref to off_D6A590 is
-// the constructor, and the trampoline dispatches through a runtime-XOR
-// indirect. Find the consumer another way before rebuilding; do NOT assume the
-// pre-MoP order of petition-then-signer.
+// PARKED -- SMSG_PETITION_SIGN_RESULTS 0x06AE. The last unconverted petition
+// reply, and the reason CMSG_PETITION_SIGN stays unregistered.
+//
+// LAYOUT is fully decoded from reader sub_6FB9AF (parser sub_7000D1, vtable
+// off_D6A590): two GUIDs at object +16 and +32 with sixteen INTERLEAVED mask
+// bits, then a 4-BIT result, then sixteen interleaved bytes.
+//
+// IDENTITY is not, and every static route has been tried and eliminated:
+//   - the vtable: the only xref to off_D6A590 is the constructor;
+//   - the trampoline sub_6C5C7A: dispatches through a runtime-XOR indirect that
+//     cannot be resolved statically, the same construct that blocked
+//     SMSG_PETITION_SHOWLIST until its consumer was found another way;
+//   - the petition UI globals: every function touching qword_11E9F18 and its
+//     neighbours is accounted for -- sub_9633C0 opens a petition, sub_9634D4
+//     appends a signer, sub_96373C resets the block, and sub_962C09 /
+//     sub_96311E / sub_962F5E are the SignPetition, OfferPetition and
+//     RenamePetition builders. None consumes this reply;
+//   - the corpus: zero rows for 0x06AE in 18414, in either direction.
+//
+// Both GUIDs are eight bytes, so guessing has a 50% chance of naming the wrong
+// player in the message the signer sees -- and the packet would be exactly the
+// right length either way. This needs a live client: sign a charter and observe
+// which name appears. That is a cheaper experiment than any further static
+// work, and it is the only remaining source of evidence.
 void Player::SendPetitionSignResult(ObjectGuid petitionGuid, Player* player, uint32 result)
 {
     WorldPacket data(SMSG_PETITION_SIGN_RESULTS, 8 + 8 + 4);

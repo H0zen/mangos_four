@@ -741,6 +741,14 @@ void InitializeOpcodes()
     DefC(CMSG_PETITION_SHOW_SIGNATURES, "CMSG_PETITION_SHOW_SIGNATURES", STATUS_LOGGEDIN, PROCESS_THREADUNSAFE, &WorldSession::HandlePetitionShowSignOpcode);
     DefC(CMSG_OFFER_PETITION, "CMSG_OFFER_PETITION", STATUS_LOGGEDIN, PROCESS_THREADUNSAFE, &WorldSession::HandleOfferPetitionOpcode);
     DefC(CMSG_PETITION_BUY, "CMSG_PETITION_BUY", STATUS_LOGGEDIN, PROCESS_THREADUNSAFE, &WorldSession::HandlePetitionBuyOpcode);
+
+    // TURN_IN, held back earlier on the assumption that creating a guild dragged
+    // in the whole guild reply surface. It does not: Guild::Create and
+    // Guild::AddMember send no packet at all, and the handler's only reply is
+    // SendPetitionTurnInResult -> SMSG_TURN_IN_PETITION_RESULTS, rebuilt as a
+    // single 4-bit field and admitted. Reader sub_689A90, a lone bit-packed GUID.
+    // The caution was worth taking at the time; it just turned out not to bind.
+    DefC(CMSG_TURN_IN_PETITION, "CMSG_TURN_IN_PETITION", STATUS_LOGGEDIN, PROCESS_THREADUNSAFE, &WorldSession::HandleTurnInPetitionOpcode);
     DefS(SMSG_PETITION_SHOWLIST, "SMSG_PETITION_SHOWLIST");
     DefS(SMSG_PETITION_SHOW_SIGNATURES, "SMSG_PETITION_SHOW_SIGNATURES");
     DefS(SMSG_PETITION_QUERY_RESPONSE, "SMSG_PETITION_QUERY_RESPONSE");
