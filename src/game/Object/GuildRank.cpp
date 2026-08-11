@@ -91,13 +91,39 @@ void Guild::DelRank(uint32 rankId)
         return;
     }
 
-    RankList::iterator itr = m_Ranks.erase(m_Ranks.begin() + rankId);
+    m_Ranks.erase(m_Ranks.begin() + rankId);
+
+    // Everything below the deleted rank moves up one, and the members sitting on
+    // those ranks have to move with it. Renumbering guild_rank alone leaves every
+    // member below this point pointing at the rank that used to be beneath their
+    // own -- inheriting its name, rights and bank limits -- while whoever held
+    // the last rank falls off the end of m_Ranks entirely, which reads back as
+    // "<unknown>" with no rights at all. The stale number survives relog, since
+    // it is guild_member.rank that is wrong.
+    //
+    // Members ON the deleted rank are refused by the handler, but should one
+    // reach here they land on the rank that replaced it, which is the closest
+    // thing to where they were.
+    for (MemberList::iterator itr = members.begin(); itr != members.end(); ++itr)
+    {
+        if (itr->second.RankId > rankId)
+        {
+            --itr->second.RankId;
+
+            if (Player* member = sObjectMgr.GetPlayer(ObjectGuid(HIGHGUID_PLAYER, itr->first)))
+            {
+                member->SetRank(itr->second.RankId);
+            }
+        }
+    }
+
     // delete lowest guild_rank
     CharacterDatabase.BeginTransaction();
     CharacterDatabase.PExecute("DELETE FROM `guild_rank` WHERE `rid` ='%u' AND `guildid` ='%u'", rankId, m_Id);
     CharacterDatabase.PExecute("DELETE FROM `guild_bank_right` WHERE `rid` ='%u' AND `guildid` ='%u'", rankId, m_Id);
     CharacterDatabase.PExecute("UPDATE `guild_rank` SET `rid` = `rid` - 1 WHERE `rid` > '%u' AND `guildid` ='%u'", rankId, m_Id);
     CharacterDatabase.PExecute("UPDATE `guild_bank_right` SET `rid` = `rid` - 1 WHERE `rid` > '%u' AND `guildid` ='%u'", rankId, m_Id);
+    CharacterDatabase.PExecute("UPDATE `guild_member` SET `rank` = `rank` - 1 WHERE `rank` > '%u' AND `guildid` ='%u'", rankId, m_Id);
     CharacterDatabase.CommitTransaction();
 }
 
