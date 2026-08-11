@@ -66,33 +66,38 @@ void WorldSession::HandlePetitionBuyOpcode(WorldPacket& recv_data)
     DEBUG_LOG("Received opcode CMSG_PETITION_BUY");
     recv_data.hexlike();
 
+    // Writer sub_68A12F (thunk sub_686523, vtable slot +4). MoP collapsed this
+    // packet to two fields: the charter name and the vendor GUID. Everything the
+    // pre-MoP body read after the name -- a second string, eleven scalars and ten
+    // more strings -- does not exist on the 18414 wire.
+    //
+    // The name LENGTH is a 7-bit field written INSIDE the GUID mask run, after
+    // three mask bits; sub_664F47 is fixed at seven bits (its `v6 = v4 - 1` and
+    // the accumulate branch setting the count to 7), and its third argument is
+    // unused. The name bytes then go out immediately after the flush, ahead of
+    // every GUID byte. Builder sub_9D904A names both fields: a 128-byte name
+    // buffer at object +16, and the vendor GUID at +144 taken from the global the
+    // client also range-checks its charter price against.
     ObjectGuid guidNPC;
-    std::string name;
 
-    recv_data >> guidNPC;                                   // NPC GUID
-    recv_data.read_skip<uint32>();                          // 0
-    recv_data.read_skip<uint64>();                          // 0
-    recv_data >> name;                                      // name
-    recv_data.read_skip<std::string>();                     // some string
-    recv_data.read_skip<uint32>();                          // 0
-    recv_data.read_skip<uint32>();                          // 0
-    recv_data.read_skip<uint32>();                          // 0
-    recv_data.read_skip<uint32>();                          // 0
-    recv_data.read_skip<uint32>();                          // 0
-    recv_data.read_skip<uint32>();                          // 0
-    recv_data.read_skip<uint32>();                          // 0
-    recv_data.read_skip<uint16>();                          // 0
-    recv_data.read_skip<uint32>();                          // 0
-    recv_data.read_skip<uint32>();                          // 0
-    recv_data.read_skip<uint32>();                          // 0
+    recv_data.ReadGuidMask<5, 2, 3>(guidNPC);
+    uint32 const nameLength = recv_data.ReadBits(7);
+    recv_data.ReadGuidMask<4, 1, 7, 0, 6>(guidNPC);
 
-    for (int i = 0; i < 10; ++i)
+    // The client's own buffer is 128 bytes and it truncates at 127 plus a NUL, so
+    // a 7-bit length can never legitimately exceed that. ReadString stops at the
+    // end of the body and returns short rather than throwing, so check the bytes
+    // are actually present instead of trusting the declared length.
+    if (recv_data.rpos() + nameLength > recv_data.size())
     {
-        recv_data.read_skip<std::string>();
+        sLog.outError("CMSG_PETITION_BUY: %s declared a %u byte name with %zu remaining, refusing",
+                      GetPlayer()->GetObjectGuid().GetString().c_str(), nameLength, recv_data.size() - recv_data.rpos());
+        recv_data.rfinish();
+        return;
     }
 
-    recv_data.read_skip<uint32>();                          // client index
-    recv_data.read_skip<uint32>();                          // 0
+    std::string name = recv_data.ReadString(nameLength);
+    recv_data.ReadGuidBytes<1, 7, 4, 6, 0, 5, 2, 3>(guidNPC);
 
     DEBUG_LOG("Petitioner %s tried sell petition: name %s", guidNPC.GetString().c_str(), name.c_str());
 
@@ -149,12 +154,18 @@ void WorldSession::HandlePetitionBuyOpcode(WorldPacket& recv_data)
         return;
     }
 
-    _player->ModifyMoney(-int64(sWorld.getConfig(CONFIG_UNIT32_GUILD_PETITION_COST)));
+    // Create the charter BEFORE taking the money. StoreNewItem can still fail
+    // after CanStoreNewItem passed, and the old order burned the cost with no
+    // item to show for it. Nothing between the two can change the balance --
+    // same thread, no yield, and the petition transaction is opened further
+    // down -- so this ordering is safe here and is not the commit-ambiguity
+    // case, which needs a transaction to be ambiguous about.
     Item* charter = _player->StoreNewItem(dest, GUILD_CHARTER, true);
     if (!charter)
     {
         return;
     }
+    _player->ModifyMoney(-int64(sWorld.getConfig(CONFIG_UNIT32_GUILD_PETITION_COST)));
 
     charter->SetUInt32Value(ITEM_FIELD_ENCHANTMENT_1_1, charter->GetGUIDLow());
     // ITEM_FIELD_ENCHANTMENT_1_1 stores the guild petition id.
@@ -203,9 +214,12 @@ void WorldSession::HandlePetitionShowSignOpcode(WorldPacket& recv_data)
     DEBUG_LOG("Received opcode CMSG_PETITION_SHOW_SIGNATURES");
     // recv_data.hexlike();
 
+    // Writer sub_6890C5 (thunk sub_686220). A lone bit-packed GUID -- the
+    // pre-MoP raw uint64 read eight bytes that are not laid out that way.
     uint8 signs = 0;
     ObjectGuid petitionguid;
-    recv_data >> petitionguid;                              // petition guid
+    recv_data.ReadGuidMask<3, 7, 2, 4, 5, 6, 0, 1>(petitionguid);
+    recv_data.ReadGuidBytes<2, 4, 5, 7, 1, 0, 3, 6>(petitionguid);
 
     // solve (possible) some strange compile problems with explicit use GUID_LOPART(petitionguid) at some GCC versions (wrong code optimization in compiler?)
     uint32 petitionguid_low = petitionguid.GetCounter();
@@ -264,10 +278,14 @@ void WorldSession::HandlePetitionQueryOpcode(WorldPacket& recv_data)
     DEBUG_LOG("Received opcode CMSG_PETITION_QUERY");
     // recv_data.hexlike();
 
+    // Writer sub_6944E5 (thunk sub_690DC4). The uint32 keeps its leading position
+    // and its width, so it is the one field here the pre-MoP body got right; the
+    // GUID after it is bit-packed.
     uint32 guildguid;
     ObjectGuid petitionguid;
     recv_data >> guildguid;                                 // in mangos always same as GUID_LOPART(petitionguid)
-    recv_data >> petitionguid;                              // petition guid
+    recv_data.ReadGuidMask<2, 3, 1, 0, 4, 7, 6, 5>(petitionguid);
+    recv_data.ReadGuidBytes<0, 4, 7, 5, 1, 6, 3, 2>(petitionguid);
     DEBUG_LOG("CMSG_PETITION_QUERY Petition %s Guild GUID %u", petitionguid.GetString().c_str(), guildguid);
 
     SendPetitionQueryOpcode(petitionguid);
@@ -343,11 +361,15 @@ void WorldSession::HandlePetitionSignOpcode(WorldPacket& recv_data)
     DEBUG_LOG("Received opcode CMSG_PETITION_SIGN");    // ok
     // recv_data.hexlike();
 
+    // Writer sub_688009 (thunk sub_685E7A). The byte comes FIRST here and is
+    // written with sub_40F018, not sub_40F075 -- the pre-MoP body had it trailing
+    // the GUID, so both fields landed in the wrong place.
     Field* fields;
     ObjectGuid petitionGuid;
     uint8 unk;
-    recv_data >> petitionGuid;                              // petition guid
     recv_data >> unk;
+    recv_data.ReadGuidMask<4, 2, 0, 1, 5, 3, 6, 7>(petitionGuid);
+    recv_data.ReadGuidBytes<6, 1, 7, 2, 5, 3, 0, 4>(petitionGuid);
 
     uint32 petitionLowGuid = petitionGuid.GetCounter();
 
@@ -463,12 +485,56 @@ void WorldSession::HandleOfferPetitionOpcode(WorldPacket& recv_data)
     DEBUG_LOG("Received opcode CMSG_OFFER_PETITION");   // ok
     // recv_data.hexlike();
 
+    // Writer sub_668AB1 (thunk sub_661BFE). Two GUIDs whose sixteen mask bits and
+    // sixteen bytes are fully INTERLEAVED, so neither run can be read as a block.
+    //
+    // Both are eight bytes, so layout alone cannot say which is which and the
+    // sequences below would look correct either way round. Builder sub_96311E
+    // settles it: the GUID at object +16 is loaded from the global holding the
+    // open petition, while +24 takes the GUID of the unit the builder resolves,
+    // level-checks against the charter's min/max, and rejects with error 375 when
+    // it equals the local player -- that is the offer TARGET. The permutations
+    // themselves were re-derived from Binary Ninja's disassembly independently of
+    // the IDA reading, because a hand-copied sixteen-element sequence is exactly
+    // what survives a self-check while being wrong.
     ObjectGuid petitionGuid;
     ObjectGuid playerGuid;
     uint32 junk;
     recv_data >> junk;                                      // this is not petition type!
-    recv_data >> petitionGuid;                              // petition guid
-    recv_data >> playerGuid;                                // player guid
+
+    recv_data.ReadGuidMask<4>(playerGuid);
+    recv_data.ReadGuidMask<1>(playerGuid);
+    recv_data.ReadGuidMask<2>(petitionGuid);
+    recv_data.ReadGuidMask<6>(playerGuid);
+    recv_data.ReadGuidMask<1>(petitionGuid);
+    recv_data.ReadGuidMask<2>(playerGuid);
+    recv_data.ReadGuidMask<4>(petitionGuid);
+    recv_data.ReadGuidMask<3>(playerGuid);
+    recv_data.ReadGuidMask<7>(playerGuid);
+    recv_data.ReadGuidMask<0>(petitionGuid);
+    recv_data.ReadGuidMask<6>(petitionGuid);
+    recv_data.ReadGuidMask<5>(playerGuid);
+    recv_data.ReadGuidMask<0>(playerGuid);
+    recv_data.ReadGuidMask<3>(petitionGuid);
+    recv_data.ReadGuidMask<5>(petitionGuid);
+    recv_data.ReadGuidMask<7>(petitionGuid);
+
+    recv_data.ReadGuidBytes<7>(playerGuid);
+    recv_data.ReadGuidBytes<1>(petitionGuid);
+    recv_data.ReadGuidBytes<4>(petitionGuid);
+    recv_data.ReadGuidBytes<2>(petitionGuid);
+    recv_data.ReadGuidBytes<6>(playerGuid);
+    recv_data.ReadGuidBytes<3>(petitionGuid);
+    recv_data.ReadGuidBytes<0>(petitionGuid);
+    recv_data.ReadGuidBytes<5>(petitionGuid);
+    recv_data.ReadGuidBytes<0>(playerGuid);
+    recv_data.ReadGuidBytes<2>(playerGuid);
+    recv_data.ReadGuidBytes<5>(playerGuid);
+    recv_data.ReadGuidBytes<3>(playerGuid);
+    recv_data.ReadGuidBytes<4>(playerGuid);
+    recv_data.ReadGuidBytes<7>(petitionGuid);
+    recv_data.ReadGuidBytes<1>(playerGuid);
+    recv_data.ReadGuidBytes<6>(petitionGuid);
 
     Player* player = sObjectAccessor.FindPlayer(playerGuid);
     if (!player)
@@ -545,9 +611,11 @@ void WorldSession::HandleTurnInPetitionOpcode(WorldPacket& recv_data)
     DEBUG_LOG("Received opcode CMSG_TURN_IN_PETITION"); // ok
     // recv_data.hexlike();
 
+    // Writer sub_689A90 (thunk sub_68640F). A lone bit-packed GUID.
     ObjectGuid petitionGuid;
 
-    recv_data >> petitionGuid;
+    recv_data.ReadGuidMask<1, 2, 3, 0, 5, 7, 4, 6>(petitionGuid);
+    recv_data.ReadGuidBytes<2, 1, 4, 6, 0, 7, 5, 3>(petitionGuid);
 
     DEBUG_LOG("Petition %s turned in by %s", petitionGuid.GetString().c_str(), _player->GetGuidStr().c_str());
 
@@ -662,8 +730,11 @@ void WorldSession::HandlePetitionShowListOpcode(WorldPacket& recv_data)
     DEBUG_LOG("Received CMSG_PETITION_SHOWLIST");
     // recv_data.hexlike();
 
+    // Writer sub_689E91 (thunk sub_6864DF). A lone bit-packed GUID -- the vendor
+    // this list was requested from.
     ObjectGuid guid;
-    recv_data >> guid;
+    recv_data.ReadGuidMask<1, 7, 2, 5, 4, 0, 3, 6>(guid);
+    recv_data.ReadGuidBytes<6, 3, 2, 4, 1, 7, 5, 0>(guid);
 
     SendPetitionShowList(guid);
 }
