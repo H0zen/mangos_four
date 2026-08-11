@@ -1168,7 +1168,7 @@ void InitializeOpcodes()
 
     // Guild bank permissions query. The request carries no body at all (2,089 corpus
     // observations, every one of them zero bytes) so there is no reader to get wrong,
-    // and the reply is now byte-exact against retail: mop_guild_packets compares the
+    // and the reply is now byte-exact against retail: mop_guild_packets DESCRIBES (the byte-exact assertion was dropped at 6872ffcd3) the
     // generated packet against capture-000006 seq 1959 in full. All 2,080 corpus
     // observations of the reply are exactly 83 bytes.
     //
@@ -1183,7 +1183,7 @@ void InitializeOpcodes()
     //
     // The request reader takes its two interleaved guid orders from the client's own
     // send serializer sub_665EE4 and is fixture-locked against two captures. The reply
-    // is byte-exact: mop_guild_packets rebuilds capture-000004 seq 39473 in full, all
+    // is byte-exact: mop_guild_packets documents capture-000004 seq 39473 -- the byte-exact assertion was dropped at 6872ffcd3 --
     // 133 bytes of a four-rank guild.
     //
     // The inherited reply was not a variant of the right packet, it was a different one
@@ -1200,7 +1200,7 @@ void InitializeOpcodes()
 
     // Guild rank query. The reader takes its guid order from the client's own send
     // serializer sub_C860F3, and the reply is now byte-exact against retail:
-    // mop_guild_packets rebuilds capture-000019 seq 185 in full, all 447 bytes of a
+    // mop_guild_packets documents capture-000019 seq 185 -- the byte-exact assertion was dropped at 6872ffcd3 -- 447 bytes of a
     // five-rank guild carrying the stock MoP rank names.
     //
     // The inherited reply was wrong in ways no length check could see. It wrote an
@@ -1220,7 +1220,7 @@ void InitializeOpcodes()
 
     // Guild roster. The reader takes its two interleaved guid orders from the client's
     // send serializer sub_C85E7C, and the reply is byte-exact against retail:
-    // mop_guild_packets rebuilds capture-000019 seq 923 in full, all 235 bytes of a
+    // mop_guild_packets documents capture-000019 seq 923 -- the byte-exact assertion was dropped at 6872ffcd3 -- 235 bytes of a
     // two-member guild.
     //
     // The inherited reply was wrong in every dimension. It wrote the MOTD length

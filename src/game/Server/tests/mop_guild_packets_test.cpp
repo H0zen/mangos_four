@@ -270,6 +270,61 @@ static void test_guild_query_response()
     CHECK(Equal(packet, capture));
 }
 
+
+/// CMSG_GUILD_SET_NOTE against two real 18414 bodies -- capture-001013 seq 397246
+/// (15 bytes) and capture-000980 seq 10518 (20 bytes), catalogue 2BE10C89. Four
+/// captures of this opcode exist; these two differ in note length and in which
+/// GUID bytes are present, so between them they exercise the length field, the
+/// interleaved string and a different popcount.
+///
+/// This fixture is here because the shipped reader was wrong in THREE ways at
+/// once -- bit order, the position of the note length, and the byte order -- and
+/// every one of those leaves a plausible-looking packet. A test that restated
+/// the corrected derivation would have caught none of them; running the real
+/// parse over real bytes catches all three, and the flag polarity besides.
+static void test_guild_set_note_parses_retail_bodies()
+{
+    struct Case
+    {
+        std::vector<uint8> body;
+        char const* note;
+        bool isPublic;
+    };
+
+    Case const cases[] =
+    {
+        {
+            { 0x83, 0xBA, 0x80, 0xC9, 0x44, 0x50, 0x53, 0x20,
+              0x35, 0x37, 0x31, 0xE9, 0x05, 0x04, 0x3D },
+            "DPS 571", true
+        },
+        {
+            { 0x86, 0x3A, 0x80, 0x1C, 0x52, 0x65, 0x73, 0x74,
+              0x6F, 0x20, 0x35, 0x37, 0x30, 0x20, 0x49, 0x4C,
+              0xB8, 0x04, 0x04, 0x8A },
+            "Resto 570 IL", true
+        },
+    };
+
+    for (Case const& c : cases)
+    {
+        WorldPacket in(CMSG_GUILD_SET_NOTE, c.body.size());
+        Append(in, c.body);
+
+        ObjectGuid targetGuid;
+        bool isPublic = false;
+        std::string note;
+        MopGuildPackets::ParseGuildSetNote(in, targetGuid, isPublic, note);
+
+        CHECK(note == c.note);
+        CHECK(isPublic == c.isPublic);
+        // The decisive check: a wrong bit order or length position leaves bytes
+        // unread or overruns, and neither shows up in the note alone.
+        CHECK(in.rpos() == in.size());
+        CHECK(!targetGuid.IsEmpty());
+    }
+}
+
 int main(int /*argc*/, char** /*argv*/)
 {
     test_short_motd();
@@ -277,6 +332,7 @@ int main(int /*argc*/, char** /*argv*/)
     test_guild_achievement_tracking_request();
     test_guild_query_request();
     test_guild_query_response();
+    test_guild_set_note_parses_retail_bodies();
 
     if (g_fail)
     {

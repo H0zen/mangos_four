@@ -884,38 +884,15 @@ void WorldSession::HandleGuildSetNoteOpcode(WorldPacket& recvPacket)
 {
     DEBUG_LOG("WORLD: Received opcode CMSG_GUILD_SET_NOTE");
 
-    bool officer;
-    uint32 noteLen;
     std::string name, note;
     ObjectGuid targetGuid;
+    bool isPublic = false;
 
-    // Writer sub_C85C5A (thunk sub_C84BDA). The previous reader had the bit order,
-    // the length's position and the byte order all different from this. The note
-    // LENGTH is a full 8 bits (sub_665185 writes a whole byte) and sits after the
-    // first mask bit, not near the end; the flag sits INSIDE the mask run; and the
-    // string goes out in the middle of the byte run, not after it.
-    recvPacket.ReadGuidMask<1>(targetGuid);
-    noteLen = recvPacket.ReadBits(8);
-    recvPacket.ReadGuidMask<4, 2>(targetGuid);
-    // Polarity settled by the builder route, since the writer only passes object
-    // +153 through and cannot say what it means. Two Lua entry points build this
-    // packet and differ in exactly one argument: GuildRosterSetPublicNote
-    // (sub_968C4E) calls sub_C85A76 with 1, GuildRosterSetOfficerNote
-    // (sub_968D56) with 0 -- and they read from different member-record offsets,
-    // +698 and +827, which corroborates the pairing. sub_C85A76 stores that
-    // argument at record +137, and sub_C87393 copies the record to packet +16,
-    // landing it at +153: exactly the byte the writer emits as this bit.
-    //
-    // So a SET bit means the PUBLIC note. The inherited negation below is
-    // therefore correct, which is worth having proven rather than assumed --
-    // getting it backwards would have filed every note into the wrong column,
-    // silently, in a packet of exactly the right length.
-    officer = !recvPacket.ReadBit();
-    recvPacket.ReadGuidMask<3, 5, 0, 6, 7>(targetGuid);
-
-    recvPacket.ReadGuidBytes<5, 1, 6>(targetGuid);
-    note = recvPacket.ReadString(noteLen);
-    recvPacket.ReadGuidBytes<0, 7, 4, 3, 2>(targetGuid);
+    // Parsed by MopGuildPackets::ParseGuildSetNote, which carries the derivation
+    // and is driven by real captured bodies in mop_guild_packets. A set flag is
+    // the PUBLIC note, so officer is its inverse.
+    MopGuildPackets::ParseGuildSetNote(recvPacket, targetGuid, isPublic, note);
+    bool const officer = !isPublic;
 
     Guild* guild = sGuildMgr.GetGuildById(GetPlayer()->GetGuildId());
     if (!guild)

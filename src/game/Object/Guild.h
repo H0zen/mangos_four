@@ -829,6 +829,36 @@ namespace MopGuildPackets
         WriteGuidBytes(out, leaverGuid, leaverBytes);
         return true;
     }
+
+    /**
+     * @brief Parses CMSG_GUILD_SET_NOTE, from writer sub_C85C5A.
+     *
+     * Lifted out of the handler so it can be run over real captured bodies. The
+     * shipped reader was wrong three ways at once -- bit order, the position of
+     * the note length, and the byte order -- and a test that merely restated the
+     * new derivation would have caught none of that. Driving THIS function with
+     * captured bytes does.
+     *
+     * The note length is a full 8 bits and sits immediately after the first mask
+     * bit; the public/officer flag sits inside the mask run; and the note itself
+     * goes out in the MIDDLE of the byte run. A set flag means the PUBLIC note --
+     * established from the client's two builders, GuildRosterSetPublicNote
+     * passing 1 and GuildRosterSetOfficerNote passing 0, and corroborated by the
+     * captures, whose notes read "DPS 571" and "Resto 570 IL".
+     */
+    inline void ParseGuildSetNote(WorldPacket& in, ObjectGuid& targetGuid,
+                                  bool& isPublic, std::string& note)
+    {
+        in.ReadGuidMask<1>(targetGuid);
+        uint32 const noteLen = in.ReadBits(8);
+        in.ReadGuidMask<4, 2>(targetGuid);
+        isPublic = in.ReadBit();
+        in.ReadGuidMask<3, 5, 0, 6, 7>(targetGuid);
+
+        in.ReadGuidBytes<5, 1, 6>(targetGuid);
+        note = in.ReadString(noteLen);
+        in.ReadGuidBytes<0, 7, 4, 3, 2>(targetGuid);
+    }
 }
 
 class Item;
