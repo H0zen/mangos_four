@@ -41,7 +41,7 @@ make -j"$(nproc)" && make install -j"$(nproc)"
 
 Windows: use the EasyBuild helper. **A PR MUST keep CI green:** the Linux build compiles with **both** GCC and
 Clang, Windows builds on AppVeyor, and Codacy/CodeFactor gate quality. `PLAYERBOTS` defaults **OFF**; only
-enable it deliberately. A full `make install` also installs the map/vmap/mmap extractor tools, so `BUILD_TOOLS`
+enable it deliberately. A full `make install` also installs the extractor tool, so `BUILD_TOOLS`
 targets must build before installing.
 
 ## Code style

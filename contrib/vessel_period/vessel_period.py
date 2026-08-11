@@ -1,36 +1,46 @@
 #!/usr/bin/env python3
-"""Compute a vessel's route period from the client, the way the server does.
+"""Compute a vessel's route circuit time with the server's own timing arithmetic.
 
-WHAT THIS ANSWERS. `transports.period` is the route clock: the server takes
-`GameTime % period` and the client interpolates the hull from the same number. Nobody
-recorded where those values came from, and they cannot be looked up -- the client carries
-the ROUTE (TaxiPathNode.dbc) but not the CADENCE. This tool closes that gap by running
-Transport::GenerateWaypoints' own timing arithmetic outside the server, so a missing period
-can be computed rather than invented, and an existing one can be checked.
+WHAT THIS IS FOR. `transports.period` is the route clock: the server takes
+`GameTime % period` as the phase of the lap. Nobody recorded where those numbers came from.
+This tool runs Transport::GenerateWaypoints' timing half outside the server, so a missing
+period can be computed rather than invented and an existing one can be checked.
 
-WHAT IT FOUND, and why the tool exists in this shape. Run in `fit` mode against every
-vessel whose period the database already carries, the answer is not noise:
+WHAT IT CANNOT TELL YOU, stated first because the temptation runs the other way. Both
+`transports.period` and the `gameobject_template` motion fields are EMULATOR data --
+hand-derived numbers in the same hand-built database. Finding that they agree with each
+other says only that whoever built that database computed them together. It is NOT evidence
+about the client, and no conclusion about Blizzard may be drawn from it.
 
-    * with the server's built-in constants (30 yd/s, 1 yd/s^2) only 12 of 28 land within
-      1% -- the two constants describe no vessel in particular;
-    * let the top speed vary and 21 of 28 fall under 0.5%, most under 0.05%, with the
-      speeds clustered: the classic ferries and zeppelins at 24.5-31, and BOTH Isle of
-      Conquest airships on exactly 25.5;
-    * the Vashj'ir vessels never fit at any speed, because a leg shorter than
-      speed^2 / 2a is never cruised at all -- it costs sqrt(2d/a) and the cap does not
-      enter. Three of the four sit on the stock speed of 30 and want five to eight times
-      the stock ACCELERATION. A submarine does not cruise faster; it gets up to speed
-      faster.
+WHAT WAS ESTABLISHED FROM THE 5.4.8 CLIENT ITSELF, all of it negative, and worth recording
+so the next person does not spend the same days on it:
 
-So the periods in the database were computed with this arithmetic, once, with each
-vessel's own motion. They are derived data whose inputs were lost, not magic numbers.
+    * TaxiPath.dbc carries From = To = Cost = 0 for every transport path. No cadence there.
+    * TransportAnimation.dbc does not contain these vessels. It is the ELEVATOR table --
+      of its 113 TransportIDs, 95 of the 98 that resolve are gameobject type 11
+      ("Mesa Elevator", "Undervator", "Plunger"). Its id range covers these entries, so
+      their absence is a fact and not a range artefact.
+    * GameObjects.db2, the client's own per-entry gameobject record (build 18273, 1780 rows,
+      ids 80..213367), contains none of them either.
+    * Path.db2 / PathNode.db2, the MoP path system, span ids 3032..6891; these vessels use
+      taxi paths 241..2600. No overlap.
+
+So the client holds no link from a vessel's entry to a route, and the model does not come
+from the entry at all -- the server sends GAMEOBJECT_DISPLAYID outright. What the client
+does with a type-15 hull is, on the evidence available here, UNKNOWN. Do not write code that
+assumes an answer.
+
+WHAT THE FIT MODE SHOWS. Sweeping speed alone against the stored periods, 21 of 28 land
+under 0.5%; sweeping speed and acceleration together, 33 of 35 do. That is a two-parameter
+fit to one observation per vessel, so the pair it returns is A motion reproducing that
+period, never THE vessel's motion. Treat it as such.
 
 A CAUTION, because it is the thing that actually bites. `period` and the span of the
 generated waypoint table (`m_pathTime`) must agree: Transport::Update cycles the clock over
-the first and indexes positions by the second. Where they disagree the pose jumps -- with
-the stock constants Orgrim's Hammer moves in 137-yard steps against a 6.85x mismatch, and
-3-yard steps once the speed is right. A period computed here is only correct if the server
-is given the same speed and acceleration in `transports`.
+the first and indexes positions by the second. Where they disagree the pose jumps -- at the
+built-in 30 yd/s and 1 yd/s^2, Orgrim's Hammer runs a 6.85x mismatch and its pose moves in
+137-yard steps. A period computed here is only correct if the server is driven with the same
+speed and acceleration it was computed with.
 
 USAGE
 
