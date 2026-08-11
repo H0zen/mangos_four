@@ -280,8 +280,9 @@ void WorldSession::HandleGuildRemoveOpcode(WorldPacket& recvPacket)
 
     std::string plName;
     ObjectGuid targetGuid;
-    recvPacket.ReadGuidMask<6, 5, 4, 0, 1, 3, 7, 2>(targetGuid);
-    recvPacket.ReadGuidBytes<2, 6, 5, 7, 1, 4, 3, 0>(targetGuid);
+    // Writer sub_C868E0 (thunk sub_C84F18).
+    recvPacket.ReadGuidMask<7, 3, 4, 2, 5, 6, 1, 0>(targetGuid);
+    recvPacket.ReadGuidBytes<0, 2, 5, 6, 7, 1, 4, 3>(targetGuid);
 
     Guild* guild = sGuildMgr.GetGuildById(GetPlayer()->GetGuildId());
     if (!guild)
@@ -442,8 +443,10 @@ void WorldSession::HandleGuildPromoteOpcode(WorldPacket& recvPacket)
 
     std::string plName;
     ObjectGuid targetGuid;
-    recvPacket.ReadGuidMask<7, 2, 5, 6, 1, 0, 3, 4>(targetGuid);
-    recvPacket.ReadGuidBytes<0, 5, 2, 3, 6, 4, 1, 7>(targetGuid);
+    // Writer sub_C85476 (thunk sub_C849CD). The permutations below were wrong in
+    // both runs and are re-derived from it; IDA and Binary Ninja agree exactly.
+    recvPacket.ReadGuidMask<6, 0, 4, 3, 1, 7, 2, 5>(targetGuid);
+    recvPacket.ReadGuidBytes<1, 7, 2, 5, 3, 4, 0, 6>(targetGuid);
 
     Guild* guild = sGuildMgr.GetGuildById(GetPlayer()->GetGuildId());
     if (!guild)
@@ -505,8 +508,11 @@ void WorldSession::HandleGuildDemoteOpcode(WorldPacket& recvPacket)
 
     std::string plName;
     ObjectGuid targetGuid;
-    recvPacket.ReadGuidMask<7, 1, 5, 6, 2, 3, 0, 4>(targetGuid);
-    recvPacket.ReadGuidBytes<1, 2, 7, 5, 6, 0, 4, 3>(targetGuid);
+    // Writer sub_C86553 (thunk sub_C84E1B). Note this permutation differs from
+    // GUILD_PROMOTE's and GUILD_REMOVE's -- MoP randomises it per opcode, so no
+    // sibling's order may be carried across.
+    recvPacket.ReadGuidMask<3, 6, 0, 2, 7, 5, 4, 1>(targetGuid);
+    recvPacket.ReadGuidBytes<7, 4, 2, 5, 1, 3, 0, 6>(targetGuid);
 
     Guild* guild = sGuildMgr.GetGuildById(GetPlayer()->GetGuildId());
 
