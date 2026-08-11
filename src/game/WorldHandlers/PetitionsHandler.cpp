@@ -759,19 +759,26 @@ void WorldSession::SendPetitionShowList(ObjectGuid guid)
         GetPlayer()->RemoveSpellsCausingAura(SPELL_AURA_FEIGN_DEATH);
     }
 
-    WorldPacket data(SMSG_PETITION_SHOWLIST, 8 + 1 + 4 * 6);
-    data << guid;                           // npc guid
-
-    if (pCreature->IsTabardDesigner())
-    {
-        data << uint8(1);                   // count
-        data << uint32(1);                  // index
-        data << uint32(GUILD_CHARTER);      // charter entry
-        data << uint32(CHARTER_DISPLAY_ID); // charter display id
-        data << uint32(sWorld.getConfig(CONFIG_UNIT32_GUILD_PETITION_COST)); // charter cost
-        data << uint32(0);                  // unknown
-        data << uint32(sWorld.getConfig(CONFIG_UINT32_MIN_PETITION_SIGNS));  // required signs
-    }
+    // Reader sub_6F8626 (parser sub_7047D7, vtable off_D695C8). MoP reduced this
+    // to two fields: the vendor GUID and ONE uint32. The count, index, charter
+    // entry, display id, unknown and required-signs dwords the pre-MoP body wrote
+    // are not on the 18414 wire -- the client sources all of that itself.
+    //
+    // No capture of this opcode exists in the corpus, so the uint32 is named by
+    // the consumer at 0x9D8FF0, which is unambiguous: it takes the GUID from
+    // record +16 into the vendor global, and record +24 into dword_1210740 --
+    // precisely the global GetGuildCharterCost() returns to the registrar's
+    // MoneyFrame_Update, and the one BuyGuildCharter range-checks the player's
+    // money against before sending CMSG_PETITION_BUY. It is the charter COST.
+    //
+    // The scalar is interleaved into the GUID byte run and cannot be moved.
+    WorldPacket data(SMSG_PETITION_SHOWLIST, 1 + 8 + 4);
+    data.WriteGuidMask<3, 5, 7, 6, 1, 0, 2, 4>(guid);
+    data.FlushBits();
+    data.WriteGuidBytes<6, 0, 1>(guid);
+    data << uint32(pCreature->IsTabardDesigner()
+                   ? sWorld.getConfig(CONFIG_UNIT32_GUILD_PETITION_COST) : 0);
+    data.WriteGuidBytes<4, 3, 5, 2, 7>(guid);
 
     SendPacket(&data);
     DEBUG_LOG("Sent SMSG_PETITION_SHOWLIST");
