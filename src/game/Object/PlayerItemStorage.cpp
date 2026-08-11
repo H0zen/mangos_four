@@ -625,12 +625,26 @@ void Player::DestroyItem(uint8 bag, uint8 slot, bool update)
         // turns this one in. A destroyed charter would keep taking signatures,
         // and each signer stays barred from signing anything else, because both
         // checks work from those rows rather than from the item.
+        //
+        // Direct, to match the signature insert in HandlePetitionSignOpcode.
+        // Queued, these would race it: the handler reads the petition row, the
+        // worker commits both deletes, and the insert then lands on a charter
+        // that no longer exists. Nothing in the schema prevents that -- there is
+        // no foreign key -- and the orphan row would bar its signer from every
+        // other charter. Both sides being direct puts them in the world thread's
+        // own order, so a destroy either precedes the read or follows the write.
+        //
+        // The item row itself is not dropped until the next inventory save, so a
+        // crash in between restores a charter whose petition rows have gone. That
+        // is the harmless direction: the item is then inert, and buying another
+        // charter clears it. The reverse -- rows without an item -- is the state
+        // this block exists to prevent.
         if (ItemPrototype const* pProto = pItem->GetProto())
         {
             if (pProto->Flags & ITEM_FLAG_CHARTER)
             {
-                CharacterDatabase.PExecute("DELETE FROM `petition` WHERE `petitionguid` = '%u'", pItem->GetGUIDLow());
-                CharacterDatabase.PExecute("DELETE FROM `petition_sign` WHERE `petitionguid` = '%u'", pItem->GetGUIDLow());
+                CharacterDatabase.DirectPExecute("DELETE FROM `petition` WHERE `petitionguid` = '%u'", pItem->GetGUIDLow());
+                CharacterDatabase.DirectPExecute("DELETE FROM `petition_sign` WHERE `petitionguid` = '%u'", pItem->GetGUIDLow());
             }
         }
 
