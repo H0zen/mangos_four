@@ -676,6 +676,38 @@ void InitializeOpcodes()
     DefC(CMSG_GUILD_DEMOTE, "CMSG_GUILD_DEMOTE", STATUS_LOGGEDIN, PROCESS_THREADUNSAFE, &WorldSession::HandleGuildDemoteOpcode);
     DefC(CMSG_GUILD_REMOVE, "CMSG_GUILD_REMOVE", STATUS_LOGGEDIN, PROCESS_THREADUNSAFE, &WorldSession::HandleGuildRemoveOpcode);
 
+    // The rank-structure trio and LEAVE. Unlike the three above, these four
+    // readers were already CORRECT against their writers -- checked, not
+    // assumed: ADD_RANK sub_C858B2 is a uint32 then a 7-bit name length,
+    // DEL_RANK sub_686F54 is a bare uint32 and nothing else, SWITCH_RANK
+    // sub_C852A8 is a uint32 then one bit, and LEAVE's writer is nullsub_2 so
+    // its body is empty. Worth stating explicitly, because six readers in this
+    // same cluster were NOT correct and all of them looked equally converted.
+    //
+    // Every reply is likewise already built through MopGuildPackets and
+    // admitted, at every depth: Query -> SMSG_GUILD_QUERY_RESPONSE, QueryRanks
+    // -> SMSG_GUILD_QUERY_RANKS_RESULT, Roster -> SMSG_GUILD_ROSTER,
+    // BroadcastMemberLeft -> SMSG_GUILD_EVENT_PLAYER_LEFT, Disband ->
+    // SMSG_GUILD_EVENT_DISBANDED, and SendGuildCommandResult.
+    DefC(CMSG_GUILD_ADD_RANK, "CMSG_GUILD_ADD_RANK", STATUS_LOGGEDIN, PROCESS_THREADUNSAFE, &WorldSession::HandleGuildAddRankOpcode);
+    DefC(CMSG_GUILD_DEL_RANK, "CMSG_GUILD_DEL_RANK", STATUS_LOGGEDIN, PROCESS_THREADUNSAFE, &WorldSession::HandleGuildDelRankOpcode);
+    DefC(CMSG_GUILD_SWITCH_RANK, "CMSG_GUILD_SWITCH_RANK", STATUS_LOGGEDIN, PROCESS_THREADUNSAFE, &WorldSession::HandleGuildSwitchRankOpcode);
+    DefC(CMSG_GUILD_LEAVE, "CMSG_GUILD_LEAVE", STATUS_LOGGEDIN, PROCESS_THREADUNSAFE, &WorldSession::HandleGuildLeaveOpcode);
+
+    // The two text setters, whose length fields were off by one until 9381387b1
+    // -- MOTD read 11 bits where sub_C872E6 emits 10, INFO_TEXT read 12 where
+    // sub_C87297 emits 11. Their replies were already fine: BroadcastMotd goes
+    // through MopGuildPackets to the admitted SMSG_GUILD_EVENT_MOTD, and the
+    // info-text handler emits nothing but SendGuildCommandResult.
+    DefC(CMSG_GUILD_MOTD, "CMSG_GUILD_MOTD", STATUS_LOGGEDIN, PROCESS_THREADUNSAFE, &WorldSession::HandleGuildMOTDOpcode);
+    DefC(CMSG_GUILD_INFO_TEXT, "CMSG_GUILD_INFO_TEXT", STATUS_LOGGEDIN, PROCESS_THREADUNSAFE, &WorldSession::HandleGuildChangeInfoTextOpcode);
+
+    // NOT registered: CMSG_GUILD_SET_NOTE. Its layout is corrected but it
+    // carries a public/officer flag whose polarity only the client's builder can
+    // settle -- the writer passes object +153 straight through, so the bit means
+    // whatever that field holds. Getting it backwards files every note into the
+    // wrong column, silently and with a correct-length packet.
+
     // Petitions -- the guild/arena charter flow, dormant in this tree until now.
     // All seven readers were rebuilt from the client's own writers, reached
     // through the vtable whose slot +12 holds 0x00C84A3D (slot +8 the opcode
