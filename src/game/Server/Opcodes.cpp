@@ -699,17 +699,33 @@ void InitializeOpcodes()
     // excluded deliberately and are not listed.
     //
     //   CMSG_GUILD_SET_RANK 0x0C7A -- writer sub_C866DC (thunk sub_C84EA8).
-    //     Real 5.4.8 opcode, and the MoP replacement for the 0x1024 handler this
-    //     wave deleted. Its body is the rank DEFINITION: a rank id, then EIGHT
-    //     pairs of bank-tab rights and slots, FOUR further uint32 (+0x60, +0x14,
-    //     +0x64, +0x10), a 7-bit name
-    //     length and the name. No GUIDs anywhere.
-    //     HandleGuildSetRankOpcode does not read that packet. It reads a rank id
-    //     and TWO bit-packed GUIDs, i.e. a member rank ASSIGNMENT. The handler is
-    //     matched to the wrong packet, which is why registering it was never
-    //     safe. Fixing it is not a reader rewrite: the handler would have to set
-    //     rank permissions and per-tab bank rights instead of moving one member,
-    //     and the tab rights are guild-bank surface, which is out of scope here.
+    //     The MoP replacement for the 0x1024 handler this wave deleted. Wire
+    //     order: uint32 from object +92, then EIGHT pairs (+104+4i, +136+4i),
+    //     then +96, +20, +100, +16, then a 7-bit name length and the name.
+    //     No GUIDs. Zero captures in any build, so the builder route is the only
+    //     evidence -- and sub_9679B8 (GuildBankTabItemWithdraw) supplies it by
+    //     filling every slot:
+    //       +16  the rank INDEX
+    //       +104+4i / +136+4i  per tab, sub_964F49 then sub_964FBF. Which is
+    //            which is settled: the Lua setter SetGuildBankTabItemWithdraw
+    //            writes sub_964FBF's array (dword_11F0028, clamped to 100000),
+    //            so the pair is (tab RIGHTS, tab SLOTS-PER-DAY) in that order.
+    //       +92, +96, +20/+100  three distinct getters over the client's 37-dword
+    //            rank record -- sub_964DEB (record +4), sub_964E9F (+12) and
+    //            sub_964E7D (+0, written TWICE, to both +20 and +100).
+    //
+    //     STILL AMBIGUOUS: which of those three is rank Rights and which is
+    //     BankMoneyPerDay. RankInfo holds only those two, so one of the three is
+    //     something this core does not model. Naming them needs the Lua getters
+    //     (GuildControlGetRankFlags and the withdraw-gold limit) traced to the
+    //     same record offsets -- a short job, but not one to guess at: both are
+    //     uint32 and a swap would silently grant the wrong permissions.
+    //
+    //     HandleGuildSetRankOpcode also still reads the wrong packet entirely --
+    //     a rank id and two bit-packed GUIDs, i.e. a member rank ASSIGNMENT. It
+    //     needs rewriting to the layout above and pointing at SetRankName,
+    //     SetRankRights, SetBankMoneyPerDay and SetBankRightsAndSlots, all of
+    //     which already exist.
     //
     //   CMSG_GUILD_DISBAND 0x0D73 -- NOW REGISTERED, see below. The claim here
     //     that no handler existed was wrong.
