@@ -631,6 +631,14 @@ bool Guild::LoadMembersFromDB(QueryResult* guildMembersResult)
         if (newmember.RankId >= m_Ranks.size())
         {
             newmember.RankId = GetLowestRank();
+
+            // Write the correction back rather than re-applying it every load.
+            // Left in place, the stale number becomes valid again the moment the
+            // guild adds a rank, and this member silently arrives on a rank they
+            // were never given. Guilds carrying this from before DelRank moved
+            // members with their ranks are repaired here.
+            CharacterDatabase.DirectPExecute("UPDATE `guild_member` SET `rank` = '%u' WHERE `guildid` = '%u' AND `guid` = '%u'",
+                                             newmember.RankId, m_Id, lowguid);
         }
 
         newmember.Pnote                 = fields[3].GetCppString();
