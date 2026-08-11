@@ -1182,7 +1182,7 @@ void Guild::DisplayGuildEventLog(WorldSession* session)
     ByteBuffer buffer;
     WorldPacket data(SMSG_GUILD_EVENT_LOG, 0);
     // count, max count == 100
-    data.WriteBits(m_GuildEventLog.size(), 23);
+    data.WriteBits(m_GuildEventLog.size(), 21);   // sub_6A29A8 is 21 bits, not 23
     for (GuildEventLog::iterator itr = m_GuildEventLog.begin(); itr != m_GuildEventLog.end(); ++itr)
     {
         itr->WriteData(data, buffer);
@@ -1402,38 +1402,45 @@ bool GuildItemPosCount::isContainedIn(GuildItemPosCountVec const& vec) const
 
 void GuildEventLogEntry::WriteData(WorldPacket& data, ByteBuffer& buffer)
 {
-    // Player 1
+    // Rebuilt from client reader sub_6A6843 (parser sub_6A7485, vtable
+    // off_D65FE4). The previous body was bit-packed and so looked converted, but
+    // every one of the sixteen mask bits and the whole byte run were in the wrong
+    // place. The reader takes all entries' masks first and all entries' bytes
+    // second, which is what the data/buffer split here produces.
+    //
+    // The entry record is 24 bytes: 0-7 guid1, 8-15 guid2, +16 a uint32, and two
+    // single bytes at +20 and +21.
+    //
+    // +16 is the only uint32, so it is unambiguously the timestamp. The two
+    // BYTES are not distinguished by the binary: their identity here is inferred
+    // from position relative to that uint32, which the pre-MoP body also
+    // respected -- rank before it, event type after. If a live guild log shows
+    // the wrong rank or the wrong event kind, swap them; a capture or the
+    // client's consumer would settle it properly.
     ObjectGuid guid1 = ObjectGuid(HIGHGUID_PLAYER, PlayerGuid1);
-    // Player 2 not for left/join guild events
     ObjectGuid guid2 = ObjectGuid(HIGHGUID_PLAYER, PlayerGuid2);
-    data.WriteGuidMask<2, 4>(guid1);
-    data.WriteGuidMask<7, 6>(guid2);
-    data.WriteGuidMask<3>(guid1);
-    data.WriteGuidMask<3, 5>(guid2);
-    data.WriteGuidMask<7, 5, 0>(guid1);
-    data.WriteGuidMask<4, 2, 0, 1>(guid2);
-    data.WriteGuidMask<1, 6>(guid1);
 
-    buffer.WriteGuidBytes<3, 2, 5>(guid2);
+    data.WriteGuidMask<6, 1>(guid1);
+    data.WriteGuidMask<5, 1, 3, 0, 4>(guid2);
+    data.WriteGuidMask<4>(guid1);
+    data.WriteGuidMask<7>(guid2);
+    data.WriteGuidMask<0, 2, 7, 3, 5>(guid1);
+    data.WriteGuidMask<2, 6>(guid2);
 
-    // New Rank - only for promote/demote guild events
-    buffer << uint8(NewRank);
-
+    buffer.WriteGuidBytes<5, 4>(guid1);
+    buffer.WriteGuidBytes<6>(guid2);
+    buffer.WriteGuidBytes<2>(guid1);
     buffer.WriteGuidBytes<4>(guid2);
-    buffer.WriteGuidBytes<0, 4>(guid1);
-
-    // Event timestamp
-    buffer << uint32(time(NULL) - TimeStamp);
-
+    buffer << uint8(NewRank);                               // +20, see note above
+    buffer.WriteGuidBytes<0>(guid2);
     buffer.WriteGuidBytes<7, 3>(guid1);
-    buffer.WriteGuidBytes<0, 6, 7>(guid2);
-    buffer.WriteGuidBytes<5>(guid1);
-
-    // Event type
-    buffer << uint8(EventType);
-
-    buffer.WriteGuidBytes<1>(guid2);
-    buffer.WriteGuidBytes<2, 6, 1>(guid1);
+    buffer.WriteGuidBytes<5, 2>(guid2);
+    buffer.WriteGuidBytes<0>(guid1);
+    buffer << uint32(time(NULL) - TimeStamp);               // +16
+    buffer.WriteGuidBytes<1, 6>(guid1);
+    buffer.WriteGuidBytes<7, 1>(guid2);
+    buffer << uint8(EventType);                             // +21, see note above
+    buffer.WriteGuidBytes<3>(guid2);
 }
 
 void GuildBankEventLogEntry::WriteData(WorldPacket& data, ByteBuffer& buffer)

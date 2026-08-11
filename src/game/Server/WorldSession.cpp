@@ -560,6 +560,10 @@ static bool IsEnterWorldConverted(uint16 opcode)
         // unregistered. See the note above Player::SendPetitionSignResult.
         // Guild. Its body was a NUL-terminated string and a uint8 where 18414
         // wants a 6-bit length, a bit, the name bytes and a realm address.
+        // Rebuilt from reader sub_6A6843 at this commit: 21-bit count, and all
+        // sixteen per-entry mask bits and byte positions were previously wrong.
+        case SMSG_GUILD_EVENT_LOG:                   // Guild::DisplayGuildEventLog
+
         case SMSG_GUILD_DECLINE:                     // Player::SendGuildDeclined
 
         case SMSG_PETITION_SHOWLIST:                 // SendPetitionShowList
