@@ -345,14 +345,14 @@ bool InFrontPhased(WorldObject const& a, WorldObject const& b, float dist, float
 {
     Geometry::Placement pa, pb;
     return CanInteract(a, b) && InCommonFrame(a, b, pa, pb) &&
-           InFrontPhased(pa, *pb, dist, arc);
+           pa.IsInFront(pb, dist, arc);
 }
 
 bool InBackPhased(WorldObject const& a, WorldObject const& b, float dist, float arc)
 {
     Geometry::Placement pa, pb;
     return CanInteract(a, b) && InCommonFrame(a, b, pa, pb) &&
-           InBackPhased(pa, *pb, dist, arc);
+           pa.IsInBack(pb, dist, arc);
 }
 
 namespace

@@ -85,12 +85,12 @@ void TargetedMovementGeneratorMedium<T, D>::_setTargetLocation(T& owner, bool up
         // Chase Movement and angle == 0 case: Chase to current angle
         else if (this->GetMovementGeneratorType() == CHASE_MOTION_TYPE && i_angle == 0.0f)
         {
-            FindFreeSpotNear(*i_target, &owner, x, y, z, owner.Where().Extent(), this->GetDynamicTargetDistance(owner, false), i_target->Where().BearingTo(owner.Where()));
+            FindFreeSpotNear(*i_target.getTarget(), &owner, x, y, z, owner.Where().Extent(), this->GetDynamicTargetDistance(owner, false), i_target->Where().BearingTo(owner.Where()));
         }
         // Targeted movement to at i_offset distance from target and i_angle from target facing
         else
         {
-            FindFreeSpotNear(*i_target, &owner, x, y, z, owner.Where().Extent(), this->GetDynamicTargetDistance(owner, false), i_target->Where().Facing() + i_angle);
+            FindFreeSpotNear(*i_target.getTarget(), &owner, x, y, z, owner.Where().Extent(), this->GetDynamicTargetDistance(owner, false), i_target->Where().Facing() + i_angle);
         }
     }
     else
@@ -492,10 +492,10 @@ float ChaseMovementGenerator<T>::GetDynamicTargetDistance(T& owner, bool forRang
 {
     if (!forRangeCheck)
     {
-        return this->i_offset + CHASE_DEFAULT_RANGE_FACTOR * CombatReachBetween(*this->i_target, owner);
+        return this->i_offset + CHASE_DEFAULT_RANGE_FACTOR * CombatReachBetween(*this->i_target.getTarget(), owner);
     }
 
-    return CHASE_RECHASE_RANGE_FACTOR * CombatReachBetween(*this->i_target, owner) - this->i_target->Where().Extent();
+    return CHASE_RECHASE_RANGE_FACTOR * CombatReachBetween(*this->i_target.getTarget(), owner) - this->i_target->Where().Extent();
 }
 
 /**

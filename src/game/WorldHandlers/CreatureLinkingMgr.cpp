@@ -677,8 +677,8 @@ void CreatureLinkingHolder::ProcessSlave(CreatureLinkingEvent eventType, Creatur
 void CreatureLinkingHolder::SetFollowing(Creature* pWho, Creature* pWhom)
 {
     // Do some calculations
-    const float sX = pWho->Spawn().X(), sY = pWho->Spawn().Y();
-    const float mX = pWhom->Spawn().X(), mY = pWhom->Spawn().Y();
+    const float sX = pWho->Spawn().X(), sY = pWho->Spawn().Y(), sZ = pWho->Spawn().Z();
+    const float mX = pWhom->Spawn().X(), mY = pWhom->Spawn().Y(), mZ = pWhom->Spawn().Z();
     const float mO = pWhom->Spawn().Facing();
 
     float dx, dy, dz;

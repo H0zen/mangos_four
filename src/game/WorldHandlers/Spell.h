@@ -1400,7 +1400,7 @@ namespace MaNGOS
                         }
                         break;
                     case PUSH_SELF_CENTER:
-                        if (i_castingObject->Where().WithinDist((Unit*)(itr->getSource())->Where(), i_radius))
+                        if (i_castingObject->Where().WithinDist(itr->getSource()->Where(), i_radius))
                         {
                             i_data->push_back(itr->getSource());
                         }
@@ -1412,7 +1412,7 @@ namespace MaNGOS
                         }
                         break;
                     case PUSH_TARGET_CENTER:
-                        if (i_spell.m_targets.getUnitTarget() && i_spell.m_targets.getUnitTarget()->Where().WithinDist((Unit*)(itr->getSource())->Where(), i_radius))
+                        if (i_spell.m_targets.getUnitTarget() && i_spell.m_targets.getUnitTarget()->Where().WithinDist(itr->getSource()->Where(), i_radius))
                         {
                             i_data->push_back(itr->getSource());
                         }

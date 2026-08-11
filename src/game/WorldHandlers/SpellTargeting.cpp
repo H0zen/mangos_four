@@ -386,7 +386,7 @@ void Spell::SetTargetMap(SpellEffectIndex effIndex, uint32 targetMode, UnitList&
 
             while (t && next != tempTargetUnitMap.end())
             {
-                if (!prev->Where().WithinDist(*next->Where(), CHAIN_SPELL_JUMP_RADIUS))
+                if (!prev->Where().WithinDist((*next)->Where(), CHAIN_SPELL_JUMP_RADIUS))
                 {
                     break;
                 }
@@ -485,7 +485,7 @@ void Spell::SetTargetMap(SpellEffectIndex effIndex, uint32 targetMode, UnitList&
 
                 while (t && next != tempTargetUnitMap.end())
                 {
-                    if (!prev->Where().WithinDist(*next->Where(), CHAIN_SPELL_JUMP_RADIUS))
+                    if (!prev->Where().WithinDist((*next)->Where(), CHAIN_SPELL_JUMP_RADIUS))
                     {
                         break;
                     }
@@ -1319,7 +1319,7 @@ void Spell::SetTargetMap(SpellEffectIndex effIndex, uint32 targetMode, UnitList&
 
                 while (t && next != tempTargetUnitMap.end())
                 {
-                    if (!prev->Where().WithinDist(*next->Where(), CHAIN_SPELL_JUMP_RADIUS))
+                    if (!prev->Where().WithinDist((*next)->Where(), CHAIN_SPELL_JUMP_RADIUS))
                     {
                         break;
                     }
