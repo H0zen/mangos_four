@@ -694,6 +694,38 @@ void InitializeOpcodes()
     DefC(CMSG_GUILD_SWITCH_RANK, "CMSG_GUILD_SWITCH_RANK", STATUS_LOGGEDIN, PROCESS_THREADUNSAFE, &WorldSession::HandleGuildSwitchRankOpcode);
     DefC(CMSG_GUILD_LEAVE, "CMSG_GUILD_LEAVE", STATUS_LOGGEDIN, PROCESS_THREADUNSAFE, &WorldSession::HandleGuildLeaveOpcode);
 
+    // AUDIT of the guild CMSGs still dormant after this wave, so the next pass
+    // starts from evidence rather than from a fresh enumeration. Bank opcodes are
+    // excluded deliberately and are not listed.
+    //
+    //   CMSG_GUILD_SET_RANK 0x0C7A -- writer sub_C866DC (thunk sub_C84EA8).
+    //     Real 5.4.8 opcode, and the MoP replacement for the 0x1024 handler this
+    //     wave deleted. Its body is the rank DEFINITION: a rank id, then EIGHT
+    //     pairs of bank-tab rights and slots, three further uint32, a 7-bit name
+    //     length and the name. No GUIDs anywhere.
+    //     HandleGuildSetRankOpcode does not read that packet. It reads a rank id
+    //     and TWO bit-packed GUIDs, i.e. a member rank ASSIGNMENT. The handler is
+    //     matched to the wrong packet, which is why registering it was never
+    //     safe. Fixing it is not a reader rewrite: the handler would have to set
+    //     rank permissions and per-tab bank rights instead of moving one member,
+    //     and the tab rights are guild-bank surface, which is out of scope here.
+    //
+    //   CMSG_GUILD_DISBAND 0x0D73 -- writer nullsub_2, so the body is EMPTY.
+    //     No dedicated handler exists; Guild::Disband is only reached today from
+    //     the leave and remove paths.
+    //
+    //   CMSG_GUILD_EVENT_LOG_QUERY 0x15D9 -- writer nullsub_2, body EMPTY, and
+    //     HandleGuildEventLogQueryOpcode correctly reads nothing. Its reply
+    //     SMSG_GUILD_EVENT_LOG is bit-packed and looks converted, but it has
+    //     neither a DefS nor a send-gate entry, and nobody has checked it against
+    //     the client's reader or a capture. Registering on the strength of
+    //     "looks converted" is exactly how CMSG_GUILD_INVITE stayed broken
+    //     through two review rounds. Prove the reply first; this is the cheapest
+    //     of the four to finish.
+    //
+    //   CMSG_GUILD_ACHIEVEMENT_MEMBERS 0x1470 -- thunk sub_C84A42. No handler at
+    //     all. Achievement surface rather than ranks or roster.
+
     // The two text setters, whose length fields were off by one until 9381387b1
     // -- MOTD read 11 bits where sub_C872E6 emits 10, INFO_TEXT read 12 where
     // sub_C87297 emits 11. Their replies were already fine: BroadcastMotd goes
