@@ -64,7 +64,7 @@
 #include "GridNotifiersImpl.h"
 #include "CellImpl.h"
 #include "Vehicle.h"
-#include "G3D/Vector3.h"
+#include "Geometry/Vector3.h"
 #include "LootMgr.h"
 #include <random>
 

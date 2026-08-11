@@ -66,7 +66,6 @@ endif()
 
 if(BUILD_MANGOSD OR BUILD_TOOLS OR WITH_TESTS)
     add_subdirectory(${MANGOS_DEP_DIR}/recastnavigation dep/recastnavigation)
-    add_subdirectory(${MANGOS_DEP_DIR}/g3dlite dep/g3dlite)
 endif()
 
 # StormLib backs extractor_mpq, which is configured alongside the parsers the unit

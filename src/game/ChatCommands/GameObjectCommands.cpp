@@ -36,7 +36,7 @@
 
 #include "Chat.h"
 #include "Language.h"
-#include "G3D/Quat.h"
+#include "Geometry/Quat.h"
 #include "MapManager.h"
 #include "GameEventMgr.h"
 #include "Player.h"

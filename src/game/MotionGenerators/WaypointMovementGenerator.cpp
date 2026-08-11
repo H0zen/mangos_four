@@ -937,13 +937,13 @@ void FlightPathMovementGenerator::Reset(Player& player)
     // node is not silently discarded from a combined multi-leg route.
     if (m_continuousRoute)
     {
-        init.Path().push_back(G3D::Vector3(player.Where().X(),
+        init.Path().push_back(Geometry::Vector3(player.Where().X(),
             player.Where().Y(), player.Where().Z()));
     }
 
     for (uint32 i = splineStart; i != end; ++i)
     {
-        G3D::Vector3 vertice((*i_path)[i].x, (*i_path)[i].y, (*i_path)[i].z);
+        Geometry::Vector3 vertice((*i_path)[i].x, (*i_path)[i].y, (*i_path)[i].z);
         init.Path().push_back(vertice);
     }
     init.SetFirstPointId(splineStart);

@@ -6644,7 +6644,7 @@ void Unit::ScheduleAINotify(uint32 delay)
  */
 void Unit::OnRelocated()
 {
-    // switch to use G3D::Vector3 is good idea, maybe
+    // switch to use Geometry::Vector3 is good idea, maybe
     float dx = m_last_notified_position.x - Where().X();
     float dy = m_last_notified_position.y - Where().Y();
     float dz = m_last_notified_position.z - Where().Z();

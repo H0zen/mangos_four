@@ -24,7 +24,7 @@
  */
 
 #include "GameObject.h"
-#include "G3D/Quat.h"
+#include "Geometry/Quat.h"
 #include "QuestDef.h"
 #include "ObjectMgr.h"
 #include "PoolManager.h"

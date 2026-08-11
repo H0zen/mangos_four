@@ -146,8 +146,10 @@ bool IocpServer::start(uint16_t port, SessionFactory factory,
     m_factory = std::move(factory);
 
     // Own one Winsock reference for this listener's lifetime. realmd (and every
-    // module server) links neither gsoap nor g3dlite, so nothing else guarantees
-    // WSAStartup has run before the socket calls below.
+    // module server) does not link gsoap, so nothing else guarantees WSAStartup
+    // has run before the socket calls below. That was already true of realmd; it
+    // is now true of mangosd as well, since g3dlite -- the other library that
+    // happened to call it -- is gone.
     if (!m_wsaStarted) {
         WSADATA wsa{};
         if (WSAStartup(MAKEWORD(2, 2), &wsa) != 0) {

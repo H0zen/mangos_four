@@ -259,7 +259,6 @@ target_link_libraries(game
         # database, the world or the client archives.
         terrain
         geometry
-        g3dlite
         $<$<BOOL:${SCRIPT_LIB_SD3}>:mangosscript>
         $<$<BOOL:${SCRIPT_LIB_ELUNA}>:lualib>
     PRIVATE

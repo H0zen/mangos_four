@@ -27,7 +27,7 @@
 #define MANGOSSERVER_MOVESPLINEINIT_ARGS_H
 
 #include "MoveSplineFlag.h"
-#include <G3D/Vector3.h>
+#include "Geometry/Vector3.h"
 
 class Unit;
 

@@ -64,7 +64,7 @@
 #include "GridNotifiersImpl.h"
 #include "CellImpl.h"
 #include "Vehicle.h"
-#include "G3D/Vector3.h"
+#include "Geometry/Vector3.h"
 #include "LootMgr.h"
 #include <random>
 
@@ -1055,7 +1055,7 @@ void Spell::EffectLeapForward(SpellEffectEntry const* effect)
     float dist = GetSpellRadius(sSpellRadiusStore.LookupEntry(effect->GetRadiusIndex()));
     const float IN_OR_UNDER_LIQUID_RANGE = 0.8f;                // range to make player under liquid or on liquid surface from liquid level
 
-    G3D::Vector3 prevPos, nextPos;
+    Geometry::Vector3 prevPos, nextPos;
     float orientation = unitTarget->Where().Facing();
 
     prevPos.x = unitTarget->Where().X();

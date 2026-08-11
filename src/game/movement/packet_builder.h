@@ -27,7 +27,7 @@
 #define MANGOSSERVER_PACKET_BUILDER_H
 
 #include "ObjectGuid.h"
-#include <G3D/Vector3.h>
+#include "Geometry/Vector3.h"
 #include <vector>
 
 class ByteBuffer;
@@ -39,7 +39,7 @@ namespace Movement
 
     struct MonsterMoveData
     {
-        G3D::Vector3 position;
+        Geometry::Vector3 position;
         uint32 splineId = 0;
         uint8 type = 0;
         ObjectGuid moverGuid;
@@ -51,9 +51,9 @@ namespace Movement
         float verticalAcceleration = 0.0f;
         ObjectGuid facingTargetGuid;
         float facingAngle = 0.0f;
-        G3D::Vector3 facingPoint;
-        std::vector<G3D::Vector3> compressedPath;
-        std::vector<G3D::Vector3> uncompressedPath;
+        Geometry::Vector3 facingPoint;
+        std::vector<Geometry::Vector3> compressedPath;
+        std::vector<Geometry::Vector3> uncompressedPath;
     };
 
     /**
@@ -73,7 +73,7 @@ namespace Movement
 
             static void WriteMonsterMove(MonsterMoveData const& move, WorldPacket& data);
 
-            static void WriteStopMovement(G3D::Vector3 const& position, uint32 splineId, WorldPacket& data,
+            static void WriteStopMovement(Geometry::Vector3 const& position, uint32 splineId, WorldPacket& data,
                 ObjectGuid moverGuid, ObjectGuid transportGuid = ObjectGuid(), int8 transportSeat = -1);
 
             /**

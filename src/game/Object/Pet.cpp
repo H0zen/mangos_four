@@ -269,7 +269,7 @@ void Pet::UpdateTransport(Player* owner)
 void Pet::SendSplineAnchor(ObjectGuid transportGuid, float x, float y, float z, float orientation)
 {
     Movement::MonsterMoveData move;
-    move.position = G3D::Vector3(x, y, z);
+    move.position = Geometry::Vector3(x, y, z);
     move.splineId = Movement::MoveSplineInit::GenerateSplineId();
     move.type = Movement::MonsterMoveFacingAngle;
     move.moverGuid = GetObjectGuid();
@@ -318,8 +318,8 @@ bool Pet::MoveTransportFollow(Unit* target, float offset, float angle, bool walk
 
     float const localOrientation = std::atan2(deltaY, deltaX);
     uint32 const duration = uint32(distance / speed * 1000.0f);
-    G3D::Vector3 const start(currentLocal->x, currentLocal->y, currentLocal->z);
-    G3D::Vector3 const destination(destinationX, destinationY, destinationZ);
+    Geometry::Vector3 const start(currentLocal->x, currentLocal->y, currentLocal->z);
+    Geometry::Vector3 const destination(destinationX, destinationY, destinationZ);
 
     m_movementInfo.SetTransportData(ownerTransport->GetObjectGuid(), destinationX, destinationY,
         destinationZ, localOrientation, owner->m_movementInfo.GetTransportTime(), -1);

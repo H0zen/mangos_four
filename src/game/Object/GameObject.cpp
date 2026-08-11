@@ -24,7 +24,7 @@
  */
 
 #include "GameObject.h"
-#include "G3D/Quat.h"
+#include "Geometry/Quat.h"
 #include "QuestDef.h"
 #include "ObjectMgr.h"
 #include "PoolManager.h"
@@ -1092,7 +1092,7 @@ const char* GameObject::GetNameForLocaleIdx(int32 loc_idx) const
     return GetName();
 }
 
-using G3D::Quat;
+using Geometry::Quat;
 struct QuaternionCompressed
 {
     QuaternionCompressed() : m_raw(0) {}
@@ -1135,7 +1135,7 @@ void GameObject::SetWorldRotation(float qx, float qy, float qz, float qw)
     // Temporary solution for gameobjects that has no rotation data in DB:
     if (qz == 0.f && qw == 0.f)
     {
-        rotation = Quat::fromAxisAngleRotation(G3D::Vector3::unitZ(), Where().Facing());
+        rotation = Geometry::FromAxisAngle(Geometry::Vector3::unitZ(), Where().Facing());
     }
 
     rotation.unitize();
@@ -1156,7 +1156,7 @@ void GameObject::SetTransportPathRotation(const QuaternionData& rotation)
 
 void GameObject::SetWorldRotationAngles(float z_rot, float y_rot, float x_rot)
 {
-    Quat quat(G3D::Matrix3::fromEulerAnglesZYX(z_rot, y_rot, x_rot));
+    const Quat quat = Geometry::FromEulerAnglesZYX(z_rot, y_rot, x_rot);
     SetWorldRotation(quat.x, quat.y, quat.z, quat.w);
 }
 
