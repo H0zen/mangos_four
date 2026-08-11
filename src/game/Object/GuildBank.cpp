@@ -671,8 +671,10 @@ bool Guild::LoadBankRightsFromDB(QueryResult* guildBankTabRightsResult)
             break;
         uint8 TabId        = fields[1].GetUInt8();
         uint32 rankId      = fields[2].GetUInt32();
-        uint16 right       = fields[3].GetUInt16();
-        uint16 SlotPerDay  = fields[4].GetUInt16();
+        // 32-bit: the column is int unsigned and the client permits values up to
+        // 100000, which a 16-bit read silently folded to 34464 on every restart.
+        uint32 right       = fields[3].GetUInt32();
+        uint32 SlotPerDay  = fields[4].GetUInt32();
 
         SetBankRightsAndSlots(rankId, TabId, right, SlotPerDay, false);
     }

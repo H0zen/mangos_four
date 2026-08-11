@@ -356,6 +356,49 @@ static void test_guild_set_note_parses_retail_bodies()
     }
 }
 
+
+/// SMSG_GUILD_EVENT_LOG entry layout, with DISTINCT EventType and NewRank.
+///
+/// Those two single bytes were assigned the wrong way round when this packet was
+/// first rebuilt -- by position relative to the uint32 -- and only the client's
+/// consumer settles them: GetGuildEventInfo switches on the one from record +20
+/// to yield invite/join/promote/demote/remove/quit, and passes the one from +21
+/// to the rank-name lookup. A fixture using equal values could not have caught
+/// that, so this one deliberately uses 3 and 7.
+///
+/// Every byte is exact: the elapsed time is a parameter of the inline builder
+/// rather than time(NULL) - TimeStamp, which no fixture could pin.
+static void test_guild_event_log_entry_layout()
+{
+    WorldPacket data(SMSG_GUILD_EVENT_LOG, 0);
+    ByteBuffer buffer;
+    data.WriteBits(1, 21);                                  // one entry
+    // HIGHGUID_PLAYER is 0, so the raw values are the low parts unchanged.
+    MopGuildPackets::BuildGuildEventLogEntry(data, buffer, 3,
+        UINT64_C(0x0A0B0C0D), UINT64_C(0x01020304), 7, 0x11223344);
+    data.FlushBits();
+    data.append(buffer);
+
+    static uint8 const expected[] =
+    {
+        0x00, 0x00, 0x0A, 0xE3, 0x50,                       // 21-bit count + 16 mask bits
+        0x0A, 0x03, 0x05, 0x0B, 0x03, 0x0C,                 // g1[2], EventType, g2[0], g1[3], g2[2], g1[0]
+        0x44, 0x33, 0x22, 0x11,                             // elapsed, now a parameter
+        0x0D, 0x02, 0x07, 0x00,                             // g1[1], g2[1], NewRank, g2[3]
+    };
+
+    CHECK(data.size() == sizeof(expected));
+    if (data.size() != sizeof(expected))
+    {
+        return;
+    }
+
+    for (size_t i = 0; i < sizeof(expected); ++i)
+    {
+        CHECK(data.contents()[i] == expected[i]);
+    }
+}
+
 int main(int /*argc*/, char** /*argv*/)
 {
     test_short_motd();
@@ -364,6 +407,7 @@ int main(int /*argc*/, char** /*argv*/)
     test_guild_query_request();
     test_guild_query_response();
     test_guild_set_note_parses_retail_bodies();
+    test_guild_event_log_entry_layout();
 
     if (g_fail)
     {

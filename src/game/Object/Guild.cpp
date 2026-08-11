@@ -909,6 +909,25 @@ void Guild::BroadcastPacket(WorldPacket* packet)
  * @param packet The packet to send.
  * @param rankId The rank that should receive the packet.
  */
+void Guild::BroadcastRankDefinitions()
+{
+    // A rank definition change is guild-wide, but Query and QueryRanks take a
+    // single session and Roster carries only rank IDs -- not names, rights, bank
+    // rights or limits. Broadcasting the roster alone therefore left every other
+    // member showing the old definitions until they requeried or relogged.
+    for (MemberList::const_iterator itr = members.begin(); itr != members.end(); ++itr)
+    {
+        Player* player = sObjectAccessor.FindPlayer(ObjectGuid(HIGHGUID_PLAYER, itr->first));
+        if (player && player->GetSession())
+        {
+            Query(player->GetSession());
+            QueryRanks(player->GetSession());
+        }
+    }
+
+    Roster();                                               // NULL session = broadcast
+}
+
 void Guild::BroadcastPacketToRank(WorldPacket* packet, uint32 rankId)
 {
     for (MemberList::const_iterator itr = members.begin(); itr != members.end(); ++itr)
@@ -1402,45 +1421,13 @@ bool GuildItemPosCount::isContainedIn(GuildItemPosCountVec const& vec) const
 
 void GuildEventLogEntry::WriteData(WorldPacket& data, ByteBuffer& buffer)
 {
-    // Rebuilt from client reader sub_6A6843 (parser sub_6A7485, vtable
-    // off_D65FE4). The previous body was bit-packed and so looked converted, but
-    // every one of the sixteen mask bits and the whole byte run were in the wrong
-    // place. The reader takes all entries' masks first and all entries' bytes
-    // second, which is what the data/buffer split here produces.
-    //
-    // The entry record is 24 bytes: 0-7 guid1, 8-15 guid2, +16 a uint32, and two
-    // single bytes at +20 and +21.
-    //
-    // +16 is the only uint32, so it is unambiguously the timestamp. The two
-    // BYTES are not distinguished by the binary: their identity here is inferred
-    // from position relative to that uint32, which the pre-MoP body also
-    // respected -- rank before it, event type after. If a live guild log shows
-    // the wrong rank or the wrong event kind, swap them; a capture or the
-    // client's consumer would settle it properly.
-    ObjectGuid guid1 = ObjectGuid(HIGHGUID_PLAYER, PlayerGuid1);
-    ObjectGuid guid2 = ObjectGuid(HIGHGUID_PLAYER, PlayerGuid2);
-
-    data.WriteGuidMask<6, 1>(guid1);
-    data.WriteGuidMask<5, 1, 3, 0, 4>(guid2);
-    data.WriteGuidMask<4>(guid1);
-    data.WriteGuidMask<7>(guid2);
-    data.WriteGuidMask<0, 2, 7, 3, 5>(guid1);
-    data.WriteGuidMask<2, 6>(guid2);
-
-    buffer.WriteGuidBytes<5, 4>(guid1);
-    buffer.WriteGuidBytes<6>(guid2);
-    buffer.WriteGuidBytes<2>(guid1);
-    buffer.WriteGuidBytes<4>(guid2);
-    buffer << uint8(NewRank);                               // +20, see note above
-    buffer.WriteGuidBytes<0>(guid2);
-    buffer.WriteGuidBytes<7, 3>(guid1);
-    buffer.WriteGuidBytes<5, 2>(guid2);
-    buffer.WriteGuidBytes<0>(guid1);
-    buffer << uint32(time(NULL) - TimeStamp);               // +16
-    buffer.WriteGuidBytes<1, 6>(guid1);
-    buffer.WriteGuidBytes<7, 1>(guid2);
-    buffer << uint8(EventType);                             // +21, see note above
-    buffer.WriteGuidBytes<3>(guid2);
+    // Layout lives in MopGuildPackets::BuildGuildEventLogEntry so a fixture can
+    // drive it without linking the database. See the note there on why the two
+    // single bytes are event-type-then-rank and not the reverse.
+    MopGuildPackets::BuildGuildEventLogEntry(data, buffer, EventType,
+        ObjectGuid(HIGHGUID_PLAYER, PlayerGuid1).GetRawValue(),
+        ObjectGuid(HIGHGUID_PLAYER, PlayerGuid2).GetRawValue(),
+        NewRank, uint32(time(NULL) - TimeStamp));
 }
 
 void GuildBankEventLogEntry::WriteData(WorldPacket& data, ByteBuffer& buffer)

@@ -846,6 +846,73 @@ namespace MopGuildPackets
      * passing 1 and GuildRosterSetOfficerNote passing 0, and corroborated by the
      * captures, whose notes read "DPS 571" and "Resto 570 IL".
      */
+    /**
+     * @brief One SMSG_GUILD_EVENT_LOG entry, from client reader sub_6A6843.
+     *
+     * Inline so the layout can be driven by a test without linking the database.
+     * The elapsed time is a parameter rather than computed here for the same
+     * reason -- time(NULL) cannot be pinned in a fixture.
+     *
+     * eventType goes to record +20 and newRank to +21. That is not the order
+     * position suggests, and it was wrong here once: the consumer settles it,
+     * since GetGuildEventInfo switches on the field from +20 to yield
+     * invite/join/promote/demote/remove/quit and passes the one from +21 to the
+     * rank-name lookup sub_966826.
+     */
+    inline void BuildGuildEventLogEntry(WorldPacket& out, ByteBuffer& buffer,
+        uint8 eventType, uint64 guid1, uint64 guid2, uint8 newRank, uint32 elapsed)
+    {
+        uint8 const mask1[] = { 6, 1 };
+        WriteGuidMask(out, guid1, mask1);
+        uint8 const mask2[] = { 5, 1, 3, 0, 4 };
+        WriteGuidMask(out, guid2, mask2);
+        uint8 const mask3[] = { 4 };
+        WriteGuidMask(out, guid1, mask3);
+        uint8 const mask4[] = { 7 };
+        WriteGuidMask(out, guid2, mask4);
+        uint8 const mask5[] = { 0, 2, 7, 3, 5 };
+        WriteGuidMask(out, guid1, mask5);
+        uint8 const mask6[] = { 2, 6 };
+        WriteGuidMask(out, guid2, mask6);
+
+        uint8 const b1[] = { 5, 4 };
+        for (uint8 index : b1)
+            buffer.WriteByteSeq(GuidByte(guid1, index));
+        uint8 const b2[] = { 6 };
+        for (uint8 index : b2)
+            buffer.WriteByteSeq(GuidByte(guid2, index));
+        uint8 const b3[] = { 2 };
+        for (uint8 index : b3)
+            buffer.WriteByteSeq(GuidByte(guid1, index));
+        uint8 const b4[] = { 4 };
+        for (uint8 index : b4)
+            buffer.WriteByteSeq(GuidByte(guid2, index));
+        buffer << uint8(eventType);                        // +20
+        uint8 const b5[] = { 0 };
+        for (uint8 index : b5)
+            buffer.WriteByteSeq(GuidByte(guid2, index));
+        uint8 const b6[] = { 7, 3 };
+        for (uint8 index : b6)
+            buffer.WriteByteSeq(GuidByte(guid1, index));
+        uint8 const b7[] = { 5, 2 };
+        for (uint8 index : b7)
+            buffer.WriteByteSeq(GuidByte(guid2, index));
+        uint8 const b8[] = { 0 };
+        for (uint8 index : b8)
+            buffer.WriteByteSeq(GuidByte(guid1, index));
+        buffer << uint32(elapsed);                         // +16
+        uint8 const b9[] = { 1, 6 };
+        for (uint8 index : b9)
+            buffer.WriteByteSeq(GuidByte(guid1, index));
+        uint8 const b10[] = { 7, 1 };
+        for (uint8 index : b10)
+            buffer.WriteByteSeq(GuidByte(guid2, index));
+        buffer << uint8(newRank);                          // +21
+        uint8 const b11[] = { 3 };
+        for (uint8 index : b11)
+            buffer.WriteByteSeq(GuidByte(guid2, index));
+    }
+
     inline void ParseGuildSetNote(WorldPacket& in, ObjectGuid& targetGuid,
                                   bool& isPublic, std::string& note)
     {
@@ -1192,6 +1259,7 @@ class Guild
         void BroadcastToOfficers(WorldSession* session, const std::string& msg, uint32 language = LANG_UNIVERSAL);
         void BroadcastAddonToOfficers(WorldSession* session, const std::string& msg, const std::string& prefix);
         void BroadcastPacketToRank(WorldPacket* packet, uint32 rankId);
+        void BroadcastRankDefinitions();
         void BroadcastPacket(WorldPacket* packet);
         // for calendar
         void MassInviteToEvent(WorldSession* session, uint32 minLevel, uint32 maxLevel, uint32 minRank);

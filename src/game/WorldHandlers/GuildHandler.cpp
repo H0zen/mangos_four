@@ -643,15 +643,19 @@ void WorldSession::HandleGuildSetRankOpcode(WorldPacket& recvPacket)
         return;
     }
 
-    // The guildmaster rank is not editable. The client's own rank dropdown starts
-    // below it, so a packet naming it did not come from the stock UI -- and
-    // SetRankRights, unlike SetBankMoneyPerDay and SetBankRightsAndSlots, does
-    // not force the guildmaster back to full rights. Without this a leader could
-    // send rights=0 for rank 0 and lock the guild out of its own management.
+    // The guildmaster rank IS editable -- the retail rank UI renames it, and
+    // GuildDefaultRanks says so explicitly -- so it cannot simply be rejected.
+    // But SetRankRights, unlike SetBankMoneyPerDay and SetBankRightsAndSlots,
+    // does not force the guildmaster back to full rights, so a packet naming
+    // rank 0 with rights=0 would lock the guild out of its own management.
+    // Force the invariant instead of refusing the packet: the rename still
+    // lands, the rights cannot be dropped.
     if (rankIndex == GR_GUILDMASTER)
     {
-        SendGuildCommandResult(GUILD_INVITE_S, "", ERR_GUILD_PERMISSIONS);
-        return;
+        // OR rather than assign: the load path does the same (Guild.cpp), and
+        // assigning would strip any stored extension bits on what may be nothing
+        // more than a rename.
+        rights |= GR_RIGHT_ALL;
     }
 
     // Match the client's own ceiling. It clamps both of these to 100000 before
@@ -677,9 +681,10 @@ void WorldSession::HandleGuildSetRankOpcode(WorldPacket& recvPacket)
         guild->SetBankRightsAndSlots(rankIndex, tab, tabRights[tab], tabSlots[tab], true);
     }
 
-    guild->Query(this);
-    guild->QueryRanks(this);
-    guild->Roster(this);
+    // Rank definitions are guild-wide state, so every member needs the update --
+    // not just the leader who sent it. Roster(this) alone left everyone else
+    // showing the old rank names and rights until they relogged.
+    guild->BroadcastRankDefinitions();
 }
 
 void WorldSession::HandleGuildSwitchRankOpcode(WorldPacket& recvPacket)
@@ -707,9 +712,9 @@ void WorldSession::HandleGuildSwitchRankOpcode(WorldPacket& recvPacket)
 
     guild->SwitchRank(rankId, up);
 
-    guild->QueryRanks(this);
-    guild->Query(this);
-    guild->Roster();                                        // broadcast for tab rights update
+    // Reordering ranks changes two definitions, so every member needs them --
+    // Roster alone carries only rank IDs. Same gap as CMSG_GUILD_SET_RANK had.
+    guild->BroadcastRankDefinitions();
 }
 
 /**
@@ -983,9 +988,7 @@ void WorldSession::HandleGuildAddRankOpcode(WorldPacket& recvPacket)
 
     guild->CreateRank(rankname, GR_RIGHT_GCHATLISTEN | GR_RIGHT_GCHATSPEAK);
 
-    guild->Query(this);
-    guild->QueryRanks(this);
-    guild->Roster();                                        // broadcast for tab rights update
+    guild->BroadcastRankDefinitions();
 }
 
 /**
@@ -1022,9 +1025,7 @@ void WorldSession::HandleGuildDelRankOpcode(WorldPacket& recvPacket)
 
     guild->DelRank(rankId);
 
-    guild->Query(this);
-    guild->QueryRanks(this);
-    guild->Roster();                                        // broadcast for tab rights update
+    guild->BroadcastRankDefinitions();
 }
 
 /**
