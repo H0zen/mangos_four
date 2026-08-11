@@ -348,7 +348,16 @@ void WorldSession::HandlePetitionBuyOpcode(WorldPacket& recv_data)
     CharacterDatabase.PExecute("DELETE FROM `petition_sign` WHERE `petitionguid` IN ( %s )", ssInvalidPetitionGUIDs.str().c_str());
     CharacterDatabase.PExecute("INSERT INTO `petition` (`ownerguid`, `petitionguid`, `name`) VALUES ('%u', '%u', '%s')",
                                _player->GetGUIDLow(), charter->GetGUIDLow(), name.c_str());
-    CharacterDatabase.CommitTransaction();
+
+    // Direct: queued, this is not ordered against the direct write in
+    // HandlePetitionSignOpcode, so a signature could be taken and confirmed
+    // against the charter this replaces and then be deleted underneath it -- the
+    // signer told it counted when it did not. A failure is ambiguous, so it is
+    // reported rather than retried.
+    if (!CharacterDatabase.CommitTransactionDirect())
+    {
+        sLog.outError("CMSG_PETITION_BUY: could not replace the petitions owned by %u", _player->GetGUIDLow());
+    }
 }
 
 /**
@@ -619,13 +628,16 @@ void WorldSession::HandlePetitionSignOpcode(WorldPacket& recv_data)
     // this handler. A plain insert could therefore land after the charter had
     // gone, and petition_sign has no foreign key to catch it: that orphan row
     // would bar its signer from every other charter through the check above.
-    // Doing it in one statement holds whatever the other paths do and whenever
-    // they commit.
+    //
+    // That closes one of the two orderings. The other is safe already: an insert
+    // that lands BEFORE the invalidation commits is removed by it, because every
+    // one of those paths deletes the petition_sign rows as well as the petition.
+    // Both together are what make this safe, not this statement alone.
     if (!CharacterDatabase.DirectPExecute(
                 "INSERT INTO `petition_sign` (`ownerguid`, `petitionguid`, `playerguid`, `player_account`) "
                 "SELECT '%u', '%u', '%u', '%u' FROM DUAL "
-                "WHERE EXISTS (SELECT 1 FROM `petition` WHERE `petitionguid` = '%u')",
-                ownerLowGuid, petitionLowGuid, _player->GetGUIDLow(), GetAccountId(), petitionLowGuid))
+                "WHERE EXISTS (SELECT 1 FROM `petition` WHERE `petitionguid` = '%u' AND `ownerguid` = '%u')",
+                ownerLowGuid, petitionLowGuid, _player->GetGUIDLow(), GetAccountId(), petitionLowGuid, ownerLowGuid))
     {
         sLog.outError("CMSG_PETITION_SIGN: failed to record %s signing petition %u",
                       _player->GetGuidStr().c_str(), petitionLowGuid);
@@ -921,6 +933,8 @@ void WorldSession::HandleTurnInPetitionOpcode(WorldPacket& recv_data)
     sGuildMgr.AddGuild(guild);
 
     // add members
+    uint32 admitted = 0;
+
     for (uint8 i = 0; i < signs; ++i)
     {
         Field* fields = result->Fetch();
@@ -931,12 +945,30 @@ void WorldSession::HandleTurnInPetitionOpcode(WorldPacket& recv_data)
             continue;
         }
 
-        guild->AddMember(signGuid, guild->GetLowestRank());
+        if (guild->AddMember(signGuid, guild->GetLowestRank()))
+        {
+            ++admitted;
+        }
+
         result->NextRow();
+    }
+
+    // A signature that admits nobody -- the signer joined a guild since signing,
+    // say -- would otherwise leave a guild standing on fewer members than the
+    // charter was required to collect, silently. The guild exists by this point,
+    // so this reports rather than refuses.
+    if (admitted < count)
+    {
+        sLog.outError("TURN IN PETITION: guild '%s' created by %s from %u signatures but only %u members were admitted",
+                      name.c_str(), _player->GetGuidStr().c_str(), uint32(signs), admitted);
     }
 
     delete result;
 
+    // DestroyItem above already dropped both of these directly, so this affects
+    // no rows. It is kept deliberately: it is the turn-in path's own statement of
+    // what it requires, and it does not depend on a charter-flag check in the
+    // item code staying where it is.
     CharacterDatabase.BeginTransaction();
     CharacterDatabase.PExecute("DELETE FROM `petition` WHERE `petitionguid` = '%u'", petitionGuid.GetCounter());
     CharacterDatabase.PExecute("DELETE FROM `petition_sign` WHERE `petitionguid` = '%u'", petitionGuid.GetCounter());

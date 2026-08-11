@@ -4203,13 +4203,24 @@ void Player::RemovePetitionsAndSigns(ObjectGuid guid)
 
         delete result;
 
-        CharacterDatabase.PExecute("DELETE FROM `petition_sign` WHERE `playerguid` = '%u'", lowguid);
+        // Direct, because a queued delete is not ordered against a later direct
+        // read. Guild::AddMember calls this and then publishes the membership in
+        // memory: with the delete still pending, another charter's turn-in counts
+        // this signature, fails to admit its now-guilded owner, and creates a
+        // guild short of the signatures it was required to have.
+        CharacterDatabase.DirectPExecute("DELETE FROM `petition_sign` WHERE `playerguid` = '%u'", lowguid);
     }
 
     CharacterDatabase.BeginTransaction();
     CharacterDatabase.PExecute("DELETE FROM `petition` WHERE `ownerguid` = '%u'", lowguid);
     CharacterDatabase.PExecute("DELETE FROM `petition_sign` WHERE `ownerguid` = '%u'", lowguid);
-    CharacterDatabase.CommitTransaction();
+
+    // Same reason, and a failure here is ambiguous -- it may have rolled back or
+    // committed unreadably -- so it is reported rather than retried.
+    if (!CharacterDatabase.CommitTransactionDirect())
+    {
+        sLog.outError("RemovePetitionsAndSigns: could not clear petitions owned by %u", lowguid);
+    }
 }
 
 /**
