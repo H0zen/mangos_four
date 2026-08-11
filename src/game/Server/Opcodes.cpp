@@ -701,7 +701,8 @@ void InitializeOpcodes()
     //   CMSG_GUILD_SET_RANK 0x0C7A -- writer sub_C866DC (thunk sub_C84EA8).
     //     Real 5.4.8 opcode, and the MoP replacement for the 0x1024 handler this
     //     wave deleted. Its body is the rank DEFINITION: a rank id, then EIGHT
-    //     pairs of bank-tab rights and slots, three further uint32, a 7-bit name
+    //     pairs of bank-tab rights and slots, FOUR further uint32 (+0x60, +0x14,
+    //     +0x64, +0x10), a 7-bit name
     //     length and the name. No GUIDs anywhere.
     //     HandleGuildSetRankOpcode does not read that packet. It reads a rank id
     //     and TWO bit-packed GUIDs, i.e. a member rank ASSIGNMENT. The handler is
@@ -1261,11 +1262,14 @@ void InitializeOpcodes()
     //   u32, u32, A7, A3, B4, u32, guildName, u32, u32, B0, oldGuildName, A5,
     //   u32, B1, A6, B3, B6.
     //
-    // What is NOT settled is the identity of the NINE uint32. The handler
-    // currently sends level, borderStyle, borderColor, emblemStyle,
-    // backgroundColor and emblemColor -- six values for nine slots, all the same
-    // width. Ten captures exist for this opcode, so correlating fields that
-    // differ between them is the way in; do not map them from the pre-MoP order.
+    // Field identity is PARTLY settled. Correlating the ten captures against the
+    // matching guild-query response names positions 2, 6 and 8 as borderStyle,
+    // borderColor and emblemStyle, and pairs 1/3 as {backgroundColor,
+    // emblemColor}, 5 as the old-guild realm and 7/9 as {new-guild realm,
+    // inviter realm}. Position 4 looks like guild level but is unproven, and the
+    // paired ones cannot be separated because every capture has equal colours or
+    // a single realm. Finish it with a capture that breaks one of those ties;
+    // do not map the remainder from the pre-MoP order.
     //
     //  DefC(CMSG_GUILD_INVITE, ...)  -- restore once the reply is rebuilt.
 
