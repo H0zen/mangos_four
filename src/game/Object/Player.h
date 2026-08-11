@@ -4393,6 +4393,13 @@ class Player : public Unit
         // Clear the divider GUID
         void ClearDividerGuid() { m_dividerGuid.Clear(); }
 
+        // The charter this player was last offered, and may therefore sign. The
+        // sign packet carries only a client-supplied item GUID, so without this
+        // any charter on the realm could be named; see HandlePetitionSignOpcode.
+        ObjectGuid GetOfferedPetitionGuid() const { return m_offeredPetitionGuid; }
+        void SetOfferedPetitionGuid(ObjectGuid guid) { m_offeredPetitionGuid = guid; }
+        void ClearOfferedPetitionGuid() { m_offeredPetitionGuid.Clear(); }
+
         // Get the in-game time
         uint32 GetInGameTime() { return m_ingametime; }
 
@@ -6265,6 +6272,7 @@ class Player : public Unit
         QuestSet m_monthlyquests;
 
         ObjectGuid m_dividerGuid; // Divider GUID
+        ObjectGuid m_offeredPetitionGuid; // charter last offered to this player
         uint32 m_ingametime; // In-game time
 
         /*********************************************************/

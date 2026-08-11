@@ -536,19 +536,19 @@ void WorldSession::HandlePetitionSignOpcode(WorldPacket& recv_data)
         return;
     }
 
-    // Nothing in this packet binds it to an offer. The petition GUID is a
-    // client-supplied item GUID and item GUIDs are enumerable, so a charter can
-    // be named without ever having been shown one. Signing legitimately always
-    // follows CMSG_OFFER_PETITION, which already requires the owner to be within
-    // TRADE_DISTANCE of the signer, so holding the same bound here is what a real
-    // client can produce anyway and stops a forged packet signing any charter on
-    // the realm from anywhere. The owner is needed below for the success
-    // notification in any case.
-    Player* owner = sObjectMgr.GetPlayer(ownerGuid);
-    if (!owner || !_player->IsWithinDistInMap(owner, TRADE_DISTANCE, false))
+    // Nothing in this packet binds it to an offer: the petition GUID is a
+    // client-supplied item GUID, and item GUIDs are enumerable, so a charter can
+    // be named without ever having been shown one. The offer is where ownership
+    // and proximity can be established, so signing is admitted only for the
+    // charter this player was actually offered.
+    //
+    // Checking proximity here instead would be weaker AND stricter at once: a
+    // forged packet from anyone standing nearby would still pass, while a real
+    // offer would stop being signable the moment the owner stepped away.
+    if (_player->GetOfferedPetitionGuid() != petitionGuid)
     {
-        DEBUG_LOG("CMSG_PETITION_SIGN: %s tried to sign petition %u whose owner %s is offline or out of range",
-                  _player->GetGuidStr().c_str(), petitionLowGuid, ownerGuid.GetString().c_str());
+        DEBUG_LOG("CMSG_PETITION_SIGN: %s tried to sign petition %u without being offered it",
+                  _player->GetGuidStr().c_str(), petitionLowGuid);
         return;
     }
 
@@ -606,10 +606,24 @@ void WorldSession::HandlePetitionSignOpcode(WorldPacket& recv_data)
         return;
     }
 
-    CharacterDatabase.PExecute("INSERT INTO `petition_sign` (`ownerguid`,`petitionguid`, `playerguid`, `player_account`) VALUES ('%u', '%u', '%u','%u')",
-                               ownerLowGuid, petitionLowGuid, _player->GetGUIDLow(), GetAccountId());
+    // Direct, not queued. Every check above reads committed state through the
+    // synchronous pool while PExecute only enqueues, so an async insert stays
+    // invisible to the next signature's checks -- two signatures in quick
+    // succession could both pass, which the schema permits because its key is
+    // (petitionguid, playerguid). Writing directly also lets a failure be
+    // reported as one instead of answering OK for a row that never landed.
+    if (!CharacterDatabase.DirectPExecute("INSERT INTO `petition_sign` (`ownerguid`,`petitionguid`, `playerguid`, `player_account`) VALUES ('%u', '%u', '%u','%u')",
+                                          ownerLowGuid, petitionLowGuid, _player->GetGUIDLow(), GetAccountId()))
+    {
+        sLog.outError("CMSG_PETITION_SIGN: failed to record %s signing petition %u",
+                      _player->GetGuidStr().c_str(), petitionLowGuid);
+        return;
+    }
 
     DEBUG_LOG("PETITION SIGN: %s by %s", petitionGuid.GetString().c_str(), _player->GetGuidStr().c_str());
+
+    // The offer is spent.
+    _player->ClearOfferedPetitionGuid();
 
     // close at signer side
     _player->SendPetitionSignResult(petitionGuid, _player, PETITION_SIGN_OK);
@@ -624,7 +638,10 @@ void WorldSession::HandlePetitionSignOpcode(WorldPacket& recv_data)
     // to sub_9634D4, which appends the signer and announces
     // ERR_PETITION_SIGNED_S. A failure forwarded here would put a signature the
     // database does not have into the owner's charter.
-    owner->SendPetitionSignResult(petitionGuid, _player, PETITION_SIGN_OK);
+    if (Player* owner = sObjectMgr.GetPlayer(ownerGuid))
+    {
+        owner->SendPetitionSignResult(petitionGuid, _player, PETITION_SIGN_OK);
+    }
 }
 
 /**
@@ -776,6 +793,12 @@ void WorldSession::HandleOfferPetitionOpcode(WorldPacket& recv_data)
     BuildPetitionShowSignatures(data, petitionGuid, _player->GetObjectGuid(),
                                 petitionGuid.GetCounter(), signers);
     player->GetSession()->SendPacket(&data);
+
+    // Record what was offered. This is the only legitimate route to signing, and
+    // the ownership and proximity checks above are the point at which those can
+    // be established -- CMSG_PETITION_SIGN itself carries nothing that ties it to
+    // an offer.
+    player->SetOfferedPetitionGuid(petitionGuid);
 }
 
 /**

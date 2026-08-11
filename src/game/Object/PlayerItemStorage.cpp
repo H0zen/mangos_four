@@ -620,6 +620,20 @@ void Player::DestroyItem(uint8 bag, uint8 slot, bool update)
             stmt.PExecute(pItem->GetGUIDLow());
         }
 
+        // A charter's petition rows outlive the item otherwise -- nothing drops
+        // them until the owner deletes the character, buys another charter, or
+        // turns this one in. A destroyed charter would keep taking signatures,
+        // and each signer stays barred from signing anything else, because both
+        // checks work from those rows rather than from the item.
+        if (ItemPrototype const* pProto = pItem->GetProto())
+        {
+            if (pProto->Flags & ITEM_FLAG_CHARTER)
+            {
+                CharacterDatabase.PExecute("DELETE FROM `petition` WHERE `petitionguid` = '%u'", pItem->GetGUIDLow());
+                CharacterDatabase.PExecute("DELETE FROM `petition_sign` WHERE `petitionguid` = '%u'", pItem->GetGUIDLow());
+            }
+        }
+
         RemoveEnchantmentDurations(pItem);
         RemoveItemDurations(pItem);
 
