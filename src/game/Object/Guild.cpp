@@ -374,6 +374,12 @@ bool Guild::AddMember(ObjectGuid plGuid, uint32 plRank)
         pl->SetGuildLevel(GetLevel());
         pl->SetRank(newmember.RankId);
         pl->SetGuildIdInvited(0);
+
+        // Those fields name the guild without describing it, so a client told
+        // only that much has nothing to show. Every route in -- founding a
+        // charter, accepting an invite, a GM command -- ends here, so this is
+        // where the rest belongs.
+        SendGuildStateTo(pl->GetSession());
     }
 
     UpdateAccountsNumber();
@@ -1403,6 +1409,44 @@ void Guild::BroadcastMotd(std::string const& motd)
 
     BroadcastPacket(&data);
     DEBUG_LOG("WORLD: Sent SMSG_GUILD_EVENT_MOTD");
+}
+
+/**
+ * @brief Sends a member everything the client needs to display its guild.
+ *
+ * SetInGuild only writes object fields, which tell the client WHICH guild it is
+ * in -- a GUID pointing at data it does not have. Until this arrives there is
+ * nothing to render, which is why a guild founded from a charter stayed invisible
+ * until the next login: the login path sent this and the founding path did not.
+ *
+ * The MOTD is what does the work. Its handler at 0x966D5C stores the text, fires
+ * GUILD_MOTD and then raises GUILD_ROSTER_UPDATE, and the UI asks for the roster
+ * off that event -- so nothing has to be pushed ahead of it.
+ *
+ * The bank tab list below is sent for parity with login, but does NOT currently
+ * reach an 18414 client: its opcode is not admitted by IsEnterWorldConverted, so
+ * the send gate drops it while GuildBank.cpp still logs it as sent. That is a
+ * guild bank matter, out of scope for this wave, and founding does not need it.
+ */
+void Guild::SendGuildStateTo(WorldSession* session)
+{
+    if (!session)
+    {
+        return;
+    }
+
+    WorldPacket data(SMSG_GUILD_EVENT_MOTD, MOTD.size() + 2);
+
+    if (MopGuildPackets::BuildGuildMotd(data, MOTD))
+    {
+        session->SendPacket(&data);
+    }
+    else
+    {
+        sLog.outError("WORLD: Guild %u MOTD is too long for SMSG_GUILD_EVENT_MOTD", m_Id);
+    }
+
+    DisplayGuildBankTabsInfo(session);
 }
 
 void Guild::BroadcastMemberJoined(ObjectGuid guid, std::string const& name)

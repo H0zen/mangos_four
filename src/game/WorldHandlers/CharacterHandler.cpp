@@ -1023,17 +1023,10 @@ void WorldSession::HandlePlayerLogin(LoginQueryHolder* holder)
         if (guild)
         {
             pCurrChar->SetGuildLevel(guild->GetLevel());
-            /* Build MOTD packet and send it to the player */
-            data.Initialize(SMSG_GUILD_EVENT_MOTD, guild->GetMOTD().size() + 2);
-            if (MopGuildPackets::BuildGuildMotd(data, guild->GetMOTD()))
-            {
-                SendPacket(&data);
-                DEBUG_LOG("WORLD: Sent guild-motd (SMSG_GUILD_EVENT_MOTD)");
-            }
-            else
-                sLog.outError("WORLD: Guild %u MOTD is too long for SMSG_GUILD_EVENT_MOTD", guild->GetId());
 
-            guild->DisplayGuildBankTabsInfo(this);
+            // Same state a member is sent when it joins -- one definition, so the
+            // two routes cannot drift apart again.
+            guild->SendGuildStateTo(this);
             /* Let everyone in the guild know you've just signed in */
             guild->BroadcastMemberPresence(pCurrChar->GetObjectGuid(), pCurrChar->GetName(), true);
         }

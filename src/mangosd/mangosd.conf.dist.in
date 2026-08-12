@@ -677,9 +677,14 @@ SD3ErrorLogFile              = "scriptdev3-errors.log"
 #        The cost for guild petition charter (in copper)
 #        Default: 1000 (10 silver)
 #
-#    Guild.PetitionSignatures
-#        Required signatures count to create a guild (0..4).
-#        Default: 4
+#    MinPetitionSigns
+#        Required signatures count to create a guild (0..9), not counting the
+#        founder. The core reads this name; the Guild.PetitionSignatures that
+#        used to be documented here was read by nothing, so the value shown had
+#        no effect and every server silently enforced the default.
+#        Note that a second character on the same account cannot sign, so
+#        testing charters needs this many separate accounts.
+#        Default: 9
 #
 #    Guild.EventLogRecordsCount
 #        Count of guild event log records stored in guild_eventlog table
@@ -851,7 +856,7 @@ Quests.Weekly.ResetWeekDay                = 3
 Quests.Weekly.ResetHour                   = 6
 Quests.IgnoreRaid                         = 0
 Guild.PetitionCost                        = 1000
-Guild.PetitionSignatures                  = 4
+MinPetitionSigns                          = 9
 Guild.EventLogRecordsCount                = 100
 Guild.BankEventLogRecordsCount            = 25
 Guild.UndeletableLevel                    = 4

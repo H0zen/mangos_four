@@ -1359,6 +1359,11 @@ class Guild
         void   MoveFromBankToChar(Player* pl, uint8 BankTab, uint8 BankTabSlot, uint8 PlayerBag, uint8 PlayerSlot, uint32 SplitedAmount);
         void   MoveFromCharToBank(Player* pl, uint8 PlayerBag, uint8 PlayerSlot, uint8 BankTab, uint8 BankTabSlot, uint32 SplitedAmount);
 
+        // Everything a client needs before it can show the guild it belongs to.
+        // Membership itself travels as object fields, which say WHICH guild but
+        // nothing about it, so this has to be sent on joining as well as on login.
+        void   SendGuildStateTo(WorldSession* session);
+
         // Tabs
         void   DisplayGuildBankTabsInfo(WorldSession* session, uint8 TabId = 0);
         void   CreateNewBankTab();
