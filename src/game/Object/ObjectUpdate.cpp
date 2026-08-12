@@ -334,15 +334,25 @@ namespace
             }
         };
 
-        // Object block: only guid, type and scale. m_data (2/3), m_entryID (5)
-        // and m_dynamicFlags (6) are deliberately NOT sent - the player's own
-        // self create does not carry them either, there is no corresponding
-        // incremental translation (so a guild change would go stale), index 5
-        // is zero for players, and index 6 has viewer-relative semantics that
-        // this builder cannot evaluate.
+        // Object block: guid, the guild guid, type and scale. m_entryID (5) is
+        // zero for players and m_dynamicFlags (6) has viewer-relative semantics
+        // this builder cannot evaluate, so those two stay out.
+        //
+        // m_data (2/3) used to be omitted as well, on the grounds that the self
+        // create did not carry it either and that a guild change would go stale
+        // without an incremental translation. The first half was circular -- both
+        // sides were missing it -- and the second is now answered: indices 2, 3
+        // and 4 translate identically and the incremental path carries them. This
+        // is what puts a guild name under a player for everyone looking at them.
+        //
+        // The type word is the real field, not a constant: its HIGH half is the
+        // client's gate on the guild guid above (IsInGuild -> sub_7ABF60 tests
+        // word [descriptors+0x12] against 1), and SetInGuild maintains it.
         add(0, object.GetUInt32Value(OBJECT_FIELD_GUID));
         add(1, object.GetUInt32Value(OBJECT_FIELD_GUID + 1));
-        add(4, 0x19u); // OBJECT | UNIT | PLAYER
+        add(2, object.GetUInt32Value(OBJECT_FIELD_DATA));
+        add(3, object.GetUInt32Value(OBJECT_FIELD_DATA + 1));
+        add(4, object.GetUInt32Value(OBJECT_FIELD_TYPE));
         addTranslated(OBJECT_FIELD_SCALE_X);
         // Current target, so an observer's UI can show target-of-target and
         // who is targeting them. Emitted unconditionally: zero is the real

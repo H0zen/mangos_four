@@ -1880,6 +1880,7 @@ void Map::SendInitSelf(Player* player)
     //
     MopUpdateObject::SelfPlayer sp{};
     sp.guid = player->GetObjectGuid().GetRawValue();
+    sp.guildGuid = player->GetGuidValue(OBJECT_FIELD_DATA).GetRawValue();
     sp.mapId = uint16(player->GetMapId());
     sp.x = player->GetPositionX();
     sp.y = player->GetPositionY();

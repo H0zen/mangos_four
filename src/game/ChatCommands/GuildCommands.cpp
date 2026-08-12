@@ -225,22 +225,38 @@ bool ChatHandler::HandleGuildDeleteCommand(char* args)
         return false;
     }
 
+    // Quotes are optional. ExtractQuotedArg returns nothing at all for a bare
+    // name, and returning false then prints the syntax help -- which is what made
+    // this look like it was demanding quotes it had already been given.
     char* guildStr = ExtractQuotedArg(&args);
-    if (!guildStr)
+    std::string gld = guildStr ? guildStr : args;
+
+    // A bare name is the rest of the line, spaces included: guild names have them.
+    while (!gld.empty() && isWhiteSpace(gld[gld.size() - 1]))
+    {
+        gld.erase(gld.size() - 1);
+    }
+
+    if (gld.empty())
     {
         return false;
     }
-
-    std::string gld = guildStr;
 
     Guild* targetGuild = sGuildMgr.GetGuildByName(gld);
     if (!targetGuild)
     {
+        // Not a syntax error, so say what actually happened instead of repeating
+        // the usage line.
+        PSendSysMessage("Guild '%s' not found.", gld.c_str());
+        SetSentErrorMessage(true);
         return false;
     }
+
+    std::string const deletedName = targetGuild->GetName();
 
     targetGuild->Disband();
     delete targetGuild;
 
+    PSendSysMessage("Guild '%s' deleted.", deletedName.c_str());
     return true;
 }

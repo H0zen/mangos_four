@@ -110,6 +110,13 @@ bool MopUpdateObject::TranslateObserverPlayerIndex(uint16 legacyIndex, uint16& t
 
     switch (legacyIndex)
     {
+        // The object block is laid out identically in both, so these are their
+        // own translation. 2/3 are the guild guid and 4 is the word whose high
+        // half tells the client to read it; without them here a guild joined or
+        // left in world never reached anyone watching until they relogged.
+        case 2:  targetIndex = 2;  return true; // guild guid, low
+        case 3:  targetIndex = 3;  return true; // guild guid, high
+        case 4:  targetIndex = 4;  return true; // type mask + guild presence
         case 7:  targetIndex = 7;  return true; // scale
         // The current target, as a two-word GUID. Client indices 22/23 are
         // CGUnitData::target in the 18414 descriptor table. Nothing projected
@@ -540,6 +547,12 @@ void MopUpdateObject::TranslateSelfPlayerFields(StaticField const* sourceFields,
 
         switch (sourceIndex)
         {
+            // The object block matches in both layouts, so these carry straight
+            // through. Without them the owner's own client never learned it had
+            // joined or left a guild until the next login.
+            case 2:  fields.push_back({ 2, value }); break;   // guild guid, low
+            case 3:  fields.push_back({ 3, value }); break;   // guild guid, high
+            case 4:  fields.push_back({ 4, value }); break;   // type + guild presence
             case 7:  fields.push_back({ 7, value }); break;
             case 26:
                 fields.push_back({ 30, RepackUnitBytes0(value) });
@@ -972,7 +985,16 @@ void MopUpdateObject::AppendSelfCreateBlock(ByteBuffer& out, const SelfPlayer& e
     {
         {  0, uint32(e.guid & 0xFFFFFFFFu) },   // OBJECT_FIELD_GUID low
         {  1, uint32(e.guid >> 32) },           // OBJECT_FIELD_GUID high
-        {  4, 25u },                            // OBJECT_FIELD_TYPE (OBJECT|UNIT|PLAYER)
+        {  2, uint32(e.guildGuid & 0xFFFFFFFFu) },  // OBJECT_FIELD_DATA low -- guild guid
+        {  3, uint32(e.guildGuid >> 32) },          // OBJECT_FIELD_DATA high
+        // OBJECT_FIELD_TYPE. The low half is the type mask; the HIGH half is the
+        // client's gate on the two fields above it. IsInGuild (sub_8A0F42 ->
+        // sub_7ABF60) compares word [descriptors+0x12] -- this field's high half --
+        // against 1, and answers "no guild" before it ever reads the guid at
+        // +0x08/+0x0C. A bare 25 therefore hid the guild completely: the guild key
+        // opened the finder, no guild name rendered under the player, and the
+        // client never sent CMSG_GUILD_QUERY because nothing ever asked it to.
+        {  4, 25u | (e.guildGuid ? (1u << 16) : 0u) },
         {  7, FloatBits(e.scale) },             // OBJECT_FIELD_SCALE
         { 30, sex },                            // UNIT_FIELD_SEX  (OBJECT_END+0x16)
         { 31, uint32(e.powerType) },            // UNIT_FIELD_DISPLAY_POWER (+0x17)

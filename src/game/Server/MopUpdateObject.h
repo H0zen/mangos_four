@@ -332,6 +332,9 @@ namespace MopUpdateObject
         bool hasTransportTime2, hasTransportTime3;
 
         // values (18414 UNIT/OBJECT fields)
+        // The client will not read the guild guid at all unless the high half of
+        // OBJECT_FIELD_TYPE says it is there, so the two travel together.
+        uint64 guildGuid;
         uint8  race, class_, gender, powerType;
         uint32 health, maxHealth;
         // All class power slots (dense-indexed like the server's UNIT_FIELD_POWER1..5).

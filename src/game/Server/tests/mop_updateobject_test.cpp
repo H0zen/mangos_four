@@ -136,7 +136,7 @@ int main(int /*argc*/, char** /*argv*/)
 
     int const guidByteCount = NonZeroGuidBytes(player.guid);
     size_t const expectedSize =
-        6 + (3 + guidByteCount) + 13 + (guidByteCount + 13 * 4 + 4) + 114;
+        6 + (3 + guidByteCount) + 13 + (guidByteCount + 13 * 4 + 4) + 122;
     CHECK(packet.GetOpcode() == SMSG_UPDATE_OBJECT);
     CHECK(packet.size() == expectedSize);
 
@@ -166,7 +166,7 @@ int main(int /*argc*/, char** /*argv*/)
     CHECK(decodedGuid == player.guid);
     CHECK(typeId == 4);
 
-    packet.rpos(packet.size() - 114);
+    packet.rpos(packet.size() - 122);
     uint8 blockCount = 0;
     packet >> blockCount;
     CHECK(blockCount == 3);
@@ -186,28 +186,63 @@ int main(int /*argc*/, char** /*argv*/)
     CHECK(hasBit(69));
     CHECK(hasBit(70));
 
-    uint32 fields[25] = {};
+    uint32 fields[27] = {};
     for (uint32& field : fields)
     {
         packet >> field;
     }
     CHECK(fields[0] == uint32(player.guid));
-    CHECK(fields[2] == 25u);
-    CHECK(fields[4] == (uint32(player.race) |
+    // OBJECT_FIELD_DATA is the guild guid and the type word's HIGH half is what
+    // tells the client to read it. This fixture is unguilded, so both are clear;
+    // the guilded case is covered below.
+    CHECK(fields[2] == 0u);
+    CHECK(fields[3] == 0u);
+    CHECK(fields[4] == 25u);
+    CHECK(fields[6] == (uint32(player.race) |
                         (uint32(player.class_) << 8) |
                         (uint32(player.powerType) << 16) |
                         (uint32(player.gender) << 24)));
-    CHECK(fields[6] == player.health);
-    CHECK(fields[12] == player.maxHealth);
-    CHECK(fields[18] == player.level);
-    CHECK(fields[20] == 0x00000008u);
-    CHECK(fields[23] == player.displayId);
-    CHECK(fields[24] == player.nativeDisplayId);
+    CHECK(fields[8] == player.health);
+    CHECK(fields[14] == player.maxHealth);
+    CHECK(fields[20] == player.level);
+    CHECK(fields[22] == 0x00000008u);
+    CHECK(fields[25] == player.displayId);
+    CHECK(fields[26] == player.nativeDisplayId);
 
     uint8 dynamicFieldCount = 0;
     packet >> dynamicFieldCount;
     CHECK(dynamicFieldCount == 0);
     CHECK(packet.rpos() == packet.size());
+
+    // A guilded player. The client refuses to look at the guild guid unless the
+    // HIGH half of the type word is 1 -- IsInGuild (sub_8A0F42 -> sub_7ABF60)
+    // tests word [descriptors+0x12] before reading +0x08/+0x0C -- so a create
+    // block that carried the guid but left the type word at a bare 25 showed no
+    // guild anywhere: no guild frame, no name under the player, and no
+    // CMSG_GUILD_QUERY, because nothing ever asked the client to resolve it.
+    MopUpdateObject::SelfPlayer guilded = MakeSelf();
+    guilded.guildGuid = UI64LIT(0x1FF7000000000001);
+    WorldPacket guildedPacket;
+    MopUpdateObject::BuildSelfCreate(guildedPacket, guilded);
+    CHECK(guildedPacket.size() == expectedSize);
+
+    guildedPacket.rpos(guildedPacket.size() - 122);
+    uint8 guildedBlockCount = 0;
+    guildedPacket >> guildedBlockCount;
+    CHECK(guildedBlockCount == 3);
+    uint32 guildedMask[3] = {};
+    for (uint32& word : guildedMask)
+    {
+        guildedPacket >> word;
+    }
+    uint32 guildedFields[27] = {};
+    for (uint32& field : guildedFields)
+    {
+        guildedPacket >> field;
+    }
+    CHECK(guildedFields[2] == uint32(guilded.guildGuid & 0xFFFFFFFFu));
+    CHECK(guildedFields[3] == uint32(guilded.guildGuid >> 32));
+    CHECK(guildedFields[4] == (25u | (1u << 16)));
 
     MopUpdateObject::StaticField const changedUnitFlags[] = {
         { 55, 0x00000009u }
