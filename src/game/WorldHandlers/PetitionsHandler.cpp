@@ -922,7 +922,7 @@ void WorldSession::HandleTurnInPetitionOpcode(WorldPacket& recv_data)
 
     for (ObjectGuid const& signGuid : signers)
     {
-        Player* signer = sObjectMgr.GetPlayer(signGuid);
+        Player* signer = sObjectMgr.GetPlayer(signGuid, false);
 
         if (signer)
         {

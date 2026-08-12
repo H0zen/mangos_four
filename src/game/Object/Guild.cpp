@@ -382,7 +382,7 @@ bool Guild::AddMember(ObjectGuid plGuid, uint32 plRank)
 #ifdef ENABLE_ELUNA
     if (Eluna* e = sWorld.GetEluna())
     {
-        e->OnAddMember(this, pl, newmember.RankId);
+        e->OnAddMember(this, pl && pl->IsInWorld() ? pl : nullptr, newmember.RankId);
     }
 #endif /* ENABLE_ELUNA */
 
@@ -809,7 +809,7 @@ bool Guild::DelMember(ObjectGuid guid, bool isDisbanding)
 #ifdef ENABLE_ELUNA
     if (Eluna* e = sWorld.GetEluna())
     {
-        e->OnRemoveMember(this, player, isDisbanding); // IsKicked not a part of Mangos, implement?
+        e->OnRemoveMember(this, player && player->IsInWorld() ? player : nullptr, isDisbanding); // IsKicked not a part of Mangos, implement?
     }
 #endif /* ENABLE_ELUNA */
 
