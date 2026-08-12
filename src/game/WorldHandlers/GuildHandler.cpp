@@ -710,7 +710,10 @@ void WorldSession::HandleGuildSwitchRankOpcode(WorldPacket& recvPacket)
         return;
     }
 
-    guild->SwitchRank(rankId, up);
+    if (!guild->SwitchRank(rankId, up))
+    {
+        return;
+    }
 
     // Reordering ranks changes two definitions, so every member needs them --
     // Roster alone carries only rank IDs. Same gap as CMSG_GUILD_SET_RANK had.
@@ -1023,7 +1026,10 @@ void WorldSession::HandleGuildDelRankOpcode(WorldPacket& recvPacket)
         return;
     }
 
-    guild->DelRank(rankId);
+    if (!guild->DelRank(rankId))
+    {
+        return;
+    }
 
     guild->BroadcastRankDefinitions();
 }

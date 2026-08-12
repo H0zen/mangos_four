@@ -78,32 +78,27 @@ void Guild::AddRank(const std::string& name_, uint32 rights, uint32 money)
 /**
  * @brief Deletes the lowest guild rank if allowed.
  */
-void Guild::DelRank(uint32 rankId)
+bool Guild::DelRank(uint32 rankId)
 {
     if (rankId >= m_Ranks.size())
     {
-        return;
+        return false;
     }
 
     // client won't allow to have less than GUILD_RANKS_MIN_COUNT ranks in guild
     if (m_Ranks.size() <= GUILD_RANKS_MIN_COUNT || rankId < GUILD_RANKS_MIN_COUNT)
     {
-        return;
+        return false;
+    }
+
+    if (HasMembersWithRank(rankId))
+    {
+        return false;
     }
 
     m_Ranks.erase(m_Ranks.begin() + rankId);
 
-    // Everything below the deleted rank moves up one, and the members sitting on
-    // those ranks have to move with it. Renumbering guild_rank alone leaves every
-    // member below this point pointing at the rank that used to be beneath their
-    // own -- inheriting its name, rights and bank limits -- while whoever held
-    // the last rank falls off the end of m_Ranks entirely, which reads back as
-    // "<unknown>" with no rights at all. The stale number survives relog, since
-    // it is guild_member.rank that is wrong.
-    //
-    // Members ON the deleted rank are refused by the handler, but should one
-    // reach here they land on the rank that replaced it, which is the closest
-    // thing to where they were.
+    // Rank definitions and their members must move together.
     for (MemberList::iterator itr = members.begin(); itr != members.end(); ++itr)
     {
         if (itr->second.RankId > rankId)
@@ -117,6 +112,14 @@ void Guild::DelRank(uint32 rankId)
         }
     }
 
+    for (GuildEventLog::iterator itr = m_GuildEventLog.begin(); itr != m_GuildEventLog.end(); ++itr)
+    {
+        if (itr->NewRank > rankId)
+        {
+            --itr->NewRank;
+        }
+    }
+
     // delete lowest guild_rank
     CharacterDatabase.BeginTransaction();
     CharacterDatabase.PExecute("DELETE FROM `guild_rank` WHERE `rid` ='%u' AND `guildid` ='%u'", rankId, m_Id);
@@ -124,22 +127,37 @@ void Guild::DelRank(uint32 rankId)
     CharacterDatabase.PExecute("UPDATE `guild_rank` SET `rid` = `rid` - 1 WHERE `rid` > '%u' AND `guildid` ='%u'", rankId, m_Id);
     CharacterDatabase.PExecute("UPDATE `guild_bank_right` SET `rid` = `rid` - 1 WHERE `rid` > '%u' AND `guildid` ='%u'", rankId, m_Id);
     CharacterDatabase.PExecute("UPDATE `guild_member` SET `rank` = `rank` - 1 WHERE `rank` > '%u' AND `guildid` ='%u'", rankId, m_Id);
+    CharacterDatabase.PExecute("UPDATE `guild_eventlog` SET `NewRank` = `NewRank` - 1 WHERE `NewRank` > '%u' AND `guildid` ='%u'", rankId, m_Id);
     CharacterDatabase.CommitTransaction();
+
+    return true;
 }
 
-void Guild::SwitchRank(uint32 rankId, bool up)
+bool Guild::SwitchRank(uint32 rankId, bool up)
 {
     if (rankId >= m_Ranks.size())
     {
-        return;
+        return false;
     }
 
-    if ((rankId == GR_GUILDMASTER && up) || (rankId == GetLowestRank() && !up))
+    if (rankId == GR_GUILDMASTER)
     {
-        return;
+        DEBUG_LOG("Guild::SwitchRank: guild %u refused a swap involving the guildmaster rank", m_Id);
+        return false;
+    }
+
+    if (rankId == GetLowestRank() && !up)
+    {
+        return false;
     }
 
     uint32 otherRankId = rankId + (up ? -1 : 1);
+
+    if (otherRankId == GR_GUILDMASTER)
+    {
+        DEBUG_LOG("Guild::SwitchRank: guild %u refused a swap involving the guildmaster rank", m_Id);
+        return false;
+    }
     DEBUG_LOG("rank: %u otherrank %u", rankId, otherRankId);
 
     std::swap(m_Ranks[rankId], m_Ranks[otherRankId]);
@@ -169,6 +187,8 @@ void Guild::SwitchRank(uint32 rankId, bool up)
         }
 
     CharacterDatabase.CommitTransaction();
+
+    return true;
 }
 
 /**

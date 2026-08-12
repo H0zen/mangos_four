@@ -1288,8 +1288,8 @@ class Guild
         }
 
         void CreateRank(std::string name, uint32 rights);
-        void DelRank(uint32 rankId);
-        void SwitchRank(uint32 rankId, bool up);
+        bool DelRank(uint32 rankId);
+        bool SwitchRank(uint32 rankId, bool up);
         std::string GetRankName(uint32 rankId);
         uint32 GetRankRights(uint32 rankId);
         uint32 GetRanksSize() const { return m_Ranks.size(); }
