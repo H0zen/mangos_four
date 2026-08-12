@@ -1298,6 +1298,11 @@ class Guild
         void SetRankRights(uint32 rankId, uint32 rights);
         bool HasRankRight(uint32 rankId, uint32 right)
         {
+            if (rankId >= m_Ranks.size())
+            {
+                return false;
+            }
+
             return ((GetRankRights(rankId) & right) != GR_RIGHT_EMPTY) ? true : false;
         }
 

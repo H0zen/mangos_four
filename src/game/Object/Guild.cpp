@@ -259,6 +259,17 @@ void Guild::CreateDefaultGuildRanks(int locale_idx)
  */
 bool Guild::AddMember(ObjectGuid plGuid, uint32 plRank)
 {
+    if (m_Ranks.empty())
+    {
+        return false;
+    }
+
+    // GUILD_RANK_NONE is the omitted-rank sentinel used by Eluna.
+    if (plRank >= m_Ranks.size())
+    {
+        plRank = GetLowestRank();
+    }
+
     Player* pl = sObjectMgr.GetPlayer(plGuid);
     if (pl)
     {
