@@ -1109,24 +1109,65 @@ void Guild::Roster(WorldSession* session /*= NULL*/)
         roster.push_back(entry);
     }
 
-    // GetAccountsNumber(), not m_accountsNumber: zero is that member's
-    // needs-recalculation marker, so reading it directly sends 0 accounts on the
-    // first roster after startup and after every membership change.
-    WorldPacket data;
-    if (!MopGuildPackets::BuildGuildRoster(data, roster, MOTD, GINFO, GetAccountsNumber(),
-        secsToTimeBitFields(m_CreatedDate), 0))
-    {
-        sLog.outError("Guild::Roster: guild %u has a field too long for the 18414 roster body; not sending", m_Id);
-        return;
-    }
+    // Zero is the needs-recalculation marker, so do not read m_accountsNumber directly.
+    uint32 const accountsNumber = GetAccountsNumber();
+    uint32 const createdDatePacked = secsToTimeBitFields(m_CreatedDate);
 
     if (session)
     {
+        MemberSlot* recipient = session->GetPlayer()
+            ? GetMemberSlot(session->GetPlayer()->GetObjectGuid()) : NULL;
+        if (!recipient || !HasRankRight(recipient->RankId, GR_RIGHT_VIEWOFFNOTE))
+        {
+            for (std::vector<MopGuildPackets::RosterMember>::iterator itr = roster.begin(); itr != roster.end(); ++itr)
+            {
+                itr->officerNote.clear();
+            }
+        }
+
+        WorldPacket data;
+        if (!MopGuildPackets::BuildGuildRoster(data, roster, MOTD, GINFO, accountsNumber,
+            createdDatePacked, 0))
+        {
+            sLog.outError("Guild::Roster: guild %u has a field too long for the 18414 roster body; not sending", m_Id);
+            return;
+        }
+
         session->SendPacket(&data);
     }
     else
     {
-        BroadcastPacket(&data);
+        WorldPacket officerData;
+        if (!MopGuildPackets::BuildGuildRoster(officerData, roster, MOTD, GINFO, accountsNumber,
+            createdDatePacked, 0))
+        {
+            sLog.outError("Guild::Roster: guild %u has a field too long for the 18414 roster body; not sending", m_Id);
+            return;
+        }
+
+        for (std::vector<MopGuildPackets::RosterMember>::iterator itr = roster.begin(); itr != roster.end(); ++itr)
+        {
+            itr->officerNote.clear();
+        }
+
+        WorldPacket memberData;
+        if (!MopGuildPackets::BuildGuildRoster(memberData, roster, MOTD, GINFO, accountsNumber,
+            createdDatePacked, 0))
+        {
+            sLog.outError("Guild::Roster: guild %u has a field too long for the 18414 roster body; not sending", m_Id);
+            return;
+        }
+
+        for (MemberList::const_iterator itr = members.begin(); itr != members.end(); ++itr)
+        {
+            Player* player = sObjectAccessor.FindPlayer(ObjectGuid(HIGHGUID_PLAYER, itr->first));
+            if (player && player->GetSession())
+            {
+                WorldPacket const* data = HasRankRight(itr->second.RankId, GR_RIGHT_VIEWOFFNOTE)
+                    ? &officerData : &memberData;
+                player->GetSession()->SendPacket(data);
+            }
+        }
     }
     DEBUG_LOG("WORLD: Sent (SMSG_GUILD_ROSTER)");
 }

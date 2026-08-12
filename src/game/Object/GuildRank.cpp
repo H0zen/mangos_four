@@ -50,6 +50,8 @@ void Guild::CreateRank(std::string name_, uint32 rights)
     // ranks are sequence 0,1,2,... where 0 means guildmaster
     uint32 new_rank_id = m_Ranks.size();
 
+    std::string dbName = name_;
+    CharacterDatabase.escape_string(dbName);
     AddRank(name_, rights, 0);
 
     // existing records in db should be deleted before calling this procedure and m_PurchasedTabs must be loaded already
@@ -59,9 +61,7 @@ void Guild::CreateRank(std::string name_, uint32 rights)
         // create bank rights with 0
         CharacterDatabase.PExecute("INSERT INTO `guild_bank_right` (`guildid`,`TabId`,`rid`) VALUES ('%u','%u','%u')", m_Id, i, new_rank_id);
     }
-    // name now can be used for encoding to DB
-    CharacterDatabase.escape_string(name_);
-    CharacterDatabase.PExecute("INSERT INTO `guild_rank` (`guildid`,`rid`,`rname`,`rights`) VALUES ('%u', '%u', '%s', '%u')", m_Id, new_rank_id, name_.c_str(), rights);
+    CharacterDatabase.PExecute("INSERT INTO `guild_rank` (`guildid`,`rid`,`rname`,`rights`) VALUES ('%u', '%u', '%s', '%u')", m_Id, new_rank_id, dbName.c_str(), rights);
 }
 
 /**
@@ -160,9 +160,13 @@ bool Guild::SwitchRank(uint32 rankId, bool up)
     }
     DEBUG_LOG("rank: %u otherrank %u", rankId, otherRankId);
 
-    std::swap(m_Ranks[rankId], m_Ranks[otherRankId]);
+    std::string rankName = m_Ranks[rankId].Name;
+    std::string otherRankName = m_Ranks[otherRankId].Name;
+    CharacterDatabase.escape_string(rankName);
+    CharacterDatabase.escape_string(otherRankName);
 
     CharacterDatabase.BeginTransaction();
+    std::swap(m_Ranks[rankId], m_Ranks[otherRankId]);
     for (uint32 i = 0; i < uint32(GetPurchasedTabs()); ++i)
     {
         CharacterDatabase.PExecute("REPLACE INTO guild_bank_right (guildid,TabId,rid,gbright,SlotPerDay) "
@@ -172,9 +176,9 @@ bool Guild::SwitchRank(uint32 rankId, bool up)
     }
 
     CharacterDatabase.PExecute("REPLACE INTO guild_rank (guildid,rid,rname,rights,BankMoneyPerDay) "
-        "VALUES ('%u', '%u', '%s', '%u', '%u')", m_Id, rankId, m_Ranks[rankId].Name.c_str(),m_Ranks[rankId].Rights,m_Ranks[rankId].BankMoneyPerDay);
+        "VALUES ('%u', '%u', '%s', '%u', '%u')", m_Id, rankId, otherRankName.c_str(),m_Ranks[rankId].Rights,m_Ranks[rankId].BankMoneyPerDay);
     CharacterDatabase.PExecute("REPLACE INTO guild_rank (guildid,rid,rname,rights,BankMoneyPerDay) "
-        "VALUES ('%u', '%u', '%s', '%u', '%u')", m_Id, otherRankId, m_Ranks[otherRankId].Name.c_str(),m_Ranks[otherRankId].Rights,m_Ranks[otherRankId].BankMoneyPerDay);
+        "VALUES ('%u', '%u', '%s', '%u', '%u')", m_Id, otherRankId, rankName.c_str(),m_Ranks[otherRankId].Rights,m_Ranks[otherRankId].BankMoneyPerDay);
 
     for (MemberList::iterator itr = members.begin(); itr != members.end(); ++itr)
         if (itr->second.RankId == rankId)
@@ -185,6 +189,23 @@ bool Guild::SwitchRank(uint32 rankId, bool up)
         {
             itr->second.ChangeRank(rankId);
         }
+
+    for (GuildEventLog::iterator itr = m_GuildEventLog.begin(); itr != m_GuildEventLog.end(); ++itr)
+    {
+        if (itr->NewRank == rankId)
+        {
+            itr->NewRank = otherRankId;
+        }
+        else if (itr->NewRank == otherRankId)
+        {
+            itr->NewRank = rankId;
+        }
+    }
+
+    CharacterDatabase.PExecute("UPDATE `guild_eventlog` SET `NewRank` = CASE `NewRank` "
+        "WHEN '%u' THEN '%u' WHEN '%u' THEN '%u' ELSE `NewRank` END "
+        "WHERE `guildid` = '%u' AND `NewRank` IN ('%u', '%u')",
+        rankId, otherRankId, otherRankId, rankId, m_Id, rankId, otherRankId);
 
     CharacterDatabase.CommitTransaction();
 
@@ -236,11 +257,11 @@ void Guild::SetRankName(uint32 rankId, std::string name_)
         return;
     }
 
+    std::string dbName = name_;
+    CharacterDatabase.escape_string(dbName);
     m_Ranks[rankId].Name = name_;
 
-    // name now can be used for encoding to DB
-    CharacterDatabase.escape_string(name_);
-    CharacterDatabase.PExecute("UPDATE `guild_rank` SET `rname`='%s' WHERE `rid`='%u' AND `guildid`='%u'", name_.c_str(), rankId, m_Id);
+    CharacterDatabase.PExecute("UPDATE `guild_rank` SET `rname`='%s' WHERE `rid`='%u' AND `guildid`='%u'", dbName.c_str(), rankId, m_Id);
 }
 
 /**

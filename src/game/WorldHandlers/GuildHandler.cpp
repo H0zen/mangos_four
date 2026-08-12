@@ -1744,10 +1744,14 @@ void WorldSession::HandleGuildQueryRanksOpcode(WorldPacket& recv_data)
     // in order 6,0,1,7,3,2,5,4 (each XOR 1). The order this handler inherited from
     // MaNGOS Three is a different permutation, so it decoded the wrong guild.
     ObjectGuid guildGuid(MopGuildPackets::ReadGuildQueryRanks(recv_data));
-    if (Guild* guild = sGuildMgr.GetGuildByGuid(guildGuid))
+    Guild* guild = sGuildMgr.GetGuildByGuid(guildGuid);
+    if (!guild || guild->GetId() != GetPlayer()->GetGuildId() ||
+        !guild->GetMemberSlot(GetPlayer()->GetObjectGuid()))
     {
-        guild->QueryRanks(this);
+        return;
     }
+
+    guild->QueryRanks(this);
 }
 
 void WorldSession::HandleGuildSetAchievementTracking(WorldPacket& recvPacket)
