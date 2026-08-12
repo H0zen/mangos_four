@@ -244,6 +244,37 @@ int main(int /*argc*/, char** /*argv*/)
     CHECK(guildedFields[3] == uint32(guilded.guildGuid >> 32));
     CHECK(guildedFields[4] == (25u | (1u << 16)));
 
+    // Joining a guild in world. This is the path a charter founder takes, and it
+    // is NOT the create block above: the owner's incremental collector has to
+    // carry the guid and the type word, or the founder stays unguilded on his own
+    // client until the next login while everyone watching sees the guild at once.
+    MopUpdateObject::StaticField const changedGuild[] = {
+        { 2, 0x00000001u },
+        { 3, 0x1FF70000u },
+        { 4, 25u | (1u << 16) }
+    };
+    std::vector<MopUpdateObject::StaticField> projectedGuild;
+    MopUpdateObject::TranslateSelfPlayerFields(changedGuild, 3, projectedGuild);
+    CHECK(projectedGuild.size() == 3);
+    CHECK(projectedGuild[0].index == 2);
+    CHECK(projectedGuild[0].value == 0x00000001u);
+    CHECK(projectedGuild[1].index == 3);
+    CHECK(projectedGuild[1].value == 0x1FF70000u);
+    CHECK(projectedGuild[2].index == 4);
+    CHECK(projectedGuild[2].value == (25u | (1u << 16)));
+
+    // The same three have to reach observers, or nobody else sees the guild name
+    // appear under a player who just joined one.
+    uint16 observerGuildLo = 0;
+    uint16 observerGuildHi = 0;
+    uint16 observerGuildType = 0;
+    CHECK(MopUpdateObject::TranslateObserverPlayerIndex(2, observerGuildLo));
+    CHECK(MopUpdateObject::TranslateObserverPlayerIndex(3, observerGuildHi));
+    CHECK(MopUpdateObject::TranslateObserverPlayerIndex(4, observerGuildType));
+    CHECK(observerGuildLo == 2);
+    CHECK(observerGuildHi == 3);
+    CHECK(observerGuildType == 4);
+
     MopUpdateObject::StaticField const changedUnitFlags[] = {
         { 55, 0x00000009u }
     };

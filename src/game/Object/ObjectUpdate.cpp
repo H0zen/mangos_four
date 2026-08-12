@@ -775,6 +775,15 @@ void Object::BuildValuesUpdateBlockForPlayer(UpdateData* data, Player* target) c
                 }
             };
 
+            // The guild guid and the type word whose high half admits it.
+            // SetInGuild dirties all three, and without them here the owner's own
+            // client never learns it joined a guild until the next login -- which
+            // is exactly how founding a charter left the founder unguilded while
+            // everyone watching saw it immediately. Ordered first: the serializer
+            // requires ascending legacy indices and these are the lowest.
+            addIfChanged(OBJECT_FIELD_DATA);
+            addIfChanged(uint16(OBJECT_FIELD_DATA + 1));
+            addIfChanged(OBJECT_FIELD_TYPE);
             addIfChanged(OBJECT_FIELD_SCALE_X);
             addIfChanged(UNIT_FIELD_BYTES_0);
             addIfChanged(UNIT_FIELD_HEALTH);
