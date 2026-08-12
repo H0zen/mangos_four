@@ -264,10 +264,14 @@ bool Guild::AddMember(ObjectGuid plGuid, uint32 plRank)
         return false;
     }
 
-    // GUILD_RANK_NONE is the omitted-rank sentinel used by Eluna.
-    if (plRank >= m_Ranks.size())
+    // Eluna's omitted-rank sentinel maps to the lowest rank; other invalid ranks are rejected.
+    if (plRank == GUILD_RANK_NONE)
     {
         plRank = GetLowestRank();
+    }
+    else if (plRank >= m_Ranks.size())
+    {
+        return false;
     }
 
     Player* pl = sObjectMgr.GetPlayer(plGuid);
