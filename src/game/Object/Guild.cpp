@@ -99,7 +99,7 @@ void MemberSlot::ChangeRank(uint32 newRank)
 {
     RankId = newRank;
 
-    Player* player = sObjectMgr.GetPlayer(guid);
+    Player* player = sObjectMgr.GetPlayer(guid, false);
     // If player not online data in data field will be loaded from guild tabs no need to update it !!
     if (player)
     {
@@ -274,7 +274,7 @@ bool Guild::AddMember(ObjectGuid plGuid, uint32 plRank)
         return false;
     }
 
-    Player* pl = sObjectMgr.GetPlayer(plGuid);
+    Player* pl = sObjectMgr.GetPlayer(plGuid, false);
     if (pl)
     {
         if (pl->GetGuildId() != 0)
@@ -317,7 +317,11 @@ bool Guild::AddMember(ObjectGuid plGuid, uint32 plRank)
         newmember.Name   = pl->GetName();
         newmember.Level  = pl->getLevel();
         newmember.Class  = pl->getClass();
-        newmember.ZoneId = pl->GetZoneId();
+        // GetZoneId() goes through GetTerrain(), which asserts on m_currMap and
+        // dereferences it -- and this lookup now finds players who are loaded but
+        // between maps, where that map is null. Same guard MemberSlot::SetMemberStats
+        // uses for the same reason.
+        newmember.ZoneId = pl->IsInWorld() ? pl->GetZoneId() : pl->GetCachedZoneId();
     }
     else
     {
@@ -769,7 +773,7 @@ bool Guild::DelMember(ObjectGuid guid, bool isDisbanding)
         SetLeader(newLeaderGUID);
 
         // If player not online data in data field will be loaded from guild tabs no need to update it !!
-        if (Player* newLeader = sObjectMgr.GetPlayer(newLeaderGUID))
+        if (Player* newLeader = sObjectMgr.GetPlayer(newLeaderGUID, false))
         {
             newLeader->SetRank(GR_GUILDMASTER);
         }
@@ -785,7 +789,7 @@ bool Guild::DelMember(ObjectGuid guid, bool isDisbanding)
 
     members.erase(lowguid);
 
-    Player* player = sObjectMgr.GetPlayer(guid);
+    Player* player = sObjectMgr.GetPlayer(guid, false);
     // If player not online data in data field will be loaded from guild tabs no need to update it !!
     if (player)
     {

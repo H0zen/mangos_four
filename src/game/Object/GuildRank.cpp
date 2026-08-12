@@ -105,7 +105,7 @@ bool Guild::DelRank(uint32 rankId)
         {
             --itr->second.RankId;
 
-            if (Player* member = sObjectMgr.GetPlayer(ObjectGuid(HIGHGUID_PLAYER, itr->first)))
+            if (Player* member = sObjectMgr.GetPlayer(ObjectGuid(HIGHGUID_PLAYER, itr->first), false))
             {
                 member->SetRank(itr->second.RankId);
             }
