@@ -1286,6 +1286,7 @@ enum OpcodesList
     CMSG_BATTLEFIELD_MGR_QUEUE_REQUEST           = 0x1283, // 5.4.8 18414 (Wow.exe binary)
     CMSG_LOG_DISCONNECT                          = 0x10B3, // 5.4.8 18414 (Wow.exe binary)
     SMSG_SET_TIME_ZONE_INFORMATION               = 0x19C1,    // 5.4.8 18414 (Wow.exe leaf; name reference-consensus)
+    CMSG_GUILD_REQUEST_PARTY_STATE               = 0x10C3, // 5.4.8 18414 (Wow.exe binary; thunk sub_6901B6 pushes 0x10C3)
 
     // ---------------------------------------------------------------------
     // Client dispatch leaves the server did not previously declare.

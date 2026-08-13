@@ -1767,6 +1767,57 @@ void WorldSession::HandleGuildQueryRanksOpcode(WorldPacket& recv_data)
     guild->QueryRanks(this);
 }
 
+void WorldSession::HandleGuildRequestPartyStateOpcode(WorldPacket& recv_data)
+{
+    DEBUG_LOG("WORLD: Received CMSG_GUILD_REQUEST_PARTY_STATE");
+
+    ObjectGuid guildGuid(MopGuildPackets::ReadGuildRequestPartyState(recv_data));
+    Guild* guild = sGuildMgr.GetGuildByGuid(guildGuid);
+    if (!guild || guild->GetId() != GetPlayer()->GetGuildId() ||
+        !guild->GetMemberSlot(GetPlayer()->GetObjectGuid()))
+    {
+        return;
+    }
+
+    // Required and the multiplier belong to the guild-group bonus, which does
+    // not exist in this core, so the honest reply is that the group is not one:
+    // the flag is false and both of those are zero. Hiding behind the flag is
+    // not a reason to be careless with the rest -- InGuildParty (sub_9658A6)
+    // pushes all four values every call, so an addon reads the count whatever
+    // the flag says. Only the stock GuildInstanceDifficulty frame is gated on it
+    // (MiniMapInstanceDifficulty_Update).
+    //
+    // So present has to mean what it says: guild members actually here with the
+    // requester. Someone in another dungeon is not present with you, whatever
+    // the group roster says, hence the map and instance filter. Ungrouped is
+    // zero rather than one -- 20921 of the 62866 corpus replies are thirteen
+    // zero bytes, which is consistent with that though it does not on its own
+    // prove those sessions were ungrouped.
+    uint32 numPresent = 0;
+    if (Group* group = GetPlayer()->GetGroup())
+    {
+        for (GroupReference* itr = group->GetFirstMember(); itr != NULL; itr = itr->next())
+        {
+            // IsInWorld before the ids: GetMapId and GetInstanceId are cached
+            // fields, so a member taken out of the world for a far transfer
+            // still reports the map it left and would otherwise be counted as
+            // standing here.
+            Player* member = itr->getSource();
+            if (member && member->IsInWorld() &&
+                member->GetGuildId() == guild->GetId() &&
+                member->GetMapId() == GetPlayer()->GetMapId() &&
+                member->GetInstanceId() == GetPlayer()->GetInstanceId())
+            {
+                ++numPresent;
+            }
+        }
+    }
+
+    WorldPacket data;
+    MopGuildPackets::BuildGuildPartyState(data, 0, 0.0f, numPresent, false);
+    SendPacket(&data);
+}
+
 void WorldSession::HandleGuildSetAchievementTracking(WorldPacket& recvPacket)
 {
     std::vector<uint32> achievementIds;

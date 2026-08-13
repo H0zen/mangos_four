@@ -1988,6 +1988,7 @@ class WorldSession
         void HandleGuildChangeInfoTextOpcode(WorldPacket& recvPacket);
         void HandleSaveGuildEmblemOpcode(WorldPacket& recvPacket);
         void HandleGuildQueryRanksOpcode(WorldPacket& recvPacket);
+        void HandleGuildRequestPartyStateOpcode(WorldPacket& recvPacket);
         void HandleGuildSetAchievementTracking(WorldPacket& recvPacket);
         void HandleGuildAutoDeclineToggleOpcode(WorldPacket& recvPacket);
 

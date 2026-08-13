@@ -303,6 +303,55 @@ namespace MopGuildPackets
         }
     }
 
+    /**
+     * CMSG_GUILD_REQUEST_PARTY_STATE body: the querying player's guild guid.
+     *
+     * Orders taken from the client's own writer, sub_691C9D, which is slot +4 of
+     * the message vtable off_D65520; slot +8 is the thunk that pushes 0x10C3, and
+     * slot +12 is the campaign's sub_C84A3D signature. The writer reads the guid
+     * from +0x10 of the object, which is where sub_69585B stores it.
+     */
+    inline uint64 ReadGuildRequestPartyState(WorldPacket& in)
+    {
+        uint8 const maskOrder[] = { 1, 5, 7, 2, 6, 3, 0, 4 };
+        uint8 const byteOrder[] = { 2, 5, 4, 6, 1, 0, 7, 3 };
+        return ReadGuid(in, maskOrder, byteOrder);
+    }
+
+    /**
+     * SMSG_GUILD_PARTY_STATE_RESPONSE body: a fixed 13 bytes.
+     *
+     * Every one of the 62866 replies in the 18414 corpus is exactly this length,
+     * against 62972 requests. Two decoded payloads fix the order:
+     * capture-000072 seq 5140 is 0C 00 00 00 | 00 00 00 00 | 01 00 00 00 | 00 and
+     * capture-000015 seq 3122 is 02 00 00 00 | 00 00 80 3F | 02 00 00 00 | 80.
+     *
+     * The first is required=12, present=1, so the trailing flag is false; read the
+     * other way round it would be 12 present against 1 required, which would have
+     * to set the flag. Two aggregates say the same thing independently: the first
+     * dword is never 1 in any capture and the third is 1 in 22797 of them, and the
+     * first is never 4 because the client substitutes 4 itself for five-man
+     * parties (Minimap.lua, GuildInstanceDifficulty_OnEnter).
+     *
+     * Field identity is the client's: sub_967C66 stores +0x10 to the flag global,
+     * +0x1C to present, +0x14 to required and +0x18 to the multiplier, and
+     * InGuildParty (sub_9658A6) returns them as
+     * (inGuildParty, numGuildPresent, numGuildRequired, xpMultiplier).
+     *
+     * The trailing byte is 0x80 for true, so it is one MSB-first bit and a flush,
+     * not a uint8 -- which produces identical bytes either way.
+     */
+    inline void BuildGuildPartyState(WorldPacket& out, uint32 numRequired,
+        float xpMultiplier, uint32 numPresent, bool inGuildParty)
+    {
+        out.Initialize(SMSG_GUILD_PARTY_STATE_RESPONSE, 13);
+        out << uint32(numRequired);
+        out << float(xpMultiplier);
+        out << uint32(numPresent);
+        out.WriteBit(inGuildParty);
+        out.FlushBits();
+    }
+
     /// One member as SMSG_GUILD_ROSTER carries it.
     struct RosterMember
     {

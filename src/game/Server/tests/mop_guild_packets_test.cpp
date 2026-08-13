@@ -399,6 +399,87 @@ static void test_guild_event_log_entry_layout()
     }
 }
 
+// capture-000015 seq 1103, the whole 7-byte body. Six mask bits set, six guid
+// bytes, and the reader must land exactly on the end of the packet.
+static void test_guild_party_state_request()
+{
+    {
+        std::vector<uint8> const capture = { 0xBE, 0xFE, 0xF5, 0x24, 0x88, 0x1E, 0x00 };
+        WorldPacket packet(CMSG_GUILD_REQUEST_PARTY_STATE, capture.size());
+        Append(packet, capture);
+
+        uint64 const guildGuid = MopGuildPackets::ReadGuildRequestPartyState(packet);
+
+        CHECK(guildGuid == 0x1FF4000001FF2589ULL);
+        CHECK(packet.rpos() == capture.size());
+    }
+    {
+        // capture-000020 seq 2102, the eight-byte form. Seven mask bits, and
+        // unlike the body above this one carries guid byte 5.
+        std::vector<uint8> const capture = { 0xFE, 0x47, 0x81, 0xF0, 0xC0, 0xE6, 0x1E, 0x03 };
+        WorldPacket packet(CMSG_GUILD_REQUEST_PARTY_STATE, capture.size());
+        Append(packet, capture);
+
+        uint64 const guildGuid = MopGuildPackets::ReadGuildRequestPartyState(packet);
+
+        CHECK(guildGuid == 0x1FF180000246C1E7ULL);
+        CHECK(packet.rpos() == capture.size());
+    }
+}
+
+// The two decoded retail replies. Both are 13 bytes; the trailing 0x80 is the
+// flag written as one MSB-first bit and flushed.
+static void test_guild_party_state_response()
+{
+    {
+        // capture-000072 seq 5140: required 12, no multiplier, one guild member
+        // present, so not a guild group.
+        WorldPacket data;
+        MopGuildPackets::BuildGuildPartyState(data, 12, 0.0f, 1, false);
+
+        static uint8 const expected[] =
+        {
+            0x0C, 0x00, 0x00, 0x00,
+            0x00, 0x00, 0x00, 0x00,
+            0x01, 0x00, 0x00, 0x00,
+            0x00,
+        };
+
+        CHECK(uint32(data.GetOpcode()) == 0x0A78u);
+        CHECK(data.size() == sizeof(expected));
+        if (data.size() == sizeof(expected))
+        {
+            for (size_t i = 0; i < sizeof(expected); ++i)
+            {
+                CHECK(data.contents()[i] == expected[i]);
+            }
+        }
+    }
+    {
+        // capture-000015 seq 3122: required 2, multiplier 1.0f, two present, is
+        // a guild group.
+        WorldPacket data;
+        MopGuildPackets::BuildGuildPartyState(data, 2, 1.0f, 2, true);
+
+        static uint8 const expected[] =
+        {
+            0x02, 0x00, 0x00, 0x00,
+            0x00, 0x00, 0x80, 0x3F,
+            0x02, 0x00, 0x00, 0x00,
+            0x80,
+        };
+
+        CHECK(data.size() == sizeof(expected));
+        if (data.size() == sizeof(expected))
+        {
+            for (size_t i = 0; i < sizeof(expected); ++i)
+            {
+                CHECK(data.contents()[i] == expected[i]);
+            }
+        }
+    }
+}
+
 int main(int /*argc*/, char** /*argv*/)
 {
     test_short_motd();
@@ -408,6 +489,8 @@ int main(int /*argc*/, char** /*argv*/)
     test_guild_query_response();
     test_guild_set_note_parses_retail_bodies();
     test_guild_event_log_entry_layout();
+    test_guild_party_state_request();
+    test_guild_party_state_response();
 
     if (g_fail)
     {

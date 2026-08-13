@@ -671,6 +671,8 @@ static bool IsEnterWorldConverted(uint16 opcode)
         case SMSG_GUILD_QUERY_RANKS_RESULT:   // MopGuildPackets::BuildGuildRanks, byte-exact vs capture-000019 seq 185
         case SMSG_GUILD_ROSTER:               // MopGuildPackets::BuildGuildRoster, byte-exact vs capture-000019 seq 923
         case SMSG_GUILD_QUERY_RESPONSE:       // MopGuildPackets::BuildGuildQueryResponse, byte-exact vs capture-000004 seq 39473
+        case SMSG_GUILD_PARTY_STATE_RESPONSE: // MopGuildPackets::BuildGuildPartyState; fixed 13 bytes, shape decoded from
+                                              // capture-000015 seq 3122 and capture-000072 seq 5140
         case SMSG_TABARD_VENDOR_ACTIVATE:     // MopGuildPackets::BuildTabardVendorActivate
         case SMSG_SAVE_GUILD_EMBLEM:          // MopGuildPackets::BuildSaveGuildEmblemResult
         case SMSG_BINDER_CONFIRM:              // MopBindPackets::BuildBinderConfirm

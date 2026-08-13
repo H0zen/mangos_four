@@ -175,9 +175,9 @@
  *   TOTAL SMSG rows                   925
  *
  * SUBSYSTEM CONFIDENCE: high=365, low=221, medium=182, none=157
- * STATUS TOTALS: ACTIVE=654, DOC=422, DORMANT=444
- *   SMSG: ACTIVE=360, DOC=270, DORMANT=295
- *   CMSG: ACTIVE=294, DOC=152, DORMANT=149
+ * STATUS TOTALS: ACTIVE=656, DOC=421, DORMANT=443
+ *   SMSG: ACTIVE=361, DOC=270, DORMANT=294
+ *   CMSG: ACTIVE=295, DOC=151, DORMANT=149
  */
 
 // CAVEATS -- read before trusting any single row:
@@ -556,7 +556,7 @@ typedef uint16_t uint16;
  *
  *  -- GuildInfo.cpp (33) --
  *   SMSG_GUILD_EVENT_BANK_TAB_TEXT_CHANGED         0x0A70  DORMANT  [low-conf]
- *   SMSG_GUILD_PARTY_STATE_RESPONSE                0x0A78  DORMANT  [low-conf]
+ *   SMSG_GUILD_PARTY_STATE_RESPONSE                0x0A78  ACTIVE   [low-conf]
  *   SMSG_GUILD_QUERY_RANKS_RESULT                  0x0A79  ACTIVE   [low-conf]
  *   SMSG_GUILD_NEWS_UPDATE                         0x0AE8  DORMANT  [medium-conf]
  *   SMSG_GUILD_CHALLENGE_UPDATED                   0x0AE9  DORMANT  [low-conf]
@@ -1695,7 +1695,7 @@ typedef uint16_t uint16;
  *   CMSG_RESET_FACTION_CHEAT                       0x10B6  DORMANT
  *   CMSG_UNKNOWN_0x10BB                            0x10BB  DOC
  *   CMSG_QUEST_POI_QUERY                           0x10C2  ACTIVE
- *   CMSG_GUILD_REQUEST_PARTY_STATE                 0x10C3  DOC
+ *   CMSG_GUILD_REQUEST_PARTY_STATE                 0x10C3  ACTIVE
  *   CMSG_FORCE_SWIM_BACK_SPEED_CHANGE_ACK          0x10D1  ACTIVE
  *   MSG_MOVE_SET_SWIM_SPEED_CHEAT                  0x10D3  ACTIVE   server-binding=CMSG_TIME_SYNC_RESPONSE_DROPPED
  *   CMSG_MOVE_REMOVE_MOVEMENT_FORCE_ACK            0x10DB  DOC

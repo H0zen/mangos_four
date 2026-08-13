@@ -1323,6 +1323,13 @@ void InitializeOpcodes()
     DefC(CMSG_GUILD_QUERY_RANKS, "CMSG_GUILD_QUERY_RANKS", STATUS_LOGGEDIN, PROCESS_THREADUNSAFE, &WorldSession::HandleGuildQueryRanksOpcode);
     DefS(SMSG_GUILD_QUERY_RANKS_RESULT, "SMSG_GUILD_QUERY_RANKS_RESULT");
 
+    // Asked on every party, difficulty and instance-size change, so it is one of
+    // the highest-volume guild opcodes on the wire: 62972 requests in the 18414
+    // corpus against 62866 replies, every reply exactly 13 bytes. The request
+    // carries only the querying player's guild guid.
+    DefC(CMSG_GUILD_REQUEST_PARTY_STATE, "CMSG_GUILD_REQUEST_PARTY_STATE", STATUS_LOGGEDIN, PROCESS_THREADUNSAFE, &WorldSession::HandleGuildRequestPartyStateOpcode);
+    DefS(SMSG_GUILD_PARTY_STATE_RESPONSE, "SMSG_GUILD_PARTY_STATE_RESPONSE");
+
     // Full client-side guild-achievement tracking snapshot. The core has no
     // matching backend, so the handler validates and consumes it without state.
     DefC(CMSG_GUILD_SET_ACHIEVEMENT_TRACKING, "CMSG_GUILD_SET_ACHIEVEMENT_TRACKING", STATUS_LOGGEDIN, PROCESS_THREADUNSAFE, &WorldSession::HandleGuildSetAchievementTracking);
