@@ -1988,6 +1988,22 @@ void Map::SendInitSelf(Player* player)
         selfFields.push_back({ PLAYER_FLAGS, player->GetUInt32Value(PLAYER_FLAGS) });
     }
 
+    // Guild rank, and it has to be here rather than left to the incremental
+    // path: the client answers IsGuildLeader() by finding its own rank id in
+    // the rank list and asking whether that rank's order is zero. A client
+    // never told its rank reads 0, which is the guildmaster rank, so every
+    // guilded character looked like the guild leader and an Initiate was handed
+    // the Guild Control button.
+    //
+    // Skipping the zero is right here for the same reason it is elsewhere: zero
+    // is the client's own default, and it is also the correct value for an
+    // actual guildmaster, so omitting it says exactly what sending it would.
+    if (player->GetUInt32Value(PLAYER_GUILDRANK) != 0)
+    {
+        selfFields.push_back({ PLAYER_GUILDRANK,
+            player->GetUInt32Value(PLAYER_GUILDRANK) });
+    }
+
     // The packed appearance words. Byte 3 of PLAYER_BYTES_2 carries rest
     // state, which GetRestState() reads and MainMenuBar.lua compares; byte 0
     // of PLAYER_BYTES_3 carries gender, which the client reads from here for

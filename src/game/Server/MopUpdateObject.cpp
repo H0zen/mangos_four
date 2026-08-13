@@ -167,6 +167,13 @@ bool MopUpdateObject::TranslateObserverPlayerIndex(uint16 legacyIndex, uint16& t
         // previously dropped here. Facial hair and gender are visible to
         // other players, not just to the owner. See the self projection for
         // where these indices come from.
+        // Guild rank. PUBLIC in the legacy layout and carried in updateVisualBits,
+        // and the field the client answers IsGuildLeader() from: it looks its own
+        // rank id up in the rank list and reports leader when that rank's order is
+        // zero, so a client never told its rank reads 0 and believes it leads the
+        // guild. Every IsGuildLeader()-gated control -- the Guild Control button
+        // among them -- then opens for an Initiate.
+        case 158: targetIndex = 163; return true; // guild rank
         case 161: targetIndex = 166; return true; // skin/face/hair/hair colour
         case 162: targetIndex = 167; return true; // facial hair, rest state
         case 163: targetIndex = 168; return true; // gender, drunk, arena faction
@@ -592,6 +599,13 @@ void MopUpdateObject::TranslateSelfPlayerFields(StaticField const* sourceFields,
             // 11, and its absolute 18414 index is already pinned at 171 by the
             // quest-log projection, which puts the block base at 160.
             case 157: fields.push_back({ 162, value }); break;
+            // Guild rank, relative index 3, so 163 off the same base of 160.
+            // The client answers IsGuildLeader() from this: it finds its own rank
+            // id in the rank list and reports leader when that rank's order is 0.
+            // Never sending it left every guilded client reading rank 0, which is
+            // the guildmaster rank, so an Initiate was handed the Guild Control
+            // button and every other IsGuildLeader()-gated control.
+            case 158: fields.push_back({ 163, value }); break;
             // The three packed PLAYER_BYTES words. None was projected at all,
             // in either path, despite Player.cpp:2933-2935 marking all three
             // as visual bits - so rest state, facial hair and gender never

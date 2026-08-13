@@ -816,6 +816,14 @@ void Object::BuildValuesUpdateBlockForPlayer(UpdateData* data, Player* target) c
             // of the quest log because the serializer requires ascending
             // legacy indices.
             addIfChanged(PLAYER_FLAGS);
+            // Guild rank. Changes strictly after login -- joining a guild,
+            // promotion, demotion, leaving -- so the login seed alone can never
+            // deliver a transition, and the client answers IsGuildLeader() from
+            // this field. Without it a promotion or demotion does not reach the
+            // client until relog, and the rank the client keeps using is the one
+            // it had when it zoned in. Ordered directly after PLAYER_FLAGS at
+            // 157 to keep the legacy indices ascending.
+            addIfChanged(PLAYER_GUILDRANK);
             // Rest state lives in byte 3 of PLAYER_BYTES_2 and changes when the
             // player enters or leaves an inn - i.e. always AFTER login, so the
             // login seed alone would never deliver a single transition and
