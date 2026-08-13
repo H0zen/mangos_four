@@ -1226,44 +1226,28 @@ void InitializeOpcodes()
     DefS(SMSG_PET_LEARNED_SPELL, "SMSG_PET_LEARNED_SPELL");
     DefS(SMSG_PET_REMOVED_SPELL, "SMSG_PET_REMOVED_SPELL");
 
-    // UNREGISTERED. Its request reader is fine -- a 9-bit player-name length then
-    // raw bytes -- but its reply SMSG_GUILD_INVITE 0x0F71 fails gates 3 and 4, so
-    // by this file's own standard it cannot stay registered. It was registered
-    // before the 2026-08-11 wave and was never re-checked; "already registered"
-    // turned out to mean "never held to the four gates".
+    // Promoted with its rebuilt reply. The request reader was always fine -- a
+    // 9-bit player-name length then raw bytes -- but the reply was pre-MoP and
+    // undelivered, so inviting anyone did nothing except leave the target
+    // flagged as invited. Both halves are fixed together.
     //
-    // Gate 4: there is no DefS(SMSG_GUILD_INVITE) and no IsEnterWorldConverted
-    // case, so WorldSession::SendPacket drops the reply -- AFTER the handler has
-    // already set the invitee's SetGuildIdInvited. The invitee therefore never
-    // sees the popup and guild invitations do not work at all today.
+    // The value is the client's own: thunk sub_661C2D pushes 0x869. The reply
+    // 0x0F71 is confirmed by routing rather than by a literal, because the
+    // inbound dispatcher sub_68EC4C switches on a bit-compacted opcode
+    //   idx = a4&1 | ((a4&0x18 | ((a4&0x180 | ((a4&0x400 | (a4>>1)&0x7800)>>1))>>2))>>2)
+    // and no opcode literal survives anywhere. 0x0F71 compacts to case 0x35,
+    // which is the case that runs parser sub_6A0BF8 -> reader sub_69E959. That
+    // compaction is 64-to-1, so it does not by itself pin the value; what pins
+    // it is that the ten retail 0x0F71 captures are consumed byte-exact by that
+    // reader (capture-000499 seq 777, 65 of 65 bytes).
     //
-    // Gate 3: the body is pre-MoP. It writes six raw uint32 before any bits; a
-    // real 18414 capture has the inviter's NAME at offset 10.
-    //
-    // The layout IS recovered, from reader sub_69E959 (parser sub_6A0BF8, vtable
-    // off_D65F94), and verified byte-exact against capture-000499 seq 777 --
-    // 65 of 65 bytes consumed, yielding an inviter name of SIX UTF-8 bytes
-    // (44 C3 B8 64 67 65, "D-o-slash-d-g-e"; the 6-bit length field reads 6, not
-    // 5, so do not treat it as ASCII), guild "Divine Wrath", an empty old-guild
-    // name, guild GUID high 0x1FF4 and a zero old-guild GUID.
-    // Bit section, in order:
-    //   A4, <7-bit lenGuildName>, B4, A6, B2, B1, B5, B7, A0, B3, A5, B6,
-    //   <6-bit lenInviterName>, A1, A3, B0, A2, <7-bit lenOldGuildName>, A7
-    // where A is the new guild GUID at +16 and B the old guild GUID at +136.
-    // Byte section: A1, u32, A4, inviterName, u32, B7, A0, A2, u32, B2, B5,
-    //   u32, u32, A7, A3, B4, u32, guildName, u32, u32, B0, oldGuildName, A5,
-    //   u32, B1, A6, B3, B6.
-    //
-    // Field identity is PARTLY settled. Correlating the ten captures against the
-    // matching guild-query response names positions 2, 6 and 8 as borderStyle,
-    // borderColor and emblemStyle, and pairs 1/3 as {backgroundColor,
-    // emblemColor}, 5 as the old-guild realm and 7/9 as {new-guild realm,
-    // inviter realm}. Position 4 looks like guild level but is unproven, and the
-    // paired ones cannot be separated because every capture has equal colours or
-    // a single realm. Finish it with a capture that breaks one of those ties;
-    // do not map the remainder from the pre-MoP order.
-    //
-    //  DefC(CMSG_GUILD_INVITE, ...)  -- restore once the reply is rebuilt.
+    // The rebuilt body and the three uint32 whose identity is still open are
+    // documented at MopGuildPackets::BuildGuildInvite. Those three are cosmetic:
+    // two tabard colours that may be transposed, one realm pair that cannot be
+    // observed because guild invites are same-realm, and the guild level. None
+    // affects whether the popup appears or the accept path works.
+    DefC(CMSG_GUILD_INVITE, "CMSG_GUILD_INVITE", STATUS_LOGGEDIN, PROCESS_THREADUNSAFE, &WorldSession::HandleGuildInviteOpcode);
+    DefS(SMSG_GUILD_INVITE, "SMSG_GUILD_INVITE");
 
     // Guild event packets split from the pre-MoP generic guild-event packet.
     DefS(SMSG_GUILD_EVENT_MOTD, "SMSG_GUILD_EVENT_MOTD");

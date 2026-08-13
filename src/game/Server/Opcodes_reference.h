@@ -576,7 +576,7 @@ typedef uint16_t uint16;
  *   SMSG_UNKNOWN_0x0EF0                            0x0EF0  DOC      [low-conf]
  *   SMSG_GUILD_EVENT_BANK_MONEY_CHANGED            0x0F68  DORMANT  [low-conf]
  *   SMSG_GUILD_NEWS_DELETED                        0x0F70  DORMANT  [medium-conf]
- *   SMSG_GUILD_INVITE                              0x0F71  DORMANT  [low-conf]
+ *   SMSG_GUILD_INVITE                              0x0F71  ACTIVE   [high-conf]  reader sub_69E959; byte-exact vs capture-000499 seq 777
  *   SMSG_GUILD_XP_GAIN                             0x0FE0  DORMANT  [low-conf]
  *   SMSG_GUILD_FLAGGED_FOR_RENAME                  0x0FE9  DORMANT  [low-conf]
  *   SMSG_GUILD_PERMISSIONS                         0x0FF9  ACTIVE   [low-conf]
@@ -1568,7 +1568,7 @@ typedef uint16_t uint16;
  *   CMSG_CREATURE_QUERY                            0x0842  ACTIVE
  *   CMSG_MOVE_HOVER_ACK                            0x0858  DORMANT
  *   CMSG_SUBMIT_BUG                                0x0861  DOC
- *   CMSG_GUILD_INVITE                              0x0869  DORMANT  [high-conf]  live 18414 capture: 9-bit name length plus raw name
+ *   CMSG_GUILD_INVITE                              0x0869  ACTIVE   [high-conf]  thunk sub_661C2D; 9-bit name length plus raw name
  *   CMSG_UNKNOWN_0x0870                            0x0870  DOC
  *   CMSG_MOVE_SET_CAN_TURN_WHILE_FALLING_ACK       0x0873  DOC
  *   CMSG_UNKNOWN_0x087A                            0x087A  DOC

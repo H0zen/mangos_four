@@ -675,6 +675,7 @@ static bool IsEnterWorldConverted(uint16 opcode)
                                               // capture-000015 seq 3122 and capture-000072 seq 5140
         case SMSG_GUILD_CHALLENGE_UPDATED:    // MopGuildPackets::BuildGuildChallengeUpdate; fixed 120 bytes, five groups of
                                               // six uint32, from capture-000009 seq 30430 and capture-000025 seq 9450
+        case SMSG_GUILD_INVITE:               // MopGuildPackets::BuildGuildInvite, byte-exact vs capture-000499 seq 777
         case SMSG_TABARD_VENDOR_ACTIVATE:     // MopGuildPackets::BuildTabardVendorActivate
         case SMSG_SAVE_GUILD_EMBLEM:          // MopGuildPackets::BuildSaveGuildEmblemResult
         case SMSG_BINDER_CONFIRM:              // MopBindPackets::BuildBinderConfirm

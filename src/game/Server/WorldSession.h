@@ -1573,7 +1573,9 @@ class WorldSession
         void SendLfgBootUpdate(LFGBoot const& boot);
         void SendPartyResult(PartyOperation operation, const std::string& member, PartyResult res);
         void SendGroupInvite(Player* player, bool alreadyInGroup = false);
-        void SendGuildInvite(Player* player, bool alreadyInGuild = false);
+        /// Returns false without sending if the 18414 body cannot be built, so
+        /// callers can avoid flagging a target as invited with no invite in flight.
+        bool SendGuildInvite(Player* player, bool alreadyInGuild = false);
         void SendTransferAborted(uint32 mapid, uint8 reason, uint8 arg = 0);
         void SendTransferRoot(uint32 counter);
         void SendSuspendToken();

@@ -123,28 +123,63 @@ void WorldSession::HandleGuildCreateOpcode(WorldPacket& recvPacket)
  * @param player The invited player.
  * @param alreadyInGuild Unused legacy flag for prior guild membership checks.
  */
-void WorldSession::SendGuildInvite(Player* player, bool alreadyInGuild /*= false*/)
+bool WorldSession::SendGuildInvite(Player* player, bool /*alreadyInGuild = false*/)
 {
-    // PARKED alongside CMSG_GUILD_INVITE. This is the second way into the same
-    // broken reply and it is NOT dead code: Eluna exposes it to Lua as
-    // Player:SendGuildInvite, and SCRIPT_LIB_ELUNA defaults ON, so unregistering
-    // the opcode did not close this path.
+    // Both ways into the invite reply come through here: the CMSG_GUILD_INVITE
+    // handler and Eluna's Player:SendGuildInvite, which is a live path because
+    // SCRIPT_LIB_ELUNA defaults ON.
     //
-    // What it used to do was worse than the handler's version -- two raw
-    // cstrings, a body pre-dating even the six-uint32 one -- and it set
-    // SetGuildIdInvited before sending. Since SMSG_GUILD_INVITE is not admitted
-    // to IsEnterWorldConverted the packet was dropped every time, so the only
-    // observable effect was leaving the target flagged as invited to a guild
-    // whose invitation they could never see or act on.
-    //
-    // Refusing outright is better than half-working: a script author gets a log
-    // line instead of a target stuck in an invited state. Restore this together
-    // with the opcode, once the reply is rebuilt from reader sub_69E959 -- the
-    // layout is recorded at the registration site in Opcodes.cpp.
-    sLog.outError("WorldSession::SendGuildInvite: refused for %s -- SMSG_GUILD_INVITE "
-                  "is not converted for 5.4.8 and is dropped by the send gate. "
-                  "Guild invitations are unavailable until it is rebuilt.",
-                  player ? player->GetGuidStr().c_str() : "<null>");
+    // Returns false without sending if the body cannot be built, so the caller
+    // can decline to flag the target as invited. The previous version set that
+    // flag first and sent afterwards, which left targets invited to a guild
+    // whose invitation they could never see.
+    if (!player || !player->GetSession() || !_player)
+    {
+        return false;
+    }
+
+    Guild* guild = sGuildMgr.GetGuildById(_player->GetGuildId());
+    if (!guild)
+    {
+        return false;
+    }
+
+    // The invitee's current guild, if any, is what the client shows in the
+    // "you will lose reputation with" warning; with no old guild it sends a zero
+    // guid, an empty name and a zero realm, as the retail capture does.
+    bool const hasOldGuild = player->GetGuildId() != 0;
+
+    WorldPacket data;
+    if (!MopGuildPackets::BuildGuildInvite(data,
+            guild->GetObjectGuid().GetRawValue(),
+            hasOldGuild ? player->GetGuildGuid().GetRawValue() : uint64(0),
+            _player->GetName(), guild->GetName(),
+            hasOldGuild ? player->GetGuildName() : std::string(),
+            guild->GetLevel(),
+            guild->GetEmblemStyle(), guild->GetEmblemColor(),
+            guild->GetBorderStyle(), guild->GetBorderColor(),
+            guild->GetBackgroundColor(),
+            realmID, hasOldGuild ? realmID : 0, realmID))
+    {
+        sLog.outError("WorldSession::SendGuildInvite: guild %u has a field too long "
+                      "for the 18414 invite body; not sending to %s",
+                      guild->GetId(), player->GetGuidStr().c_str());
+        return false;
+    }
+
+    player->GetSession()->SendPacket(&data);
+
+    // Flag the target here rather than in the caller. Eluna's
+    // Player:SendGuildInvite goes straight through this function and ignores the
+    // return value, so a flag set only by the CMSG handler would leave a scripted
+    // invitation showing a popup that HandleGuildAcceptOpcode then refuses --
+    // it resolves the guild from GetGuildIdInvited(), which would still be 0.
+    // Setting it after SendPacket keeps the send-first ordering that stops a
+    // target being marked invited for a packet that was never built.
+    player->SetGuildIdInvited(_player->GetGuildId());
+
+    DEBUG_LOG("WORLD: Sent (SMSG_GUILD_INVITE)");
+    return true;
 }
 
 /**
@@ -224,57 +259,16 @@ void WorldSession::HandleGuildInviteOpcode(WorldPacket& recvPacket)
 
     DEBUG_LOG("Player %s Invited %s to Join his Guild", GetPlayer()->GetName(), Invitedname.c_str());
 
-    player->SetGuildIdInvited(GetPlayer()->GetGuildId());
+    // SendGuildInvite sends and flags the target, in that order, and reports
+    // failure without doing either.
+    if (!SendGuildInvite(player))
+    {
+        SendGuildCommandResult(GUILD_INVITE_S, Invitedname, ERR_GUILD_INTERNAL);
+        return;
+    }
+
     // Put record into guildlog
     guild->LogGuildEvent(GUILD_EVENT_LOG_INVITE_PLAYER, GetPlayer()->GetObjectGuid(), player->GetObjectGuid());
-
-    ObjectGuid oldGuild = player->GetGuildGuid();
-    ObjectGuid newGuild = guild->GetObjectGuid();
-    std::string oldGuildName = player->GetGuildName();
-    std::string newGuildName = guild->GetName();
-
-    WorldPacket data(SMSG_GUILD_INVITE, 4 * 6 + 10);          // guess size
-    data << uint32(guild->GetLevel());
-    data << uint32(guild->GetBorderStyle());
-    data << uint32(guild->GetBorderColor());
-    data << uint32(guild->GetEmblemStyle());
-    data << uint32(guild->GetBackgroundColor());
-    data << uint32(guild->GetEmblemColor());
-
-    data.WriteGuidMask<3, 2>(newGuild);
-    data.WriteBits(oldGuildName.length(), 8);
-    data.WriteGuidMask<1>(newGuild);
-    data.WriteGuidMask<6, 4, 1, 5, 7, 2>(oldGuild);
-    data.WriteGuidMask<7, 0, 6>(newGuild);
-    data.WriteBits(newGuildName.length(), 8);
-    data.WriteGuidMask<3, 0>(oldGuild);
-    data.WriteGuidMask<5>(newGuild);
-    data.WriteBits(strlen(_player->GetName()), 7);
-    data.WriteGuidMask<4>(newGuild);
-
-    data.WriteGuidBytes<1>(newGuild);
-    data.WriteGuidBytes<3>(oldGuild);
-    data.WriteGuidBytes<6>(newGuild);
-    data.WriteGuidBytes<2, 1>(oldGuild);
-    data.WriteGuidBytes<0>(newGuild);
-
-    data.WriteStringData(oldGuildName);
-
-    data.WriteGuidBytes<7, 2>(newGuild);
-
-    data.WriteStringData(_player->GetName());
-
-    data.WriteGuidBytes<7, 6, 5, 0>(oldGuild);
-    data.WriteGuidBytes<4>(newGuild);
-
-    data.WriteStringData(newGuildName);
-
-    data.WriteGuidBytes<5, 3>(newGuild);
-    data.WriteGuidBytes<4>(oldGuild);
-
-    player->GetSession()->SendPacket(&data);
-
-    DEBUG_LOG("WORLD: Sent (SMSG_GUILD_INVITE)");
 }
 
 /**

@@ -514,9 +514,54 @@ static void test_guild_challenge_update_matches_capture()
     }
 }
 
+// SMSG_GUILD_INVITE against capture-000499 seq 777, the whole 65-byte body.
+//
+// The capture cannot distinguish backgroundColor from emblemColor: that guild
+// has both set to 14, which is why the pair is still unresolved. Passing them
+// swapped would produce the same bytes, so this fixture pins the layout and the
+// three name lengths (7/6/7) but does NOT prove that assignment.
+//
+// The inviter name is six UTF-8 bytes for five glyphs, which is the case that
+// makes a byte length rather than a character count observable.
+static void test_guild_invite_matches_capture()
+{
+    static uint8 const expected[] = {
+        0x0C, 0x42, 0x06, 0xD0, 0x10, 0x31, 0x0E, 0x00, 0x00, 0x00, 0x44, 0xC3,
+        0xB8, 0x64, 0x67, 0x65, 0x00, 0x00, 0x00, 0x00, 0x8F, 0x13, 0x0E, 0x00,
+        0x00, 0x00, 0x0A, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x1E, 0x03,
+        0x2D, 0x00, 0x00, 0x00, 0x44, 0x69, 0x76, 0x69, 0x6E, 0x65, 0x20, 0x57,
+        0x72, 0x61, 0x74, 0x68, 0x18, 0x00, 0x01, 0x03, 0xA4, 0x00, 0x00, 0x00,
+        0x18, 0x00, 0x01, 0x03, 0xF5
+    };
+
+    WorldPacket packet;
+    CHECK(MopGuildPackets::BuildGuildInvite(packet,
+        UI64LIT(0x1FF400000212308E),         // new guild guid
+        UI64LIT(0),                          // no old guild
+        std::string("D\xC3\xB8" "dge"),      // six bytes, five glyphs
+        std::string("Divine Wrath"),
+        std::string(),                       // empty old guild name
+        10u,                                 // guild level
+        164u, 14u,                           // emblem style, colour
+        0u, 45u,                             // border style, colour
+        14u,                                 // background colour
+        0x03010018u, 0u, 0x03010018u));      // new realm, old realm, inviter realm
+    CHECK(Equal(packet, std::vector<uint8>(expected, expected + sizeof(expected))));
+
+    // A name longer than the 6-bit length field must be refused, not truncated
+    // into a body the client would misparse.
+    WorldPacket tooLong;
+    CHECK(!MopGuildPackets::BuildGuildInvite(tooLong, UI64LIT(1), UI64LIT(0),
+        std::string(64, 'A'), std::string("G"), std::string(), 1u,
+        0u, 0u, 0u, 0u, 0u, 1u, 0u, 1u));
+
+    CHECK(uint32(SMSG_GUILD_INVITE) == 0x0F71u);
+}
+
 int main(int /*argc*/, char** /*argv*/)
 {
     test_short_motd();
+    test_guild_invite_matches_capture();
     test_guild_invite_request();
     test_guild_achievement_tracking_request();
     test_guild_query_request();

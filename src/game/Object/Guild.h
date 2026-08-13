@@ -607,6 +607,114 @@ namespace MopGuildPackets
         out << result;
     }
 
+    /**
+     * SMSG_GUILD_INVITE body, 18414.
+     *
+     * Rebuilt from the client's own reader sub_69E959 (parser sub_6A0BF8, reached
+     * from the inbound dispatcher sub_68EC4C) and verified byte-exact against
+     * capture-000499 seq 777 -- 65 of 65 bytes consumed. The inherited body was
+     * pre-MoP: six raw uint32 before any bits, and 8/8/7-bit name lengths where
+     * the client reads 7/6/7 (sub_6650D3 returns seven bits, sub_691684 six).
+     *
+     * A is the new guild guid, B the old one. Both name blocks are raw bytes with
+     * no terminator; the client NUL-terminates its own buffer after the read.
+     *
+     * The nine uint32 are NOT all identified. Positions 2, 6, 8 and 5 are proven
+     * -- borderStyle, borderColor, emblemStyle and the old guild's realm -- by
+     * correlating the ten retail captures against the matching guild-query
+     * responses. Three remain open, and each is written below at its proven wire
+     * offset with the best-supported meaning:
+     *
+     *   1 and 3 are {backgroundColor, emblemColor}, and this assignment is a
+     *     guess. The pair IS separable -- decoding four captures gives 14/14
+     *     (000499 seq 777), 16/14 (000146 seq 274767), 3/3 (000657 seq 223882)
+     *     and 16/15 (000985 seq 107581), so two of the four differ. It is simply
+     *     not done: settling it means taking one of the unequal captures and
+     *     reading that same guild's SMSG_GUILD_QUERY_RESPONSE, whose emblemColor
+     *     and backgroundColor positions are proven byte-exact, then comparing.
+     *     Until then, swapped means the invite popup's tabard shows the two
+     *     colours the wrong way round and nothing else changes.
+     *   7 and 9 are {new-guild realm, inviter realm}. A guild invite is
+     *     same-realm, so both carry the same value here and the ambiguity is not
+     *     observable on the wire.
+     *   4 looks like the guild level -- the popup has a level field and the value
+     *     is in range -- but no capture varies it, so it is unproven.
+     *
+     * Identity cannot be finished statically: the client's field-naming consumer
+     * is invoked through a pointer computed at runtime (sub_6A0F7E calls
+     * dword_109735C minus a computed offset), which is why no SMSG handler
+     * address appears anywhere in the image.
+     */
+    inline bool BuildGuildInvite(WorldPacket& out,
+        uint64 newGuildGuid, uint64 oldGuildGuid,
+        std::string const& inviterName, std::string const& newGuildName,
+        std::string const& oldGuildName, uint32 guildLevel,
+        uint32 emblemStyle, uint32 emblemColor, uint32 borderStyle,
+        uint32 borderColor, uint32 backgroundColor,
+        uint32 newGuildRealm, uint32 oldGuildRealm, uint32 inviterRealm)
+    {
+        if (inviterName.size() >= (size_t(1) << 6) ||
+            newGuildName.size() >= (size_t(1) << 7) ||
+            oldGuildName.size() >= (size_t(1) << 7))
+        {
+            return false;
+        }
+
+        out.Initialize(SMSG_GUILD_INVITE, 48 + inviterName.size() +
+            newGuildName.size() + oldGuildName.size());
+
+        out.WriteBit(GuidByte(newGuildGuid, 4) != 0);
+        out.WriteBits(uint32(newGuildName.length()), 7);
+        out.WriteBit(GuidByte(oldGuildGuid, 4) != 0);
+        out.WriteBit(GuidByte(newGuildGuid, 6) != 0);
+        out.WriteBit(GuidByte(oldGuildGuid, 2) != 0);
+        out.WriteBit(GuidByte(oldGuildGuid, 1) != 0);
+        out.WriteBit(GuidByte(oldGuildGuid, 5) != 0);
+        out.WriteBit(GuidByte(oldGuildGuid, 7) != 0);
+        out.WriteBit(GuidByte(newGuildGuid, 0) != 0);
+        out.WriteBit(GuidByte(oldGuildGuid, 3) != 0);
+        out.WriteBit(GuidByte(newGuildGuid, 5) != 0);
+        out.WriteBit(GuidByte(oldGuildGuid, 6) != 0);
+        out.WriteBits(uint32(inviterName.length()), 6);
+        out.WriteBit(GuidByte(newGuildGuid, 1) != 0);
+        out.WriteBit(GuidByte(newGuildGuid, 3) != 0);
+        out.WriteBit(GuidByte(oldGuildGuid, 0) != 0);
+        out.WriteBit(GuidByte(newGuildGuid, 2) != 0);
+        out.WriteBits(uint32(oldGuildName.length()), 7);
+        out.WriteBit(GuidByte(newGuildGuid, 7) != 0);
+        out.FlushBits();
+
+        out.WriteByteSeq(GuidByte(newGuildGuid, 1));
+        out << uint32(backgroundColor);                     // 1, paired with 3
+        out.WriteByteSeq(GuidByte(newGuildGuid, 4));
+        out.append(inviterName.c_str(), inviterName.size());
+        out << uint32(borderStyle);                         // 2
+        out.WriteByteSeq(GuidByte(oldGuildGuid, 7));
+        out.WriteByteSeq(GuidByte(newGuildGuid, 0));
+        out.WriteByteSeq(GuidByte(newGuildGuid, 2));
+        out << uint32(emblemColor);                         // 3, paired with 1
+        out.WriteByteSeq(GuidByte(oldGuildGuid, 2));
+        out.WriteByteSeq(GuidByte(oldGuildGuid, 5));
+        out << uint32(guildLevel);                          // 4, unproven
+        out << uint32(oldGuildRealm);                       // 5
+        out.WriteByteSeq(GuidByte(newGuildGuid, 7));
+        out.WriteByteSeq(GuidByte(newGuildGuid, 3));
+        out.WriteByteSeq(GuidByte(oldGuildGuid, 4));
+        out << uint32(borderColor);                         // 6
+        out.append(newGuildName.c_str(), newGuildName.size());
+        out << uint32(newGuildRealm);                       // 7, paired with 9
+        out << uint32(emblemStyle);                         // 8
+        out.WriteByteSeq(GuidByte(oldGuildGuid, 0));
+        out.append(oldGuildName.c_str(), oldGuildName.size());
+        out.WriteByteSeq(GuidByte(newGuildGuid, 5));
+        out << uint32(inviterRealm);                        // 9, paired with 7
+        out.WriteByteSeq(GuidByte(oldGuildGuid, 1));
+        out.WriteByteSeq(GuidByte(newGuildGuid, 6));
+        out.WriteByteSeq(GuidByte(oldGuildGuid, 3));
+        out.WriteByteSeq(GuidByte(oldGuildGuid, 6));
+        return true;
+    }
+
     inline bool ReadGuildInvite(WorldPacket& in, std::string& name)
     {
         name.clear();
