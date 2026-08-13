@@ -678,6 +678,8 @@ static bool IsEnterWorldConverted(uint16 opcode)
         case SMSG_GUILD_INVITE:               // MopGuildPackets::BuildGuildInvite, byte-exact vs capture-000499 seq 777
         case SMSG_TABARD_VENDOR_ACTIVATE:     // MopGuildPackets::BuildTabardVendorActivate
         case SMSG_SAVE_GUILD_EMBLEM:          // MopGuildPackets::BuildSaveGuildEmblemResult
+        case SMSG_GUILD_BANK_LIST:            // MopGuildBankPackets::BuildListBody, byte-exact vs capture-000601 seq 1289646
+                                              // (723 bytes, fifteen present items)
         case SMSG_BINDER_CONFIRM:              // MopBindPackets::BuildBinderConfirm
         case SMSG_PLAYERBOUND:                 // MopBindPackets::BuildPlayerBound
         case SMSG_LFG_PROPOSAL_UPDATE:        // MopLfgPackets::BuildProposalUpdate, byte-exact vs capture-000044 seq 1948 and capture-000059 seq 2063424

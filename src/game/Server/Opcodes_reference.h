@@ -499,7 +499,7 @@ typedef uint16_t uint16;
  *   SMSG_UPDATE_COMBO_POINTS                       0x082F  ACTIVE   [high-conf]
  *   SMSG_TALENTS_INVOLUNTARILY_RESET               0x088A  DORMANT  [low-conf]
  *   SMSG_AREA_TRIGGER_NO_CORPSE                    0x089E  ACTIVE   [high-conf]
- *   SMSG_GUILD_BANK_LIST                           0x0B79  DORMANT  [medium-conf]
+ *   SMSG_GUILD_BANK_LIST                           0x0B79  ACTIVE   [high-conf]  byte-exact vs capture-000601 seq 1289646
  *   SMSG_MONEY_NOTIFY                              0x0C0F  DORMANT  [medium-conf]
  *   SMSG_ITEM_PUSH_RESULT                          0x0E0A  ACTIVE
  *   SMSG_CORPSE_TRANSPORT_QUERY                    0x0E0B  ACTIVE   server-binding=SMSG_CORPSE_QUERY_RESPONSE
@@ -1438,7 +1438,7 @@ typedef uint16_t uint16;
  *   CMSG_QUESTGIVER_STATUS_QUERY                   0x036A  ACTIVE
  *   CMSG_USE_EQUIPMENT_SET                         0x036E  DORMANT
  *   CMSG_AUTOEQUIP_ITEM_SLOT                       0x036F  DORMANT
- *   CMSG_GUILD_BANKER_ACTIVATE                     0x0372  DORMANT
+ *   CMSG_GUILD_BANKER_ACTIVATE                     0x0372  ACTIVE
  *   CMSG_QUERY_INSPECT_ACHIEVEMENTS                0x0373  DORMANT
  *   CMSG_USED_FOLLOW                               0x0374  DOC
  *   CMSG_REQUEST_PVP_REWARDS                       0x0375  DORMANT
@@ -1754,7 +1754,7 @@ typedef uint16_t uint16;
  *   CMSG_PETITION_SHOW_SIGNATURES                  0x136B  ACTIVE
  *   CMSG_QUEST_PUSH_RESULT                         0x1370  ACTIVE
  *   CMSG_MAIL_TAKE_ITEM                            0x1371  ACTIVE
- *   CMSG_GUILD_BANK_QUERY_TAB                      0x1372  DORMANT
+ *   CMSG_GUILD_BANK_QUERY_TAB                      0x1372  ACTIVE
  *   CMSG_BATTLEFIELD_PORT                          0x1379  DORMANT
  *   CMSG_UNKNOWN_0x140A                            0x140A  DOC
  *   CMSG_CHANNEL_SET_OWNER                         0x141A  DORMANT

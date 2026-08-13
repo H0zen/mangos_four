@@ -1377,6 +1377,20 @@ void InitializeOpcodes()
     DefC(CMSG_GUILD_BANK_MONEY_WITHDRAWN, "CMSG_GUILD_BANK_MONEY_WITHDRAWN", STATUS_LOGGEDIN, PROCESS_THREADUNSAFE, &WorldSession::HandleGuildBankMoneyWithdrawn);
     DefS(SMSG_GUILD_BANK_MONEY_WITHDRAWN, "SMSG_GUILD_BANK_MONEY_WITHDRAWN");
 
+    // Opening the guild bank, and paging a tab within it. Held until now because
+    // the first uint32 of each present-item SMSG_GUILD_BANK_LIST record lands on
+    // the client's +48 field, whose meaning was unmodelled. It is settled: the
+    // field reaches bank-cache +0x40 (sub_971019) and of the ten functions that
+    // reach a cache record through sub_96EDC2 only sub_8D02D8 -- the tooltip
+    // path -- reads it, testing bit 2, which is ITEM_DYNFLAG_UNLOCKED. That state
+    // is real here, so GuildBank.cpp now sends the item's own flags rather than a
+    // constant; sending 0 would have shown every opened lockbox as still locked.
+    // The body itself decodes byte-exact across all 607 build-18414 replies in
+    // the corpus, 12,261 item records.
+    DefC(CMSG_GUILD_BANKER_ACTIVATE, "CMSG_GUILD_BANKER_ACTIVATE", STATUS_LOGGEDIN, PROCESS_THREADUNSAFE, &WorldSession::HandleGuildBankerActivate);
+    DefC(CMSG_GUILD_BANK_QUERY_TAB, "CMSG_GUILD_BANK_QUERY_TAB", STATUS_LOGGEDIN, PROCESS_THREADUNSAFE, &WorldSession::HandleGuildBankQueryTab);
+    DefS(SMSG_GUILD_BANK_LIST, "SMSG_GUILD_BANK_LIST");
+
     // Wave 32 tabard-vendor interaction and guild-emblem save.
     DefC(CMSG_TABARD_VENDOR_ACTIVATE, "CMSG_TABARD_VENDOR_ACTIVATE", STATUS_LOGGEDIN, PROCESS_THREADUNSAFE, &WorldSession::HandleTabardVendorActivateOpcode);
     DefS(SMSG_TABARD_VENDOR_ACTIVATE, "SMSG_TABARD_VENDOR_ACTIVATE");
@@ -1986,12 +2000,6 @@ void InitializeOpcodes()
     // once that reply was rebuilt to its 18414 body and admitted.
     //
     // GET_MAIL_LIST is promoted with its rebuilt 18414 two-pass reply.
-    // The 18414 CMSG_GUILD_BANKER_ACTIVATE request body is resolved, but the
-    // wave remains held solely because the first uint32 in each present-item
-    // SMSG_GUILD_BANK_LIST record maps to the client's +48 dynamic-flags field,
-    // whose server-side meaning and state are not yet modelled. Activate/query
-    // registration, reply registration/admission, and all three reference rows
-    // therefore remain dormant as one source-enforced wave.
     DefC(CMSG_GET_MAIL_LIST, "CMSG_GET_MAIL_LIST", STATUS_LOGGEDIN, PROCESS_THREADUNSAFE, &WorldSession::HandleGetMailList);
     DefS(SMSG_MAIL_LIST_RESULT, "SMSG_MAIL_LIST_RESULT");
     DefC(CMSG_MAIL_MARK_AS_READ, "CMSG_MAIL_MARK_AS_READ", STATUS_LOGGEDIN, PROCESS_THREADUNSAFE, &WorldSession::HandleMailMarkAsRead);

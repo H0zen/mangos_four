@@ -899,10 +899,21 @@ bool Guild::AppendDisplayGuildBankSlot(MopGuildBankPackets::GuildBankList& list,
     if (pItem)
     {
         record.present = true;
-        // Retail present-item bodies carry non-zero dynamic flags, but this
-        // backend never maintains their MoP meaning on Item. Zero is the only
-        // truthful value until that server-side state exists.
-        record.dynamicFlags = 0;
+        // The client copies this field to bank-cache +0x40 (sub_971019), and of
+        // the ten functions reaching a cache record through sub_96EDC2 only
+        // sub_8D02D8 -- SetGuildBankItem, the tooltip path -- reads it, testing
+        // bit 2. Bit 2 is ITEM_DYNFLAG_UNLOCKED, which this server does model and
+        // does set: opening a lockbox flags the item in SpellEffectSummonLock,
+        // and an unlocked box can then be deposited. Sending a flat 0 would tell
+        // the client every such box is still locked, so send the item's real
+        // flags.
+        //
+        // Retail also carries 0x00030000, sometimes with 0x20 (capture-000601
+        // seq 1289646). Those bits are not modelled here and are read by nothing
+        // in the guild bank path -- across all 607 build-18414 bank replies,
+        // 12,261 item records, bit 2 is never set, so retail's own traffic
+        // exercises only the branch we already reproduce.
+        record.dynamicFlags = pItem->GetUInt32Value(ITEM_FIELD_FLAGS);
         for (uint32 socketIndex = 0; socketIndex < MAX_GEM_SOCKETS; ++socketIndex)
         {
             uint32 enchantmentId = pItem->GetEnchantmentId(

@@ -1423,10 +1423,13 @@ void Guild::BroadcastMotd(std::string const& motd)
  * GUILD_MOTD and then raises GUILD_ROSTER_UPDATE, and the UI asks for the roster
  * off that event -- so nothing has to be pushed ahead of it.
  *
- * The bank tab list below is sent for parity with login, but does NOT currently
- * reach an 18414 client: its opcode is not admitted by IsEnterWorldConverted, so
- * the send gate drops it while GuildBank.cpp still logs it as sent. That is a
- * guild bank matter, out of scope for this wave, and founding does not need it.
+ * This used to send a bank tab list too, which never reached an 18414 client
+ * because the send gate dropped the opcode. Admitting SMSG_GUILD_BANK_LIST for
+ * the bank wave would have turned that dead call into real traffic no retail
+ * server sends: across build 18414 the corpus holds 124 CMSG_GUILD_BANKER_ACTIVATE
+ * and 490 CMSG_GUILD_BANK_QUERY_TAB against 607 replies, so the bank list is
+ * strictly a response and never volunteered at login or on joining. Dropping the
+ * call keeps what the client actually observed and matches retail.
  */
 void Guild::SendGuildStateTo(WorldSession* session)
 {
@@ -1445,8 +1448,6 @@ void Guild::SendGuildStateTo(WorldSession* session)
     {
         sLog.outError("WORLD: Guild %u MOTD is too long for SMSG_GUILD_EVENT_MOTD", m_Id);
     }
-
-    DisplayGuildBankTabsInfo(session);
 }
 
 void Guild::BroadcastMemberJoined(ObjectGuid guid, std::string const& name)
