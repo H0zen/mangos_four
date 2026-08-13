@@ -1336,6 +1336,38 @@ void InitializeOpcodes()
     DefC(CMSG_GUILD_REQUEST_CHALLENGE_UPDATE, "CMSG_GUILD_REQUEST_CHALLENGE_UPDATE", STATUS_LOGGEDIN, PROCESS_THREADUNSAFE, &WorldSession::HandleGuildRequestChallengeUpdateOpcode);
     DefS(SMSG_GUILD_CHALLENGE_UPDATED, "SMSG_GUILD_CHALLENGE_UPDATED");
 
+    // CMSG_LF_GUILD_SET_GUILD_POST 0x1D9F is deliberately NOT registered, and the
+    // client sends it about once a second while the guild finder is open.
+    //
+    // The body is fully derived, from the client's own writer sub_66DD5F at slot
+    // +4 of vtable off_D632EC, whose slot +8 thunk sub_66230A pushes 0x1D9F and
+    // whose slot +12 is the sub_C84A3D signature:
+    //
+    //     uint32 x4   the recruitment masks
+    //     10 bits     comment length (sub_66B79F writes len>>2 as 8 bits then len&3 as 2)
+    //      1 bit      listed flag
+    //     flush
+    //     raw comment bytes
+    //
+    // The four masks are named by the client's own getter sub_99C46E, which the
+    // UI reads as quest/dungeon/raid/pvp/rp, weekdays/weekends,
+    // tank/healer/damage, any-level/max-level, and listed.
+    //
+    // Registering it would be wrong in both directions. Answering it means the
+    // guild finder -- post storage, applicant and recruit lists, browse and
+    // matching, plus SMSG_LF_GUILD_POST_UPDATED to confirm -- none of which
+    // exists here. And a parse-and-discard sink would be worse than nothing: the
+    // corpus holds ZERO packets of this opcode across all 1079 captures, so the
+    // reader above cannot be checked against any retail body, and if it is wrong
+    // it throws once a second on a live server. Unregistered costs one DEBUG_LOG
+    // line through Handle_NULL, which is the cheaper way to be wrong.
+    //
+    // Why the client repeats it is unresolved. GuildRecruitmentListGuildButton_Update
+    // in Blizzard_GuildInfo.lua only sends on a user click or when de-listing a
+    // guild whose settings are incomplete, so the cadence comes from somewhere
+    // else -- most likely the client's own finder state machine waiting for a
+    // reply. Settling that needs the live client.
+
     // Full client-side guild-achievement tracking snapshot. The core has no
     // matching backend, so the handler validates and consumes it without state.
     DefC(CMSG_GUILD_SET_ACHIEVEMENT_TRACKING, "CMSG_GUILD_SET_ACHIEVEMENT_TRACKING", STATUS_LOGGEDIN, PROCESS_THREADUNSAFE, &WorldSession::HandleGuildSetAchievementTracking);
