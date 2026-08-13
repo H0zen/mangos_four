@@ -1296,6 +1296,25 @@ class Guild
 
         void SetRankName(uint32 rankId, std::string name);
         void SetRankRights(uint32 rankId, uint32 rights);
+        // GR_RIGHT_EMPTY is a baseline bit OR'd into the low constants, not a
+        // right in itself: the client's own rank-flag table (dword_F654C0 in the
+        // 18414 client, 20 entries of stride 8, read by GuildControlSetRankFlag)
+        // carries the distinguishing bit alone and never bit 6. So the
+        // meaningful part of any constant is what remains once the baseline is
+        // masked off, and the rank must carry all of it.
+        //
+        // The former test compared the AND against GR_RIGHT_EMPTY, so it was
+        // false only when the result was exactly 0x40. That failed open twice
+        // over: the seven constants that carry no baseline bit can only AND to 0
+        // or to themselves, never to 0x40, so they were granted to every rank
+        // unconditionally; and any stored mask lacking bit 6 ANDed to 0 against
+        // the low constants, which also read as granted.
+        //
+        // What that actually let through: bank tab rename and re-icon, with no
+        // further gate. Gold withdrawal and guild-funded repair were still
+        // bounded by the rank's per-day allowance, which is 0 for a rank created
+        // by CreateRank -- so the hole there was real but confined to ranks the
+        // leader had given an allowance without ticking the matching box.
         bool HasRankRight(uint32 rankId, uint32 right)
         {
             if (rankId >= m_Ranks.size())
@@ -1303,7 +1322,8 @@ class Guild
                 return false;
             }
 
-            return ((GetRankRights(rankId) & right) != GR_RIGHT_EMPTY) ? true : false;
+            uint32 const required = right & ~uint32(GR_RIGHT_EMPTY);
+            return required != 0 && (GetRankRights(rankId) & required) == required;
         }
 
         bool HasMembersWithRank(uint32 rankId) const
