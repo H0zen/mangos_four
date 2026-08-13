@@ -516,10 +516,11 @@ static void test_guild_challenge_update_matches_capture()
 
 // SMSG_GUILD_INVITE against capture-000499 seq 777, the whole 65-byte body.
 //
-// The capture cannot distinguish backgroundColor from emblemColor: that guild
-// has both set to 14, which is why the pair is still unresolved. Passing them
-// swapped would produce the same bytes, so this fixture pins the layout and the
-// three name lengths (7/6/7) but does NOT prove that assignment.
+// This guild has borderColor and emblemColor both 14, so those two alone could
+// be transposed without changing a byte. They are not guessed here: the colour
+// assignment comes from the client's consumer sub_9683C3 and the tabard resolver
+// sub_831870, and the fixture is written to agree with it. What the fixture
+// itself pins is the layout and the three name lengths (7/6/7).
 //
 // The inviter name is six UTF-8 bytes for five glyphs, which is the case that
 // makes a byte length rather than a character count observable.
@@ -543,8 +544,8 @@ static void test_guild_invite_matches_capture()
         std::string(),                       // empty old guild name
         10u,                                 // guild level
         164u, 14u,                           // emblem style, colour
-        0u, 45u,                             // border style, colour
-        14u,                                 // background colour
+        0u, 14u,                             // border style, colour
+        45u,                                 // background colour
         0x03010018u, 0u, 0x03010018u));      // new realm, old realm, inviter realm
     CHECK(Equal(packet, std::vector<uint8>(expected, expected + sizeof(expected))));
 

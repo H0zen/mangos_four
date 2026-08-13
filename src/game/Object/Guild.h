@@ -625,15 +625,15 @@ namespace MopGuildPackets
      * responses. Three remain open, and each is written below at its proven wire
      * offset with the best-supported meaning:
      *
-     *   1 and 3 are {backgroundColor, emblemColor}, and this assignment is a
-     *     guess. The pair IS separable -- decoding four captures gives 14/14
-     *     (000499 seq 777), 16/14 (000146 seq 274767), 3/3 (000657 seq 223882)
-     *     and 16/15 (000985 seq 107581), so two of the four differ. It is simply
-     *     not done: settling it means taking one of the unequal captures and
-     *     reading that same guild's SMSG_GUILD_QUERY_RESPONSE, whose emblemColor
-     *     and backgroundColor positions are proven byte-exact, then comparing.
-     *     Until then, swapped means the invite popup's tabard shows the two
-     *     colours the wrong way round and nothing else changes.
+     *   1, 3 and 6 are borderColor, emblemColor and backgroundColor, settled by
+     *     the consumer route rather than by correlating captures. sub_9683C3
+     *     hands 6, 1, 3 and 8 to the tabard resolver sub_831870, which pairs each
+     *     input with one output -- arg5 from arg1, arg6 from arg2, arg7 from
+     *     arg3 -- and those outputs are pushed to Lua as tabardData[1..9], which
+     *     SetGuildTabardTextures reads as background, border then emblem RGB.
+     *     The captures agree and rule out the earlier reading: 6 is 44..49,
+     *     which only GuildColorBackground's 51 rows can hold, while 1 and 3 stay
+     *     inside the 17 rows of the border and emblem colour tables.
      *   7 and 9 are {new-guild realm, inviter realm}. A guild invite is
      *     same-realm, so both carry the same value here and the ambiguity is not
      *     observable on the wire.
@@ -685,7 +685,7 @@ namespace MopGuildPackets
         out.FlushBits();
 
         out.WriteByteSeq(GuidByte(newGuildGuid, 1));
-        out << uint32(backgroundColor);                     // 1, paired with 3
+        out << uint32(borderColor);                         // 1
         out.WriteByteSeq(GuidByte(newGuildGuid, 4));
         out.append(inviterName.c_str(), inviterName.size());
         out << uint32(borderStyle);                         // 2
@@ -695,12 +695,12 @@ namespace MopGuildPackets
         out << uint32(emblemColor);                         // 3, paired with 1
         out.WriteByteSeq(GuidByte(oldGuildGuid, 2));
         out.WriteByteSeq(GuidByte(oldGuildGuid, 5));
-        out << uint32(guildLevel);                          // 4, unproven
+        out << uint32(guildLevel);                          // 4
         out << uint32(oldGuildRealm);                       // 5
         out.WriteByteSeq(GuidByte(newGuildGuid, 7));
         out.WriteByteSeq(GuidByte(newGuildGuid, 3));
         out.WriteByteSeq(GuidByte(oldGuildGuid, 4));
-        out << uint32(borderColor);                         // 6
+        out << uint32(backgroundColor);                     // 6
         out.append(newGuildName.c_str(), newGuildName.size());
         out << uint32(newGuildRealm);                       // 7, paired with 9
         out << uint32(emblemStyle);                         // 8
