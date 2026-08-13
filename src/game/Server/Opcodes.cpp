@@ -1330,6 +1330,12 @@ void InitializeOpcodes()
     DefC(CMSG_GUILD_REQUEST_PARTY_STATE, "CMSG_GUILD_REQUEST_PARTY_STATE", STATUS_LOGGEDIN, PROCESS_THREADUNSAFE, &WorldSession::HandleGuildRequestPartyStateOpcode);
     DefS(SMSG_GUILD_PARTY_STATE_RESPONSE, "SMSG_GUILD_PARTY_STATE_RESPONSE");
 
+    // Sent whenever the guild info panel opens. The request carries no body at
+    // all -- the client's writer for it is nullsub_2 -- and all 166 requests in
+    // the 18414 corpus are zero bytes.
+    DefC(CMSG_GUILD_REQUEST_CHALLENGE_UPDATE, "CMSG_GUILD_REQUEST_CHALLENGE_UPDATE", STATUS_LOGGEDIN, PROCESS_THREADUNSAFE, &WorldSession::HandleGuildRequestChallengeUpdateOpcode);
+    DefS(SMSG_GUILD_CHALLENGE_UPDATED, "SMSG_GUILD_CHALLENGE_UPDATED");
+
     // Full client-side guild-achievement tracking snapshot. The core has no
     // matching backend, so the handler validates and consumes it without state.
     DefC(CMSG_GUILD_SET_ACHIEVEMENT_TRACKING, "CMSG_GUILD_SET_ACHIEVEMENT_TRACKING", STATUS_LOGGEDIN, PROCESS_THREADUNSAFE, &WorldSession::HandleGuildSetAchievementTracking);

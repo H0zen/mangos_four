@@ -1818,6 +1818,33 @@ void WorldSession::HandleGuildRequestPartyStateOpcode(WorldPacket& recv_data)
     SendPacket(&data);
 }
 
+void WorldSession::HandleGuildRequestChallengeUpdateOpcode(WorldPacket& /*recv_data*/)
+{
+    DEBUG_LOG("WORLD: Received CMSG_GUILD_REQUEST_CHALLENGE_UPDATE");
+
+    // No body to read. The client's writer for this message is nullsub_2 --
+    // vtable off_EBDA08 slot +4, with slot +8 the thunk pushing 0x147A -- and
+    // all 166 requests in the 18414 corpus are zero bytes.
+
+    // This core has no guild challenges: no definitions, no per-guild counters,
+    // no weekly reset. Answering with retail's reward table and zero progress
+    // would advertise five challenges that can never be completed here, so the
+    // reply is empty instead. Zero in the max count is what makes it empty
+    // rather than merely unstarted: GetNumGuildChallenges counts only types
+    // whose max is above zero, so GuildInfoFrame_UpdateChallenges loops zero
+    // times and never fills in a progress count or tooltip. The five rows
+    // themselves are static XML ($parentChallenge1..5) and keep their labels --
+    // an empty reply does not remove them, and neither does sending nothing.
+    //
+    // Filling these five arrays from the retail table quoted in
+    // BuildGuildChallengeUpdate is all that is needed once challenges exist.
+    uint32 const none[GUILD_CHALLENGE_TYPES] = {};
+
+    WorldPacket data;
+    MopGuildPackets::BuildGuildChallengeUpdate(data, none, none, none, none, none);
+    SendPacket(&data);
+}
+
 void WorldSession::HandleGuildSetAchievementTracking(WorldPacket& recvPacket)
 {
     std::vector<uint32> achievementIds;

@@ -352,6 +352,61 @@ namespace MopGuildPackets
         out.FlushBits();
     }
 
+    /// Challenge types the 18414 client tracks. Index 0 is unused: the client
+    /// counts a type as existing only where the max count is above zero
+    /// (GetNumGuildChallenges, sub_96591B), and retail leaves slot 0 at zero.
+    #define GUILD_CHALLENGE_TYPES 6
+
+    /**
+     * SMSG_GUILD_CHALLENGE_UPDATED body: a fixed 120 bytes, five groups of six
+     * uint32. Every one of the 163 replies in the 18414 corpus is that length.
+     *
+     * The five NAMES are the client's own: the challenge tooltip in
+     * Blizzard_GuildInfo.xml reads
+     * `local index, current, max, xp, gold, maxGold = GetGuildChallengeInfo(...)`,
+     * and GetGuildChallengeInfo (sub_965952) returns dword_11EFE88, _E70, _E28,
+     * _E58, _E40 in that order. maxGold is the reward once the guild is at max
+     * level, xp the reward below it.
+     *
+     * Which name sits at which WIRE position is inferred, not proven, because the
+     * parser could not be located. The inference: capture-000009 seq 30430 and
+     * capture-000025 seq 9450 differ only in the fifth group, so that is the
+     * per-guild one, and it is elementwise <= the first, so the first is the max
+     * it is measured against. Of the remaining three the largest is xp, and of
+     * the other two the larger is maxGold, being exactly twice gold throughout.
+     * That gives max, gold, maxGold, xp, current, and the table those two
+     * captures carry:
+     *   type            max  gold  maxGold  xp
+     *   1 Dungeon         7   125     250     300000
+     *   2 Raid            1   500    1000    3000000
+     *   3 Rated BG        3   250     500    1500000
+     *   4 Scenario       15   125     250      50000
+     *   5 Challenge Mode  3   250     500    1000000
+     * Slot 0 is unused and zero throughout. Corpus-wide, only one value has been
+     * checked across all 163 replies -- 300000 at byte offset 76 -- so the rest
+     * of the table is static across those two captures, not proven static across
+     * the corpus.
+     *
+     * Do not infer the client's internal order from this. sub_9668AA copies
+     * current from the fourth record block and max from the first, so the
+     * record is not filled in wire order and the parser's arrangement is
+     * unknown -- it does not affect the bytes on the wire.
+     */
+    inline void BuildGuildChallengeUpdate(WorldPacket& out,
+        uint32 const (&maxCount)[GUILD_CHALLENGE_TYPES],
+        uint32 const (&gold)[GUILD_CHALLENGE_TYPES],
+        uint32 const (&maxGold)[GUILD_CHALLENGE_TYPES],
+        uint32 const (&xp)[GUILD_CHALLENGE_TYPES],
+        uint32 const (&currentCount)[GUILD_CHALLENGE_TYPES])
+    {
+        out.Initialize(SMSG_GUILD_CHALLENGE_UPDATED, 120);
+        for (uint32 value : maxCount)     { out << uint32(value); }
+        for (uint32 value : gold)         { out << uint32(value); }
+        for (uint32 value : maxGold)      { out << uint32(value); }
+        for (uint32 value : xp)           { out << uint32(value); }
+        for (uint32 value : currentCount) { out << uint32(value); }
+    }
+
     /// One member as SMSG_GUILD_ROSTER carries it.
     struct RosterMember
     {

@@ -175,9 +175,9 @@
  *   TOTAL SMSG rows                   925
  *
  * SUBSYSTEM CONFIDENCE: high=365, low=221, medium=182, none=157
- * STATUS TOTALS: ACTIVE=656, DOC=421, DORMANT=443
- *   SMSG: ACTIVE=361, DOC=270, DORMANT=294
- *   CMSG: ACTIVE=295, DOC=151, DORMANT=149
+ * STATUS TOTALS: ACTIVE=658, DOC=420, DORMANT=442
+ *   SMSG: ACTIVE=362, DOC=270, DORMANT=293
+ *   CMSG: ACTIVE=296, DOC=150, DORMANT=149
  */
 
 // CAVEATS -- read before trusting any single row:
@@ -559,7 +559,7 @@ typedef uint16_t uint16;
  *   SMSG_GUILD_PARTY_STATE_RESPONSE                0x0A78  ACTIVE   [low-conf]
  *   SMSG_GUILD_QUERY_RANKS_RESULT                  0x0A79  ACTIVE   [low-conf]
  *   SMSG_GUILD_NEWS_UPDATE                         0x0AE8  DORMANT  [medium-conf]
- *   SMSG_GUILD_CHALLENGE_UPDATED                   0x0AE9  DORMANT  [low-conf]
+ *   SMSG_GUILD_CHALLENGE_UPDATED                   0x0AE9  ACTIVE   [low-conf]
  *   SMSG_UNKNOWN_0x0AF1                            0x0AF1  DOC      [low-conf]
  *   SMSG_UNKNOWN_0x0B69                            0x0B69  ACTIVE   [low-conf]  server-binding=SMSG_GUILD_EVENT_PLAYER_JOINED
  *   SMSG_UNKNOWN_0x0B70                            0x0B70  ACTIVE   [low-conf]  server-binding=SMSG_GUILD_EVENT_PRESENCE_CHANGE
@@ -1770,7 +1770,7 @@ typedef uint16_t uint16;
  *   CMSG_LEARN_PET_SPECIALIZATION_GROUP            0x1463  DOC
  *   CMSG_GUILD_ACHIEVEMENT_MEMBERS                 0x1470  DORMANT
  *   CMSG_GUILD_MOTD                                0x1473  ACTIVE
- *   CMSG_GUILD_REQUEST_CHALLENGE_UPDATE            0x147A  DOC
+ *   CMSG_GUILD_REQUEST_CHALLENGE_UPDATE            0x147A  ACTIVE
  *   CMSG_GUILD_DECLINE                             0x147B  ACTIVE
  *   CMSG_JOIN_CHANNEL                              0x148E  ACTIVE
  *   CMSG_PVP_LOG_DATA                              0x14C2  DORMANT
