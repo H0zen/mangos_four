@@ -338,10 +338,12 @@ void WorldSession::HandlePetitionBuyOpcode(WorldPacket& recv_data)
         delete result;
     }
 
-    // delete petitions with the same guid as this one
+    // The new charter joins the list so its own rows are cleared before they are
+    // inserted, which is why this is not a list of invalid petitions -- with no
+    // prior charter it is only the one being bought.
     ssInvalidPetitionGUIDs << "'" << charter->GetGUIDLow() << "'";
 
-    DEBUG_LOG("Invalid petition GUIDs: %s", ssInvalidPetitionGUIDs.str().c_str());
+    DEBUG_LOG("Petition rows cleared before insert: %s", ssInvalidPetitionGUIDs.str().c_str());
     CharacterDatabase.escape_string(name);
     CharacterDatabase.BeginTransaction();
     CharacterDatabase.PExecute("DELETE FROM `petition` WHERE `petitionguid` IN ( %s )",  ssInvalidPetitionGUIDs.str().c_str());

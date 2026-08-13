@@ -775,6 +775,14 @@ void WorldSession::SendPacket(WorldPacket const* packet, bool bypassSuppress)
     // port scaffold until every live sender reaches 18414 parity.
     if (m_suppressWorldSends && !bypassSuppress && !IsEnterWorldConverted(uint16(packet->GetOpcode())))
     {
+        // Say so. Senders log "Sent <opcode>" either side of this call and the
+        // packet never leaves, so the log asserted a delivery that did not
+        // happen -- SMSG_GUILD_BANK_LIST reads as sent in the world log and is
+        // absent from the packet capture. A dropped send is now visible at the
+        // same level as the claim it contradicts.
+        DEBUG_LOG("WORLD: SUPPRESSED (not enter-world converted) %s (0x%04X) -- NOT sent",
+                  LookupOpcodeName(DIR_SERVER, uint16(packet->GetOpcode())),
+                  uint32(packet->GetOpcode()));
         return;
     }
 

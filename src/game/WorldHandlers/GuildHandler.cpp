@@ -419,20 +419,33 @@ void WorldSession::HandleGuildDeclineOpcode(WorldPacket& recvPacket)
  */
 void WorldSession::HandleGuildRosterOpcode(WorldPacket& recvPacket)
 {
-    ObjectGuid guid1, guid2;
-
-    // Order is taken from the 18414 client's own send serializer sub_C85E7C. It holds
-    // two guids at object offsets +16..23 (guid1) and +24..31 (guid2) and interleaves
-    // them; the order this handler inherited from MaNGOS Three was a different
-    // permutation entirely.
+    // The body is two interleaved bit-packed guids, in the order the 18414
+    // client's own serializer sub_C85E7C writes them -- but the VALUES are
+    // meaningless and must never be used.
+    //
+    // Its constructor sub_C8590D sets only the vtable and +0x0C; it leaves the
+    // sixteen bytes at +0x10..+0x1F alone, and both callers (sub_966847 and
+    // sub_96A078) build the request on the stack and send it without filling
+    // them. The client therefore serializes whatever was on its stack. That is
+    // what the odd traffic is: values shaped like addresses, small leftovers such
+    // as 288, identical bodies decoding identically because the stack is the same
+    // at the same call site, and a body length of 4-6 bytes that varies purely
+    // with how many junk bytes happened to be non-zero.
+    //
+    // Retail traffic says the same. Two requests from one session in
+    // capture-000019 (sequences 852 and 5962, generation 2BE10C89...) are the
+    // same player in the same guild, and four of their seventeen bytes differ --
+    // real guids would be byte-identical. Their masks are FF FB, fifteen of
+    // sixteen bytes present, where a guild guid such as 0x1FF7000000000001 has
+    // three. Retail servers are handed the same rubbish.
+    //
+    // So this reads the body only to consume it correctly. The roster is served
+    // from the session's own guild, which is the only trustworthy source.
     uint64 rawGuid1 = 0;
     uint64 rawGuid2 = 0;
     MopGuildPackets::ReadGuildRoster(recvPacket, rawGuid1, rawGuid2);
-    guid1.Set(rawGuid1);
-    guid2.Set(rawGuid2);
 
-    DEBUG_LOG("WORLD: Received opcode CMSG_GUILD_ROSTER, guid1: %s raw: " UI64FMTD ", guid2: %s raw: " UI64FMTD "",
-        guid1.GetString().c_str(), guid1.GetRawValue(), guid2.GetString().c_str(), guid2.GetRawValue());
+    DEBUG_LOG("WORLD: Received opcode CMSG_GUILD_ROSTER (body ignored: the client sends uninitialised stack here)");
 
     if (Guild* guild = sGuildMgr.GetGuildById(_player->GetGuildId()))
     {
