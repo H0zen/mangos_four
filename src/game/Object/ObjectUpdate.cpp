@@ -440,6 +440,17 @@ namespace
         // create would otherwise never learn this player's hair, facial hair
         // or gender at all. Zero is meaningful for all three (male, sober,
         // no arena faction), so they are emitted unconditionally.
+        // Guild rank, which an observer needs from the create and not from the
+        // changed-value path: ClearUpdateMask drops the change flags on entering
+        // the world, so a watcher that only saw the create would read rank 0 --
+        // guildmaster -- for everyone until that player happened to be promoted.
+        // The client reads a target's rank from the same descriptor slot for
+        // GetGuildInfo("unit"). Sorts at 163, below PLAYER_BYTES at 166.
+        //
+        // Zero is omitted rather than sent: an omitted descriptor slot starts at
+        // zero in a create, so omitting says exactly what sending would, and zero
+        // is the correct value for a real guildmaster.
+        addTranslated(PLAYER_GUILDRANK, true);
         addTranslated(PLAYER_BYTES);
         addTranslated(PLAYER_BYTES_2);
         addTranslated(PLAYER_BYTES_3);
@@ -816,13 +827,14 @@ void Object::BuildValuesUpdateBlockForPlayer(UpdateData* data, Player* target) c
             // of the quest log because the serializer requires ascending
             // legacy indices.
             addIfChanged(PLAYER_FLAGS);
-            // Guild rank. Changes strictly after login -- joining a guild,
-            // promotion, demotion, leaving -- so the login seed alone can never
-            // deliver a transition, and the client answers IsGuildLeader() from
-            // this field. Without it a promotion or demotion does not reach the
-            // client until relog, and the rank the client keeps using is the one
-            // it had when it zoned in. Ordered directly after PLAYER_FLAGS at
-            // 157 to keep the legacy indices ascending.
+            // Guild rank. The initial value is loaded before world entry, so the
+            // login seed carries it; what needs this entry is every later
+            // transition -- joining, promotion, demotion, leaving -- because the
+            // client answers IsGuildLeader() from this field. Without it a
+            // promotion does not reach the client until relog, and the rank the
+            // client keeps using is the one it had when it zoned in. Ordered
+            // directly after PLAYER_FLAGS at 157 to keep the legacy indices
+            // ascending.
             addIfChanged(PLAYER_GUILDRANK);
             // Rest state lives in byte 3 of PLAYER_BYTES_2 and changes when the
             // player enters or leaves an inn - i.e. always AFTER login, so the
