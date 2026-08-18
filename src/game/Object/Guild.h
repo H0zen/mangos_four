@@ -241,10 +241,16 @@ namespace MopGuildPackets
             out.append(rank.name.c_str(), rank.name.size());
         }
         out.append(guildName.c_str(), guildName.size());
-        out << uint32(borderColor);
+        // Background before border, not the other way round. Retail puts 44 and
+        // 45 in the slot straight after the guild name (capture-000146 seq 1601
+        // and 3811) and GuildColorBorder.dbc has only 17 rows, so that slot
+        // cannot be a border colour. Transposed, every tabard drawn from a guild
+        // query shows the two colours swapped, and a background id of 17 or more
+        // indexes off the end of the border table and draws no tabard at all.
+        out << uint32(backgroundColor);
         out.WriteByteSeq(GuidByte(guid, 5));
         out.WriteByteSeq(GuidByte(guid, 4));
-        out << uint32(backgroundColor);
+        out << uint32(borderColor);
         out.WriteByteSeq(GuidByte(guid, 1));
         out.WriteByteSeq(GuidByte(guid, 6));
         out.WriteByteSeq(GuidByte(guid, 0));
@@ -619,11 +625,12 @@ namespace MopGuildPackets
      * A is the new guild guid, B the old one. Both name blocks are raw bytes with
      * no terminator; the client NUL-terminates its own buffer after the read.
      *
-     * The nine uint32 are NOT all identified. Positions 2, 6, 8 and 5 are proven
-     * -- borderStyle, borderColor, emblemStyle and the old guild's realm -- by
-     * correlating the ten retail captures against the matching guild-query
-     * responses. Three remain open, and each is written below at its proven wire
-     * offset with the best-supported meaning:
+     * Eight of the nine uint32 are identified. Positions 2, 8 and 5 are
+     * borderStyle, emblemStyle and the old guild's realm. Do NOT read anything
+     * more into the capture correlation that first suggested them: the guild
+     * query response it was correlated against had its own two tabard colours
+     * transposed, so that route gave the wrong answer for the colours and was
+     * replaced by the consumer route below. Only 7 and 9 are still ambiguous:
      *
      *   1, 3 and 6 are borderColor, emblemColor and backgroundColor, settled by
      *     the consumer route rather than by correlating captures. sub_9683C3
@@ -637,13 +644,15 @@ namespace MopGuildPackets
      *   7 and 9 are {new-guild realm, inviter realm}. A guild invite is
      *     same-realm, so both carry the same value here and the ambiguity is not
      *     observable on the wire.
-     *   4 looks like the guild level -- the popup has a level field and the value
-     *     is in range -- but no capture varies it, so it is unproven.
+     *   4 is the guild level, from the same consumer: it becomes event argument
+     *     three, which GuildInviteFrame_OnEvent puts in GuildInviteFrameLevelNumber.
+     *     Four captures read 10, 25, 25 and 17, never above the level cap.
      *
-     * Identity cannot be finished statically: the client's field-naming consumer
-     * is invoked through a pointer computed at runtime (sub_6A0F7E calls
-     * dword_109735C minus a computed offset), which is why no SMSG handler
-     * address appears anywhere in the image.
+     * The consumer is reached through a pointer the client computes rather than
+     * stores (sub_6A0F7E calls dword_109735C minus a computed offset), which is
+     * why no SMSG handler address appears anywhere in the image as a pointer or
+     * a call target. That obfuscates the route; it does not prevent reading it,
+     * and sub_9683C3 is ordinary static code once found.
      */
     inline bool BuildGuildInvite(WorldPacket& out,
         uint64 newGuildGuid, uint64 oldGuildGuid,

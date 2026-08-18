@@ -257,7 +257,11 @@ static void test_guild_query_response()
     CHECK(MopGuildPackets::BuildGuildQueryResponse(packet, 0x1FF40000000A798CULL,
         "I N C O M I N G", ranks,
         /*emblemStyle*/ 24, /*emblemColor*/ 14, /*borderStyle*/ 2,
-        /*borderColor*/ 2, /*backgroundColor*/ 3, /*realm*/ 50593805));
+        // This guild's two colours are 2 and 3, both inside the 17-row border
+        // table, so the capture alone cannot separate them; the assignment comes
+        // from retail guilds whose post-name slot holds 44 and 45. Swapping these
+        // two inputs against the builder swap leaves the bytes identical.
+        /*borderColor*/ 3, /*backgroundColor*/ 2, /*realm*/ 50593805));
 
     CHECK(packet.GetOpcode() == SMSG_GUILD_QUERY_RESPONSE);
     std::fprintf(stderr, "GQ got: ");
