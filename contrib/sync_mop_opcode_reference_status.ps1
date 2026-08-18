@@ -143,7 +143,7 @@ $counts = @{
     'C|DORMANT' = 0
 }
 
-$rowPattern = '^(?<prefix>[ \t]*\*[ \t]+(?<name>(CMSG|SMSG|MSG)_[A-Za-z0-9_]+)[ \t]+(?<hex>0x[0-9A-Fa-f]+)[ \t]+)(?<status>ACTIVE|DOC|DORMANT)(?<suffix>[^\r\n]*)$'
+$rowPattern = '^(?<prefix>[ \t]*\*[ \t]+(?<name>(?<kind>CMSG|SMSG|MSG)_[A-Za-z0-9_]+)[ \t]+(?<hex>0x[0-9A-Fa-f]+)[ \t]+)(?<status>ACTIVE|DOC|DORMANT)(?<suffix>[^\r\n]*)$'
 $linePattern = '(?m)^[^\r\n]*'
 
 $updatedText = [regex]::Replace($originalText, $linePattern, {
@@ -181,8 +181,10 @@ $updatedText = [regex]::Replace($originalText, $linePattern, {
         $expectedStatus = 'DOC'
     }
 
-    $counts["TOTAL|$expectedStatus"]++
-    $counts["$($script:section)|$expectedStatus"]++
+    if ($rowMatch.Groups['kind'].Value -ne 'MSG') {
+        $counts["TOTAL|$expectedStatus"]++
+        $counts["$($script:section)|$expectedStatus"]++
+    }
     if ($rowMatch.Groups['status'].Value -ne $expectedStatus) {
         $script:statusChangeCount++
     }
@@ -243,8 +245,8 @@ if ($rowCount -ne 1520) {
 }
 
 $summaryReplacements = @{
-    '(?m)^[ \t]*\*[ \t]+STATUS TOTALS:[^\r\n]*(\r?)$' =
-        " * STATUS TOTALS: ACTIVE=$($counts['TOTAL|ACTIVE']), DOC=$($counts['TOTAL|DOC']), DORMANT=$($counts['TOTAL|DORMANT'])"
+    '(?m)^[ \t]*\*[ \t]+STATUS TOTALS(?: \(excludes 3 shared MSG aliases\))?:[^\r\n]*(\r?)$' =
+        " * STATUS TOTALS (excludes 3 shared MSG aliases): ACTIVE=$($counts['TOTAL|ACTIVE']), DOC=$($counts['TOTAL|DOC']), DORMANT=$($counts['TOTAL|DORMANT'])"
     '(?m)^[ \t]*\*[ \t]+SMSG: ACTIVE=[^\r\n]*(\r?)$' =
         " *   SMSG: ACTIVE=$($counts['S|ACTIVE']), DOC=$($counts['S|DOC']), DORMANT=$($counts['S|DORMANT'])"
     '(?m)^[ \t]*\*[ \t]+CMSG: ACTIVE=[^\r\n]*(\r?)$' =
