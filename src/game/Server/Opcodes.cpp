@@ -1247,11 +1247,12 @@ void InitializeOpcodes()
     // it is that the ten retail 0x0F71 captures are consumed byte-exact by that
     // reader (capture-000499 seq 777, 65 of 65 bytes).
     //
-    // The rebuilt body and the three uint32 whose identity is still open are
-    // documented at MopGuildPackets::BuildGuildInvite. Those three are cosmetic:
-    // two tabard colours that may be transposed, one realm pair that cannot be
-    // observed because guild invites are same-realm, and the guild level. None
-    // affects whether the popup appears or the accept path works.
+    // The rebuilt body is documented at MopGuildPackets::BuildGuildInvite. The
+    // tabard colours and the guild level were open when this was written and are
+    // now settled by the client's own consumer; only the realm pair at positions
+    // 7 and 9 is still ambiguous, and a guild invite is same-realm so the wire
+    // cannot show the difference. None of it affects whether the popup appears
+    // or the accept path works.
     DefC(CMSG_GUILD_INVITE, "CMSG_GUILD_INVITE", STATUS_LOGGEDIN, PROCESS_THREADUNSAFE, &WorldSession::HandleGuildInviteOpcode);
     DefS(SMSG_GUILD_INVITE, "SMSG_GUILD_INVITE");
 

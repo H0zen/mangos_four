@@ -433,13 +433,6 @@ namespace
         //
         // Creatures are unaffected: BuildMopUnitStaticFields still carries the
         // field, and a creature create demonstrably does animate.
-        // The packed appearance words. These must be in the CREATE, not left
-        // to the changed-value path: Object::ClearUpdateMask drops the change
-        // flags on entering the world, and PLAYER_BYTES in particular never
-        // changes again afterwards, so an observer that only ever saw the
-        // create would otherwise never learn this player's hair, facial hair
-        // or gender at all. Zero is meaningful for all three (male, sober,
-        // no arena faction), so they are emitted unconditionally.
         // Guild rank, which an observer needs from the create and not from the
         // changed-value path: ClearUpdateMask drops the change flags on entering
         // the world, so a watcher that only saw the create would read rank 0 --
@@ -451,6 +444,13 @@ namespace
         // zero in a create, so omitting says exactly what sending would, and zero
         // is the correct value for a real guildmaster.
         addTranslated(PLAYER_GUILDRANK, true);
+        // The packed appearance words. These must be in the CREATE, not left
+        // to the changed-value path: Object::ClearUpdateMask drops the change
+        // flags on entering the world, and PLAYER_BYTES in particular never
+        // changes again afterwards, so an observer that only ever saw the
+        // create would otherwise never learn this player's hair, facial hair
+        // or gender at all. Zero is meaningful for all three (male, sober,
+        // no arena faction), so they are emitted unconditionally.
         addTranslated(PLAYER_BYTES);
         addTranslated(PLAYER_BYTES_2);
         addTranslated(PLAYER_BYTES_3);

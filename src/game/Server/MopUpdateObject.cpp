@@ -163,10 +163,6 @@ bool MopUpdateObject::TranslateObserverPlayerIndex(uint16 legacyIndex, uint16& t
         // Emote state, so an observer sees a state emote end. Without this a
         // watcher keeps rendering the dance after the dancer has walked away.
         case 83: targetIndex = 89; return true; // emote state
-        // Packed appearance words, all PUBLIC in the legacy layout and all
-        // previously dropped here. Facial hair and gender are visible to
-        // other players, not just to the owner. See the self projection for
-        // where these indices come from.
         // Guild rank. PUBLIC in the legacy layout and carried in updateVisualBits,
         // and the field the client answers IsGuildLeader() from: it looks its own
         // rank id up in the rank list and reports leader when that rank's order is
@@ -174,6 +170,10 @@ bool MopUpdateObject::TranslateObserverPlayerIndex(uint16 legacyIndex, uint16& t
         // guild. Every IsGuildLeader()-gated control -- the Guild Control button
         // among them -- then opens for an Initiate.
         case 158: targetIndex = 163; return true; // guild rank
+        // Packed appearance words, all PUBLIC in the legacy layout and all
+        // previously dropped here. Facial hair and gender are visible to
+        // other players, not just to the owner. See the self projection for
+        // where these indices come from.
         case 161: targetIndex = 166; return true; // skin/face/hair/hair colour
         case 162: targetIndex = 167; return true; // facial hair, rest state
         case 163: targetIndex = 168; return true; // gender, drunk, arena faction

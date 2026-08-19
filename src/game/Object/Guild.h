@@ -1531,11 +1531,14 @@ class Guild
         // unconditionally; and any stored mask lacking bit 6 ANDed to 0 against
         // the low constants, which also read as granted.
         //
-        // What that actually let through: bank tab rename and re-icon, with no
-        // further gate. Gold withdrawal and guild-funded repair were still
-        // bounded by the rank's per-day allowance, which is 0 for a rank created
-        // by CreateRank -- so the hole there was real but confined to ranks the
-        // leader had given an allowance without ticking the matching box.
+        // What that actually let through: nothing, yet. All three rights that
+        // both fail open and have a caller -- WITHDRAW_GOLD at
+        // HandleGuildBankWithdrawMoney, MODIFY_BANK_TABS at
+        // HandleGuildBankUpdateTab, WITHDRAW_REPAIR at PlayerDurability -- sit
+        // behind opcodes that are still dormant, so no client could reach any of
+        // them. The predicate was wrong regardless and is worth fixing before
+        // those opcodes register, not after; do not read this as the hole having
+        // been exploitable.
         bool HasRankRight(uint32 rankId, uint32 right)
         {
             if (rankId >= m_Ranks.size())
