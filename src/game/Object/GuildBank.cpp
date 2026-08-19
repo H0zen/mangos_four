@@ -899,7 +899,8 @@ bool Guild::AppendDisplayGuildBankSlot(MopGuildBankPackets::GuildBankList& list,
     if (pItem)
     {
         record.present = true;
-        // The client copies this field to bank-cache +0x40 (sub_971019), and of
+        // The client copies this field to bank-cache +0x40 (the routine at
+        // 0x971019, which IDA does not define as a function), and of
         // the ten functions reaching a cache record through sub_96EDC2 only
         // sub_8D02D8 -- SetGuildBankItem, the tooltip path -- reads it, testing
         // bit 2. Bit 2 is ITEM_DYNFLAG_UNLOCKED, which this server does model and
@@ -925,9 +926,13 @@ bool Guild::AppendDisplayGuildBankSlot(MopGuildBankPackets::GuildBankList& list,
         }
         record.permanentEnchantId = pItem->GetEnchantmentId(PERM_ENCHANTMENT_SLOT);
         record.entry = pItem->GetEntry();
-        int32 spellCharges = pItem->GetSpellCharges();
-        record.spellCharges = spellCharges < 0
-            ? uint32(-int64(spellCharges)) : uint32(spellCharges);
+        // Raw, sign bit and all. A negative charge count is what marks an item
+        // consumed on use, and every other serializer in this core sends it
+        // unchanged -- AuctionHouseMgr, TradeHandler and MailHandler all cast
+        // straight to uint32. Taking the absolute value here turned a -1 into a
+        // 1, which tells the client the opposite of the truth. No corpus record
+        // exercises it: all fifteen items in capture-000601 seq 1289646 carry 0.
+        record.spellCharges = uint32(pItem->GetSpellCharges());
         record.stackCount = pItem->GetCount();
         record.randomPropertyId = pItem->GetItemRandomPropertyId();
         record.suffixFactor = pItem->GetItemSuffixFactor();
