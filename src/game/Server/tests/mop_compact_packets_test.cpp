@@ -1022,7 +1022,13 @@ static void test_guild_bank_deposit_money_matches_capture()
 // and present bytes in {1,4,6,7,3,5,2,0} each XOR one. It cannot prove those
 // orders are right; what it protects is that nobody transposes one of them
 // later, which is otherwise invisible because the reader has no corpus anchor.
-// The guid is a real bank gameobject, taken from the deposit capture.
+// The first guid is a real bank gameobject, taken from the deposit capture.
+//
+// TWO vectors, deliberately, and the second is not padding. A single vector
+// cannot catch a transposed maskOrder: every present bit in it is 1, so swapping
+// two present slots decodes identically and only a present-versus-absent swap
+// shows up. The two guids zero DIFFERENT byte indices -- 2 and 3 in the first,
+// 1 and 5 in the second -- so a swap invisible to one is visible to the other.
 static void test_guild_bank_buy_tab_round_trip()
 {
     std::vector<uint8_t> const body =
@@ -1035,6 +1041,18 @@ static void test_guild_bank_buy_tab_round_trip()
     CHECK(tabId == 3);
     CHECK(guid.GetRawValue() == UINT64_C(0xF113426F0000070F));
     CHECK(packet.rpos() == packet.size());
+
+    // Zeros at byte indices 1 and 5 rather than 2 and 3.
+    std::vector<uint8_t> const second =
+        { 0x00, 0xBD, 0x12, 0x12, 0xF0, 0x6E, 0x06, 0x43 };
+
+    WorldPacket other = InputPacket(CMSG_GUILD_BANK_BUY_TAB, second);
+    uint8 otherTab = 0xFF;
+    ObjectGuid otherGuid(UINT64_C(0xFFFFFFFFFFFFFFFF));
+    CHECK(MopCompactPackets::ReadGuildBankBuyTab(other, otherTab, otherGuid));
+    CHECK(otherTab == 0);
+    CHECK(otherGuid.GetRawValue() == UINT64_C(0xF11300136F070042));
+    CHECK(other.rpos() == other.size());
 
     std::vector<std::vector<uint8_t>> malformed;
     for (size_t size = 0; size < body.size(); ++size)

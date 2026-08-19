@@ -1106,8 +1106,11 @@ namespace MopCompactPackets
     /// packed GUID. The inherited handler read a raw eight-byte GUID and THEN the
     /// tab, so it had both the order and the encoding wrong.
     ///
-    /// No capture of this opcode exists anywhere in the 18414 corpus, so these
-    /// orders have never met a real body. Binary Ninja and IDA were read
+    /// No capture of this opcode exists at build 18414, so these orders have
+    /// never met a real body. (Joining by value AND direction, CMSG 593 does
+    /// appear at other builds, but every one of those bodies is a single byte,
+    /// which this writer cannot produce -- it always emits at least a tab and a
+    /// mask -- so they are a different opcode at those builds.) Binary Ninja and IDA were read
     /// independently and agree on both, and the function ends at 0x6882BC right
     /// after the eighth byte write, so nothing follows the GUID.
     ///

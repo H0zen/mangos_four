@@ -1443,7 +1443,7 @@ void WorldSession::HandleGuildBankDepositMoney(WorldPacket& recv_data)
     // so any arithmetic on the total would write a wrong one durably.
     if (!pGuild->IsBankStateTrusted())
     {
-        sLog.outError("%s: refused for player %u -- guild %u bank total is untrusted "
+        sLog.outError("%s: refused for player %u -- guild %u bank state is untrusted "
             "after an unrecoverable commit; reload the guild",
             "CMSG_GUILD_BANK_DEPOSIT_MONEY", GetPlayer()->GetGUIDLow(), GuildId);
         return;
@@ -1531,7 +1531,7 @@ void WorldSession::HandleGuildBankWithdrawMoney(WorldPacket& recv_data)
     // so any arithmetic on the total would write a wrong one durably.
     if (!pGuild->IsBankStateTrusted())
     {
-        sLog.outError("%s: refused for player %u -- guild %u bank total is untrusted "
+        sLog.outError("%s: refused for player %u -- guild %u bank state is untrusted "
             "after an unrecoverable commit; reload the guild",
             "CMSG_GUILD_BANK_WITHDRAW_MONEY", GetPlayer()->GetGUIDLow(), GuildId);
         return;
@@ -1766,13 +1766,18 @@ void WorldSession::HandleGuildBankBuyTab(WorldPacket& recv_data)
     // guild's first one and hand their own rank unlimited withdrawal on it.
     if (GetPlayer()->GetObjectGuid() != pGuild->GetLeaderGuid())
     {
-        SendGuildCommandResult(GUILD_UNK1, "", ERR_GUILD_PERMISSIONS);
+        SendGuildCommandResult(GUILD_INVITE_S, "", ERR_GUILD_PERMISSIONS);
         return;
     }
 
-    // Same gate the money handlers carry. This handler's own recovery is what
-    // sets the flag, and without it a later purchase is refused silently by the
-    // TabId != GetPurchasedTabs() check below, which is safe but undiagnosable.
+    // Same gate the money handlers carry, and this one is load-bearing rather
+    // than diagnostic -- do not remove it on the assumption that the
+    // TabId != GetPurchasedTabs() check below already refuses. It does not.
+    // CreateNewBankTab pushes onto m_TabListMap before the commit and
+    // GetPurchasedTabs() is that vector's size, so an ambiguous commit leaves the
+    // count already incremented: the leader relogs, the client offers tab N+1,
+    // and N+1 != N+1 is false, so the retry sails through and buys a second tab
+    // on top of a phantom one.
     if (!pGuild->IsBankStateTrusted())
     {
         sLog.outError("CMSG_GUILD_BANK_BUY_TAB: refused for player %u -- guild %u "
@@ -1815,7 +1820,15 @@ void WorldSession::HandleGuildBankBuyTab(WorldPacket& recv_data)
     pGuild->CreateNewBankTab();
     GetPlayer()->ModifyMoney(-int64(TabCost));
     GetPlayer()->SaveGoldToDB();
-    pGuild->SetBankRightsAndSlots(GetPlayer()->GetRank(), TabId, GUILD_BANK_RIGHT_FULL, WITHDRAW_SLOT_UNLIMITED, true);
+    // GR_GUILDMASTER, not the buyer's rank. Those are the same thing only while
+    // the leader sits at rank 0, and that invariant is not this file's to rely
+    // on: .guild rank calls ChangeRank on any member with no leader check and no
+    // repair, so a GM can move the leader to rank 3 while m_LeaderGuid stays put.
+    // The gate above would still pass, and granting to the buyer's rank would
+    // then hand every rank-3 member full unlimited rights on the new tab -- the
+    // exact escalation the gate exists to stop. Naming the rank says what a tab
+    // purchase actually means and cannot drift.
+    pGuild->SetBankRightsAndSlots(GR_GUILDMASTER, TabId, GUILD_BANK_RIGHT_FULL, WITHDRAW_SLOT_UNLIMITED, true);
 
     if (!CharacterDatabase.CommitTransactionDirect())
     {
