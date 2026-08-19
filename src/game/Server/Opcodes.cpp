@@ -1410,6 +1410,14 @@ void InitializeOpcodes()
     DefC(CMSG_GUILD_BANK_WITHDRAW_MONEY, "CMSG_GUILD_BANK_WITHDRAW_MONEY", STATUS_LOGGEDIN, PROCESS_THREADUNSAFE, &WorldSession::HandleGuildBankWithdrawMoney);
     DefS(SMSG_GUILD_EVENT_BANK_MONEY_CHANGED, "SMSG_GUILD_EVENT_BANK_MONEY_CHANGED");
 
+    // Buying a tab. Its body is the tab id as a plain byte and THEN the packed
+    // bank guid; the inherited handler read a raw guid first and the tab second,
+    // so it had the order and the encoding wrong. Derived from the client's
+    // writer sub_688164, read the same way in Binary Ninja and IDA. No corpus
+    // body exists for this opcode. It answers with a roster broadcast and a bank
+    // list, not with the money-changed packet above.
+    DefC(CMSG_GUILD_BANK_BUY_TAB, "CMSG_GUILD_BANK_BUY_TAB", STATUS_LOGGEDIN, PROCESS_THREADUNSAFE, &WorldSession::HandleGuildBankBuyTab);
+
     DefC(CMSG_GUILD_BANKER_ACTIVATE, "CMSG_GUILD_BANKER_ACTIVATE", STATUS_LOGGEDIN, PROCESS_THREADUNSAFE, &WorldSession::HandleGuildBankerActivate);
     DefC(CMSG_GUILD_BANK_QUERY_TAB, "CMSG_GUILD_BANK_QUERY_TAB", STATUS_LOGGEDIN, PROCESS_THREADUNSAFE, &WorldSession::HandleGuildBankQueryTab);
     DefS(SMSG_GUILD_BANK_LIST, "SMSG_GUILD_BANK_LIST");

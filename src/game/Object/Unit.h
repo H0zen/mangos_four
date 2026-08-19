@@ -1101,6 +1101,82 @@ namespace MopCompactPackets
         return ReadGuildBankMoneyBody(in, money, bankGuid, maskOrder, byteOrder);
     }
 
+    /// CMSG_GUILD_BANK_BUY_TAB (0x0251), writer sub_688164: the tab id as a
+    /// plain byte -- written raw, not XOR-obfuscated -- then the bank object's
+    /// packed GUID. The inherited handler read a raw eight-byte GUID and THEN the
+    /// tab, so it had both the order and the encoding wrong.
+    ///
+    /// No capture of this opcode exists anywhere in the 18414 corpus, so these
+    /// orders have never met a real body. Binary Ninja and IDA were read
+    /// independently and agree on both, and the function ends at 0x6882BC right
+    /// after the eighth byte write, so nothing follows the GUID.
+    ///
+    /// ReadPrefixedPackedValue below walks this same shape for two other opcodes,
+    /// but it performs no validation at all. Buying a tab spends gold, so this
+    /// one rejects rather than returns whatever it happened to read.
+    inline bool ReadGuildBankBuyTab(WorldPacket& in, uint8& tabId,
+        ObjectGuid& bankGuid)
+    {
+        size_t const remaining = in.size() - in.rpos();
+        if (remaining < 2)
+        {
+            in.rfinish();
+            return false;
+        }
+
+        uint8 const mask = in[in.rpos() + 1];
+        size_t guidByteCount = 0;
+        for (uint8 bits = mask; bits; bits >>= 1)
+        {
+            guidByteCount += bits & 1;
+        }
+        if (remaining != 2 + guidByteCount)
+        {
+            in.rfinish();
+            return false;
+        }
+
+        for (size_t index = in.rpos() + 2; index < in.size(); ++index)
+        {
+            if (in[index] == 1)
+            {
+                in.rfinish();
+                return false;
+            }
+        }
+
+        uint8 parsedTab = 0;
+        in >> parsedTab;
+
+        uint8 const maskOrder[] = { 0, 1, 3, 7, 2, 6, 5, 4 };
+        uint8 const byteOrder[] = { 1, 4, 6, 7, 3, 5, 2, 0 };
+        uint8 guid[8] = { 0, 0, 0, 0, 0, 0, 0, 0 };
+        in.ResetBitReader();
+        for (uint8 index = 0; index < 8; ++index)
+        {
+            guid[maskOrder[index]] = in.ReadBit();
+        }
+        for (uint8 index = 0; index < 8; ++index)
+        {
+            in.ReadByteSeq(guid[byteOrder[index]]);
+        }
+
+        uint64 raw = 0;
+        for (uint8 index = 0; index < 8; ++index)
+        {
+            raw |= uint64(guid[index]) << (8 * index);
+        }
+        if (raw == 0 || in.rpos() != in.size())
+        {
+            in.rfinish();
+            return false;
+        }
+
+        tabId = parsedTab;
+        bankGuid = ObjectGuid(raw);
+        return true;
+    }
+
     /// A plain byte, then one mask byte, then the present bytes of a packed
     /// eight-byte value. Two unrelated opcodes share this exact shape at 18414
     /// and differ only in their orders, so the walk is written once.

@@ -1015,6 +1015,49 @@ static void test_guild_bank_deposit_money_matches_capture()
     }
 }
 
+// CMSG_GUILD_BANK_BUY_TAB. NO retail body of this opcode exists in the 18414
+// corpus, so unlike the deposit fixture above this one is SYNTHETIC: it is built
+// from the client writer sub_688164's own orders -- tab id as a plain
+// unobfuscated byte, then mask bits MSB-first over guid indices {0,1,3,7,2,6,5,4}
+// and present bytes in {1,4,6,7,3,5,2,0} each XOR one. It cannot prove those
+// orders are right; what it protects is that nobody transposes one of them
+// later, which is otherwise invisible because the reader has no corpus anchor.
+// The guid is a real bank gameobject, taken from the deposit capture.
+static void test_guild_bank_buy_tab_round_trip()
+{
+    std::vector<uint8_t> const body =
+        { 0x03, 0xD7, 0x06, 0x6E, 0x12, 0xF0, 0x43, 0x0E };
+
+    WorldPacket packet = InputPacket(CMSG_GUILD_BANK_BUY_TAB, body);
+    uint8 tabId = 0xFF;
+    ObjectGuid guid(UINT64_C(0xFFFFFFFFFFFFFFFF));
+    CHECK(MopCompactPackets::ReadGuildBankBuyTab(packet, tabId, guid));
+    CHECK(tabId == 3);
+    CHECK(guid.GetRawValue() == UINT64_C(0xF113426F0000070F));
+    CHECK(packet.rpos() == packet.size());
+
+    std::vector<std::vector<uint8_t>> malformed;
+    for (size_t size = 0; size < body.size(); ++size)
+    {
+        malformed.emplace_back(body.begin(), body.begin() + size);
+    }
+    std::vector<uint8_t> trailing = body;
+    trailing.push_back(0x00);
+    malformed.push_back(trailing);
+    malformed.push_back({ 0x03, 0xD7, 0x01, 0x6E, 0x12, 0xF0, 0x43, 0x0E }); // decodes to zero
+    malformed.push_back({ 0x03, 0x00 });                                     // all-zero guid
+
+    for (std::vector<uint8_t> const& bad : malformed)
+    {
+        WorldPacket rejected = InputPacket(CMSG_GUILD_BANK_BUY_TAB, bad);
+        uint8 rejectedTab = 0xFF;
+        ObjectGuid rejectedGuid(UINT64_C(0xFFFFFFFFFFFFFFFF));
+        CHECK(!MopCompactPackets::ReadGuildBankBuyTab(rejected, rejectedTab, rejectedGuid));
+        CHECK(rejected.rpos() == rejected.size());
+        CHECK(rejectedGuid.GetRawValue() == UINT64_C(0xFFFFFFFFFFFFFFFF));
+    }
+}
+
 static void test_combo_points_packet()
 {
     WorldPacket packet;
@@ -2272,6 +2315,7 @@ int main(int /*argc*/, char** /*argv*/)
     test_guild_banker_activate_rejects_malformed_bodies();
     test_pre_resurrect_packet();
     test_guild_bank_deposit_money_matches_capture();
+    test_guild_bank_buy_tab_round_trip();
     test_combo_points_packet();
     test_instance_reset_result_bodies();
 

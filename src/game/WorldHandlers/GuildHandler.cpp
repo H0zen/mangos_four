@@ -123,7 +123,7 @@ namespace
             // to it and writes the result out durably, so the error compounds
             // and lands on someone else. Refuse money operations until the guild
             // is reloaded.
-            guild->MarkBankMoneyUntrusted();
+            guild->MarkBankStateUntrusted();
             recovered = false;
         }
 
@@ -1438,10 +1438,10 @@ void WorldSession::HandleGuildBankDepositMoney(WorldPacket& recv_data)
         return;
     }
 
-    // Refuse while the bank total is untrusted: an earlier ambiguous commit left
-    // memory possibly disagreeing with the row and the row could not be re-read,
-    // so any arithmetic on it would write a wrong total durably.
-    if (!pGuild->IsBankMoneyTrusted())
+    // Refuse while the bank state is untrusted: an earlier ambiguous commit left
+    // memory possibly disagreeing with the rows and they could not be re-read,
+    // so any arithmetic on the total would write a wrong one durably.
+    if (!pGuild->IsBankStateTrusted())
     {
         sLog.outError("%s: refused for player %u -- guild %u bank total is untrusted "
             "after an unrecoverable commit; reload the guild",
@@ -1526,10 +1526,10 @@ void WorldSession::HandleGuildBankWithdrawMoney(WorldPacket& recv_data)
         return;
     }
 
-    // Refuse while the bank total is untrusted: an earlier ambiguous commit left
-    // memory possibly disagreeing with the row and the row could not be re-read,
-    // so any arithmetic on it would write a wrong total durably.
-    if (!pGuild->IsBankMoneyTrusted())
+    // Refuse while the bank state is untrusted: an earlier ambiguous commit left
+    // memory possibly disagreeing with the rows and they could not be re-read,
+    // so any arithmetic on the total would write a wrong one durably.
+    if (!pGuild->IsBankStateTrusted())
     {
         sLog.outError("%s: refused for player %u -- guild %u bank total is untrusted "
             "after an unrecoverable commit; reload the guild",
@@ -1599,6 +1599,23 @@ void WorldSession::HandleGuildBankWithdrawMoney(WorldPacket& recv_data)
 void WorldSession::HandleGuildBankSwapItems(WorldPacket& recv_data)
 {
     DEBUG_LOG("WORLD: Received (CMSG_GUILD_BANK_SWAP_ITEMS)");
+
+    // Closed ahead of this opcode being registered, because the consequence is
+    // permanent. A tab purchase whose commit could not be confirmed can leave a
+    // tab in memory with no guild_bank_tab row; storing an item into it writes a
+    // guild_bank_item row with a TabId that LoadGuildBankFromDB then drops, and
+    // the item is gone for good. Refuse while the bank state is untrusted.
+    if (Guild* untrustedGuild = sGuildMgr.GetGuildById(GetPlayer()->GetGuildId()))
+    {
+        if (!untrustedGuild->IsBankStateTrusted())
+        {
+            sLog.outError("CMSG_GUILD_BANK_SWAP_ITEMS: refused for player %u -- guild %u "
+                "bank state is untrusted after an unrecoverable commit; reload the guild",
+                GetPlayer()->GetGUIDLow(), GetPlayer()->GetGuildId());
+            recv_data.rfinish();
+            return;
+        }
+    }
 
     ObjectGuid goGuid;
     uint8 BankToBank;
@@ -1713,10 +1730,12 @@ void WorldSession::HandleGuildBankBuyTab(WorldPacket& recv_data)
     DEBUG_LOG("WORLD: Received (CMSG_GUILD_BANK_BUY_TAB)");
 
     ObjectGuid goGuid;
-    uint8 TabId;
-
-    recv_data >> goGuid;
-    recv_data >> TabId;
+    uint8 TabId = 0;
+    if (!MopCompactPackets::ReadGuildBankBuyTab(recv_data, TabId, goGuid))
+    {
+        DEBUG_LOG("WORLD: Rejected malformed CMSG_GUILD_BANK_BUY_TAB");
+        return;
+    }
 
     if (!GetPlayer()->GetGameObjectIfCanInteractWith(goGuid, GAMEOBJECT_TYPE_GUILD_BANK))
     {
@@ -1732,6 +1751,33 @@ void WorldSession::HandleGuildBankBuyTab(WorldPacket& recv_data)
     Guild* pGuild = sGuildMgr.GetGuildById(GuildId);
     if (!pGuild)
     {
+        return;
+    }
+
+    // Only the leader may buy a tab, and this is a privilege check rather than a
+    // fidelity one. The purchase grants GUILD_BANK_RIGHT_FULL and
+    // WITHDRAW_SLOT_UNLIMITED to the BUYER'S OWN RANK a few lines below. For the
+    // guild master that does nothing -- rank 0 short-circuits true in
+    // IsMemberHaveRights and SetBankRightsAndSlots already forces it full -- so
+    // the grant only ever changes anything when the buyer is NOT the master,
+    // which is precisely the case the client never offers: Blizzard_GuildBankUI
+    // enables Purchase behind IsGuildLeader(), and BuyGuildBankTab() takes no
+    // arguments. Without this, any member who could afford a tab could buy the
+    // guild's first one and hand their own rank unlimited withdrawal on it.
+    if (GetPlayer()->GetObjectGuid() != pGuild->GetLeaderGuid())
+    {
+        SendGuildCommandResult(GUILD_UNK1, "", ERR_GUILD_PERMISSIONS);
+        return;
+    }
+
+    // Same gate the money handlers carry. This handler's own recovery is what
+    // sets the flag, and without it a later purchase is refused silently by the
+    // TabId != GetPurchasedTabs() check below, which is safe but undiagnosable.
+    if (!pGuild->IsBankStateTrusted())
+    {
+        sLog.outError("CMSG_GUILD_BANK_BUY_TAB: refused for player %u -- guild %u "
+            "bank state is untrusted after an unrecoverable commit; reload the guild",
+            GetPlayer()->GetGUIDLow(), GuildId);
         return;
     }
 
@@ -1753,10 +1799,53 @@ void WorldSession::HandleGuildBankBuyTab(WorldPacket& recv_data)
         return;
     }
 
-    // Go on with creating tab
+    // The tab rows, the gold and the rank's rights on the new tab are one
+    // purchase and must land together. They did not: the tab rows went out in
+    // CreateNewBankTab's own sub-transaction, the rights as a bare PExecute, and
+    // the gold was only a memory change left for the next periodic save. Nothing
+    // tied them, so a failure between them left a tab paid for and not created,
+    // or created and not paid for.
+    if (!CharacterDatabase.BeginTransaction())
+    {
+        sLog.outError("CMSG_GUILD_BANK_BUY_TAB: could not begin a transaction for player %u",
+            GetPlayer()->GetGUIDLow());
+        return;
+    }
+
     pGuild->CreateNewBankTab();
     GetPlayer()->ModifyMoney(-int64(TabCost));
+    GetPlayer()->SaveGoldToDB();
     pGuild->SetBankRightsAndSlots(GetPlayer()->GetRank(), TabId, GUILD_BANK_RIGHT_FULL, WITHDRAW_SLOT_UNLIMITED, true);
+
+    if (!CharacterDatabase.CommitTransactionDirect())
+    {
+        // Same ambiguity as the money handlers, with more state behind it: the
+        // purchased-tab count, the tab list entry and the rank's rights on that
+        // tab are all published to memory by now. Only the player's gold is
+        // re-read: the tab and its rights could be read back too, but correcting
+        // them in memory is the thing that cannot be done safely, since popping a
+        // tab whose commit actually landed creates the inverse phantom. So adopt
+        // the gold and mark the whole bank state untrusted, which stops money AND
+        // item operations until a reload settles what really happened.
+        if (QueryResult* durable = CharacterDatabase.PQuery(
+            "SELECT `money` FROM `characters` WHERE `guid` = '%u'", GetPlayer()->GetGUIDLow()))
+        {
+            GetPlayer()->SetMoney((*durable)[0].GetUInt64());
+            delete durable;
+        }
+        else
+        {
+            SuppressCharacterSave();
+        }
+
+        pGuild->MarkBankStateUntrusted();
+        sLog.outError("CMSG_GUILD_BANK_BUY_TAB: commit could not be confirmed for player %u "
+            "and guild %u; the guild's bank state is untrusted until it is reloaded",
+            GetPlayer()->GetGUIDLow(), GuildId);
+        KickPlayer();
+        return;
+    }
+
     pGuild->Roster();                                       // broadcast for tab rights update
     pGuild->DisplayGuildBankTabsInfo(this, TabId);
 }

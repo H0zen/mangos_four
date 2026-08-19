@@ -1609,6 +1609,7 @@ class Guild
 
         // Tabs
         void   DisplayGuildBankTabsInfo(WorldSession* session, uint8 TabId = 0);
+        /// Queues its rows into the caller's transaction and does not commit.
         void   CreateNewBankTab();
         void   SetGuildBankTabText(uint8 TabId, std::string text);
         void   SendGuildBankTabText(WorldSession* session, uint8 TabId);
@@ -1641,14 +1642,20 @@ class Guild
             }
         }
 
-        /// Set when an ambiguous commit leaves the in-memory bank total possibly
-        /// disagreeing with the row and the row could not be re-read. While it
-        /// holds, the money handlers refuse: the next deposit would otherwise
-        /// compute a new total from the untrusted one and write THAT durably,
-        /// minting or burning the difference on behalf of a different player.
-        /// Only a reload of the guild clears it.
-        bool   IsBankMoneyTrusted() const { return m_bankMoneyTrusted; }
-        void   MarkBankMoneyUntrusted() { m_bankMoneyTrusted = false; }
+        /// Set when an ambiguous commit leaves the in-memory bank state possibly
+        /// disagreeing with the rows and the rows could not be re-read. It covers
+        /// the bank TOTAL and the purchased-tab list, not money alone.
+        ///
+        /// Money, because the next deposit would otherwise compute a new total
+        /// from an untrusted one and write THAT durably, minting or burning the
+        /// difference on behalf of a different player. Tabs, because a purchase
+        /// whose commit could not be confirmed may leave a tab in m_TabListMap
+        /// that has no guild_bank_tab row: an item stored into it would write a
+        /// guild_bank_item row whose TabId no reload can match, and
+        /// LoadGuildBankFromDB drops exactly those rows -- the item would be gone
+        /// for good. Only a reload of the guild clears the flag.
+        bool   IsBankStateTrusted() const { return m_bankStateTrusted; }
+        void   MarkBankStateUntrusted() { m_bankStateTrusted = false; }
         // per days
         bool   MemberItemWithdraw(uint8 TabId, uint32 LowGuid);
         uint32 GetMemberSlotWithdrawRem(uint32 LowGuid, uint8 TabId);
@@ -1702,7 +1709,7 @@ class Guild
         uint32 m_GuildBankEventLogNextGuid_Item[GUILD_BANK_MAX_TABS];
 
         uint64 m_GuildBankMoney;
-        bool   m_bankMoneyTrusted = true;
+        bool   m_bankStateTrusted = true;
 
     private:
         void UpdateAccountsNumber() { m_accountsNumber = 0;}// mark for lazy calculation at request in GetAccountsNumber

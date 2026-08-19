@@ -256,10 +256,13 @@ void Guild::CreateNewBankTab()
     uint32 tabId = GetPurchasedTabs();                      // next free id
     m_TabListMap.push_back(new GuildBankTab);
 
-    CharacterDatabase.BeginTransaction();
+    // Queue only -- the CALLER owns the transaction. This used to open its own,
+    // which was worse than redundant: Database::BeginTransaction calls init() on
+    // the per-thread storage, so opening one inside another DISCARDS whatever the
+    // outer had already queued. Buying a tab has to be one transaction with the
+    // gold it costs, so the begin and the commit belong to the handler.
     CharacterDatabase.PExecute("DELETE FROM `guild_bank_tab` WHERE `guildid`='%u' AND `TabId`='%u'", m_Id, tabId);
     CharacterDatabase.PExecute("INSERT INTO `guild_bank_tab` (`guildid`,`TabId`) VALUES ('%u','%u')", m_Id, tabId);
-    CharacterDatabase.CommitTransaction();
 }
 
 void Guild::SetGuildBankTabInfo(uint8 TabId, std::string Name, std::string Icon)

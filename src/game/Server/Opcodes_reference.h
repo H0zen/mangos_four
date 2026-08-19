@@ -1366,7 +1366,7 @@ typedef uint16_t uint16;
  *   CMSG_SET_LFG_BONUS_FACTION_ID                  0x0247  DOC
  *   CMSG_SETSHEATHED                               0x0249  ACTIVE
  *   CMSG_CANCEL_TEMP_ENCHANTMENT                   0x024B  DORMANT
- *   CMSG_GUILD_BANK_BUY_TAB                        0x0251  DORMANT
+ *   CMSG_GUILD_BANK_BUY_TAB                        0x0251  ACTIVE   from client writer sub_688164; NO corpus body exists
  *   CMSG_PETITION_QUERY                            0x0255  ACTIVE
  *   CMSG_LEAVE_BATTLEFIELD                         0x0257  ACTIVE
  *   CMSG_AUCTION_REMOVE_ITEM                       0x0259  DORMANT
