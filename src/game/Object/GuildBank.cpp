@@ -128,26 +128,6 @@ void Guild::DisplayGuildBankContent(WorldSession* session, uint8 TabId,
         TabId, uint32(list.items.size()));
 }
 
-void Guild::DisplayGuildBankMoneyUpdate()
-{
-    for (MemberList::const_iterator itr = members.begin(); itr != members.end(); ++itr)
-    {
-        Player* player = sObjectAccessor.FindPlayer(ObjectGuid(HIGHGUID_PLAYER, itr->first));
-        if (!player)
-        {
-            continue;
-        }
-
-        MopGuildBankPackets::GuildBankList list;
-        list.tabId = 0;
-        list.money = GetGuildBankMoney();
-        list.withdrawRemaining = int32(GetMemberSlotWithdrawRem(player->GetGUIDLow(), 0));
-        SendGuildBankList(player->GetSession(), list);
-    }
-
-    DEBUG_LOG("WORLD: Sent (SMSG_GUILD_BANK_LIST)");
-}
-
 void Guild::DisplayGuildBankContentUpdate(uint8 TabId, int32 slot1, int32 slot2)
 {
     if (TabId >= GetPurchasedTabs() || slot1 < 0 || slot1 >= GUILD_BANK_MAX_SLOTS ||

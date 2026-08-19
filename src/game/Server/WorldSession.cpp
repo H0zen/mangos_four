@@ -669,6 +669,8 @@ static bool IsEnterWorldConverted(uint16 opcode)
         case SMSG_GUILD_INVITE:               // MopGuildPackets::BuildGuildInvite, byte-exact vs capture-000499 seq 777
         case SMSG_TABARD_VENDOR_ACTIVATE:     // MopGuildPackets::BuildTabardVendorActivate
         case SMSG_SAVE_GUILD_EMBLEM:          // MopGuildPackets::BuildSaveGuildEmblemResult
+        case SMSG_GUILD_EVENT_BANK_MONEY_CHANGED: // MopGuildBankPackets::BuildGuildBankMoneyChanged; fixed 8 bytes,
+                                              // all 143 corpus bodies are that size, value is the new bank total
         case SMSG_GUILD_BANK_LIST:            // MopGuildBankPackets::BuildListBody, byte-exact vs capture-000601 seq 1289646
                                               // (723 bytes, fifteen present items)
         case SMSG_BINDER_CONFIRM:              // MopBindPackets::BuildBinderConfirm

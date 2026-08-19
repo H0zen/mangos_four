@@ -1001,6 +1001,106 @@ namespace MopCompactPackets
         return true;
     }
 
+    /// The two guild-bank money opcodes: a uint64 amount, then one mask byte,
+    /// then the present bytes of the bank object's packed GUID. Both writers --
+    /// sub_68E68D for deposit, sub_68D659 for withdraw -- emit the amount before
+    /// the bit section and differ only in their two orders, so the walk is
+    /// written once. The single retail deposit in the corpus is fifteen bytes
+    /// (capture-000888 sequence 307413): eight of amount, one mask, six present
+    /// GUID bytes. The inherited handlers read a raw eight-byte GUID for sixteen
+    /// bytes total and could not have parsed it.
+    inline bool ReadGuildBankMoneyBody(WorldPacket& in, uint64& money,
+        ObjectGuid& bankGuid,
+        uint8 const (&maskOrder)[8], uint8 const (&byteOrder)[8])
+    {
+        size_t const remaining = in.size() - in.rpos();
+        if (remaining < 9)
+        {
+            in.rfinish();
+            return false;
+        }
+
+        uint8 const mask = in[in.rpos() + 8];
+        size_t guidByteCount = 0;
+        for (uint8 bits = mask; bits; bits >>= 1)
+        {
+            guidByteCount += bits & 1;
+        }
+        if (remaining != 9 + guidByteCount)
+        {
+            in.rfinish();
+            return false;
+        }
+
+        // ReadByteSeq XORs each present wire byte with one, so a raw one decodes
+        // to zero despite its presence bit. Refuse rather than accept a GUID the
+        // client could not have written.
+        for (size_t index = in.rpos() + 9; index < in.size(); ++index)
+        {
+            if (in[index] == 1)
+            {
+                in.rfinish();
+                return false;
+            }
+        }
+
+        uint64 parsedMoney = 0;
+        in >> parsedMoney;
+
+        uint8 guid[8] = { 0, 0, 0, 0, 0, 0, 0, 0 };
+        in.ResetBitReader();
+        for (uint8 index = 0; index < 8; ++index)
+        {
+            guid[maskOrder[index]] = in.ReadBit();
+        }
+        for (uint8 index = 0; index < 8; ++index)
+        {
+            in.ReadByteSeq(guid[byteOrder[index]]);
+        }
+
+        uint64 raw = 0;
+        for (uint8 index = 0; index < 8; ++index)
+        {
+            raw |= uint64(guid[index]) << (8 * index);
+        }
+        if (raw == 0 || in.rpos() != in.size())
+        {
+            in.rfinish();
+            return false;
+        }
+
+        money = parsedMoney;
+        bankGuid = ObjectGuid(raw);
+        return true;
+    }
+
+    /// CMSG_GUILD_BANK_DEPOSIT_MONEY (0x0770), writer sub_68E68D. Verified
+    /// against capture-000888 sequence 307413: fifteen of fifteen bytes, one
+    /// gold, and a gameobject GUID as the handler's interaction check requires.
+    inline bool ReadGuildBankDepositMoney(WorldPacket& in, uint64& money,
+        ObjectGuid& bankGuid)
+    {
+        uint8 const maskOrder[] = { 2, 7, 6, 4, 0, 1, 5, 3 };
+        uint8 const byteOrder[] = { 1, 4, 5, 0, 2, 7, 6, 3 };
+        return ReadGuildBankMoneyBody(in, money, bankGuid, maskOrder, byteOrder);
+    }
+
+    /// CMSG_GUILD_BANK_WITHDRAW_MONEY (0x07EA), writer sub_68D659. NO retail
+    /// capture of this opcode exists anywhere in the 18414 corpus, so unlike
+    /// deposit these orders have never met a real body. They are not guesswork
+    /// either: IDA and Binary Ninja were read independently and agree on both,
+    /// and the function boundary was checked (sub_68D659 ends at 0x68D7B2, right
+    /// after the eighth byte write) so nothing follows the GUID and the reader's
+    /// insistence on consuming the whole body is right. The shape is otherwise
+    /// identical to deposit.
+    inline bool ReadGuildBankWithdrawMoney(WorldPacket& in, uint64& money,
+        ObjectGuid& bankGuid)
+    {
+        uint8 const maskOrder[] = { 1, 3, 7, 6, 5, 0, 4, 2 };
+        uint8 const byteOrder[] = { 0, 7, 4, 2, 1, 6, 3, 5 };
+        return ReadGuildBankMoneyBody(in, money, bankGuid, maskOrder, byteOrder);
+    }
+
     /// A plain byte, then one mask byte, then the present bytes of a packed
     /// eight-byte value. Two unrelated opcodes share this exact shape at 18414
     /// and differ only in their orders, so the walk is written once.

@@ -1597,7 +1597,6 @@ class Guild
         // Content & item deposit/withdraw
         void   DisplayGuildBankContent(WorldSession* session, uint8 TabId,
                     bool sendAllSlots = true, bool withTabInfo = false);
-        void   DisplayGuildBankMoneyUpdate();
 
         void   SwapItems(Player* pl, uint8 BankTab, uint8 BankTabSlot, uint8 BankTabDst, uint8 BankTabSlotDst, uint32 SplitedAmount);
         void   MoveFromBankToChar(Player* pl, uint8 BankTab, uint8 BankTabSlot, uint8 PlayerBag, uint8 PlayerSlot, uint32 SplitedAmount);
@@ -1625,6 +1624,31 @@ class Guild
         bool   MemberMoneyWithdraw(uint64 amount, uint32 LowGuid);
         uint64 GetGuildBankMoney() { return m_GuildBankMoney; }
         void   SetBankMoney(int64 money);
+        /// Memory only, no database write. For the recovery path after an
+        /// ambiguous commit, where the value has just been read back from the
+        /// database and writing it out again would be a pointless round trip
+        /// that could itself fail. Everywhere else wants SetBankMoney.
+        void   AdoptBankMoneyFromDB(uint64 money) { m_GuildBankMoney = money; }
+
+        /// Same, for one member's remaining daily withdrawal. A withdraw mutates
+        /// three balances, not two: the bank total, the player's money and this.
+        void   AdoptMemberRemainingWithdrawFromDB(uint32 lowGuid, uint32 remaining)
+        {
+            MemberList::iterator itr = members.find(lowGuid);
+            if (itr != members.end())
+            {
+                itr->second.BankRemMoney = remaining;
+            }
+        }
+
+        /// Set when an ambiguous commit leaves the in-memory bank total possibly
+        /// disagreeing with the row and the row could not be re-read. While it
+        /// holds, the money handlers refuse: the next deposit would otherwise
+        /// compute a new total from the untrusted one and write THAT durably,
+        /// minting or burning the difference on behalf of a different player.
+        /// Only a reload of the guild clears it.
+        bool   IsBankMoneyTrusted() const { return m_bankMoneyTrusted; }
+        void   MarkBankMoneyUntrusted() { m_bankMoneyTrusted = false; }
         // per days
         bool   MemberItemWithdraw(uint8 TabId, uint32 LowGuid);
         uint32 GetMemberSlotWithdrawRem(uint32 LowGuid, uint8 TabId);
@@ -1678,6 +1702,7 @@ class Guild
         uint32 m_GuildBankEventLogNextGuid_Item[GUILD_BANK_MAX_TABS];
 
         uint64 m_GuildBankMoney;
+        bool   m_bankMoneyTrusted = true;
 
     private:
         void UpdateAccountsNumber() { m_accountsNumber = 0;}// mark for lazy calculation at request in GetAccountsNumber

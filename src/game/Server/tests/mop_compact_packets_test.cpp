@@ -969,6 +969,52 @@ static void test_guild_banker_activate_rejects_malformed_bodies()
     }
 }
 
+// CMSG_GUILD_BANK_DEPOSIT_MONEY, the only retail body of this opcode in the
+// 18414 corpus (capture-000888 sequence 307413, fifteen bytes). An amount, one
+// mask byte, then six present GUID bytes -- which is why the inherited handler,
+// reading a raw eight-byte GUID for sixteen bytes total, could never have parsed
+// it. One gold into a guild bank whose gameobject GUID is 0xF113426F0000070F.
+static void test_guild_bank_deposit_money_matches_capture()
+{
+    std::vector<uint8_t> const body =
+        { 0x10, 0x27, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+          0x7E, 0x06, 0x6E, 0x43, 0x0E, 0xF0, 0x12 };
+
+    WorldPacket packet = InputPacket(CMSG_GUILD_BANK_DEPOSIT_MONEY, body);
+    uint64 money = 0;
+    ObjectGuid guid(UINT64_C(0xFFFFFFFFFFFFFFFF));
+    CHECK(MopCompactPackets::ReadGuildBankDepositMoney(packet, money, guid));
+    CHECK(money == 10000);
+    CHECK(guid.GetRawValue() == UINT64_C(0xF113426F0000070F));
+    CHECK(packet.rpos() == packet.size());
+
+    // The same guards the sibling reader carries: a short body, a length that
+    // disagrees with the mask popcount, a present byte that XOR-decodes to zero,
+    // an all-zero GUID, and trailing bytes.
+    std::vector<std::vector<uint8_t>> malformed;
+    for (size_t size = 0; size < body.size(); ++size)
+    {
+        malformed.emplace_back(body.begin(), body.begin() + size);
+    }
+    std::vector<uint8_t> trailing = body;
+    trailing.push_back(0x00);
+    malformed.push_back(trailing);
+    malformed.push_back({ 0x10, 0x27, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+                          0x7E, 0x01, 0x6E, 0x43, 0x0E, 0xF0, 0x12 }); // decodes to zero
+    malformed.push_back({ 0x10, 0x27, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+                          0x00 });                                     // all-zero GUID
+
+    for (std::vector<uint8_t> const& bad : malformed)
+    {
+        WorldPacket rejected = InputPacket(CMSG_GUILD_BANK_DEPOSIT_MONEY, bad);
+        uint64 rejectedMoney = 0;
+        ObjectGuid rejectedGuid(UINT64_C(0xFFFFFFFFFFFFFFFF));
+        CHECK(!MopCompactPackets::ReadGuildBankDepositMoney(rejected, rejectedMoney, rejectedGuid));
+        CHECK(rejected.rpos() == rejected.size());
+        CHECK(rejectedGuid.GetRawValue() == UINT64_C(0xFFFFFFFFFFFFFFFF));
+    }
+}
+
 static void test_combo_points_packet()
 {
     WorldPacket packet;
@@ -2225,6 +2271,7 @@ int main(int /*argc*/, char** /*argv*/)
     test_guild_banker_activate_retail_bodies();
     test_guild_banker_activate_rejects_malformed_bodies();
     test_pre_resurrect_packet();
+    test_guild_bank_deposit_money_matches_capture();
     test_combo_points_packet();
     test_instance_reset_result_bodies();
 

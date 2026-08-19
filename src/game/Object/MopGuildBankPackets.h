@@ -186,6 +186,32 @@ namespace MopGuildBankPackets
         }
         return true;
     }
+
+    /// SMSG_GUILD_EVENT_BANK_MONEY_CHANGED (0x0F68): the guild bank's NEW TOTAL
+    /// as a uint64, and nothing else. All 143 build-18414 observations are
+    /// exactly eight bytes.
+    ///
+    /// Total rather than delta is settled by the client, not by arithmetic: the
+    /// handler at 0x966DFF/0x966E0E ASSIGNS the two words into dword_1204BC0 and
+    /// dword_1204BC4 -- mov, not add -- and those are the globals the Lua binding
+    /// GetGuildBankMoney reads back at 0x96E877. Do not try to confirm it by
+    /// differencing captures: in capture-000888 the reply at sequence 307424
+    /// reads 1,105,669,092 against 1,105,653,566 at the preceding 307424-bearing
+    /// event, a gap of 15,526 for a deposit of 10,000, because other members were
+    /// moving money in between. An earlier version of this comment claimed that
+    /// gap was exactly the deposit; it is not.
+    ///
+    /// This is what retail sends on a money change. It does NOT send a bank
+    /// list: no SMSG_GUILD_BANK_LIST follows that deposit at all, and the client
+    /// re-queries its own allowance with CMSG_GUILD_BANK_MONEY_WITHDRAWN_QUERY.
+    /// Body only, like every other builder here -- the caller owns the opcode.
+    /// Keeping WorldPacket and Opcodes out of this header is what lets the
+    /// packet fixtures compile against it alone.
+    inline void BuildGuildBankMoneyChanged(ByteBuffer& out, uint64 bankMoney)
+    {
+        out << uint64(bankMoney);
+    }
+
 }
 
 #endif

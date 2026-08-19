@@ -1394,6 +1394,22 @@ void InitializeOpcodes()
     // constant; sending 0 would have shown every opened lockbox as still locked.
     // The body itself decodes byte-exact across all 607 build-18414 replies in
     // the corpus, 12,261 item records.
+
+    // Depositing and withdrawing gold. The inherited handlers read a raw
+    // eight-byte GUID for sixteen bytes total; the single retail deposit in the
+    // corpus is fifteen (capture-000888 seq 307413), an amount then a packed
+    // GUID, so they could not have parsed one. Both readers come from the
+    // client's own writers -- sub_68E68D and sub_68D659 -- and the deposit one
+    // reproduces that capture exactly. No capture of the withdraw body exists,
+    // so its orders rest on the writer alone.
+    //
+    // The reply is SMSG_GUILD_EVENT_BANK_MONEY_CHANGED, eight bytes carrying the
+    // new bank total, which is what retail answers a money change with. It does
+    // not send a bank list, and the broadcast that used to do so is gone.
+    DefC(CMSG_GUILD_BANK_DEPOSIT_MONEY, "CMSG_GUILD_BANK_DEPOSIT_MONEY", STATUS_LOGGEDIN, PROCESS_THREADUNSAFE, &WorldSession::HandleGuildBankDepositMoney);
+    DefC(CMSG_GUILD_BANK_WITHDRAW_MONEY, "CMSG_GUILD_BANK_WITHDRAW_MONEY", STATUS_LOGGEDIN, PROCESS_THREADUNSAFE, &WorldSession::HandleGuildBankWithdrawMoney);
+    DefS(SMSG_GUILD_EVENT_BANK_MONEY_CHANGED, "SMSG_GUILD_EVENT_BANK_MONEY_CHANGED");
+
     DefC(CMSG_GUILD_BANKER_ACTIVATE, "CMSG_GUILD_BANKER_ACTIVATE", STATUS_LOGGEDIN, PROCESS_THREADUNSAFE, &WorldSession::HandleGuildBankerActivate);
     DefC(CMSG_GUILD_BANK_QUERY_TAB, "CMSG_GUILD_BANK_QUERY_TAB", STATUS_LOGGEDIN, PROCESS_THREADUNSAFE, &WorldSession::HandleGuildBankQueryTab);
     DefS(SMSG_GUILD_BANK_LIST, "SMSG_GUILD_BANK_LIST");

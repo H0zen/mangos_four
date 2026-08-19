@@ -59,9 +59,109 @@
 #include "GossipDef.h"
 #include "SocialMgr.h"
 #include "Calendar.h"
+#include "MopGuildBankPackets.h"
 #ifdef ENABLE_ELUNA
 #include "LuaEngine.h"
 #endif /* ENABLE_ELUNA */
+
+namespace
+{
+    /// Retail answers a guild bank money change with the new total and nothing
+    /// else -- capture-000888 sequence 307424, eight bytes, after a deposit at
+    /// 307413. It does NOT push a bank list: none follows that deposit at all,
+    /// and the client re-queries its own remaining allowance itself with
+    /// CMSG_GUILD_BANK_MONEY_WITHDRAWN_QUERY. The inherited handlers pushed a
+    /// full bank list to every online member here, which is traffic no retail
+    /// server produces and would have cost a thirty-member guild thirty-one
+    /// packets per deposit.
+    void BroadcastGuildBankMoney(Guild* guild)
+    {
+        WorldPacket data(SMSG_GUILD_EVENT_BANK_MONEY_CHANGED, 8);
+        MopGuildBankPackets::BuildGuildBankMoneyChanged(data, guild->GetGuildBankMoney());
+        guild->BroadcastPacket(&data);
+    }
+
+    /// CommitTransactionDirect returning false is ambiguous: the statements may
+    /// have been rolled back, leaving nothing durable, or the COMMIT may have
+    /// applied and only its result been unreadable. Both balances have already
+    /// been published to memory by this point, and no ordering of those two
+    /// mutations is safe against both outcomes -- so do not guess. Read what the
+    /// database actually holds for each and adopt it, which makes the character
+    /// save that follows a no-op either way.
+    ///
+    /// If either balance cannot be re-read there is no safe value to hold, and
+    /// the logout save would persist whichever way it is currently wrong.
+    /// Discard the session's character state instead: losing unsaved progress is
+    /// cheaper than minting or burning gold.
+    void RecoverGuildBankMoneyAfterFailedCommit(WorldSession* session,
+        Guild* guild, uint32 guildId, char const* opcodeName)
+    {
+        Player* player = session->GetPlayer();
+        bool recovered = true;
+
+        if (QueryResult* durable = CharacterDatabase.PQuery(
+            "SELECT `money` FROM `characters` WHERE `guid` = '%u'", player->GetGUIDLow()))
+        {
+            player->SetMoney((*durable)[0].GetUInt64());
+            delete durable;
+        }
+        else
+        {
+            recovered = false;
+        }
+
+        if (QueryResult* durable = CharacterDatabase.PQuery(
+            "SELECT `BankMoney` FROM `guild` WHERE `guildid` = '%u'", guildId))
+        {
+            guild->AdoptBankMoneyFromDB((*durable)[0].GetUInt64());
+            delete durable;
+        }
+        else
+        {
+            // The bank total in memory may now disagree with the row and there
+            // is no way to tell. Left alone, the next deposit by ANY member adds
+            // to it and writes the result out durably, so the error compounds
+            // and lands on someone else. Refuse money operations until the guild
+            // is reloaded.
+            guild->MarkBankMoneyUntrusted();
+            recovered = false;
+        }
+
+        // A withdraw moves a third balance: the member's remaining daily
+        // allowance, decremented in memory and queued in the same transaction by
+        // Guild::MemberMoneyWithdraw. Re-read it too, or a rolled-back withdraw
+        // leaves the player charged for an allowance they never spent.
+        if (QueryResult* durable = CharacterDatabase.PQuery(
+            "SELECT `BankRemMoney` FROM `guild_member` WHERE `guildid` = '%u' AND `guid` = '%u'",
+            guildId, player->GetGUIDLow()))
+        {
+            guild->AdoptMemberRemainingWithdrawFromDB(player->GetGUIDLow(),
+                (*durable)[0].GetUInt32());
+            delete durable;
+        }
+        else
+        {
+            recovered = false;
+        }
+
+        if (!recovered)
+        {
+            sLog.outError("%s: could not re-read the durable balances for player %u "
+                "and guild %u after a failed commit; discarding in-memory character state",
+                opcodeName, player->GetGUIDLow(), guildId);
+            session->SuppressCharacterSave();
+        }
+        else
+        {
+            sLog.outBasic("%s: commit could not be confirmed for player %u and guild %u; "
+                "all three balances re-read from the database",
+                opcodeName, player->GetGUIDLow(), guildId);
+        }
+
+        session->KickPlayer();
+    }
+}
+
 
 void WorldSession::HandleGuildQueryOpcode(WorldPacket& recvPacket)
 {
@@ -1304,8 +1404,12 @@ void WorldSession::HandleGuildBankDepositMoney(WorldPacket& recv_data)
     DEBUG_LOG("WORLD: Received (CMSG_GUILD_BANK_DEPOSIT_MONEY)");
 
     ObjectGuid goGuid;
-    uint64 money;
-    recv_data >> goGuid >> money;
+    uint64 money = 0;
+    if (!MopCompactPackets::ReadGuildBankDepositMoney(recv_data, money, goGuid))
+    {
+        DEBUG_LOG("WORLD: Rejected malformed CMSG_GUILD_BANK_DEPOSIT_MONEY");
+        return;
+    }
 
     if (!money)
     {
@@ -1334,13 +1438,38 @@ void WorldSession::HandleGuildBankDepositMoney(WorldPacket& recv_data)
         return;
     }
 
-    CharacterDatabase.BeginTransaction();
+    // Refuse while the bank total is untrusted: an earlier ambiguous commit left
+    // memory possibly disagreeing with the row and the row could not be re-read,
+    // so any arithmetic on it would write a wrong total durably.
+    if (!pGuild->IsBankMoneyTrusted())
+    {
+        sLog.outError("%s: refused for player %u -- guild %u bank total is untrusted "
+            "after an unrecoverable commit; reload the guild",
+            "CMSG_GUILD_BANK_DEPOSIT_MONEY", GetPlayer()->GetGUIDLow(), GuildId);
+        return;
+    }
+
+    // Gated, as the mail money paths are. Without an active transaction the
+    // writes below queue on the async thread while the recovery reads come from
+    // a different pooled connection, so the recovery would adopt values those
+    // writes then overwrite.
+    if (!CharacterDatabase.BeginTransaction())
+    {
+        sLog.outError("%s: could not begin a transaction for player %u",
+            "CMSG_GUILD_BANK_DEPOSIT_MONEY", GetPlayer()->GetGUIDLow());
+        return;
+    }
 
     pGuild->SetBankMoney(pGuild->GetGuildBankMoney() + money);
     GetPlayer()->ModifyMoney(-int64(money));
     GetPlayer()->SaveGoldToDB();
 
-    CharacterDatabase.CommitTransaction();
+    if (!CharacterDatabase.CommitTransactionDirect())
+    {
+        RecoverGuildBankMoneyAfterFailedCommit(this, pGuild, GuildId,
+            "CMSG_GUILD_BANK_DEPOSIT_MONEY");
+        return;
+    }
 
     // logging money
     if (_player->GetSession()->GetSecurity() > SEC_PLAYER && sWorld.getConfig(CONFIG_BOOL_GM_LOG_TRADE))
@@ -1360,8 +1489,7 @@ void WorldSession::HandleGuildBankDepositMoney(WorldPacket& recv_data)
     //}
 #endif
 
-    pGuild->DisplayGuildBankTabsInfo(this, 0);
-    pGuild->DisplayGuildBankMoneyUpdate();
+    BroadcastGuildBankMoney(pGuild);
 }
 
 void WorldSession::HandleGuildBankWithdrawMoney(WorldPacket& recv_data)
@@ -1369,8 +1497,12 @@ void WorldSession::HandleGuildBankWithdrawMoney(WorldPacket& recv_data)
     DEBUG_LOG("WORLD: Received (CMSG_GUILD_BANK_WITHDRAW_MONEY)");
 
     ObjectGuid goGuid;
-    uint64 money;
-    recv_data >> goGuid >> money;
+    uint64 money = 0;
+    if (!MopCompactPackets::ReadGuildBankWithdrawMoney(recv_data, money, goGuid))
+    {
+        DEBUG_LOG("WORLD: Rejected malformed CMSG_GUILD_BANK_WITHDRAW_MONEY");
+        return;
+    }
 
     if (!money)
     {
@@ -1394,6 +1526,17 @@ void WorldSession::HandleGuildBankWithdrawMoney(WorldPacket& recv_data)
         return;
     }
 
+    // Refuse while the bank total is untrusted: an earlier ambiguous commit left
+    // memory possibly disagreeing with the row and the row could not be re-read,
+    // so any arithmetic on it would write a wrong total durably.
+    if (!pGuild->IsBankMoneyTrusted())
+    {
+        sLog.outError("%s: refused for player %u -- guild %u bank total is untrusted "
+            "after an unrecoverable commit; reload the guild",
+            "CMSG_GUILD_BANK_WITHDRAW_MONEY", GetPlayer()->GetGUIDLow(), GuildId);
+        return;
+    }
+
     if (pGuild->GetGuildBankMoney() < money)                // not enough money in bank
     {
         return;
@@ -1404,7 +1547,32 @@ void WorldSession::HandleGuildBankWithdrawMoney(WorldPacket& recv_data)
         return;
     }
 
-    CharacterDatabase.BeginTransaction();
+    // Refuse before anything moves, the way every other money-in path in this
+    // core does -- selling to a vendor and taking mail money both check the cap
+    // and return with EQUIP_ERR_TOO_MUCH_GOLD before mutating. ModifyMoney
+    // CLAMPS to MAX_MONEY_AMOUNT and only reports the error afterwards, so
+    // debiting the bank first and adding second destroys the difference: a
+    // player near the cap withdrawing a large balance empties the guild bank
+    // durably and receives only what fits, with a clean commit and nothing to
+    // tell either party the rest ceased to exist. The client cannot prevent it
+    // either -- PickupGuildBankMoney checks the bank total and the absolute cap,
+    // never the withdrawer's current money.
+    if (GetPlayer()->GetMoney() >= MAX_MONEY_AMOUNT - money)
+    {
+        GetPlayer()->SendEquipError(EQUIP_ERR_TOO_MUCH_GOLD, nullptr, nullptr);
+        return;
+    }
+
+    // Gated, as the mail money paths are. Without an active transaction the
+    // writes below queue on the async thread while the recovery reads come from
+    // a different pooled connection, so the recovery would adopt values those
+    // writes then overwrite.
+    if (!CharacterDatabase.BeginTransaction())
+    {
+        sLog.outError("%s: could not begin a transaction for player %u",
+            "CMSG_GUILD_BANK_WITHDRAW_MONEY", GetPlayer()->GetGUIDLow());
+        return;
+    }
 
     if (!pGuild->MemberMoneyWithdraw(money, GetPlayer()->GetGUIDLow()))
     {
@@ -1415,14 +1583,17 @@ void WorldSession::HandleGuildBankWithdrawMoney(WorldPacket& recv_data)
     GetPlayer()->ModifyMoney(money);
     GetPlayer()->SaveGoldToDB();
 
-    CharacterDatabase.CommitTransaction();
+    if (!CharacterDatabase.CommitTransactionDirect())
+    {
+        RecoverGuildBankMoneyAfterFailedCommit(this, pGuild, GuildId,
+            "CMSG_GUILD_BANK_WITHDRAW_MONEY");
+        return;
+    }
 
     // Log
     pGuild->LogBankEvent(GUILD_BANK_LOG_WITHDRAW_MONEY, uint8(0), GetPlayer()->GetGUIDLow(), money);
 
-    pGuild->SendMoneyInfo(this, GetPlayer()->GetGUIDLow());
-    pGuild->DisplayGuildBankTabsInfo(this, 0);
-    pGuild->DisplayGuildBankMoneyUpdate();
+    BroadcastGuildBankMoney(pGuild);
 }
 
 void WorldSession::HandleGuildBankSwapItems(WorldPacket& recv_data)

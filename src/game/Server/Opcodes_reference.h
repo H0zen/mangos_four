@@ -574,7 +574,7 @@ typedef uint16_t uint16;
  *   SMSG_GUILD_RENAMED                             0x0E70  DORMANT  [low-conf]
  *   SMSG_UNKNOWN_0x0E71                            0x0E71  DOC      [low-conf]
  *   SMSG_UNKNOWN_0x0EF0                            0x0EF0  DOC      [low-conf]
- *   SMSG_GUILD_EVENT_BANK_MONEY_CHANGED            0x0F68  DORMANT  [low-conf]
+ *   SMSG_GUILD_EVENT_BANK_MONEY_CHANGED            0x0F68  ACTIVE   [high-conf]  8 bytes, new bank total; 143/143 corpus bodies
  *   SMSG_GUILD_NEWS_DELETED                        0x0F70  DORMANT  [medium-conf]
  *   SMSG_GUILD_INVITE                              0x0F71  ACTIVE   [high-conf]  reader sub_69E959; byte-exact vs capture-000499 seq 777
  *   SMSG_GUILD_XP_GAIN                             0x0FE0  DORMANT  [low-conf]
@@ -1544,7 +1544,7 @@ typedef uint16_t uint16;
  *   CMSG_BLACKMARKET_HELLO                         0x075A  DOC
  *   CMSG_SET_TAXI_BENCHMARK_MODE                   0x0762  DORMANT
  *   CMSG_BATTLEMASTER_JOIN                         0x0769  DORMANT
- *   CMSG_GUILD_BANK_DEPOSIT_MONEY                  0x0770  DORMANT
+ *   CMSG_GUILD_BANK_DEPOSIT_MONEY                  0x0770  ACTIVE   reader sub_68E68D; byte-exact vs capture-000888 seq 307413
  *   CMSG_SET_FACTION_INACTIVE                      0x0778  DORMANT
  *   CMSG_QUESTLOG_REMOVE_QUEST                     0x0779  ACTIVE
  *   CMSG_GET_MAIL_LIST                             0x077A  ACTIVE
@@ -1553,7 +1553,7 @@ typedef uint16_t uint16;
  *   CMSG_QUESTGIVER_CHOOSE_REWARD                  0x07CB  ACTIVE
  *   CMSG_PET_ABANDON                               0x07D0  DORMANT
  *   CMSG_TEXT_EMOTE                                0x07E9  ACTIVE
- *   CMSG_GUILD_BANK_WITHDRAW_MONEY                 0x07EA  DORMANT
+ *   CMSG_GUILD_BANK_WITHDRAW_MONEY                 0x07EA  ACTIVE   reader sub_68D659; NO corpus body exists, writer-derived only
  *   CMSG_UNKNOWN_0x07EB                            0x07EB  DOC
  *   CMSG_ALTER_APPEARANCE                          0x07F0  ACTIVE
  *   CMSG_REQUEST_PARTY_MEMBER_STATS                0x0806  ACTIVE
